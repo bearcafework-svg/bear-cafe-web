@@ -1,0 +1,99 @@
+project_id = "itulsrbsluwdqwakldjs"
+
+[functions.discord-auth]
+verify_jwt = false
+
+[functions.discord-callback]
+verify_jwt = false
+
+[functions.discord-voice-state]
+verify_jwt = false
+
+[functions.discord-voice-webhook]
+verify_jwt = false
+
+# Deprecated legacy session webhook. Keep deployed only to emit clear migration errors and legacy markers.
+[functions.discord-webhook]
+verify_jwt = true
+
+# Primary session messaging endpoint. Messages that require buttons/components must go through the Bot API here.
+[functions.send-session-webhook]
+verify_jwt = false
+
+[functions.discord-roles]
+verify_jwt = false
+
+[functions.discord-member-count]
+verify_jwt = false
+
+[functions.cleanup-sessions]
+verify_jwt = false
+
+[functions.cleanup-voice-states]
+verify_jwt = false
+
+[functions.session-create]
+verify_jwt = false
+
+[functions.session-cancel]
+verify_jwt = false
+
+[functions.complete-expired-sessions]
+verify_jwt = false
+
+[functions.tag-warn-logs]
+verify_jwt = false
+
+[functions.tag-warn-ingest]
+verify_jwt = false
+
+[functions.sync-discord-profile]
+verify_jwt = false
+
+[functions.transfer-roles]
+verify_jwt = false
+
+[functions.bdfd-api]
+verify_jwt = false
+
+[functions.migrate-drive-images]
+verify_jwt = false
+
+[functions.trading-history-ingest]
+verify_jwt = false
+
+[functions.migrate-slip-images]
+verify_jwt = false
+
+[functions.trading-history-slip-update]
+verify_jwt = false
+
+[functions.upload-slip-image]
+verify_jwt = false
+
+[functions.gacha-spin]
+verify_jwt = false
+
+[functions.process-match-reward]
+verify_jwt = false
+
+[functions.grant-discord-role]
+verify_jwt = false
+
+[functions.check-user-warn-role]
+verify_jwt = false
+
+[functions.get-user-discord-roles]
+verify_jwt = false
+
+[functions.discord-users]
+verify_jwt = false
+
+[functions.bulk-role-manage]
+verify_jwt = false
+
+[functions.redeem-code]
+verify_jwt = false
+
+[functions.tag-warn-cancel-sync]
+verify_jwt = false
