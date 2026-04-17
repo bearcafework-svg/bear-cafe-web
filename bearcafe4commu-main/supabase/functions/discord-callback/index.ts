@@ -162,22 +162,26 @@ Deno.serve(async (req): Promise<Response> => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const adminBanStart = performance.now();
-    const adminBanResult = await supabase
-      .from("profiles")
-      .select("id, is_banned, role")
-      .eq("discord_id", discordUser.id)
-      .maybeSingle();
-    timing("db_adminban", adminBanStart);
+    // Run DB profile lookup + guild member fetch + role-ban check in parallel
+    const memberFetchStart = performance.now();
+    const [adminBanResult, memberResponse] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, is_banned, role")
+        .eq("discord_id", discordUser.id)
+        .maybeSingle(),
+      discordFetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${discordUser.id}`,
+        { headers: { Authorization: `Bot ${botToken}` } },
+      ),
+    ]);
+    timing("parallel_db_member", memberFetchStart);
 
     if (adminBanResult.error) {
-      log('error', 'Failed to fetch existing profile', { error: adminBanResult.error.message, code: adminBanResult.error.code });
+      log('error', 'Failed to fetch existing profile', { error: adminBanResult.error.message });
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
@@ -188,17 +192,6 @@ Deno.serve(async (req): Promise<Response> => {
       log('warn', 'User is admin-banned');
       return jsonResponse({ ok: false, error_type: "banned_admin" });
     }
-
-    const memberStart = performance.now();
-    const memberResponse = await discordFetch(
-      `https://discord.com/api/v10/guilds/${guildId}/members/${discordUser.id}`,
-      {
-        headers: {
-          Authorization: `Bot ${botToken}`,
-        },
-      },
-    );
-    timing("fetch_member", memberStart);
 
     if (memberResponse.status === 404) {
       log('warn', 'User is not a member of the guild');
@@ -216,8 +209,8 @@ Deno.serve(async (req): Promise<Response> => {
     const roleBanDecision = await isRoleBanned(discordUser.id, guildId, botToken);
     if (roleBanDecision.banned) {
       log('warn', 'User is role-banned', { reason: roleBanDecision.reason, roleName: roleBanDecision.bannedRoleName });
-      return jsonResponse({ 
-        ok: false, 
+      return jsonResponse({
+        ok: false,
         error_type: "banned_role",
         banned_role_name: roleBanDecision.bannedRoleName || null,
       });
@@ -402,8 +395,8 @@ Deno.serve(async (req): Promise<Response> => {
     timing("profile_upsert", profileStart);
     log('info', 'Profile upserted', { profileId: profile.id, username: displayName });
 
-    // Log action + update metadata with Discord access token for guilds API (non-blocking)
-    await Promise.all([
+    // Fire-and-forget: log + metadata update ไม่ต้องรอ ไม่กระทบ response time
+    Promise.all([
       supabase.from('action_logs').insert({
         user_id: profile.id,
         action_type: 'login',
@@ -416,10 +409,8 @@ Deno.serve(async (req): Promise<Response> => {
           avatar_url: avatarUrl,
           discord_access_token: tokenData.access_token,
         },
-      }).then(({ error }) => {
-        if (error) log('warn', 'Failed to update user metadata', { error: error.message });
       }),
-    ]);
+    ]).catch((err) => log('warn', 'Non-critical post-login task failed', { error: String(err) }));
 
     // Ensure we have a session
     if (!session) {

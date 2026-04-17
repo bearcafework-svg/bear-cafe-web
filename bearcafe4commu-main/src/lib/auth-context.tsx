@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { withRetry } from '@/lib/retry';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
@@ -37,61 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Fetch user roles from database (server-side validated via RLS)
-  // DB role mapping:
-  //   'moderator' → is_owner  (full admin access, enters /admin)
-  //   'admin'     → is_admin  (enters /admin, limited by allowed_pages)
-  const fetchUserRoles = async (userId: string): Promise<{ is_admin: boolean; is_owner: boolean }> => {
-    try {
-      return await withRetry(async () => {
-        const { data: roles, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId);
-        if (error) throw error;
-
-        const roleSet = new Set(roles?.map(r => r.role) || []);
-        return {
-          // 'moderator' = Owner — full access, bypasses all page restrictions
-          is_owner: roleSet.has('moderator'),
-          // 'admin' = Staff — enters /admin but limited by allowed_pages
-          is_admin: roleSet.has('admin'),
-        };
-      });
-    } catch (error) {
-      console.error('Failed to fetch user roles:', error);
-      return { is_admin: false, is_owner: false };
-    }
-  };
-
-  // Fetch user's custom permissions (allowed_pages)
-  // ใช้สำหรับควบคุม feature ภายใน /admin เท่านั้น
-  // ไม่ใช้ตัดสินว่าเข้า /admin ได้หรือไม่
-  const fetchUserCustomPermissions = async (userId: string): Promise<string[]> => {
-    try {
-      return await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('user_custom_permissions')
-          .select('custom_permissions(allowed_pages)')
-          .eq('user_id', userId);
-        if (error) throw error;
-
-        if (!data || data.length === 0) return [];
-
-        const allPages = new Set<string>();
-        data.forEach((row: any) => {
-          const pages = row.custom_permissions?.allowed_pages;
-          if (Array.isArray(pages)) {
-            pages.forEach((p: string) => allPages.add(p));
-          }
-        });
-        return Array.from(allPages);
-      });
-    } catch (error) {
-      console.error('Failed to fetch custom permissions:', error);
-      return [];
-    }
-  };
   const buildFallbackUser = (sessionUser: SupabaseUser): User => {
     const metadata = sessionUser.user_metadata || {};
     return {
@@ -111,17 +55,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (sessionUser: SupabaseUser): Promise<User | null> => {
     console.log('[Auth] Fetching profile for user:', sessionUser.id);
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
-      .eq('id', sessionUser.id)
-      .maybeSingle();
 
-    if (error) {
-      console.error('[Auth] Profile fetch error:', error);
-      throw error;
+    // รวม profile + roles + permissions เป็น 3 queries parallel แทน sequential
+    const [profileResult, rolesResult, permResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
+        .eq('id', sessionUser.id)
+        .maybeSingle(),
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', sessionUser.id),
+      supabase
+        .from('user_custom_permissions')
+        .select('custom_permissions(allowed_pages)')
+        .eq('user_id', sessionUser.id),
+    ]);
+
+    if (profileResult.error) {
+      console.error('[Auth] Profile fetch error:', profileResult.error);
+      throw profileResult.error;
     }
-    
+
+    const profile = profileResult.data;
     if (!profile) {
       console.warn('[Auth] Profile not found for user:', sessionUser.id);
       return null;
@@ -129,11 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log('[Auth] Profile loaded:', profile.username);
 
-    // Fetch roles + permissions in parallel (faster, prevents stale data)
-    const [roles, allowedPages] = await Promise.all([
-      fetchUserRoles(profile.id),
-      fetchUserCustomPermissions(profile.id),
-    ]);
+    // Roles
+    const roleSet = new Set((rolesResult.data ?? []).map((r: any) => r.role));
+    const is_owner = roleSet.has('moderator');
+    const is_admin = roleSet.has('admin');
+
+    // Permissions
+    const allPages = new Set<string>();
+    (permResult.data ?? []).forEach((row: any) => {
+      const pages = row.custom_permissions?.allowed_pages;
+      if (Array.isArray(pages)) pages.forEach((p: string) => allPages.add(p));
+    });
 
     return {
       id: profile.id,
@@ -142,11 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       avatar_url: profile.avatar_url,
       banner_url: profile.banner_url,
       discord_id: profile.discord_id,
-      is_admin: roles.is_admin,
-      is_owner: roles.is_owner,
+      is_admin,
+      is_owner,
       is_banned: profile.is_banned || false,
       ban_reason: profile.ban_reason,
-      allowed_pages: allowedPages,
+      allowed_pages: Array.from(allPages),
     };
   };
 
