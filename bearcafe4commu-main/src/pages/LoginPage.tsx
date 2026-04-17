@@ -27,6 +27,8 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
   }, [siteKey]);
 
   const handleLogin = async () => {
+    // Guard: ป้องกัน double-click ระหว่างที่กำลัง redirect อยู่
+    if (isLoginClicked) return;
     setIsLoginClicked(true);
 
     try {
@@ -41,15 +43,22 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
           }
         } catch (turnstileError) {
           console.warn('[Login] Turnstile execute failed, using bypass:', turnstileError);
+          // Reset widget so next attempt gets a fresh challenge
+          turnstileRef.current?.reset();
         }
       } else {
         console.log('[Login] Turnstile not ready or no site key, using bypass');
       }
 
       await login(token);
+      // login() redirects via window.location.href — if we reach here it means
+      // we're in iframe mode (new window opened). Reset state so user can retry.
+      setIsLoginClicked(false);
     } catch (error) {
       console.error('[Login] Error:', error);
+      // Always reset so the button becomes clickable again
       setIsLoginClicked(false);
+      turnstileRef.current?.reset();
       toast.error('ไม่สามารถติดต่อระบบยืนยันตัวตนได้ กรุณาลองใหม่อีกครั้ง');
     }
   };
@@ -131,6 +140,9 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
               ))}
             </div>
 
+            {/* Turnstile — mount ก่อนปุ่ม Login เพื่อให้ widget พร้อมก่อนที่ผู้ใช้จะกด */}
+            <TurnstileWidget ref={turnstileRef} siteKey={siteKey} action="login" />
+
             {/* Discord Login Button - More Prominent with animation */}
             <div className="animate-fade-in" style={{ animationDelay: '400ms' }}>
               <Button
@@ -148,8 +160,6 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
                 เข้าสู่ระบบด้วย Discord
               </Button>
             </div>
-            <TurnstileWidget ref={turnstileRef} siteKey={siteKey} action="login" />
-
             {/* Notice */}
             <p className="text-xs sm:text-sm text-center text-muted-foreground animate-fade-in" style={{ animationDelay: '450ms' }}>
               เมื่อเข้าสู่ระบบ แสดงว่าคุณยอมรับ

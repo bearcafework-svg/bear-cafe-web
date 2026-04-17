@@ -90,7 +90,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
     const [isWidgetReady, setIsWidgetReady] = useState(false);
     const initAttemptedRef = useRef(false);
     const errorCountRef = useRef(0);
-    const FALLBACK_THRESHOLD = 1; // Reduced from 2 for faster fallback
+    const FALLBACK_THRESHOLD = 2;
     useEffect(() => {
       if (initAttemptedRef.current) return;
       initAttemptedRef.current = true;
@@ -141,9 +141,14 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
               rejectRef.current = null;
             },
             'expired-callback': () => {
+              console.warn('[Turnstile] Token expired, resetting widget');
               rejectRef.current?.(new Error('Turnstile expired'));
               resolveRef.current = null;
               rejectRef.current = null;
+              // Reset so the next execute() gets a fresh token
+              if (widgetIdRef.current) {
+                try { window.turnstile?.reset(widgetIdRef.current); } catch (_) { /* ignore */ }
+              }
             },
           });
 
@@ -198,7 +203,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
             resolve('TURNSTILE_BYPASS_DEV');
           }
 
-          // Timeout after 5 seconds (reduced from 15 for faster fallback)
+          // Timeout after 12 seconds — invisible Turnstile can take longer on slow networks
           setTimeout(() => {
             if (resolveRef.current) {
               console.log('[Turnstile] Execution timeout, using bypass');
@@ -206,7 +211,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
               resolveRef.current = null;
               rejectRef.current = null;
             }
-          }, 5000);
+          }, 12000);
         }),
       reset: () => {
         if (window.turnstile && widgetIdRef.current) {

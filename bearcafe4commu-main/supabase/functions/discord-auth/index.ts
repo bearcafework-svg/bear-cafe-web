@@ -25,21 +25,30 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const clientId = Deno.env.get('DISCORD_CLIENT_ID');
-    // DISCORD_REDIRECT_URI must be set in Supabase Edge Function secrets
+    // DISCORD_REDIRECT_URI should be set in Supabase Edge Function secrets
     // and must match exactly what is registered in Discord Developer Portal
-    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
+    // If not set, we'll accept redirectUri from client (less secure but backward compatible)
+    const configuredRedirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
     if (!clientId) {
       console.error('DISCORD_CLIENT_ID not configured');
       throw new Error('Discord OAuth not configured');
     }
 
-    if (!redirectUri) {
-      console.error('DISCORD_REDIRECT_URI not configured');
-      throw new Error('Discord redirect URI not configured');
+    const body = await req.json();
+    const { turnstileToken, redirectUrl } = body;
+    
+    // Use server-side env var if available, otherwise fall back to client-provided redirectUrl
+    const redirectUri = configuredRedirectUri || redirectUrl || `${new URL(req.url).origin}/auth/callback`;
+    
+    if (!configuredRedirectUri) {
+      console.warn('[discord-auth] DISCORD_REDIRECT_URI not configured, using client-provided redirectUrl. This is less secure. Please set DISCORD_REDIRECT_URI in Supabase secrets.');
     }
 
-    const { turnstileToken } = await req.json();
+    if (!redirectUri) {
+      console.error('No redirect URI available');
+      throw new Error('Discord redirect URI not configured');
+    }
 
     const turnstile = await verifyTurnstile(turnstileToken);
     if (!turnstile.success) {
