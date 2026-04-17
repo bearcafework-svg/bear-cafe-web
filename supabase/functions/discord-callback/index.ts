@@ -1,30 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-serve(async (req): Promise<Response> => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-
+serve(async (req) => {
   try {
     const { code } = await req.json();
-    
-    // ตรวจสอบค่าที่จำเป็น
-    const clientId = Deno.env.get('DISCORD_CLIENT_ID');
-    const clientSecret = Deno.env.get('DISCORD_CLIENT_SECRET');
-    const guildId = Deno.env.get('DISCORD_GUILD_ID');
-    const botToken = Deno.env.get('DISCORD_BOT_TOKEN');
-    // redirect_uri ต้องอ่านจาก env var เสมอ — ห้ามรับจาก client
-    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
-    if (!code || !clientId || !clientSecret || !redirectUri) {
-      return new Response(JSON.stringify({ error: "ข้อมูลไม่ครบถ้วน" }), { status: 400, headers: corsHeaders });
-    }
+    const clientId = Deno.env.get('DISCORD_CLIENT_ID')!;
+    const clientSecret = Deno.env.get('DISCORD_CLIENT_SECRET')!;
+    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI')!;
 
-    // 1. แลก Code เป็น Token
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // 1. exchange code
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -36,52 +26,76 @@ serve(async (req): Promise<Response> => {
         redirect_uri: redirectUri,
       }),
     });
+
     const tokenData = await tokenRes.json();
 
-    // 2. ดึงข้อมูล Profile จาก Discord
+    // 2. get user
     const userRes = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
+
     const discordUser = await userRes.json();
 
-    // 3. ดึงชื่อเล่นจาก Server
-    let nickname = discordUser.global_name || discordUser.username;
-    if (guildId && botToken) {
-      const memberRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordUser.id}`, {
-        headers: { Authorization: `Bot ${botToken}` },
-      });
-      if (memberRes.ok) {
-        const memberData = await memberRes.json();
-        nickname = memberData.nick || nickname;
-      }
-    }
-
-    // 4. บันทึกลงตาราง profiles (ย้ายจาก discord_username ไป nickname)
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    
-    const { data: profile, error: dbError } = await supabase
+    // 3. หา user จาก discord_id
+    let { data: existing } = await supabase
       .from('profiles')
-      .upsert({
-        id: crypto.randomUUID(),
-        discord_id: discordUser.id,
-        username: discordUser.username, // ชื่อจริง Discord
-        nickname: nickname,             // ชื่อเล่นในเซิร์ฟเวอร์
-        avatar_url: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'discord_id' })
-      .select()
+      .select('*')
+      .eq('discord_id', discordUser.id)
       .single();
 
-    if (dbError) throw dbError;
+    let userId: string;
 
-    return new Response(JSON.stringify({ ok: true, profile }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    });
+    if (!existing) {
+      // 🔥 สร้าง auth user เอง
+      const { data: newUser, error } = await supabase.auth.admin.createUser({
+        email: `${discordUser.id}@discord.local`,
+        email_confirm: true,
+        user_metadata: {
+          discord_id: discordUser.id
+        }
+      });
 
-  } catch (error: any) {
-    return new Response(JSON.stringify({ ok: false, error: error.message }), { 
-      status: 400, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    });
+      if (error) throw error;
+
+      userId = newUser.user.id;
+
+      // insert profile
+      await supabase.from('profiles').insert({
+        id: userId,
+        discord_id: discordUser.id,
+        username: discordUser.username,
+        avatar_url: discordUser.avatar
+          ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+          : null
+      });
+
+    } else {
+      userId = existing.id;
+
+      // update profile
+      await supabase.from('profiles').update({
+        username: discordUser.username
+      }).eq('id', userId);
+    }
+
+    // 4. สร้าง session
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: `${discordUser.id}@discord.local`
+      });
+
+    if (sessionError) throw sessionError;
+
+    return new Response(JSON.stringify({
+      ok: true,
+      redirect: sessionData.properties.action_link
+    }));
+
+  } catch (err: any) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: err.message
+    }), { status: 400 });
   }
 });
