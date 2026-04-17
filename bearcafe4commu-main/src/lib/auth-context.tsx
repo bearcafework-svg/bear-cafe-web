@@ -38,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Fetch user roles from database (server-side validated via RLS)
-  // 'moderator' role in DB = 'Owner' in UI (has full access)
+  // DB role mapping:
+  //   'moderator' → is_owner  (full admin access, enters /admin)
+  //   'admin'     → is_admin  (enters /admin, limited by allowed_pages)
   const fetchUserRoles = async (userId: string): Promise<{ is_admin: boolean; is_owner: boolean }> => {
     try {
       return await withRetry(async () => {
@@ -50,8 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const roleSet = new Set(roles?.map(r => r.role) || []);
         return {
-          is_admin: roleSet.has('admin'),
+          // 'moderator' = Owner — full access, bypasses all page restrictions
           is_owner: roleSet.has('moderator'),
+          // 'admin' = Staff — enters /admin but limited by allowed_pages
+          is_admin: roleSet.has('admin'),
         };
       });
     } catch (error) {
@@ -60,13 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Fetch user's custom permissions (allowed pages)
+  // Fetch user's custom permissions (allowed_pages)
+  // ใช้สำหรับควบคุม feature ภายใน /admin เท่านั้น
+  // ไม่ใช้ตัดสินว่าเข้า /admin ได้หรือไม่
   const fetchUserCustomPermissions = async (userId: string): Promise<string[]> => {
     try {
       return await withRetry(async () => {
         const { data, error } = await supabase
           .from('user_custom_permissions')
-          .select('permission_id, custom_permissions(allowed_pages)')
+          .select('custom_permissions(allowed_pages)')
           .eq('user_id', userId);
         if (error) throw error;
 
@@ -123,11 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log('[Auth] Profile loaded:', profile.username);
 
-    // Fetch roles (validated server-side)
-    const roles = await fetchUserRoles(profile.id);
-
-    // Fetch custom permissions (allowed pages)
-    const allowedPages = await fetchUserCustomPermissions(profile.id);
+    // Fetch roles + permissions in parallel (faster, prevents stale data)
+    const [roles, allowedPages] = await Promise.all([
+      fetchUserRoles(profile.id),
+      fetchUserCustomPermissions(profile.id),
+    ]);
 
     return {
       id: profile.id,

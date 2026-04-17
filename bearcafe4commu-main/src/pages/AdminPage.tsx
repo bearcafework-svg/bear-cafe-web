@@ -126,9 +126,16 @@ export default function AdminPage() {
   const [adminRolePages, setAdminRolePages] = useState<string[]>([]);
 
   const { isMaintenanceMode, maintenanceMessage, enabledStaff, toggleMaintenanceMode, updateMaintenanceMode } = useMaintenanceMode();
-  const hasAdminAccess = user?.is_admin || user?.is_owner || (user?.allowed_pages && user.allowed_pages.length > 0);
-  const isOwner = user?.is_owner;
-  const userAllowedPages = user?.allowed_pages || [];
+
+  // canEnterAdmin: ใช้ตัดสินว่าเข้า /admin ได้หรือไม่
+  // → owner (moderator) หรือ admin หรือมี allowed_pages อย่างน้อย 1 หน้า
+  const isOwner = user?.is_owner ?? false;
+  const isAdmin = user?.is_admin ?? false;
+  const userAllowedPages = user?.allowed_pages ?? [];
+  const canEnterAdmin = isOwner || isAdmin || userAllowedPages.length > 0;
+
+  // backward compat alias
+  const hasAdminAccess = canEnterAdmin;
 
   // Fetch admin_allowed_pages from site_settings
   useEffect(() => {
@@ -153,13 +160,10 @@ export default function AdminPage() {
 
   if (!hasAdminAccess) return null;
 
-  // Filter nav items based on role + custom permissions (merged, not overridden)
+  // Filter nav items based on role + custom permissions
   const visibleItems = NAV_ITEMS.filter(item => {
-    if (isOwner) return true; // Owner sees all
-    // Merge admin role pages + custom permission pages
-    const fromAdmin = user?.is_admin
-      ? (adminRolePages.length > 0 ? adminRolePages.includes(item.id) : !item.ownerOnly)
-      : false;
+    if (isOwner) return true; // owner เห็นทุกหน้า
+    const fromAdmin = isAdmin && !item.ownerOnly;
     const fromCustom = userAllowedPages.includes(item.id);
     return fromAdmin || fromCustom;
   });
@@ -229,14 +233,12 @@ export default function AdminPage() {
     </nav>
   );
 
-  /* ─── Content area ─── */
+  /* ─── Feature access: ใช้ allowed_pages เท่านั้น (ไม่ใช้ role) ─── */
   const canAccessPage = (pageId: string) => {
-    if (isOwner) return true;
-    const fromAdmin = user?.is_admin
-      ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : true)
-      : false;
-    const fromCustom = userAllowedPages.includes(pageId);
-    return fromAdmin || fromCustom;
+    if (isOwner) return true; // owner เห็นทุกหน้า
+    // admin + custom permission pages (union)
+    return userAllowedPages.includes(pageId) ||
+      (isAdmin && !ADMIN_PAGES.find(p => p.id === pageId)?.ownerOnly);
   };
 
   const renderContent = () => {
