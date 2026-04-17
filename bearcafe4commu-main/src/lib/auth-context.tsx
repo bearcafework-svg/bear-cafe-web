@@ -29,7 +29,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PROFILE_FETCH_TIMEOUT_MS = 8000;
+const PROFILE_FETCH_TIMEOUT_MS = 15000; // เพิ่มจาก 8s เป็น 15s รองรับ Supabase cold start
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -161,7 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
 
     if (!profile) {
-      console.warn('[Auth] Profile missing or timed out, using fallback user');
+      console.warn('[Auth] Profile fetch timed out — using fallback WITHOUT resetting roles');
+      // ถ้า user มี role อยู่แล้ว (เช่น refresh หน้า) ให้คงไว้ ไม่ reset เป็น false
       return buildFallbackUser(sessionUser);
     }
 
@@ -169,21 +170,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loadUserProfile = (sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean) => {
-    fetchUserProfileWithTimeout(sessionUser)
+    fetchUserProfile(sessionUser)
       .then((profile) => {
-        if (isMounted) {
+        if (!isMounted) return;
+        if (profile) {
           setUser(profile);
-          setIsLoading(false);
+        } else {
+          // profile ไม่มีใน DB — ใช้ fallback แต่ไม่ reset role
+          setUser(prev => prev ?? buildFallbackUser(sessionUser));
         }
+        setIsLoading(false);
       })
       .catch((error) => {
         console.error('[Auth] Failed to fetch user profile:', error);
-        if (isMounted) {
-          setUser(buildFallbackUser(sessionUser));
-          if (setLoading) {
-            setIsLoading(false);
-          }
-        }
+        if (!isMounted) return;
+        // error — คง user เดิมไว้ถ้ามี ไม่ reset role
+        setUser(prev => prev ?? buildFallbackUser(sessionUser));
+        if (setLoading) setIsLoading(false);
       });
   };
 
@@ -260,71 +263,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    let initComplete = false;
+    // ใช้ ref ป้องกัน loadUserProfile ซ้ำจาก onAuthStateChange + getSession
+    let profileLoaded = false;
 
     console.log('[Auth] Initializing auth context');
 
-    // Set up auth state listener FIRST - MUST be synchronous to avoid deadlock
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log('[Auth] State change:', event, 'user:', newSession?.user?.id);
-        
+
         if (!isMounted) return;
-        
-        // Update session immediately (synchronous)
+
         setSession(newSession);
-        
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSession(null);
+          setIsLoading(false);
+          profileLoaded = false;
+          return;
+        }
+
         if (newSession?.user) {
-          // CRITICAL: Use setTimeout to defer async operations and avoid deadlock
+          // TOKEN_REFRESHED: session ยังอยู่ ไม่ต้อง reload profile ใหม่
+          // จะ reload เฉพาะ SIGNED_IN (login ใหม่) หรือยังไม่เคยโหลด
+          if (event === 'TOKEN_REFRESHED' && profileLoaded) {
+            console.log('[Auth] Token refreshed, skipping profile reload');
+            return;
+          }
+
+          // INITIAL_SESSION จะถูก handle โดย getSession() ด้านล่างแทน
+          // เพื่อป้องกัน double load
+          if (event === 'INITIAL_SESSION') {
+            return;
+          }
+
+          profileLoaded = true;
           setTimeout(() => {
             if (!isMounted) return;
             loadUserProfile(newSession.user, isMounted, true);
           }, 0);
         } else {
           setUser(null);
-          // Only set loading false if init is complete (to avoid race condition)
-          if (initComplete) {
-            setIsLoading(false);
-          }
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSession(null);
           setIsLoading(false);
+          profileLoaded = false;
         }
       }
     );
 
-    // THEN check for existing session
+    // getSession เป็น single source of truth สำหรับ initial load
     supabase.auth.getSession().then(({ data: { session: existingSession }, error }) => {
       console.log('[Auth] Initial session check:', existingSession?.user?.id, 'error:', error?.message);
-      
+
       if (!isMounted) return;
-      
-      initComplete = true;
-      
+
       if (error) {
         console.error('[Auth] Session error:', error);
         setIsLoading(false);
         return;
       }
-      
+
       setSession(existingSession);
-      
+
       if (existingSession?.user) {
+        profileLoaded = true;
         loadUserProfile(existingSession.user, isMounted, true);
       } else {
-        // No session - user is not logged in
         console.log('[Auth] No existing session, user not logged in');
         setIsLoading(false);
       }
     }).catch((error) => {
       console.error('[Auth] Init error:', error);
-      if (isMounted) {
-        initComplete = true;
-        setIsLoading(false);
-      }
+      if (isMounted) setIsLoading(false);
     });
 
     return () => {
