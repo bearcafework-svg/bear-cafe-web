@@ -26,33 +26,41 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
     });
   }, [siteKey]);
 
-  const handleLogin = async () => {
-    setIsLoginClicked(true);
+const handleLogin = async () => {
+  setIsLoginClicked(true);
 
-    try {
-      let token = 'TURNSTILE_BYPASS_DEV';
-      
-      // Try to get a real token if Turnstile is available
-      if (siteKey && turnstileRef.current?.isReady()) {
-        try {
-          const turnstileToken = await turnstileRef.current.execute();
-          if (turnstileToken) {
-            token = turnstileToken;
-          }
-        } catch (turnstileError) {
-          console.warn('[Login] Turnstile execute failed, using bypass:', turnstileError);
+  try {
+    let token = 'TURNSTILE_BYPASS_DEV';
+
+    // เอา Turnstile เหมือนเดิม (ใช้ได้)
+    if (siteKey && turnstileRef.current?.isReady()) {
+      try {
+        const turnstileToken = await turnstileRef.current.execute();
+        if (turnstileToken) {
+          token = turnstileToken;
         }
-      } else {
-        console.log('[Login] Turnstile not ready or no site key, using bypass');
+      } catch (err) {
+        console.warn('[Login] Turnstile error:', err);
       }
-
-      await login(token);
-    } catch (error) {
-      console.error('[Login] Error:', error);
-      setIsLoginClicked(false);
-      toast.error('ไม่สามารถติดต่อระบบยืนยันตัวตนได้ กรุณาลองใหม่อีกครั้ง');
     }
-  };
+
+    // 🔥 จุดสำคัญ: เปลี่ยนจาก login() → redirect ไป Discord
+    const clientId = "998239118372917278"; // 👈 ใส่จริง
+    const redirectUri = "https://bearcafe4commu.vercel.app/auth/callback";
+
+    const url = `https://discord.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify`;
+
+    // (optional) ถ้าอยากส่ง token ไปด้วย (advanced)
+    // localStorage.setItem("turnstile_token", token);
+
+    window.location.href = url;
+
+  } catch (error) {
+    console.error('[Login] Error:', error);
+    setIsLoginClicked(false);
+    toast.error('ไม่สามารถติดต่อระบบยืนยันตัวตนได้ กรุณาลองใหม่อีกครั้ง');
+  }
+};
 
   const features = [
     { icon: Users, label: 'หาเพื่อนคุย', desc: 'เชื่อมต่อกับสมาชิกในชุมชน' },
