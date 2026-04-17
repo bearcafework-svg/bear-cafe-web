@@ -94,6 +94,7 @@ function AppRoutes() {
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       <Route path="/admin/lottery" element={<ProtectedRoute requireOwner={false}><AdminPage /></ProtectedRoute>} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       
       
       <Route path="*" element={<NotFound />} />
