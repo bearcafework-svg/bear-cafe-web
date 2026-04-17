@@ -62,7 +62,7 @@ serve(async (req): Promise<Response> => {
     const { data: profile, error: dbError } = await supabase
       .from('profiles')
       .upsert({
-        id: discordUser.id, // สมมติว่าใช้ Discord ID เป็น Primary Key หรือเชื่อมกับ Auth
+        id: crypto.randomUUID(),
         discord_id: discordUser.id,
         username: discordUser.username, // ชื่อจริง Discord
         nickname: nickname,             // ชื่อเล่นในเซิร์ฟเวอร์
