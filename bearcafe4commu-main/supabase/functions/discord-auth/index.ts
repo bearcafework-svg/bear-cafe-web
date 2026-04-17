@@ -25,13 +25,21 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const clientId = Deno.env.get('DISCORD_CLIENT_ID');
-    const { redirectUrl, turnstileToken } = await req.json();
-    const redirectUri = redirectUrl;
+    // DISCORD_REDIRECT_URI must be set in Supabase Edge Function secrets
+    // and must match exactly what is registered in Discord Developer Portal
+    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
     if (!clientId) {
       console.error('DISCORD_CLIENT_ID not configured');
       throw new Error('Discord OAuth not configured');
     }
+
+    if (!redirectUri) {
+      console.error('DISCORD_REDIRECT_URI not configured');
+      throw new Error('Discord redirect URI not configured');
+    }
+
+    const { turnstileToken } = await req.json();
 
     const turnstile = await verifyTurnstile(turnstileToken);
     if (!turnstile.success) {
@@ -42,6 +50,7 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Discord OAuth2 authorization URL (identify + guilds for ownership verification)
+    // redirect_uri is read from server-side env var to guarantee exact match with Discord Portal
     const scope = encodeURIComponent('identify guilds');
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
 
