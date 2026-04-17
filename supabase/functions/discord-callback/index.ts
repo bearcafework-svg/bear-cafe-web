@@ -10,15 +10,17 @@ serve(async (req): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { code, redirectUri } = await req.json();
+    const { code } = await req.json();
     
     // ตรวจสอบค่าที่จำเป็น
     const clientId = Deno.env.get('DISCORD_CLIENT_ID');
     const clientSecret = Deno.env.get('DISCORD_CLIENT_SECRET');
     const guildId = Deno.env.get('DISCORD_GUILD_ID');
     const botToken = Deno.env.get('DISCORD_BOT_TOKEN');
+    // redirect_uri ต้องอ่านจาก env var เสมอ — ห้ามรับจาก client
+    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
-    if (!code || !clientId || !clientSecret) {
+    if (!code || !clientId || !clientSecret || !redirectUri) {
       return new Response(JSON.stringify({ error: "ข้อมูลไม่ครบถ้วน" }), { status: 400, headers: corsHeaders });
     }
 

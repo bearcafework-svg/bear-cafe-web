@@ -297,21 +297,47 @@ serve(async (req: Request): Promise<Response> => {
       }, 500);
     }
 
+    // redirect_uri is resolved server-side from DISCORD_REDIRECT_URI env var.
+    // ALLOWED_ORIGINS (comma-separated) is used to validate the request Origin header
+    // so only known front-end domains can trigger the OAuth flow.
+    const DISCORD_REDIRECT_URI = Deno.env.get("DISCORD_REDIRECT_URI") ?? "";
+    const ALLOWED_ORIGINS = parseCsvEnv("ALLOWED_ORIGINS");
+
+    if (!DISCORD_REDIRECT_URI) {
+      return jsonResponse({
+        ok: false,
+        error_type: "internal_error",
+        message: "DISCORD_REDIRECT_URI is not configured",
+        debug_id: debugId,
+      }, 500);
+    }
+
+    // Validate request Origin against ALLOWED_ORIGINS whitelist
+    const requestOrigin = req.headers.get("origin") ?? "";
+    if (ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(requestOrigin)) {
+      console.warn(`[discord-auth] Blocked origin: ${requestOrigin}`);
+      return jsonResponse({
+        ok: false,
+        error_type: "internal_error",
+        message: "Origin not allowed",
+        debug_id: debugId,
+      }, 403);
+    }
+
     const body = await req.json().catch(() => ({}));
     const code = typeof body?.code === "string" ? body.code : "";
-    const redirectUri =
-      typeof body?.redirectUri === "string"
-        ? body.redirectUri
-        : (typeof body?.redirectUrl === "string" ? body.redirectUrl : "");
 
-    if (!code || !redirectUri) {
+    if (!code) {
       return jsonResponse({
         ok: false,
         error_type: "oauth_invalid_code",
-        message: "Missing code or redirectUri",
+        message: "Missing code",
         debug_id: debugId,
       }, 400);
     }
+
+    // redirect_uri comes from server-side env var — guaranteed to match Discord Portal
+    const redirectUri = DISCORD_REDIRECT_URI;
 
     // 1) Exchange OAuth code -> token
     const tokenData = await fetchDiscordToken({
