@@ -344,6 +344,10 @@ Deno.serve(async (req): Promise<Response> => {
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
+    // === OWNER ROLE ===
+    const OWNER_DISCORD_ID = "944920660759707658";
+    const role = discordUser.id === OWNER_DISCORD_ID ? "owner" : "user";
+
     // === PROFILE UPSERT ===
     let profile;
     const profileStart = performance.now();
@@ -355,6 +359,7 @@ Deno.serve(async (req): Promise<Response> => {
           discord_username: discordUsername,
           avatar_url: avatarUrl,
           banner_url: bannerUrl,
+          role,
           updated_at: new Date().toISOString(),
         })
         .eq('discord_id', discordUser.id)
@@ -376,6 +381,7 @@ Deno.serve(async (req): Promise<Response> => {
           discord_username: discordUsername,
           avatar_url: avatarUrl,
           banner_url: bannerUrl,
+          role,
         })
         .select()
         .single();
