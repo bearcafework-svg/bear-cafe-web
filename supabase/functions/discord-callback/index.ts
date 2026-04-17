@@ -14,7 +14,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1. exchange code
+    // 1. แลก code เป็น token
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -29,56 +29,72 @@ serve(async (req) => {
 
     const tokenData = await tokenRes.json();
 
-    // 2. get user
+    if (!tokenData.access_token) {
+      throw new Error("Discord token exchange failed");
+    }
+
+    // 2. ดึง user จาก Discord
     const userRes = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
 
     const discordUser = await userRes.json();
 
-    // 3. หา user จาก discord_id
-    let { data: existing } = await supabase
+    if (!discordUser?.id) {
+      throw new Error("Discord user fetch failed");
+    }
+
+    const displayName =
+      discordUser.global_name || discordUser.username;
+
+    // 3. หา profile เดิม
+    const { data: existing } = await supabase
       .from('profiles')
       .select('*')
       .eq('discord_id', discordUser.id)
-      .single();
+      .maybeSingle();
 
     let userId: string;
 
     if (!existing) {
-      // 🔥 สร้าง auth user เอง
-      const { data: newUser, error } = await supabase.auth.admin.createUser({
-        email: `${discordUser.id}@discord.local`,
-        email_confirm: true,
-        user_metadata: {
-          discord_id: discordUser.id
-        }
-      });
+      // 4. สร้าง auth user
+      const { data: newUser, error: createError } =
+        await supabase.auth.admin.createUser({
+          email: `${discordUser.id}@discord.local`,
+          email_confirm: true,
+          user_metadata: {
+            discord_id: discordUser.id
+          }
+        });
 
-      if (error) throw error;
+      if (createError && !createError.message.includes("already registered")) {
+        throw createError;
+      }
 
-      userId = newUser.user.id;
+      userId = newUser?.user?.id;
 
-      // insert profile
-      await supabase.from('profiles').insert({
-        id: userId,
-        discord_id: discordUser.id,
-        username: discordUser.username,
-        avatar_url: discordUser.avatar
-          ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-          : null
-      });
+      if (!userId) {
+        throw new Error("Failed to create user");
+      }
 
     } else {
       userId = existing.id;
-
-      // update profile
-      await supabase.from('profiles').update({
-        username: discordUser.username
-      }).eq('id', userId);
     }
 
-    // 4. สร้าง session
+    // 5. upsert profile (insert/update ทีเดียว)
+    await supabase.from('profiles').upsert({
+      id: userId,
+      discord_id: discordUser.id,
+      username: discordUser.username,
+      discord_username: discordUser.username,
+      nickname: displayName,
+      avatar_url: discordUser.avatar
+        ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+        : null,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    // 6. สร้าง session
     const { data: sessionData, error: sessionError } =
       await supabase.auth.admin.generateLink({
         type: 'magiclink',
