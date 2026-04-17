@@ -81,20 +81,28 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { code, redirectUri } = await req.json();
+    const { code } = await req.json();
 
     const clientId = Deno.env.get('DISCORD_CLIENT_ID');
     const clientSecret = Deno.env.get('DISCORD_CLIENT_SECRET');
     const botToken = Deno.env.get('DISCORD_BOT_TOKEN');
     const guildId = Deno.env.get('DISCORD_GUILD_ID');
+    // redirect_uri must be read from server-side env var — must match exactly
+    // what was used in discord-auth and what is registered in Discord Developer Portal
+    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
     if (!clientId || !clientSecret || !botToken || !guildId) {
       log('error', 'Missing Discord configuration', { clientId: !!clientId, clientSecret: !!clientSecret, botToken: !!botToken, guildId: !!guildId });
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
-    if (!code || !redirectUri) {
-      log('warn', 'Missing code or redirectUri', { hasCode: !!code, hasRedirectUri: !!redirectUri });
+    if (!redirectUri) {
+      log('error', 'DISCORD_REDIRECT_URI not configured');
+      return jsonResponse({ ok: false, error_type: "internal_error" });
+    }
+
+    if (!code) {
+      log('warn', 'Missing code', { hasCode: !!code });
       return jsonResponse({ ok: false, error_type: "oauth_invalid_code" });
     }
 
