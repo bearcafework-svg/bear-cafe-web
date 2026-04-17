@@ -348,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     try {
       const response = await supabase.functions.invoke('discord-auth', {
-        body: { turnstileToken },
+        body: { turnstileToken, redirectUrl: `${window.location.origin}/auth/callback` },
       });
 
       console.log('[Auth] Discord auth response:', response.data ? 'success' : 'failed');

@@ -191,7 +191,7 @@ export default function AuthCallbackPage() {
     try {
       const response = await Promise.race([
         supabase.functions.invoke("discord-callback", {
-          body: { code },
+          body: { code, redirectUri: `${window.location.origin}/auth/callback` },
         }),
         new Promise<{ timedOut: true }>((resolve) => {
           window.setTimeout(() => resolve({ timedOut: true }), CALLBACK_TIMEOUT_MS);

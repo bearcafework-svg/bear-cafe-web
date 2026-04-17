@@ -81,23 +81,30 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { code } = await req.json();
+    const body = await req.json();
+    const code = typeof body?.code === 'string' ? body.code : null;
 
     const clientId = Deno.env.get('DISCORD_CLIENT_ID');
     const clientSecret = Deno.env.get('DISCORD_CLIENT_SECRET');
     const botToken = Deno.env.get('DISCORD_BOT_TOKEN');
     const guildId = Deno.env.get('DISCORD_GUILD_ID');
-    // redirect_uri must be read from server-side env var — must match exactly
-    // what was used in discord-auth and what is registered in Discord Developer Portal
-    const redirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
+    // Use server-side env var if available, otherwise fall back to client-provided redirectUri
+    const configuredRedirectUri = Deno.env.get('DISCORD_REDIRECT_URI');
 
     if (!clientId || !clientSecret || !botToken || !guildId) {
       log('error', 'Missing Discord configuration', { clientId: !!clientId, clientSecret: !!clientSecret, botToken: !!botToken, guildId: !!guildId });
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
+    // Resolve redirect_uri: prefer env var, fall back to client-provided value
+    const redirectUri = configuredRedirectUri || body?.redirectUri || null;
+
+    if (!configuredRedirectUri) {
+      log('warn', 'DISCORD_REDIRECT_URI not configured, using client-provided redirectUri. Please set it in Supabase secrets.');
+    }
+
     if (!redirectUri) {
-      log('error', 'DISCORD_REDIRECT_URI not configured');
+      log('error', 'No redirect URI available');
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
