@@ -166,102 +166,80 @@ async function getOrCreateSupabaseSession(params: {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const email = `discord_${params.discordUser.id}@users.noreply.local`;
-  const oneTimePassword = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  // Use bear-cafe.internal domain — consistent with discord-callback
+  const email = `discord_${params.discordUser.id}@bear-cafe.internal`;
+  const password = `discord_auth_${params.discordUser.id}_bear`;
 
-  // Ensure user exists (create if missing)
-  let createdOrExistingUserId: string | null = null;
+  // Step 1: Try sign in with existing credentials
+  const { data: signInData, error: signInError } = await supabaseAnon.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (!signInError && signInData.session) {
+    return { session: signInData.session, userId: signInData.user!.id };
+  }
+
+  // Step 2: Try to create new user
   const createResult = await supabaseAdmin.auth.admin.createUser({
     email,
-    password: oneTimePassword,
+    password,
     email_confirm: true,
     user_metadata: {
       discord_id: params.discordUser.id,
       discord_username: params.discordUser.username,
     },
-    app_metadata: {
-      provider: "discord",
-      providers: ["discord"],
-    },
   });
 
-  if (createResult.error) {
-    const msg = createResult.error.message.toLowerCase();
-    const alreadyExists = msg.includes("already") || msg.includes("registered");
-
-    if (!alreadyExists) {
-      throw new Error(`auth_create_user_failed:${createResult.error.message}`);
-    }
-
-    // Find existing user by email
-    let page = 1;
-    let foundUserId: string | null = null;
-
-    while (!foundUserId) {
-      const listResult = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage: 200,
-      });
-
-      if (listResult.error) {
-        throw new Error(`auth_list_users_failed:${listResult.error.message}`);
-      }
-
-      const users = listResult.data?.users ?? [];
-      if (users.length === 0) break;
-
-      const found = users.find((u) => (u.email ?? "").toLowerCase() === email.toLowerCase());
-      if (found) {
-        foundUserId = found.id;
-        break;
-      }
-
-      page += 1;
-      if (page > 50) break; // hard safety
-    }
-
-    if (!foundUserId) {
-      throw new Error("auth_existing_user_not_found");
-    }
-
-    const updateResult = await supabaseAdmin.auth.admin.updateUserById(foundUserId, {
-      password: oneTimePassword, // rotate to known one-time password for secure server-side sign-in
-      user_metadata: {
-        discord_id: params.discordUser.id,
-        discord_username: params.discordUser.username,
-      },
-      app_metadata: {
-        provider: "discord",
-        providers: ["discord"],
-      },
+  if (!createResult.error && createResult.data.user) {
+    // Sign in with the newly created user
+    const { data: newSignIn, error: newSignInError } = await supabaseAnon.auth.signInWithPassword({
+      email,
+      password,
     });
-
-    if (updateResult.error) {
-      throw new Error(`auth_update_user_failed:${updateResult.error.message}`);
+    if (newSignInError || !newSignIn.session) {
+      throw new Error(`auth_sign_in_failed:${newSignInError?.message ?? "session_not_created"}`);
     }
-
-    createdOrExistingUserId = foundUserId;
-  } else {
-    createdOrExistingUserId = createResult.data.user?.id ?? null;
+    return { session: newSignIn.session, userId: createResult.data.user.id };
   }
 
-  if (!createdOrExistingUserId) {
-    throw new Error("auth_user_id_missing");
+  const createMsg = createResult.error?.message ?? "";
+  const alreadyExists = createMsg.toLowerCase().includes("already") ||
+    createMsg.toLowerCase().includes("registered");
+
+  if (!alreadyExists) {
+    throw new Error(`auth_create_user_failed:${createMsg}`);
   }
 
-  // Create real JWT session (fixes "Invalid JWT structure")
-  const signInResult = await supabaseAnon.auth.signInWithPassword({
+  // Step 3: User exists but password may be wrong — find and reset
+  let foundUserId: string | null = null;
+  let page = 1;
+  while (!foundUserId) {
+    const listResult = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (listResult.error) throw new Error(`auth_list_users_failed:${listResult.error.message}`);
+    const users = listResult.data?.users ?? [];
+    if (users.length === 0) break;
+    const found = users.find((u) => (u.email ?? "").toLowerCase() === email.toLowerCase());
+    if (found) { foundUserId = found.id; break; }
+    if (users.length < 200) break;
+    page++;
+    if (page > 50) break;
+  }
+
+  if (!foundUserId) throw new Error("auth_existing_user_not_found");
+
+  const updateResult = await supabaseAdmin.auth.admin.updateUserById(foundUserId, { password });
+  if (updateResult.error) throw new Error(`auth_update_user_failed:${updateResult.error.message}`);
+
+  const { data: retrySignIn, error: retryError } = await supabaseAnon.auth.signInWithPassword({
     email,
-    password: oneTimePassword,
+    password,
   });
-
-  if (signInResult.error || !signInResult.data.session) {
-    throw new Error(
-      `auth_sign_in_failed:${signInResult.error?.message ?? "session_not_created"}`,
-    );
+  if (retryError || !retrySignIn.session) {
+    throw new Error(`auth_sign_in_failed:${retryError?.message ?? "session_not_created"}`);
   }
 
-  return signInResult.data.session;
+  return { session: retrySignIn.session, userId: foundUserId };
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -387,16 +365,14 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // 5) Create real Supabase auth session
-    const session = await getOrCreateSupabaseSession({
+    const { session, userId: authUserId } = await getOrCreateSupabaseSession({
       supabaseUrl: SUPABASE_URL,
       supabaseAnonKey: SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
       discordUser,
     });
 
-    // 6) Upsert profiles:
-    // username = Discord username
-    // nickname = global_name OR username fallback
+    // 6) Upsert profiles using auth UUID as id (matches profiles.id = auth.uid() constraint)
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -407,45 +383,42 @@ serve(async (req: Request): Promise<Response> => {
 
     const nickname = discordUser.global_name || discordUser.username;
 
-    const upsertPayload = {
-      id: discordUser.id, // as requested: Discord ID as PK
-      discord_id: discordUser.id,
-      username: discordUser.username,
-      nickname,
-      avatar_url: avatarUrl,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Check if profile already exists by discord_id (for existing 800 members)
+    const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
-      .upsert(upsertPayload, { onConflict: "id" })
-      .select("*")
-      .single();
+      .select("id")
+      .eq("discord_id", discordUser.id)
+      .maybeSingle();
 
-    if (profileError) {
-      // fallback for schemas using discord_id unique instead of id
-      const retry = await supabaseAdmin
+    let profile;
+    if (existingProfile) {
+      // Update existing profile — keep id intact, just refresh data
+      const { data: updated, error: updateError } = await supabaseAdmin
         .from("profiles")
-        .upsert(upsertPayload, { onConflict: "discord_id" })
+        .update({
+          username: discordUser.username,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("discord_id", discordUser.id)
         .select("*")
         .single();
-
-      if (retry.error) {
-        throw new Error(`profile_upsert_failed:${retry.error.message}`);
-      }
-
-      return jsonResponse({
-        ok: true,
-        session: {
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-          token_type: session.token_type,
-          expires_in: session.expires_in,
-          expires_at: session.expires_at,
-        },
-        profile: retry.data,
-        debug_id: debugId,
-      });
+      if (updateError) throw new Error(`profile_update_failed:${updateError.message}`);
+      profile = updated;
+    } else {
+      // Insert new profile with auth UUID as id
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from("profiles")
+        .insert({
+          id: authUserId,
+          discord_id: discordUser.id,
+          username: discordUser.username,
+          avatar_url: avatarUrl,
+        })
+        .select("*")
+        .single();
+      if (insertError) throw new Error(`profile_insert_failed:${insertError.message}`);
+      profile = inserted;
     }
 
     return jsonResponse({
