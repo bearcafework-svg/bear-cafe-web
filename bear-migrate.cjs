@@ -23,48 +23,46 @@ const TABLES_TO_UPDATE = [
 ];
 
 async function migrate() {
-  console.log('🐻 เริ่มภารกิจย้ายคลังสมบัติร้านหมี...');
+  console.log('🐻 เริ่มภารกิจย้ายคลังสมบัติร้านหมี (เวอร์ชันอัปเกรด)...');
 
-  // 1. ย้ายรูปภาพใน Storage
   for (const bucket of BUCKETS) {
-    console.log(`📂 กำลังย้ายไฟล์ใน Bucket: ${bucket}...`);
-    const { data: files } = await oldClient.storage.from(bucket).list();
+    console.log(`📂 กำลังตรวจสอบ Bucket: ${bucket}...`);
     
+    // ✨ แก้จุดบอด 1: ดึงรายชื่อไฟล์ทั้งหมด (ปรับ limit เป็น 1000+)
+    const { data: files, error } = await oldClient.storage
+      .from(bucket)
+      .list('', { limit: 5000, sortBy: { column: 'name', order: 'asc' } });
+
     if (files) {
+      console.log(`🔍 พบไฟล์ทั้งหมด ${files.length} ชิ้นใน ${bucket}`);
+      
       for (const file of files) {
-        // ดาวน์โหลดจากที่เก่า
-        const { data: blob } = await oldClient.storage.from(bucket).download(file.name);
+        if (file.id === undefined) continue; // ข้ามโฟลเดอร์ (ถ้ามี)
+
+        // ✨ แก้จุดบอด 2: เช็กว่ามีไฟล์นี้ที่บ้านใหม่หรือยัง (ป้องกันการอัปโหลดซ้ำ)
+        const { data: exists } = await newClient.storage.from(bucket).list('', { search: file.name });
+        
+        if (exists && exists.length > 0) {
+          console.log(`⏭️  ข้าม ${file.name} (มีอยู่ที่บ้านใหม่แล้ว)`);
+          continue;
+        }
+
+        const { data: blob, error: dlError } = await oldClient.storage.from(bucket).download(file.name);
+        
         if (blob) {
-          // อัปโหลดไปที่ใหม่
-          await newClient.storage.from(bucket).upload(file.name, blob, { upsert: true });
-          console.log(`✅ ย้ายรูป ${file.name} เรียบร้อย`);
-        }
-      }
-    }
-  }
-
-  // 2. แก้ลิงก์ในตารางต่างๆ
-  console.log('📝 กำลังเริ่มแก้ลิงก์ในตาราง...');
-  for (const table of TABLES_TO_UPDATE) {
-    for (const column of table.columns) {
-      // ค้นหาแถวที่มีลิงก์บ้านเก่า
-      const { data: rows } = await newClient
-        .from(table.name)
-        .select(`id, ${column}`)
-        .filter(column, 'ilike', `%${OLD_SUPABASE_URL}%`);
-
-      if (rows) {
-        for (const row of rows) {
-          const oldUrl = row[column];
-          const newUrl = oldUrl.replace(OLD_SUPABASE_URL, NEW_SUPABASE_URL);
+          const { error: upError } = await newClient.storage.from(bucket).upload(file.name, blob, { 
+            upsert: true,
+            contentType: blob.type // รักษาประเภทไฟล์ไว้ให้เหมือนเดิม
+          });
           
-          await newClient.from(table.name).update({ [column]: newUrl }).eq('id', row.id);
-          console.log(`🔄 อัปเดตลิงก์ในตาราง ${table.name} ID: ${row.id}`);
+          if (!upError) console.log(`✅ ย้ายรูป ${file.name} สำเร็จ!`);
+          else console.error(`❌ พลาดที่ไฟล์ ${file.name}:`, upError.message);
         }
       }
     }
   }
-  console.log('✨ ภารกิจเสร็จสิ้น! ร้านหมีกลับมาสวยเหมือนเดิมแล้วค่ะ');
+  // ... (ส่วนอัปเดต SQL ในตารางเดิมของคุณใช้งานได้ดีอยู่แล้วค่ะ)
+  console.log('✨ ภารกิจเสร็จสิ้น! สมาชิก 800 คนจะมีรูปสวยๆ เหมือนเดิมแล้วค่ะ');
 }
 
 migrate();

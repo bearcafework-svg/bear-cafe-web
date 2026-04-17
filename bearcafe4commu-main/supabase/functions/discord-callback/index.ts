@@ -171,7 +171,7 @@ Deno.serve(async (req): Promise<Response> => {
     const adminBanStart = performance.now();
     const adminBanResult = await supabase
       .from("profiles")
-      .select("id, is_banned")
+      .select("id, is_banned, role")
       .eq("discord_id", discordUser.id)
       .maybeSingle();
     timing("db_adminban", adminBanStart);
@@ -344,6 +344,17 @@ Deno.serve(async (req): Promise<Response> => {
       return jsonResponse({ ok: false, error_type: "internal_error" });
     }
 
+    // === OWNER ROLE ===
+    // ดึง role เดิมจาก existingProfile ก่อน — ห้าม overwrite ถ้าไม่ใช่ owner
+    const OWNER_DISCORD_ID = "944920660759707658";
+    let role: string;
+    if (discordUser.id === OWNER_DISCORD_ID) {
+      role = "owner";
+    } else {
+      // คง role เดิมไว้ ถ้าไม่มีค่าเดิมให้ default เป็น "user"
+      role = (existingProfile as any)?.role ?? "user";
+    }
+
     // === PROFILE UPSERT ===
     let profile;
     const profileStart = performance.now();
@@ -355,6 +366,7 @@ Deno.serve(async (req): Promise<Response> => {
           discord_username: discordUsername,
           avatar_url: avatarUrl,
           banner_url: bannerUrl,
+          role,
           updated_at: new Date().toISOString(),
         })
         .eq('discord_id', discordUser.id)
@@ -376,6 +388,7 @@ Deno.serve(async (req): Promise<Response> => {
           discord_username: discordUsername,
           avatar_url: avatarUrl,
           banner_url: bannerUrl,
+          role,
         })
         .select()
         .single();
