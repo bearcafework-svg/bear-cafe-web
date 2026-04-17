@@ -112,19 +112,47 @@ export function RoleTransferManagement() {
   const fetchLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
+      // Query แยก 2 ขั้น เพื่อหลีกเลี่ยง RLS join issue กับ profiles
       const { data, error } = await supabase
         .from('role_transfer_logs' as any)
-        .select('*, profiles:transferred_by(username, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
-      if (error) throw error;
-      setLogs((data as any) || []);
-    } catch (e) {
+
+      if (error) {
+        console.error('Error fetching transfer logs:', error);
+        toast({ title: 'ไม่สามารถโหลดประวัติได้', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      const rows = (data as any[]) || [];
+
+      // ดึง profile ของ transferred_by แยก (ป้องกัน RLS join fail)
+      const transferredByIds = [...new Set(rows.map((r: any) => r.transferred_by).filter(Boolean))];
+      let profileMap: Record<string, { username: string; avatar_url: string | null }> = {};
+
+      if (transferredByIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', transferredByIds);
+
+        (profileData || []).forEach((p: any) => {
+          profileMap[p.id] = { username: p.username, avatar_url: p.avatar_url };
+        });
+      }
+
+      setLogs(rows.map((r: any) => ({
+        ...r,
+        profiles: r.transferred_by ? (profileMap[r.transferred_by] ?? null) : null,
+      })));
+    } catch (e: any) {
       console.error('Error fetching transfer logs:', e);
+      toast({ title: 'เกิดข้อผิดพลาด', description: e?.message, variant: 'destructive' });
     } finally {
       setLoadingLogs(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (logsOpen && logs.length === 0) fetchLogs();
