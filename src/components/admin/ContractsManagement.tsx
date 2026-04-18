@@ -532,7 +532,21 @@ interface ContractCardProps {
 function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }: ContractCardProps) {
   const { toast } = useToast();
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    const { error } = await (supabase as any).from('contracts').delete().eq('id', contract.id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: 'ลบไม่สำเร็จ', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'ลบสัญญาแล้ว' });
+    setDeleteOpen(false);
+    onRefresh();
+  }
 
   // personal_role: role members + channel name
   const [roleMembers, setRoleMembers] = useState<Array<{ id: string; username: string; avatar: string | null; profile?: { avatar_url: string | null; username: string } | null }> | null>(null);
@@ -706,6 +720,13 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                   <Edit2 className="w-3 h-3" />
                 </Button>
               )}
+              <Button
+                size="icon" variant="ghost"
+                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
             </div>
 
             {/* Member ID + discord name */}
@@ -841,6 +862,30 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
           </div>
         </div>
       </Card>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <X className="w-4 h-4" />ยืนยันการลบ
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ลบสัญญา <span className="font-medium text-foreground">{
+              contract.type === 'house' ? 'เช่าบ้าน' :
+              contract.type === 'role' ? 'เช่ายศ' : 'ยศส่วนตัว'
+            }</span> ของ <span className="font-mono text-foreground">{contract.member_id}</span>?
+            <br /><span className="text-destructive text-xs">ข้อมูลจะถูกลบออกจากระบบถาวร</span>
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>ยกเลิก</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}ลบ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Notify confirm dialog */}
       <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
