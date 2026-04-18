@@ -138,17 +138,29 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
     if (!file || !type) return;
     e.target.value = '';
 
-    const ext = file.name.split('.').pop() ?? 'png';
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
     setUploading(type);
     try {
+      // ลบไฟล์เก่าทุก extension ก่อน (ไม่สนใจ error ถ้าไม่มีไฟล์)
+      const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+      await Promise.allSettled(
+        exts.map(oldExt =>
+          supabase.storage.from('contract-icons').remove([`type-icons/${type}.${oldExt}`])
+        )
+      );
+
+      // Upload ไฟล์ใหม่
       const { error: upErr } = await supabase.storage
         .from('contract-icons')
         .upload(`type-icons/${type}.${ext}`, file, { upsert: true });
       if (upErr) throw upErr;
+
       const { data } = supabase.storage
         .from('contract-icons')
         .getPublicUrl(`type-icons/${type}.${ext}`);
-      onUploaded(type, data.publicUrl);
+
+      // เพิ่ม cache-bust เพื่อให้ browser โหลดรูปใหม่
+      onUploaded(type, `${data.publicUrl}?t=${Date.now()}`);
       toast({ title: `อัปโหลดไอคอน ${typeLabel[type]} สำเร็จ` });
     } catch (err: any) {
       toast({ title: 'อัปโหลดไม่สำเร็จ', description: err.message, variant: 'destructive' });
@@ -865,8 +877,9 @@ export function ContractsManagement() {
             .getPublicUrl(`type-icons/${type}.${ext}`);
           // Try to verify the URL exists with a HEAD request
           try {
-            const res = await fetch(data.publicUrl, { method: 'HEAD' });
-            if (res.ok) { result[type] = data.publicUrl; break; }
+            const ts = Date.now();
+            const res = await fetch(`${data.publicUrl}?t=${ts}`, { method: 'HEAD' });
+            if (res.ok) { result[type] = `${data.publicUrl}?t=${ts}`; break; }
           } catch { /* skip */ }
         }
       }
