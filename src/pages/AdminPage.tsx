@@ -534,7 +534,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
     return (
       u.username.toLowerCase().includes(q) ||
       u.discord_id.includes(q) ||
-      ((u as any).discord_username ?? '').toLowerCase().includes(q)
+      (u.discord_username ?? '').toLowerCase().includes(q)
     );
   });
 
@@ -591,14 +591,19 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                           )}
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-[160px]">{u.username}</p>
-                            {(u as any).discord_username && (
-                              <p className="text-[10px] text-muted-foreground truncate max-w-[80px] sm:max-w-[160px]">@{(u as any).discord_username}</p>
+                            {u.discord_username && (
+                              <p className="text-[10px] text-muted-foreground truncate max-w-[80px] sm:max-w-[160px]">@{u.discord_username}</p>
                             )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs sm:text-sm hidden md:table-cell py-2 sm:py-3 px-2 sm:px-4">
-                        <span className="font-mono">{u.discord_id}</span>
+                        <div className="space-y-0.5">
+                          <p className="font-mono text-xs">{u.discord_id}</p>
+                          {u.discord_username && (
+                            <p className="text-[10px] text-muted-foreground">@{u.discord_username}</p>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="py-2 sm:py-3 px-2 sm:px-4">
                         <div className="flex flex-wrap gap-0.5 sm:gap-1">
