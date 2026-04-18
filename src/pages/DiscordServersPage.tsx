@@ -476,6 +476,9 @@ export default function DiscordServersPage() {
     setIsSubmitting(true);
     try {
       const res = await supabase.functions.invoke('resolve-discord-invite', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
         body: { invite_url: inviteUrl, category_id: categoryId },
       });
       if (res.error) throw new Error(res.error.message);
