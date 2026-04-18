@@ -528,9 +528,15 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
     }
   }
 
-  const filteredUsers = users.filter(u =>
-    u.username.toLowerCase().includes(searchQuery.toLowerCase()) || u.discord_id.includes(searchQuery)
-  );
+  const filteredUsers = users.filter(u => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      u.username.toLowerCase().includes(q) ||
+      u.discord_id.includes(q) ||
+      (u.discord_username ?? '').toLowerCase().includes(q)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -553,7 +559,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
           </CardTitle>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="ค้นหาผู้ใช้..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 text-sm" />
+            <Input placeholder="ค้นหาผู้ใช้, Discord ID, username..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 text-sm" />
           </div>
         </div>
       </CardHeader>
@@ -583,10 +589,22 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                           ) : (
                             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm">🐻</div>
                           )}
-                          <span className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{u.username}</span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-[160px]">{u.username}</p>
+                            {u.discord_username && (
+                              <p className="text-[10px] text-muted-foreground truncate max-w-[80px] sm:max-w-[160px]">@{u.discord_username}</p>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs sm:text-sm hidden md:table-cell py-2 sm:py-3 px-2 sm:px-4">{u.discord_id}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs sm:text-sm hidden md:table-cell py-2 sm:py-3 px-2 sm:px-4">
+                        <div className="space-y-0.5">
+                          <p className="font-mono text-xs">{u.discord_id}</p>
+                          {u.discord_username && (
+                            <p className="text-[10px] text-muted-foreground">@{u.discord_username}</p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="py-2 sm:py-3 px-2 sm:px-4">
                         <div className="flex flex-wrap gap-0.5 sm:gap-1">
                           {u.roles?.find(r => r.role === 'moderator') && <Badge variant="default" className="bg-honey text-foreground text-[10px] sm:text-xs px-1.5 sm:px-2">Owner</Badge>}

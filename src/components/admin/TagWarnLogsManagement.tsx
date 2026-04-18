@@ -303,10 +303,34 @@ const allIds = formattedData.reduce((acc: string[], r) => {
       });
 
       // 2. ดึง Cancel Requests ทั้งหมดมาจับคู่ผ่าน "sequence" (เลขเคส) ป้องกันปัญหา Timestamp ไม่ตรงกัน
-      const { data: cancelData } = await supabase
+      // ใช้ 2-step query เพื่อหลีกเลี่ยง PGRST200 เมื่อ FK ยังไม่ได้ migrate
+      const { data: cancelRaw } = await supabase
         .from('tag_warn_cancel_requests')
-        .select(`warn_sequence, status, created_at, approved_at, requested_by_name, requester:profiles!tag_warn_cancel_requests_requested_by_fkey(username), approver:profiles!tag_warn_cancel_requests_approved_by_fkey(username)`)
+        .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
         .order('created_at', { ascending: false });
+
+      const cancelRequests = (cancelRaw ?? []) as any[];
+
+      // รวบรวม profile IDs ที่ต้องการ
+      const profileIds = [...new Set([
+        ...cancelRequests.map((r: any) => r.requested_by).filter(Boolean),
+        ...cancelRequests.map((r: any) => r.approved_by).filter(Boolean),
+      ])];
+      const profileUsernameMap: Record<string, string> = {};
+      if (profileIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', profileIds);
+        (profileRows ?? []).forEach((p: any) => { profileUsernameMap[p.id] = p.username; });
+      }
+
+      // แปลงให้มี requester/approver เหมือนเดิม
+      const cancelData = cancelRequests.map((r: any) => ({
+        ...r,
+        requester: r.requested_by ? { username: profileUsernameMap[r.requested_by] ?? null } : null,
+        approver: r.approved_by ? { username: profileUsernameMap[r.approved_by] ?? null } : null,
+      }));
 
       const cancelRequests = (cancelData ?? []) as any[];
       const cancelRequestMap = new Map<string, any>();
@@ -363,10 +387,31 @@ const allIds = formattedData.reduce((acc: string[], r) => {
       const currentRecords = recordsRef.current;
       if (currentRecords.length === 0) return;
 
-      const { data: cancelData } = await supabase
+      const { data: cancelRaw2 } = await supabase
         .from('tag_warn_cancel_requests')
-        .select(`warn_sequence, status, created_at, approved_at, requested_by_name, requester:profiles!tag_warn_cancel_requests_requested_by_fkey(username), approver:profiles!tag_warn_cancel_requests_approved_by_fkey(username)`)
+        .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
         .order('created_at', { ascending: false });
+
+      const cancelRequests = (cancelRaw2 ?? []) as any[];
+
+      const profileIds2 = [...new Set([
+        ...cancelRequests.map((r: any) => r.requested_by).filter(Boolean),
+        ...cancelRequests.map((r: any) => r.approved_by).filter(Boolean),
+      ])];
+      const profileUsernameMap2: Record<string, string> = {};
+      if (profileIds2.length > 0) {
+        const { data: profileRows2 } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', profileIds2);
+        (profileRows2 ?? []).forEach((p: any) => { profileUsernameMap2[p.id] = p.username; });
+      }
+
+      const cancelData = cancelRequests.map((r: any) => ({
+        ...r,
+        requester: r.requested_by ? { username: profileUsernameMap2[r.requested_by] ?? null } : null,
+        approver: r.approved_by ? { username: profileUsernameMap2[r.approved_by] ?? null } : null,
+      }));
 
       const cancelRequests = (cancelData ?? []) as any[];
       const cancelRequestMap = new Map<string, any>();
