@@ -169,27 +169,47 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
     }
   }
 
+  async function handleDelete(type: ContractType) {
+    const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+    await Promise.allSettled(
+      exts.map(ext => supabase.storage.from('contract-icons').remove([`type-icons/${type}.${ext}`]))
+    );
+    onUploaded(type, '');
+    toast({ title: `ลบไอคอน ${typeLabel[type]} แล้ว` });
+  }
+
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground">ไอคอนประเภท:</span>
       {(['house', 'role', 'personal_role'] as ContractType[]).map(type => (
-        <button
-          key={type}
-          onClick={() => handleClick(type)}
-          title={`อัปโหลดไอคอน ${typeLabel[type]}`}
-          className="relative w-9 h-9 rounded-md border border-dashed border-border hover:border-primary/60 bg-muted/40 hover:bg-muted/70 transition-colors flex items-center justify-center overflow-hidden"
-        >
-          {uploading === type ? (
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          ) : typeIcons[type] ? (
-            <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover rounded-md" />
-          ) : (
-            <span className="text-base">{typeEmoji[type]}</span>
+        <div key={type} className="relative group">
+          <button
+            onClick={() => handleClick(type)}
+            title={`อัปโหลดไอคอน ${typeLabel[type]}`}
+            className="relative w-9 h-9 rounded-md border border-dashed border-border hover:border-primary/60 bg-muted/40 hover:bg-muted/70 transition-colors flex items-center justify-center overflow-hidden"
+          >
+            {uploading === type ? (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : typeIcons[type] ? (
+              <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover rounded-md" />
+            ) : (
+              <span className="text-base">{typeEmoji[type]}</span>
+            )}
+            <span className="absolute bottom-0 right-0 bg-background/80 rounded-tl p-0.5">
+              <Upload className="w-2.5 h-2.5 text-muted-foreground" />
+            </span>
+          </button>
+          {/* ปุ่มลบ — แสดงเมื่อมีรูปอยู่ */}
+          {typeIcons[type] && (
+            <button
+              onClick={() => handleDelete(type)}
+              title={`ลบไอคอน ${typeLabel[type]}`}
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
           )}
-          <span className="absolute bottom-0 right-0 bg-background/80 rounded-tl p-0.5">
-            <Upload className="w-2.5 h-2.5 text-muted-foreground" />
-          </span>
-        </button>
+        </div>
       ))}
       <input
         ref={inputRef}
@@ -944,7 +964,7 @@ export function ContractsManagement() {
   const hasFilter = searchMember || searchOperator || filterType !== 'all' || filterDateFrom || filterDateTo;
 
   function handleIconUploaded(type: ContractType, url: string) {
-    setTypeIcons(prev => ({ ...prev, [type]: url }));
+    setTypeIcons(prev => ({ ...prev, [type]: url || null }));
   }
 
   return (
