@@ -341,7 +341,8 @@ export default function CreateSessionPage() {
       // Check cooldown using the hook state (refresh to get latest)
       await refreshCooldown();
       
-      if (isOnCooldown) {
+      // Owner และ Admin ไม่ติด cooldown
+      if (isOnCooldown && !user.is_owner && !user.is_admin) {
         toast.error('กรุณารอก่อนสร้างแมตช์ใหม่', {
           description: `คุณต้องรออีก ${remainingMinutes} นาที ก่อนสร้างแมตช์ใหม่ได้`,
         });
