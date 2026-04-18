@@ -99,7 +99,11 @@ export function RoleTransferManagement() {
     return profiles.filter(p => {
       if (excludeId && p.discord_id === excludeId) return false;
       if (!q) return true;
-      return p.username.toLowerCase().includes(q) || p.discord_id.includes(q);
+      return (
+        p.username.toLowerCase().includes(q) ||
+        p.discord_id.includes(q) ||
+        ((p as any).discord_username ?? '').toLowerCase().includes(q)
+      );
     });
   };
 
@@ -315,6 +319,9 @@ export function RoleTransferManagement() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{profile.username}</p>
                       <p className="text-xs text-muted-foreground font-mono">{profile.discord_id}</p>
+                      {(profile as any).discord_username && (
+                        <p className="text-xs text-muted-foreground">@{(profile as any).discord_username}</p>
+                      )}
                     </div>
                   </CommandItem>
                 ))}

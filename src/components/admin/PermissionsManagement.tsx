@@ -338,9 +338,15 @@ export function PermissionsManagement() {
     }
   }
 
-  const filteredAssignUsers = allUsers.filter(u =>
-    u.username.toLowerCase().includes(userSearch.toLowerCase()) || u.discord_id.includes(userSearch)
-  );
+  const filteredAssignUsers = allUsers.filter(u => {
+    const q = userSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      u.username.toLowerCase().includes(q) ||
+      u.discord_id.includes(q) ||
+      ((u as any).discord_username ?? '').toLowerCase().includes(q)
+    );
+  });
 
   const groups = [...new Set(PAGE_OPTIONS.map(p => p.group))];
 
@@ -570,7 +576,7 @@ export function PermissionsManagement() {
               <Input
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
-                placeholder="ค้นหาผู้ใช้..."
+                placeholder="ค้นหาผู้ใช้, Discord ID, username..."
                 className="pl-9"
               />
             </div>
