@@ -32,12 +32,28 @@ export function HealingMessagesManagement() {
     try {
       const { data, error } = await (supabase as any)
         .from('healing_messages')
-        .select('id, message, created_at, profiles:author_id(username)')
+        .select('id, message, created_at, author_id')
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setRows((data || []) as PendingHealingMessage[]);
+
+      // ดึง username แยก เพื่อหลีกเลี่ยง PGRST200
+      const rows = (data || []) as any[];
+      const authorIds = [...new Set(rows.map((r: any) => r.author_id).filter(Boolean))];
+      const usernameMap: Record<string, string> = {};
+      if (authorIds.length > 0) {
+        const { data: profiles } = await (supabase as any)
+          .from('profiles')
+          .select('id, username')
+          .in('id', authorIds);
+        (profiles ?? []).forEach((p: any) => { usernameMap[p.id] = p.username; });
+      }
+
+      setRows(rows.map((r: any) => ({
+        ...r,
+        profiles: r.author_id ? { username: usernameMap[r.author_id] || null } : null,
+      })) as PendingHealingMessage[]);
     } catch (error: any) {
       toast({
         title: 'โหลดข้อความรออนุมัติไม่สำเร็จ',

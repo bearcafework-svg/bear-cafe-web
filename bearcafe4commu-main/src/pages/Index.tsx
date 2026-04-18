@@ -159,13 +159,8 @@ export default function Index() {
   const remainingCount = Math.max(0, categories.length - VISIBLE_CATEGORIES);
   const showMoreCard = categories.length >= MIN_CATEGORIES_FOR_MORE;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-cream via-peach/20 to-blush/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center">
-        <LoadingBear message="กำลังโหลด..." />
-      </div>
-    );
-  }
+  // ไม่ block render ทั้งหน้าเพื่อรอ categories
+  // sidebar จะแสดงทันที ส่วน content area แสดง skeleton ระหว่างโหลด
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-cream via-peach/20 to-blush/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -227,13 +222,23 @@ export default function Index() {
               <CategoryGuidance />
             </motion.div>
 
-            {/* Category Grid */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
-            >
+            {/* Category Grid — skeleton ระหว่างโหลด แทนที่จะ block ทั้งหน้า */}
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-28 rounded-2xl bg-muted/40 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
+              >
               {visibleCategories.map((category, index) => (
                 <motion.div
                   key={category.id}
@@ -269,7 +274,7 @@ export default function Index() {
                 </motion.div>
               )}
             </motion.div>
-
+            )} {/* end loading ternary */}
             {/* Match Count — subtle bar below grid */}
             {user && matchCount > 0 && (
               <motion.div

@@ -28,32 +28,28 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children, requireOwner = false }: { children: React.ReactNode; requireOwner?: boolean }) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { enabledUsers, enabledStaff, maintenanceMessage, loading: maintenanceLoading } = useMaintenanceMode();
-  
-  if (isLoading || maintenanceLoading) return <LoadingPage />;
+
+  // รอทั้ง auth และ maintenance โหลดเสร็จก่อน
+  // ถ้า authenticated แต่ user ยังเป็น null = profile กำลัง fetch → รอด้วย
+  if (isLoading || maintenanceLoading || (isAuthenticated && !user)) return <LoadingPage />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  
+
   // Check if user is banned
   if (user?.is_banned) {
     return <BannedPage reason={user.ban_reason} isBannedRole={false} />;
   }
 
-  // Check maintenance mode
-  if (enabledUsers) {
-    const isOwner = user?.is_owner;
-    const hasStaffAccess = (user?.allowed_pages?.length ?? 0) > 0;
+  // Check maintenance mode — owner (is_owner) bypass ทุกกรณีเสมอ
+  if (enabledUsers && !user?.is_owner) {
+    const hasStaffAccess = user?.is_admin || (user?.allowed_pages?.length ?? 0) > 0;
 
-    if (isOwner) {
-      // Owner bypasses all maintenance
-    } else if (enabledStaff) {
-      // Staff blocked too → everyone except Owner sees maintenance
-      return <MaintenancePage message={maintenanceMessage} />;
-    } else if (!hasStaffAccess) {
-      // Only regular users blocked
+    if (enabledStaff || !hasStaffAccess) {
+      // Staff ถูก block ด้วย หรือ user ทั่วไป
       return <MaintenancePage message={maintenanceMessage} />;
     }
-    // Staff with permissions can pass when enabledStaff is false
+    // Staff ที่มีสิทธิ์ผ่านได้เมื่อ enabledStaff = false
   }
-  
+
   return <>{children}</>;
 }
 

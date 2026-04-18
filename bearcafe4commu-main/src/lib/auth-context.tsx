@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { withRetry } from '@/lib/retry';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
@@ -29,7 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PROFILE_FETCH_TIMEOUT_MS = 8000;
+const PROFILE_FETCH_TIMEOUT_MS = 15000; // เพิ่มจาก 8s เป็น 15s รองรับ Supabase cold start
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -37,61 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Fetch user roles from database (server-side validated via RLS)
-  // DB role mapping:
-  //   'moderator' → is_owner  (full admin access, enters /admin)
-  //   'admin'     → is_admin  (enters /admin, limited by allowed_pages)
-  const fetchUserRoles = async (userId: string): Promise<{ is_admin: boolean; is_owner: boolean }> => {
-    try {
-      return await withRetry(async () => {
-        const { data: roles, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId);
-        if (error) throw error;
-
-        const roleSet = new Set(roles?.map(r => r.role) || []);
-        return {
-          // 'moderator' = Owner — full access, bypasses all page restrictions
-          is_owner: roleSet.has('moderator'),
-          // 'admin' = Staff — enters /admin but limited by allowed_pages
-          is_admin: roleSet.has('admin'),
-        };
-      });
-    } catch (error) {
-      console.error('Failed to fetch user roles:', error);
-      return { is_admin: false, is_owner: false };
-    }
-  };
-
-  // Fetch user's custom permissions (allowed_pages)
-  // ใช้สำหรับควบคุม feature ภายใน /admin เท่านั้น
-  // ไม่ใช้ตัดสินว่าเข้า /admin ได้หรือไม่
-  const fetchUserCustomPermissions = async (userId: string): Promise<string[]> => {
-    try {
-      return await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('user_custom_permissions')
-          .select('custom_permissions(allowed_pages)')
-          .eq('user_id', userId);
-        if (error) throw error;
-
-        if (!data || data.length === 0) return [];
-
-        const allPages = new Set<string>();
-        data.forEach((row: any) => {
-          const pages = row.custom_permissions?.allowed_pages;
-          if (Array.isArray(pages)) {
-            pages.forEach((p: string) => allPages.add(p));
-          }
-        });
-        return Array.from(allPages);
-      });
-    } catch (error) {
-      console.error('Failed to fetch custom permissions:', error);
-      return [];
-    }
-  };
   const buildFallbackUser = (sessionUser: SupabaseUser): User => {
     const metadata = sessionUser.user_metadata || {};
     return {
@@ -111,29 +55,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (sessionUser: SupabaseUser): Promise<User | null> => {
     console.log('[Auth] Fetching profile for user:', sessionUser.id);
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
-      .eq('id', sessionUser.id)
-      .maybeSingle();
 
-    if (error) {
-      console.error('[Auth] Profile fetch error:', error);
-      throw error;
+    // profile + roles parallel (ไม่ใช้ join เพื่อหลีกเลี่ยง PGRST200)
+    const [profileResult, rolesResult, permIdsResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
+        .eq('id', sessionUser.id)
+        .maybeSingle(),
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', sessionUser.id),
+      // ดึงแค่ permission_id ก่อน ไม่ join — ป้องกัน PGRST200 เมื่อ FK หาย
+      supabase
+        .from('user_custom_permissions')
+        .select('permission_id')
+        .eq('user_id', sessionUser.id),
+    ]);
+
+    if (profileResult.error) {
+      console.error('[Auth] Profile fetch error:', profileResult.error);
+      throw profileResult.error;
     }
-    
+
+    const profile = profileResult.data;
     if (!profile) {
       console.warn('[Auth] Profile not found for user:', sessionUser.id);
       return null;
     }
 
-    console.log('[Auth] Profile loaded:', profile.username);
+    // Roles
+    const roleSet = new Set((rolesResult.data ?? []).map((r: any) => r.role));
+    const is_owner = roleSet.has('moderator');
+    const is_admin = roleSet.has('admin');
 
-    // Fetch roles + permissions in parallel (faster, prevents stale data)
-    const [roles, allowedPages] = await Promise.all([
-      fetchUserRoles(profile.id),
-      fetchUserCustomPermissions(profile.id),
-    ]);
+    // Permissions — ดึง allowed_pages จาก custom_permissions แยก
+    const allPages = new Set<string>();
+    const permIds = (permIdsResult.data ?? []).map((r: any) => r.permission_id).filter(Boolean);
+    if (permIds.length > 0) {
+      const { data: cpData } = await supabase
+        .from('custom_permissions')
+        .select('allowed_pages')
+        .in('id', permIds);
+      (cpData ?? []).forEach((cp: any) => {
+        if (Array.isArray(cp.allowed_pages)) {
+          cp.allowed_pages.forEach((p: string) => allPages.add(p));
+        }
+      });
+    }
+
+    console.log('[Auth] Profile loaded:', profile.username);
 
     return {
       id: profile.id,
@@ -142,11 +114,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       avatar_url: profile.avatar_url,
       banner_url: profile.banner_url,
       discord_id: profile.discord_id,
-      is_admin: roles.is_admin,
-      is_owner: roles.is_owner,
+      is_admin,
+      is_owner,
       is_banned: profile.is_banned || false,
       ban_reason: profile.ban_reason,
-      allowed_pages: allowedPages,
+      allowed_pages: Array.from(allPages),
     };
   };
 
@@ -161,7 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
 
     if (!profile) {
-      console.warn('[Auth] Profile missing or timed out, using fallback user');
+      console.warn('[Auth] Profile fetch timed out — using fallback WITHOUT resetting roles');
+      // ถ้า user มี role อยู่แล้ว (เช่น refresh หน้า) ให้คงไว้ ไม่ reset เป็น false
       return buildFallbackUser(sessionUser);
     }
 
@@ -169,21 +142,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loadUserProfile = (sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean) => {
-    fetchUserProfileWithTimeout(sessionUser)
+    fetchUserProfile(sessionUser)
       .then((profile) => {
-        if (isMounted) {
+        if (!isMounted) return;
+        if (profile) {
           setUser(profile);
-          setIsLoading(false);
+        } else {
+          // profile ไม่มีใน DB — ใช้ fallback แต่ไม่ reset role
+          setUser(prev => prev ?? buildFallbackUser(sessionUser));
         }
+        setIsLoading(false);
       })
       .catch((error) => {
         console.error('[Auth] Failed to fetch user profile:', error);
-        if (isMounted) {
-          setUser(buildFallbackUser(sessionUser));
-          if (setLoading) {
-            setIsLoading(false);
-          }
-        }
+        if (!isMounted) return;
+        // error — คง user เดิมไว้ถ้ามี ไม่ reset role
+        setUser(prev => prev ?? buildFallbackUser(sessionUser));
+        if (setLoading) setIsLoading(false);
       });
   };
 
@@ -260,71 +235,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    let initComplete = false;
+    // ใช้ ref ป้องกัน loadUserProfile ซ้ำจาก onAuthStateChange + getSession
+    let profileLoaded = false;
 
     console.log('[Auth] Initializing auth context');
 
-    // Set up auth state listener FIRST - MUST be synchronous to avoid deadlock
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log('[Auth] State change:', event, 'user:', newSession?.user?.id);
-        
+
         if (!isMounted) return;
-        
-        // Update session immediately (synchronous)
+
         setSession(newSession);
-        
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSession(null);
+          setIsLoading(false);
+          profileLoaded = false;
+          return;
+        }
+
         if (newSession?.user) {
-          // CRITICAL: Use setTimeout to defer async operations and avoid deadlock
+          // TOKEN_REFRESHED: session ยังอยู่ ไม่ต้อง reload profile ใหม่
+          // จะ reload เฉพาะ SIGNED_IN (login ใหม่) หรือยังไม่เคยโหลด
+          if (event === 'TOKEN_REFRESHED' && profileLoaded) {
+            console.log('[Auth] Token refreshed, skipping profile reload');
+            return;
+          }
+
+          // INITIAL_SESSION จะถูก handle โดย getSession() ด้านล่างแทน
+          // เพื่อป้องกัน double load
+          if (event === 'INITIAL_SESSION') {
+            return;
+          }
+
+          profileLoaded = true;
           setTimeout(() => {
             if (!isMounted) return;
             loadUserProfile(newSession.user, isMounted, true);
           }, 0);
         } else {
           setUser(null);
-          // Only set loading false if init is complete (to avoid race condition)
-          if (initComplete) {
-            setIsLoading(false);
-          }
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSession(null);
           setIsLoading(false);
+          profileLoaded = false;
         }
       }
     );
 
-    // THEN check for existing session
+    // getSession เป็น single source of truth สำหรับ initial load
     supabase.auth.getSession().then(({ data: { session: existingSession }, error }) => {
       console.log('[Auth] Initial session check:', existingSession?.user?.id, 'error:', error?.message);
-      
+
       if (!isMounted) return;
-      
-      initComplete = true;
-      
+
       if (error) {
         console.error('[Auth] Session error:', error);
         setIsLoading(false);
         return;
       }
-      
+
       setSession(existingSession);
-      
+
       if (existingSession?.user) {
+        profileLoaded = true;
         loadUserProfile(existingSession.user, isMounted, true);
       } else {
-        // No session - user is not logged in
         console.log('[Auth] No existing session, user not logged in');
         setIsLoading(false);
       }
     }).catch((error) => {
       console.error('[Auth] Init error:', error);
-      if (isMounted) {
-        initComplete = true;
-        setIsLoading(false);
-      }
+      if (isMounted) setIsLoading(false);
     });
 
     return () => {

@@ -75,14 +75,24 @@ export function MascotMessage() {
     try {
       const { data, error } = await supabase
         .from('healing_messages')
-        .select('message, profiles ( username )')
+        .select('message, author_id')
         .eq('status', 'approved')
         .limit(20);
       if (error) throw error;
       if (data && data.length > 0) {
-        poolRef.current = data.map((d) => ({
+        // ดึง username แยก เพื่อหลีกเลี่ยง PGRST200 เมื่อ FK ยังไม่ได้ migrate
+        const authorIds = [...new Set(data.map((d: any) => d.author_id).filter(Boolean))];
+        const usernameMap: Record<string, string> = {};
+        if (authorIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', authorIds);
+          (profiles ?? []).forEach((p: any) => { usernameMap[p.id] = p.username; });
+        }
+        poolRef.current = data.map((d: any) => ({
           message: d.message,
-          username: (d.profiles as any)?.username || "ผู้ใช้ไม่ระบุชื่อ",
+          username: usernameMap[d.author_id] || "ผู้ใช้ไม่ระบุชื่อ",
         }));
       }
     } catch (err) {

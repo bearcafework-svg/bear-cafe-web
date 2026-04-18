@@ -141,17 +141,17 @@ export function MaintenanceToggle({ isEnabled, enabledStaff = false, message, on
               <h3 className="font-display font-bold text-base sm:text-lg leading-tight">
                 ปิดสำหรับ User ทั่วไป
               </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 truncate">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2">
                 {isEnabled ? 'User ทั่วไปไม่สามารถเข้าใช้งานได้' : 'User ทั่วไปใช้งานได้ปกติ'}
               </p>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <span className={cn(
-                "text-xs sm:text-sm font-semibold hidden sm:inline",
+                "text-xs font-semibold hidden sm:inline",
                 isEnabled ? "text-destructive" : "text-muted-foreground"
               )}>
-                {isEnabled ? 'ปิด' : 'เปิด'}
+                {isEnabled ? 'ปิดอยู่' : 'เปิดอยู่'}
               </span>
               <Switch
                 checked={isEnabled}
@@ -193,14 +193,14 @@ export function MaintenanceToggle({ isEnabled, enabledStaff = false, message, on
                     <h3 className="font-display font-bold text-sm sm:text-base leading-tight">
                       ปิดสำหรับ Staff ด้วย
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                       {enabledStaff
                         ? 'มีเพียง Owner เท่านั้นที่เข้าได้'
                         : 'Staff ที่มีสิทธิ์ยังเข้าใช้งานได้'}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Switch
                       checked={enabledStaff}
                       onCheckedChange={handleToggleStaff}
