@@ -268,8 +268,15 @@ const fetchData = useCallback(async () => {
       const formattedData: WarnRecord[] = (tagWarnData || []).map((row) => ({
         id: row.id,
         timestamp: row.log_timestamp,
-        sequence: String(row.sequence),
-        email: '', 
+        // ใช้ sequence จริงถ้ามีและไม่ใช่ 0, ไม่งั้น fallback เป็น id เพื่อป้องกัน key ซ้ำ
+        sequence: (row.sequence != null && row.sequence !== 0 && row.sequence !== '')
+          ? String(row.sequence)
+          : row.id,
+        // เก็บ sequence จริงจาก DB ไว้สำหรับ cancel request (ไม่ใช้ fallback)
+        _rawSequence: (row.sequence != null && row.sequence !== 0 && row.sequence !== '')
+          ? String(row.sequence)
+          : null,
+        email: '',
         baristaId: row.barista_id || '',
         memberId: row.member_id || '',
         warningMessage: row.message || '',
@@ -512,7 +519,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
     try {
       const payload: TagWarnCancelRequestInsert = {
         warn_timestamp: cancelTarget.timestamp,
-        warn_sequence: cancelTarget.sequence,
+        warn_sequence: (cancelTarget as any)._rawSequence ?? cancelTarget.sequence,
         member_id: cancelTarget.memberId,
         requested_by: user.id,
         requested_by_name: user.username ?? null,
@@ -946,7 +953,10 @@ const allIds = formattedData.reduce((acc: string[], r) => {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant={cancelled ? 'outline' : 'secondary'} className="gap-1 text-xs font-mono">
-                            <Hash className="h-3 w-3" />{r.sequence || idx + 1}
+                            <Hash className="h-3 w-3" />{
+                              // ถ้า sequence เป็น UUID (fallback) แสดง ? แทน
+                              r.sequence && r.sequence.includes('-') ? '?' : (r.sequence || idx + 1)
+                            }
                           </Badge>
                           {cancelled && !showBlur && <Badge variant="destructive" className="gap-1 text-xs"><X className="h-3 w-3" /> ยกเลิกแล้ว</Badge>}
                           {pendingApproval && !showBlur && <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">รออนุมัติ</Badge>}

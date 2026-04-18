@@ -556,7 +556,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
       content: `<@${member_id}>`,
       embeds: [{
         color: 16758671,
-        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n- __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n- __\`ห้องของคุณ\`__: ${room_link}\n- __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
+        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n- __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n- __\`ห้องของคุณ\`__: ${room_link}\n- __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
       }],
       components: [{
         type: 1,
