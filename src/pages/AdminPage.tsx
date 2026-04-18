@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import {
   ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
-  Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart,
+  Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan,
 } from 'lucide-react';
@@ -40,6 +40,7 @@ import { DiscordServersManagement } from '@/components/admin/DiscordServersManag
 import { MaintenanceToggle } from '@/components/admin/MaintenanceToggle';
 import { PermissionsManagement } from '@/components/admin/PermissionsManagement';
 import { HealingMessagesManagement } from '@/components/admin/HealingMessagesManagement';
+import { ContractsManagement } from '@/components/admin/ContractsManagement';
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
@@ -86,6 +87,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'banned-roles': Ban,
   'banned-words': AlertTriangle,
   'tag-warn': ClipboardList,
+  'contracts': Home,
   'healing-messages': Heart,
   'trading-history': ShoppingCart,
   'role-transfer': ArrowLeftRight,
@@ -247,6 +249,7 @@ export default function AdminPage() {
       case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
       case 'banned-words': return canAccessPage('banned-words') ? <BannedWordsManagement /> : null;
       case 'tag-warn': return canAccessPage('tag-warn') ? <TagWarnLogsManagement /> : null;
+      case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
       case 'healing-messages': return canAccessPage('healing-messages') ? <HealingMessagesManagement /> : null;
       case 'trading-history': return canAccessPage('trading-history') ? <TradingHistoryManagement /> : null;
       case 'categories': return canAccessPage('categories') ? <CategoriesManagement /> : null;

@@ -309,12 +309,12 @@ const allIds = formattedData.reduce((acc: string[], r) => {
         .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
         .order('created_at', { ascending: false });
 
-      const cancelRequests = (cancelRaw ?? []) as any[];
+      const cancelRawRows1 = (cancelRaw ?? []) as any[];
 
       // รวบรวม profile IDs ที่ต้องการ
       const profileIds = [...new Set([
-        ...cancelRequests.map((r: any) => r.requested_by).filter(Boolean),
-        ...cancelRequests.map((r: any) => r.approved_by).filter(Boolean),
+        ...cancelRawRows1.map((r: any) => r.requested_by).filter(Boolean),
+        ...cancelRawRows1.map((r: any) => r.approved_by).filter(Boolean),
       ])];
       const profileUsernameMap: Record<string, string> = {};
       if (profileIds.length > 0) {
@@ -326,15 +326,14 @@ const allIds = formattedData.reduce((acc: string[], r) => {
       }
 
       // แปลงให้มี requester/approver เหมือนเดิม
-      const cancelData = cancelRequests.map((r: any) => ({
+      const cancelData = cancelRawRows1.map((r: any) => ({
         ...r,
         requester: r.requested_by ? { username: profileUsernameMap[r.requested_by] ?? null } : null,
         approver: r.approved_by ? { username: profileUsernameMap[r.approved_by] ?? null } : null,
       }));
 
-      const cancelRequests = (cancelData ?? []) as any[];
       const cancelRequestMap = new Map<string, any>();
-      cancelRequests.forEach((r) => {
+      cancelData.forEach((r: any) => {
         const key = String(r.warn_sequence).trim();
         if (!key || cancelRequestMap.has(key)) return;
         cancelRequestMap.set(key, r);
@@ -392,11 +391,11 @@ const allIds = formattedData.reduce((acc: string[], r) => {
         .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
         .order('created_at', { ascending: false });
 
-      const cancelRequests = (cancelRaw2 ?? []) as any[];
+      const cancelRawRows = (cancelRaw2 ?? []) as any[];
 
       const profileIds2 = [...new Set([
-        ...cancelRequests.map((r: any) => r.requested_by).filter(Boolean),
-        ...cancelRequests.map((r: any) => r.approved_by).filter(Boolean),
+        ...cancelRawRows.map((r: any) => r.requested_by).filter(Boolean),
+        ...cancelRawRows.map((r: any) => r.approved_by).filter(Boolean),
       ])];
       const profileUsernameMap2: Record<string, string> = {};
       if (profileIds2.length > 0) {
@@ -407,15 +406,14 @@ const allIds = formattedData.reduce((acc: string[], r) => {
         (profileRows2 ?? []).forEach((p: any) => { profileUsernameMap2[p.id] = p.username; });
       }
 
-      const cancelData = cancelRequests.map((r: any) => ({
+      const cancelRequests2 = cancelRawRows.map((r: any) => ({
         ...r,
         requester: r.requested_by ? { username: profileUsernameMap2[r.requested_by] ?? null } : null,
         approver: r.approved_by ? { username: profileUsernameMap2[r.approved_by] ?? null } : null,
       }));
 
-      const cancelRequests = (cancelData ?? []) as any[];
       const cancelRequestMap = new Map<string, any>();
-      cancelRequests.forEach((r) => {
+      cancelRequests2.forEach((r: any) => {
         const key = String(r.warn_sequence).trim();
         if (!key || cancelRequestMap.has(key)) return;
         cancelRequestMap.set(key, r);
@@ -696,7 +694,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
           content: `<@${newWarn.memberId}>`,
           embeds: [{
             description: description,
-            color: 0xFFEFEF,
+            color: 0xFC6868,
             image: imageUrls.length > 0 ? { url: imageUrls[0] } : undefined
           }]
         };

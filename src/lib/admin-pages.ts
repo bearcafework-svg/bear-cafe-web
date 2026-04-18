@@ -20,6 +20,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'banned-roles', label: 'ยศที่ถูกแบน', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'banned-words', label: 'คำต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'tag-warn', label: 'ประวัติแท็กเตือน', group: 'moderation', groupLabel: 'การดูแล' },
+  { id: 'contracts', label: 'สัญญาเช่า', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'healing-messages', label: 'กระดานให้กำลังใจ', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'trading-history', label: 'ประวัติการซื้อขาย', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'role-transfer', label: 'ย้ายบทบาท', group: 'moderation', groupLabel: 'การดูแล' },

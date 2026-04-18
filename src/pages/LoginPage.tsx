@@ -27,37 +27,32 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
   }, [siteKey]);
 
 const handleLogin = async () => {
+  // Guard: ป้องกัน double-click
+  if (isLoginClicked) return;
   setIsLoginClicked(true);
 
   try {
     let token = 'TURNSTILE_BYPASS_DEV';
 
-    // เอา Turnstile เหมือนเดิม (ใช้ได้)
     if (siteKey && turnstileRef.current?.isReady()) {
       try {
         const turnstileToken = await turnstileRef.current.execute();
-        if (turnstileToken) {
-          token = turnstileToken;
-        }
+        if (turnstileToken) token = turnstileToken;
       } catch (err) {
         console.warn('[Login] Turnstile error:', err);
+        turnstileRef.current?.reset();
       }
     }
 
-    // 🔥 จุดสำคัญ: เปลี่ยนจาก login() → redirect ไป Discord
-    const clientId = "998239118372917278"; // 👈 ใส่จริง
-    const redirectUri = "https://bearcafe4commu.vercel.app/auth/callback";
-
-    const url = `https://discord.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify`;
-
-    // (optional) ถ้าอยากส่ง token ไปด้วย (advanced)
-    // localStorage.setItem("turnstile_token", token);
-
-    window.location.href = url;
-
+    // ใช้ login() จาก auth-context ซึ่งเรียก discord-auth Edge Function
+    // Edge Function จะสร้าง OAuth URL พร้อม scope=identify+guilds ให้อัตโนมัติ
+    await login(token);
+    // login() redirect ผ่าน window.location.href — ถ้าถึงบรรทัดนี้ = iframe mode
+    setIsLoginClicked(false);
   } catch (error) {
     console.error('[Login] Error:', error);
     setIsLoginClicked(false);
+    turnstileRef.current?.reset();
     toast.error('ไม่สามารถติดต่อระบบยืนยันตัวตนได้ กรุณาลองใหม่อีกครั้ง');
   }
 };
