@@ -16,21 +16,16 @@
 //   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 //   updated_at TIMESTAMPTZ
 // );
-// ALTER TABLE public.contracts ENABLE ROW LEVEL SECURITY;
-// CREATE POLICY "contracts: service role full access" ON public.contracts FOR ALL TO service_role USING (true) WITH CHECK (true);
-// CREATE POLICY "contracts: authenticated read" ON public.contracts FOR SELECT TO authenticated USING (true);
-// CREATE POLICY "contracts: authenticated write" ON public.contracts FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -38,7 +33,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  Plus, Home, Crown, User, Clock, Bell, Edit2, Search, RefreshCw, Loader2, AlertTriangle, CheckCircle2, X,
+  Plus, Home, Crown, User, Clock, Bell, Edit2, Search, RefreshCw,
+  Loader2, CheckCircle2, X, Upload, ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +54,12 @@ interface Contract {
   created_at: string;
   updated_at: string | null;
   edit_log: Array<{ editor: string; avatar: string | null; timestamp: string }> | null;
+}
+
+interface TypeIcons {
+  house: string | null;
+  role: string | null;
+  personal_role: string | null;
 }
 
 const ROLE_OPTIONS = [
@@ -100,6 +102,94 @@ function toLocalDatetimeValue(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ─── IconUpload Component (Owner only) ───────────────────────────────────────
+
+interface IconUploadProps {
+  typeIcons: TypeIcons;
+  onUploaded: (type: ContractType, url: string) => void;
+}
+
+function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState<ContractType | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pendingType = useRef<ContractType | null>(null);
+
+  const typeEmoji: Record<ContractType, string> = {
+    house: '🏠',
+    role: '👑',
+    personal_role: '⭐',
+  };
+
+  const typeLabel: Record<ContractType, string> = {
+    house: 'บ้าน',
+    role: 'ยศ',
+    personal_role: 'ยศส่วนตัว',
+  };
+
+  function handleClick(type: ContractType) {
+    pendingType.current = type;
+    inputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const type = pendingType.current;
+    if (!file || !type) return;
+    e.target.value = '';
+
+    const ext = file.name.split('.').pop() ?? 'png';
+    setUploading(type);
+    try {
+      const { error: upErr } = await supabase.storage
+        .from('contract-icons')
+        .upload(`type-icons/${type}.${ext}`, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage
+        .from('contract-icons')
+        .getPublicUrl(`type-icons/${type}.${ext}`);
+      onUploaded(type, data.publicUrl);
+      toast({ title: `อัปโหลดไอคอน ${typeLabel[type]} สำเร็จ` });
+    } catch (err: any) {
+      toast({ title: 'อัปโหลดไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">ไอคอนประเภท:</span>
+      {(['house', 'role', 'personal_role'] as ContractType[]).map(type => (
+        <button
+          key={type}
+          onClick={() => handleClick(type)}
+          title={`อัปโหลดไอคอน ${typeLabel[type]}`}
+          className="relative w-9 h-9 rounded-md border border-dashed border-border hover:border-primary/60 bg-muted/40 hover:bg-muted/70 transition-colors flex items-center justify-center overflow-hidden"
+        >
+          {uploading === type ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : typeIcons[type] ? (
+            <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover rounded-md" />
+          ) : (
+            <span className="text-base">{typeEmoji[type]}</span>
+          )}
+          <span className="absolute bottom-0 right-0 bg-background/80 rounded-tl p-0.5">
+            <Upload className="w-2.5 h-2.5 text-muted-foreground" />
+          </span>
+        </button>
+      ))}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+    </div>
+  );
+}
+
 // ─── Add Dialog ──────────────────────────────────────────────────────────────
 
 interface AddDialogProps {
@@ -124,7 +214,6 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [roomLink, setRoomLink] = useState('');
   const [roleName, setRoleName] = useState('');
 
-  // personal_role: Discord roles from API
   const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [roleSearch, setRoleSearch] = useState('');
@@ -146,7 +235,6 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
     }
   }
 
-  // Auto-fetch when switching to personal_role step 2
   useEffect(() => {
     if (open && type === 'personal_role' && step === 2 && discordRoles.length === 0) {
       fetchDiscordRoles();
@@ -276,7 +364,6 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                     ซิงค์ยศ
                   </Button>
                 </div>
-                {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
@@ -286,9 +373,10 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                     onChange={e => setRoleSearch(e.target.value)}
                   />
                 </div>
-                {/* Role list */}
                 {rolesLoading ? (
-                  <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
                     {filteredDiscordRoles.length === 0 ? (
@@ -358,7 +446,10 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
 
   async function handleSave() {
     setSaving(true);
-    const newLog = [...(contract.edit_log ?? []), { editor: operatorName, avatar: operatorAvatar, timestamp: new Date().toISOString() }];
+    const newLog = [
+      ...(contract.edit_log ?? []),
+      { editor: operatorName, avatar: operatorAvatar, timestamp: new Date().toISOString() },
+    ];
     const { error } = await (supabase as any).from('contracts').update({
       end_at: endAt ? new Date(endAt).toISOString() : null,
       room_link: roomLink.trim() || null,
@@ -400,11 +491,13 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
 
 interface ContractCardProps {
   contract: Contract;
+  typeIcons: TypeIcons;
+  memberProfiles: Record<string, { username: string; discord_username: string | null }>;
   onEdit: (c: Contract) => void;
   onRefresh: () => void;
 }
 
-function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
+function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }: ContractCardProps) {
   const { toast } = useToast();
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -421,6 +514,7 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
   const statusText =
     contract.type !== 'house' ? null :
     days === null ? null :
+    days <= 0 ? 'หมดอายุแล้ว' :
     days <= 3 ? 'สัญญาเช่าบ้านใกล้หมด (เร่งด่วน)' :
     days <= 7 ? 'สัญญาเช่าบ้านใกล้หมด' :
     'สัญญาเช่ายังไม่ใกล้หมด';
@@ -430,15 +524,39 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
     days !== null && days <= 7 ? 'text-orange-400' :
     'text-green-500';
 
+  const statusDot =
+    days !== null && days <= 3 ? 'bg-red-500' :
+    days !== null && days <= 7 ? 'bg-orange-400' :
+    'bg-green-500';
+
+  const typeLabel =
+    contract.type === 'house' ? 'สัญญาเช่าบ้าน' :
+    contract.type === 'role' ? 'สัญญาเช่ายศ' : 'สัญญายศส่วนตัว';
+
+  const typeColor =
+    contract.type === 'house' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+    contract.type === 'role' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+    'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+  const typeEmoji =
+    contract.type === 'house' ? '🏠' :
+    contract.type === 'role' ? '👑' : '⭐';
+
+  const iconUrl = typeIcons[contract.type];
+  const profile = memberProfiles[contract.member_id];
+  const discordName = profile?.discord_username ?? profile?.username ?? null;
+
   async function sendNotify() {
     if (!contract.end_at) return;
     setSending(true);
     const endUnix = Math.floor(new Date(contract.end_at).getTime() / 1000);
+    const member_id = contract.member_id;
+    const room_link = contract.room_link ?? '-';
     const body = {
-      content: `<@${contract.member_id}>`,
+      content: `<@${member_id}>`,
       embeds: [{
         color: 16758671,
-        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n- __\`แท็ก\`__: <@${contract.member_id}> — \`${contract.member_id}\`\n- __\`ห้องของคุณ\`__: ${contract.room_link ?? '-'}\n- __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
+        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n- __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n- __\`ห้องของคุณ\`__: ${room_link}\n- __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
       }],
       components: [{
         type: 1,
@@ -451,7 +569,11 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
       }],
     };
     try {
-      const res = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast({ title: 'ส่งการแจ้งเตือนสำเร็จ' });
     } catch (e: any) {
@@ -461,94 +583,114 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
     }
   }
 
-  const typeLabel =
-    contract.type === 'house' ? 'สัญญาเช่าบ้าน' :
-    contract.type === 'role' ? 'สัญญาเช่ายศ' : 'สัญญายศส่วนตัว';
-
-  const typeColor =
-    contract.type === 'house' ? 'bg-blue-500/10 text-blue-400' :
-    contract.type === 'role' ? 'bg-purple-500/10 text-purple-400' :
-    'bg-amber-500/10 text-amber-400';
-
   return (
     <>
-      <Card className={cn('border-2 transition-colors hover:shadow-sm', borderColor)}>
-        {/* Card Header — type badge + edit button */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn('text-[10px] px-2 py-0.5', typeColor)}>{typeLabel}</Badge>
-            {contract.type === 'house' && statusText && (
-              <span className={cn('text-[10px] font-medium flex items-center gap-1', statusColor)}>
-                <span className={cn('w-1.5 h-1.5 rounded-full inline-block', days !== null && days <= 3 ? 'bg-red-500' : days !== null && days <= 7 ? 'bg-orange-400' : 'bg-green-500')} />
-                {statusText}
-              </span>
+      <Card className={cn('border-2 transition-colors hover:shadow-sm overflow-hidden', borderColor)}>
+        <div className="flex">
+          {/* Left: Icon column */}
+          <div className="w-16 shrink-0 flex items-center justify-center bg-muted/30 border-r border-border/40">
+            {iconUrl ? (
+              <img src={iconUrl} alt={contract.type} className="w-10 h-10 object-contain rounded" />
+            ) : (
+              <span className="text-2xl">{typeEmoji}</span>
             )}
           </div>
-          {contract.type === 'house' && (
-            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => onEdit(contract)}>
-              <Edit2 className="w-3 h-3" />
-            </Button>
-          )}
-        </div>
 
-        <CardContent className="px-4 pb-3 pt-0 space-y-2">
-          {/* Member ID */}
-          <div className="flex items-center gap-1.5">
-            <User className="w-3 h-3 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground">ผู้เช่า:</span>
-            <span className="text-xs font-mono font-medium truncate">{contract.member_id}</span>
-          </div>
-
-          {/* Role name (role / personal_role) */}
-          {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
-            <div className="flex items-center gap-1.5">
-              <Crown className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className="text-xs truncate">{contract.role_name}</span>
+          {/* Right: Info column */}
+          <div className="flex-1 min-w-0 px-3 py-2.5 space-y-1.5">
+            {/* Top row: badge + status + edit */}
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', typeColor)}>
+                  {typeLabel}
+                </Badge>
+                {contract.type === 'house' && statusText && (
+                  <span className={cn('text-[10px] font-medium flex items-center gap-1', statusColor)}>
+                    <span className={cn('w-1.5 h-1.5 rounded-full inline-block', statusDot)} />
+                    {statusText}
+                  </span>
+                )}
+              </div>
+              {contract.type === 'house' && (
+                <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => onEdit(contract)}>
+                  <Edit2 className="w-3 h-3" />
+                </Button>
+              )}
             </div>
-          )}
 
-          {/* Time info */}
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-            <span className={cn('text-xs', contract.type === 'house' ? statusColor : 'text-muted-foreground')}>
-              {contract.type === 'personal_role'
-                ? formatElapsed(contract.start_at)
-                : contract.end_at ? formatRemaining(contract.end_at) : '—'}
-            </span>
+            {/* Member ID + discord name */}
+            <div className="flex items-center gap-1.5">
+              <User className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-xs font-mono font-medium truncate">{contract.member_id}</span>
+              {discordName && (
+                <span className="text-[10px] text-muted-foreground truncate">(@{discordName})</span>
+              )}
+            </div>
+
+            {/* Role name */}
+            {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
+              <div className="flex items-center gap-1.5">
+                <Crown className="w-3 h-3 text-muted-foreground shrink-0" />
+                <span className="text-xs truncate">{contract.role_name}</span>
+              </div>
+            )}
+
+            {/* Time info */}
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className={cn('text-xs', contract.type === 'house' ? statusColor : 'text-muted-foreground')}>
+                {contract.type === 'personal_role'
+                  ? formatElapsed(contract.start_at)
+                  : contract.end_at ? formatRemaining(contract.end_at) : '—'}
+              </span>
+            </div>
+
+            {/* Room link (house only) */}
+            {contract.type === 'house' && contract.room_link && (
+              <a
+                href={contract.room_link}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-blue-400 hover:underline truncate block"
+              >
+                🔗 {contract.room_link}
+              </a>
+            )}
+
+            {/* Divider + operator + date */}
+            <div className="border-t border-border/40 pt-1.5 flex items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground truncate">
+                ผู้ดำเนินการ: <span className="text-foreground/70">{contract.operator_name ?? '—'}</span>
+              </span>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {new Date(contract.created_at).toLocaleDateString('th-TH', {
+                  day: 'numeric', month: 'short', year: '2-digit',
+                })}
+              </span>
+            </div>
+
+            {/* Notify button (house, urgent, not expired) */}
+            {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="w-full h-7 text-xs gap-1"
+                onClick={() => setNotifyOpen(true)}
+              >
+                <Bell className="w-3 h-3" />กดแจ้งเตือน
+              </Button>
+            )}
           </div>
-
-          {/* Room link (house) */}
-          {contract.type === 'house' && contract.room_link && (
-            <a href={contract.room_link} target="_blank" rel="noreferrer"
-              className="text-[10px] text-blue-400 hover:underline truncate block">
-              🔗 {contract.room_link}
-            </a>
-          )}
-
-          {/* Divider */}
-          <div className="border-t border-border/40 pt-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-muted-foreground truncate">
-              ผู้ดำเนินการ: <span className="text-foreground/70">{contract.operator_name ?? '—'}</span>
-            </span>
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              {new Date(contract.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
-            </span>
-          </div>
-
-          {/* Notify button (house, urgent) */}
-          {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
-            <Button size="sm" variant="destructive" className="w-full h-7 text-xs gap-1" onClick={() => setNotifyOpen(true)}>
-              <Bell className="w-3 h-3" />กดแจ้งเตือน
-            </Button>
-          )}
-        </CardContent>
+        </div>
       </Card>
 
       {/* Notify confirm dialog */}
       <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>ยืนยันการแจ้งเตือน</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">ส่งการแจ้งเตือนไปยัง <span className="font-mono">{contract.member_id}</span> ว่าบ้านเช่าใกล้หมดอายุ?</p>
+          <p className="text-sm text-muted-foreground">
+            ส่งการแจ้งเตือนไปยัง <span className="font-mono">{contract.member_id}</span> ว่าบ้านเช่าใกล้หมดอายุ?
+          </p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setNotifyOpen(false)}>ยกเลิก</Button>
             <Button variant="destructive" onClick={sendNotify} disabled={sending}>
@@ -573,6 +715,9 @@ export function ContractsManagement() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
 
+  const [typeIcons, setTypeIcons] = useState<TypeIcons>({ house: null, role: null, personal_role: null });
+  const [memberProfiles, setMemberProfiles] = useState<Record<string, { username: string; discord_username: string | null }>>({});
+
   // Filters
   const [searchMember, setSearchMember] = useState('');
   const [searchOperator, setSearchOperator] = useState('');
@@ -581,13 +726,58 @@ export function ContractsManagement() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [page, setPage] = useState(1);
 
+  // Load stored icon URLs from storage on mount
+  useEffect(() => {
+    async function loadTypeIcons() {
+      const types: ContractType[] = ['house', 'role', 'personal_role'];
+      const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+      const result: TypeIcons = { house: null, role: null, personal_role: null };
+      for (const type of types) {
+        for (const ext of exts) {
+          const { data } = supabase.storage
+            .from('contract-icons')
+            .getPublicUrl(`type-icons/${type}.${ext}`);
+          // Try to verify the URL exists with a HEAD request
+          try {
+            const res = await fetch(data.publicUrl, { method: 'HEAD' });
+            if (res.ok) { result[type] = data.publicUrl; break; }
+          } catch { /* skip */ }
+        }
+      }
+      setTypeIcons(result);
+    }
+    loadTypeIcons();
+  }, []);
+
+  async function fetchMemberProfiles(memberIds: string[]) {
+    if (memberIds.length === 0) return;
+    const { data, error } = await (supabase as any)
+      .from('profiles')
+      .select('discord_id, username, discord_username')
+      .in('discord_id', memberIds);
+    if (error || !data) return;
+    const map: Record<string, { username: string; discord_username: string | null }> = {};
+    for (const p of data) {
+      map[p.discord_id] = { username: p.username, discord_username: p.discord_username ?? null };
+    }
+    setMemberProfiles(map);
+  }
+
   const fetchContracts = useCallback(async () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
-      .from('contracts').select('*').order('created_at', { ascending: false });
+      .from('contracts')
+      .select('*')
+      .order('created_at', { ascending: false });
     setLoading(false);
-    if (error) { toast({ title: 'โหลดข้อมูลไม่สำเร็จ', description: error.message, variant: 'destructive' }); return; }
-    setContracts(data ?? []);
+    if (error) {
+      toast({ title: 'โหลดข้อมูลไม่สำเร็จ', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const list: Contract[] = data ?? [];
+    setContracts(list);
+    const memberIds = [...new Set(list.map(c => c.member_id))];
+    fetchMemberProfiles(memberIds);
   }, [toast]);
 
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
@@ -607,29 +797,16 @@ export function ContractsManagement() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const typeLabel = (t: ContractType) =>
-    t === 'house' ? 'เช่าบ้าน' : t === 'role' ? 'เช่ายศ' : 'ยศส่วนตัว';
-
-  const typeBadgeClass = (t: ContractType) =>
-    t === 'house' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-    t === 'role' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-    'bg-amber-500/10 text-amber-400 border-amber-500/20';
-
-  const statusInfo = (c: Contract) => {
-    if (c.type !== 'house' || !c.end_at) return null;
-    const d = daysRemaining(c.end_at);
-    if (d <= 0) return { dot: 'bg-gray-400', text: 'หมดอายุ' };
-    if (d <= 3) return { dot: 'bg-red-500', text: 'เร่งด่วน' };
-    if (d <= 7) return { dot: 'bg-orange-400', text: 'ใกล้หมด' };
-    return { dot: 'bg-green-500', text: 'ปกติ' };
-  };
-
   const clearFilters = () => {
     setSearchMember(''); setSearchOperator('');
     setFilterType('all'); setFilterDateFrom(''); setFilterDateTo('');
   };
 
   const hasFilter = searchMember || searchOperator || filterType !== 'all' || filterDateFrom || filterDateTo;
+
+  function handleIconUploaded(type: ContractType, url: string) {
+    setTypeIcons(prev => ({ ...prev, [type]: url }));
+  }
 
   return (
     <div className="space-y-4">
@@ -639,7 +816,10 @@ export function ContractsManagement() {
           <h2 className="text-lg font-semibold">สัญญาเช่า</h2>
           <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {user?.is_owner && (
+            <IconUpload typeIcons={typeIcons} onUploaded={handleIconUploaded} />
+          )}
           <Button variant="outline" size="sm" onClick={fetchContracts} disabled={loading}>
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
           </Button>
@@ -653,23 +833,30 @@ export function ContractsManagement() {
       <Card className="border-border/50">
         <CardContent className="pt-4 pb-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* ค้นหาผู้เช่า */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">ผู้เช่า (Member ID)</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                <Input className="pl-8 h-8 text-sm" placeholder="ค้นหา ID..." value={searchMember} onChange={e => setSearchMember(e.target.value)} />
+                <Input
+                  className="pl-8 h-8 text-sm"
+                  placeholder="ค้นหา ID..."
+                  value={searchMember}
+                  onChange={e => setSearchMember(e.target.value)}
+                />
               </div>
             </div>
-            {/* ค้นหาผู้ดำเนินการ */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">ผู้ดำเนินการ</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                <Input className="pl-8 h-8 text-sm" placeholder="ค้นหาชื่อ..." value={searchOperator} onChange={e => setSearchOperator(e.target.value)} />
+                <Input
+                  className="pl-8 h-8 text-sm"
+                  placeholder="ค้นหาชื่อ..."
+                  value={searchOperator}
+                  onChange={e => setSearchOperator(e.target.value)}
+                />
               </div>
             </div>
-            {/* ประเภท */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">ประเภทสัญญา</Label>
               <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
@@ -682,18 +869,30 @@ export function ContractsManagement() {
                 </SelectContent>
               </Select>
             </div>
-            {/* วันที่ */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">วันที่สร้าง</Label>
               <div className="flex gap-1.5 items-center">
-                <Input type="date" className="h-8 text-xs flex-1" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+                <Input
+                  type="date"
+                  className="h-8 text-xs flex-1"
+                  value={filterDateFrom}
+                  onChange={e => setFilterDateFrom(e.target.value)}
+                />
                 <span className="text-xs text-muted-foreground shrink-0">—</span>
-                <Input type="date" className="h-8 text-xs flex-1" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+                <Input
+                  type="date"
+                  className="h-8 text-xs flex-1"
+                  value={filterDateTo}
+                  onChange={e => setFilterDateTo(e.target.value)}
+                />
               </div>
             </div>
           </div>
           {hasFilter && (
-            <button onClick={clearFilters} className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+            <button
+              onClick={clearFilters}
+              className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
               <X className="w-3 h-3" />ล้างตัวกรอง
             </button>
           )}
@@ -702,13 +901,22 @@ export function ContractsManagement() {
 
       {/* Grid */}
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
       ) : paginated.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground text-sm">ไม่พบข้อมูลสัญญา</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {paginated.map(c => (
-            <ContractCard key={c.id} contract={c} onEdit={setEditTarget} onRefresh={fetchContracts} />
+            <ContractCard
+              key={c.id}
+              contract={c}
+              typeIcons={typeIcons}
+              memberProfiles={memberProfiles}
+              onEdit={setEditTarget}
+              onRefresh={fetchContracts}
+            />
           ))}
         </div>
       )}
@@ -716,10 +924,26 @@ export function ContractsManagement() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">หน้า {page} / {totalPages} ({filtered.length} รายการ)</p>
+          <p className="text-xs text-muted-foreground">
+            หน้า {page} / {totalPages} ({filtered.length} รายการ)
+          </p>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="h-7 px-2 text-xs">ก่อนหน้า</Button>
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="h-7 px-2 text-xs">ถัดไป</Button>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="h-7 px-2 text-xs"
+            >
+              ก่อนหน้า
+            </Button>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="h-7 px-2 text-xs"
+            >
+              ถัดไป
+            </Button>
           </div>
         </div>
       )}
