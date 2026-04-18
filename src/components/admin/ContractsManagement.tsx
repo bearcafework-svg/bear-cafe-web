@@ -534,6 +534,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sending, setSending] = useState(false);
 
   async function handleDelete() {
     setDeleting(true);
