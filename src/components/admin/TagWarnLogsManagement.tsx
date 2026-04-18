@@ -694,7 +694,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
           content: `<@${newWarn.memberId}>`,
           embeds: [{
             description: description,
-            color: 0xFFEFEF,
+            color: 0xFC6868,
             image: imageUrls.length > 0 ? { url: imageUrls[0] } : undefined
           }]
         };
