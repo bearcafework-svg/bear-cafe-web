@@ -502,6 +502,64 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // personal_role: role members + channel name
+  const [roleMembers, setRoleMembers] = useState<Array<{ id: string; username: string; avatar: string | null; profile?: { avatar_url: string | null; username: string } | null }> | null>(null);
+  const [roleTotal, setRoleTotal] = useState<number | null>(null);
+  const [channelName, setChannelName] = useState<string | null>(null);
+  const [loadingExtra, setLoadingExtra] = useState(false);
+
+  // Auto-fetch for personal_role cards
+  useEffect(() => {
+    if (contract.type !== 'personal_role') return;
+    if (roleMembers !== null) return; // already loaded
+
+    async function fetchExtra() {
+      setLoadingExtra(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const body: Record<string, string> = {};
+        if (contract.discord_role_id) body.role_id = contract.discord_role_id;
+        if (contract.room_link) body.channel_url = contract.room_link;
+
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-role-members`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify(body),
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.members) {
+          // Enrich with profiles table
+          const ids: string[] = data.members.map((m: any) => m.id);
+          const { data: profiles } = await (supabase as any)
+            .from('profiles')
+            .select('discord_id, username, avatar_url')
+            .in('discord_id', ids);
+          const profileMap: Record<string, any> = {};
+          (profiles ?? []).forEach((p: any) => { profileMap[p.discord_id] = p; });
+
+          setRoleMembers(data.members.map((m: any) => ({
+            ...m,
+            profile: profileMap[m.id] ?? null,
+          })));
+          setRoleTotal(data.total ?? data.members.length);
+        }
+        if (data.channel_name) setChannelName(data.channel_name);
+      } catch { /* silent */ } finally {
+        setLoadingExtra(false);
+      }
+    }
+    fetchExtra();
+  }, [contract.type, contract.discord_role_id, contract.room_link]);
+
   const days = contract.end_at ? daysRemaining(contract.end_at) : null;
 
   const borderColor =
@@ -645,7 +703,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               </span>
             </div>
 
-            {/* Room link (house only) */}
+            {/* Room link (house only) — แสดงชื่อห้องถ้ามี */}
             {contract.type === 'house' && contract.room_link && (
               <a
                 href={contract.room_link}
@@ -655,6 +713,74 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               >
                 🔗 {contract.room_link}
               </a>
+            )}
+
+            {/* personal_role: channel name + role members */}
+            {contract.type === 'personal_role' && (
+              <>
+                {/* Channel name (ถ้ามี room_link) */}
+                {contract.room_link && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground shrink-0">#</span>
+                    {loadingExtra ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                    ) : channelName ? (
+                      <a href={contract.room_link} target="_blank" rel="noreferrer"
+                        className="text-[10px] text-blue-400 hover:underline truncate">
+                        {channelName}
+                      </a>
+                    ) : (
+                      <a href={contract.room_link} target="_blank" rel="noreferrer"
+                        className="text-[10px] text-blue-400 hover:underline truncate">
+                        ดูห้อง
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Role members */}
+                {roleMembers !== null && (
+                  <div className="space-y-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-muted-foreground">ผู้ถือบทบาท:</span>
+                      <span className={cn(
+                        'text-[10px] font-semibold',
+                        (roleTotal ?? 0) > 5 ? 'text-red-500' : 'text-foreground'
+                      )}>
+                        {roleTotal ?? roleMembers.length} คน
+                        {(roleTotal ?? 0) > 5 && ' (เกินกำหนด)'}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {roleMembers.slice(0, 5).map((m, i) => (
+                        <div key={m.id} className="flex items-center gap-1.5">
+                          {/* Avatar */}
+                          <div className="w-4 h-4 rounded-full overflow-hidden shrink-0 bg-muted">
+                            {m.profile?.avatar_url ? (
+                              <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : m.avatar ? (
+                              <img src={m.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[8px]">🐻</div>
+                            )}
+                          </div>
+                          <span className="text-[10px] truncate">
+                            {m.profile?.username ?? m.username ?? `ผู้ใช้ ${i + 1} (ยังไม่ได้ล็อคอิน)`}
+                          </span>
+                        </div>
+                      ))}
+                      {(roleTotal ?? 0) > 5 && (
+                        <p className="text-[10px] text-red-500">+{(roleTotal ?? 0) - 5} คนเพิ่มเติม</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {loadingExtra && roleMembers === null && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />กำลังโหลด...
+                  </div>
+                )}
+              </>
             )}
 
             {/* Divider + operator + date */}
