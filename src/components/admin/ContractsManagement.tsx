@@ -472,52 +472,75 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
 
   return (
     <>
-      <Card className={cn('border-2 transition-colors', borderColor)}>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-          <Badge className={cn('text-xs', typeColor)}>{typeLabel}</Badge>
-          <div className="flex gap-1">
-            {contract.type === 'house' && (
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(contract)}>
-                <Edit2 className="w-3.5 h-3.5" />
-              </Button>
+      <Card className={cn('border-2 transition-colors hover:shadow-sm', borderColor)}>
+        {/* Card Header — type badge + edit button */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn('text-[10px] px-2 py-0.5', typeColor)}>{typeLabel}</Badge>
+            {contract.type === 'house' && statusText && (
+              <span className={cn('text-[10px] font-medium flex items-center gap-1', statusColor)}>
+                <span className={cn('w-1.5 h-1.5 rounded-full inline-block', days !== null && days <= 3 ? 'bg-red-500' : days !== null && days <= 7 ? 'bg-orange-400' : 'bg-green-500')} />
+                {statusText}
+              </span>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-1.5 text-sm">
-          <p className="font-mono text-xs text-muted-foreground">ID: {contract.member_id}</p>
+          {contract.type === 'house' && (
+            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => onEdit(contract)}>
+              <Edit2 className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
 
-          {contract.type === 'house' && contract.end_at && (
-            <>
-              <p className={cn('font-medium', statusColor)}>{statusText}</p>
-              <p className="text-muted-foreground">{formatRemaining(contract.end_at)}</p>
-              {contract.room_link && (
-                <a href={contract.room_link} target="_blank" rel="noreferrer" className="text-xs text-blue-400 underline break-all">
-                  {contract.room_link}
-                </a>
-              )}
-              {days !== null && days <= 3 && (
-                <Button size="sm" variant="destructive" className="mt-1 w-full" onClick={() => setNotifyOpen(true)}>
-                  <Bell className="w-3.5 h-3.5 mr-1" />กดแจ้งเตือน
-                </Button>
-              )}
-            </>
+        <CardContent className="px-4 pb-3 pt-0 space-y-2">
+          {/* Member ID */}
+          <div className="flex items-center gap-1.5">
+            <User className="w-3 h-3 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground">ผู้เช่า:</span>
+            <span className="text-xs font-mono font-medium truncate">{contract.member_id}</span>
+          </div>
+
+          {/* Role name (role / personal_role) */}
+          {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
+            <div className="flex items-center gap-1.5">
+              <Crown className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-xs truncate">{contract.role_name}</span>
+            </div>
           )}
 
-          {contract.type === 'role' && (
-            <>
-              {contract.end_at && <p className="text-muted-foreground">{formatRemaining(contract.end_at)}</p>}
-              {contract.role_name && <p className="font-medium">{contract.role_name}</p>}
-            </>
+          {/* Time info */}
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+            <span className={cn('text-xs', contract.type === 'house' ? statusColor : 'text-muted-foreground')}>
+              {contract.type === 'personal_role'
+                ? formatElapsed(contract.start_at)
+                : contract.end_at ? formatRemaining(contract.end_at) : '—'}
+            </span>
+          </div>
+
+          {/* Room link (house) */}
+          {contract.type === 'house' && contract.room_link && (
+            <a href={contract.room_link} target="_blank" rel="noreferrer"
+              className="text-[10px] text-blue-400 hover:underline truncate block">
+              🔗 {contract.room_link}
+            </a>
           )}
 
-          {contract.type === 'personal_role' && (
-            <>
-              <p className="text-muted-foreground">{formatElapsed(contract.start_at)}</p>
-              {contract.role_name && <p className="font-medium">{contract.role_name}</p>}
-            </>
-          )}
+          {/* Divider */}
+          <div className="border-t border-border/40 pt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-muted-foreground truncate">
+              ผู้ดำเนินการ: <span className="text-foreground/70">{contract.operator_name ?? '—'}</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground shrink-0">
+              {new Date(contract.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+            </span>
+          </div>
 
-          <p className="text-xs text-muted-foreground">ผู้ดำเนินการ: {contract.operator_name ?? '-'}</p>
+          {/* Notify button (house, urgent) */}
+          {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
+            <Button size="sm" variant="destructive" className="w-full h-7 text-xs gap-1" onClick={() => setNotifyOpen(true)}>
+              <Bell className="w-3 h-3" />กดแจ้งเตือน
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -540,6 +563,8 @@ function ContractCard({ contract, onEdit, onRefresh }: ContractCardProps) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+const ITEMS_PER_PAGE = 15;
+
 export function ContractsManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -547,12 +572,19 @@ export function ContractsManagement() {
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
-  const [search, setSearch] = useState('');
+
+  // Filters
+  const [searchMember, setSearchMember] = useState('');
+  const [searchOperator, setSearchOperator] = useState('');
   const [filterType, setFilterType] = useState<ContractType | 'all'>('all');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [page, setPage] = useState(1);
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any).from('contracts').select('*').order('created_at', { ascending: false });
+    const { data, error } = await (supabase as any)
+      .from('contracts').select('*').order('created_at', { ascending: false });
     setLoading(false);
     if (error) { toast({ title: 'โหลดข้อมูลไม่สำเร็จ', description: error.message, variant: 'destructive' }); return; }
     setContracts(data ?? []);
@@ -560,17 +592,53 @@ export function ContractsManagement() {
 
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
 
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [searchMember, searchOperator, filterType, filterDateFrom, filterDateTo]);
+
   const filtered = contracts.filter(c => {
     if (filterType !== 'all' && c.type !== filterType) return false;
-    if (search && !c.member_id.toLowerCase().includes(search.toLowerCase()) && !(c.operator_name ?? '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchMember && !c.member_id.toLowerCase().includes(searchMember.toLowerCase())) return false;
+    if (searchOperator && !(c.operator_name ?? '').toLowerCase().includes(searchOperator.toLowerCase())) return false;
+    if (filterDateFrom && new Date(c.created_at) < new Date(filterDateFrom)) return false;
+    if (filterDateTo && new Date(c.created_at) > new Date(filterDateTo + 'T23:59:59')) return false;
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const typeLabel = (t: ContractType) =>
+    t === 'house' ? 'เช่าบ้าน' : t === 'role' ? 'เช่ายศ' : 'ยศส่วนตัว';
+
+  const typeBadgeClass = (t: ContractType) =>
+    t === 'house' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+    t === 'role' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+    'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+  const statusInfo = (c: Contract) => {
+    if (c.type !== 'house' || !c.end_at) return null;
+    const d = daysRemaining(c.end_at);
+    if (d <= 0) return { dot: 'bg-gray-400', text: 'หมดอายุ' };
+    if (d <= 3) return { dot: 'bg-red-500', text: 'เร่งด่วน' };
+    if (d <= 7) return { dot: 'bg-orange-400', text: 'ใกล้หมด' };
+    return { dot: 'bg-green-500', text: 'ปกติ' };
+  };
+
+  const clearFilters = () => {
+    setSearchMember(''); setSearchOperator('');
+    setFilterType('all'); setFilterDateFrom(''); setFilterDateTo('');
+  };
+
+  const hasFilter = searchMember || searchOperator || filterType !== 'all' || filterDateFrom || filterDateTo;
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-xl font-semibold">สัญญาเช่า</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">สัญญาเช่า</h2>
+          <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchContracts} disabled={loading}>
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
@@ -582,23 +650,102 @@ export function ContractsManagement() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder="ค้นหา member ID / ผู้ดำเนินการ" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกประเภท</SelectItem>
-            <SelectItem value="house">สัญญาเช่าบ้าน</SelectItem>
-            <SelectItem value="role">สัญญาเช่ายศ</SelectItem>
-            <SelectItem value="personal_role">สัญญายศส่วนตัว</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card className="border-border/50">
+        <CardContent className="pt-4 pb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* ค้นหาผู้เช่า */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ผู้เช่า (Member ID)</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Input className="pl-8 h-8 text-sm" placeholder="ค้นหา ID..." value={searchMember} onChange={e => setSearchMember(e.target.value)} />
+              </div>
+            </div>
+            {/* ค้นหาผู้ดำเนินการ */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ผู้ดำเนินการ</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Input className="pl-8 h-8 text-sm" placeholder="ค้นหาชื่อ..." value={searchOperator} onChange={e => setSearchOperator(e.target.value)} />
+              </div>
+            </div>
+            {/* ประเภท */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ประเภทสัญญา</Label>
+              <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกประเภท</SelectItem>
+                  <SelectItem value="house">สัญญาเช่าบ้าน</SelectItem>
+                  <SelectItem value="role">สัญญาเช่ายศ</SelectItem>
+                  <SelectItem value="personal_role">สัญญายศส่วนตัว</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* วันที่ */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">วันที่สร้าง</Label>
+              <div className="flex gap-1.5 items-center">
+                <Input type="date" className="h-8 text-xs flex-1" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+                <span className="text-xs text-muted-foreground shrink-0">—</span>
+                <Input type="date" className="h-8 text-xs flex-1" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          {hasFilter && (
+            <button onClick={clearFilters} className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+              <X className="w-3 h-3" />ล้างตัวกรอง
+            </button>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Grid */}
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+      ) : paginated.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground text-sm">ไม่พบข้อมูลสัญญา</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {paginated.map(c => (
+            <ContractCard key={c.id} contract={c} onEdit={setEditTarget} onRefresh={fetchContracts} />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-muted-foreground">หน้า {page} / {totalPages} ({filtered.length} รายการ)</p>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="h-7 px-2 text-xs">ก่อนหน้า</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="h-7 px-2 text-xs">ถัดไป</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Dialog */}
+      <AddDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => { setAddOpen(false); fetchContracts(); }}
+        operatorId={user?.id ?? ''}
+        operatorName={user?.username ?? ''}
+      />
+
+      {/* Edit Dialog */}
+      {editTarget && (
+        <EditDialog
+          contract={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); fetchContracts(); }}
+          operatorName={user?.username ?? ''}
+          operatorAvatar={user?.avatar_url ?? null}
+        />
+      )}
+    </div>
+  );
+}      {/* Grid */}
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : filtered.length === 0 ? (

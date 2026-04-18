@@ -304,7 +304,33 @@ serve(async (req: Request): Promise<Response> => {
 
     const body = await req.json().catch(() => ({}));
     const code = typeof body?.code === "string" ? body.code : "";
+    const turnstileToken = typeof body?.turnstileToken === "string" ? body.turnstileToken : null;
 
+    // ─── MODE 1: Generate authUrl (frontend calls with turnstileToken) ───────
+    if (!code && (turnstileToken !== null || !body?.code)) {
+      // Verify Turnstile if token provided
+      if (turnstileToken && turnstileToken !== 'TURNSTILE_BYPASS_DEV') {
+        const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+        if (turnstileSecret) {
+          const form = new FormData();
+          form.append("secret", turnstileSecret);
+          form.append("response", turnstileToken);
+          const tsRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+          const tsData = await tsRes.json();
+          if (!tsData.success) {
+            return jsonResponse({ ok: false, error_type: "internal_error", message: "Turnstile verification failed", debug_id: debugId }, 403);
+          }
+        }
+      }
+
+      const scope = encodeURIComponent("identify guilds");
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=${scope}`;
+      return new Response(JSON.stringify({ authUrl }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── MODE 2: Exchange code for session ───────────────────────────────────
     if (!code) {
       return jsonResponse({
         ok: false,
