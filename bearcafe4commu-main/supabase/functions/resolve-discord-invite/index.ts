@@ -54,13 +54,11 @@ Deno.serve(async (req): Promise<Response> => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Verify the user
-    const userClient = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } }
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    // Use adminClient with service role to verify token — bypasses ES256 JWT algorithm issue
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -108,7 +106,6 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Get user's discord_id from profile
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
     const { data: profile } = await adminClient
       .from('profiles')
       .select('discord_id')
