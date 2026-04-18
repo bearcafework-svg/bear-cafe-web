@@ -61,15 +61,12 @@ interface Contract {
 }
 
 const ROLE_OPTIONS = [
-  'ヽ 𝐂𝐨𝐨𝐤𝐢𝐞',
-  'ヽ 𝐂𝐡𝐨𝐜𝐨𝐥𝐚𝐭𝐞',
-  'ヽ 𝐒𝐭𝐫𝐚𝐰𝐛𝐞𝐫𝐫𝐲',
-  'ヽ 𝐌𝐚𝐭𝐜𝐡𝐚',
-  'ヽ 𝐁𝐥𝐮𝐞𝐛𝐞𝐫𝐫𝐲',
-  'ヽ 𝐂𝐚𝐫𝐚𝐦𝐞𝐥',
-  'ヽ 𝐕𝐚𝐧𝐢𝐥𝐥𝐚',
-  'ヽ 𝐌𝐢𝐥𝐤',
-  'ヽ 𝐈𝐜𝐞 𝐜𝐫𝐞𝐚𝐦',
+  'ヽ 𝐂𝐨𝐨𝐤𝐢𝐞 (ยศพรีเมี่ยม 𝐒) 𓂃 🍪',
+  'ヽ 𝐌𝐚𝐜𝐚𝐫𝐨𝐧 (ยศพรีเมี่ยม 𝐀) 𓂃 🥯',
+  'ヽ 𝐂𝐡𝐨𝐜 𝐓𝐫𝐮𝐟𝐟𝐥𝐞 (ยศพรีเมี่ยม 𝐁) 𓂃 🍫',
+  'ヽ 𝐂𝐡𝐞𝐞𝐬𝐞𝐜𝐚𝐤𝐞 (ยศพรีเมี่ยม 𝐂) 𓂃 🍰',
+  'ヽ 𝐃𝐨𝐧𝐮𝐭 (ยศพรีเมี่ยม 𝐃) 𓂃 🍩',
+  'ヽ 𝐈𝐜𝐞 𝐜𝐫𝐞𝐚𝐦 (ยศพรีเมี่ยม 𝐄) 𓂃 🍦',
 ];
 
 const WEBHOOK_URL =
@@ -113,6 +110,8 @@ interface AddDialogProps {
   operatorName: string;
 }
 
+interface DiscordRole { id: string; name: string; color: string | null; }
+
 function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDialogProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
@@ -124,11 +123,44 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [endAt, setEndAt] = useState('');
   const [roomLink, setRoomLink] = useState('');
   const [roleName, setRoleName] = useState('');
-  const [discordRoleId, setDiscordRoleId] = useState('');
+
+  // personal_role: Discord roles from API
+  const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [roleSearch, setRoleSearch] = useState('');
+  const [selectedDiscordRole, setSelectedDiscordRole] = useState<DiscordRole | null>(null);
+
+  async function fetchDiscordRoles() {
+    setRolesLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('discord-roles', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error) throw error;
+      setDiscordRoles(data?.roles ?? []);
+    } catch (e: any) {
+      toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message, variant: 'destructive' });
+    } finally {
+      setRolesLoading(false);
+    }
+  }
+
+  // Auto-fetch when switching to personal_role step 2
+  useEffect(() => {
+    if (open && type === 'personal_role' && step === 2 && discordRoles.length === 0) {
+      fetchDiscordRoles();
+    }
+  }, [open, type, step]);
+
+  const filteredDiscordRoles = discordRoles.filter(r =>
+    !roleSearch || r.name.toLowerCase().includes(roleSearch.toLowerCase())
+  );
 
   function reset() {
     setStep(1); setMemberId(''); setStartAt(''); setEndAt('');
-    setRoomLink(''); setRoleName(''); setDiscordRoleId('');
+    setRoomLink(''); setRoleName(''); setRoleSearch('');
+    setSelectedDiscordRole(null);
   }
 
   function handleClose() { reset(); onClose(); }
@@ -144,6 +176,9 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
     if (!memberId.trim() || !startAt) {
       toast({ title: 'กรุณากรอกข้อมูลให้ครบ', variant: 'destructive' }); return;
     }
+    if (type === 'personal_role' && !selectedDiscordRole) {
+      toast({ title: 'กรุณาเลือกยศ Discord', variant: 'destructive' }); return;
+    }
     setSaving(true);
     const payload: Record<string, unknown> = {
       type,
@@ -151,8 +186,9 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       start_at: new Date(startAt).toISOString(),
       end_at: computedEndAt(),
       room_link: type === 'house' ? roomLink.trim() || null : null,
-      role_name: type === 'role' ? roleName || null : type === 'personal_role' ? discordRoleId.trim() || null : null,
-      discord_role_id: type === 'personal_role' ? discordRoleId.trim() || null : null,
+      role_name: type === 'role' ? roleName || null
+        : type === 'personal_role' ? selectedDiscordRole?.name ?? null : null,
+      discord_role_id: type === 'personal_role' ? selectedDiscordRole?.id ?? null : null,
       operator_id: operatorId,
       operator_name: operatorName,
       edit_log: [],
@@ -228,9 +264,63 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
               </div>
             )}
             {type === 'personal_role' && (
-              <div className="space-y-1">
-                <Label>ชื่อ / ID ยศ Discord</Label>
-                <Input value={discordRoleId} onChange={e => setDiscordRoleId(e.target.value)} placeholder="role name or ID" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>ยศ Discord</Label>
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    onClick={fetchDiscordRoles} disabled={rolesLoading}
+                    className="h-7 text-xs gap-1"
+                  >
+                    <RefreshCw className={cn('w-3 h-3', rolesLoading && 'animate-spin')} />
+                    ซิงค์ยศ
+                  </Button>
+                </div>
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    className="pl-8 h-8 text-sm"
+                    placeholder="ค้นหาชื่อบทบาท..."
+                    value={roleSearch}
+                    onChange={e => setRoleSearch(e.target.value)}
+                  />
+                </div>
+                {/* Role list */}
+                {rolesLoading ? (
+                  <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
+                    {filteredDiscordRoles.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">
+                        {discordRoles.length === 0 ? 'กดซิงค์เพื่อโหลดยศ' : 'ไม่พบยศที่ค้นหา'}
+                      </p>
+                    ) : filteredDiscordRoles.map(r => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setSelectedDiscordRole(r)}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
+                          selectedDiscordRole?.id === r.id && 'bg-primary/10'
+                        )}
+                      >
+                        {r.color && (
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                        )}
+                        <span className="truncate">{r.name}</span>
+                        {selectedDiscordRole?.id === r.id && (
+                          <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-primary shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedDiscordRole && (
+                  <p className="text-xs text-muted-foreground">
+                    เลือก: <span className="font-medium text-foreground">{selectedDiscordRole.name}</span>
+                  </p>
+                )}
               </div>
             )}
           </div>
