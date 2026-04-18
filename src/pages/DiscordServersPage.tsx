@@ -475,15 +475,29 @@ export default function DiscordServersPage() {
     }
     setIsSubmitting(true);
     try {
-      const res = await supabase.functions.invoke('resolve-discord-invite', {
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: { invite_url: inviteUrl, category_id: categoryId },
-      });
-      if (res.error) throw new Error(res.error.message);
-      const result = res.data;
-      if (!result.success) throw new Error(result.error || 'Unknown error');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: 'กรุณาเข้าสู่ระบบก่อน', variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-discord-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ invite_url: inviteUrl, category_id: categoryId }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || `HTTP ${response.status}`);
+
       toast({ title: 'ส่งคำขอเรียบร้อยแล้ว!', description: `เซิร์ฟเวอร์ "${result.server.name}" จะแสดงผลหลังจากได้รับการตรวจสอบ`, className: 'bg-green-500 text-white' });
       setIsAddOpen(false);
       resetForm();
