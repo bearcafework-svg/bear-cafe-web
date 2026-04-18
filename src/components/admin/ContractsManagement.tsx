@@ -746,4 +746,3 @@ export function ContractsManagement() {
     </div>
   );
 }
-}
