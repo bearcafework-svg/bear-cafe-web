@@ -56,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = async (sessionUser: SupabaseUser): Promise<User | null> => {
     console.log('[Auth] Fetching profile for user:', sessionUser.id);
 
-    // รวม profile + roles + permissions เป็น 3 queries parallel แทน sequential
-    const [profileResult, rolesResult, permResult] = await Promise.all([
+    // profile + roles parallel (ไม่ใช้ join เพื่อหลีกเลี่ยง PGRST200)
+    const [profileResult, rolesResult, permIdsResult] = await Promise.all([
       supabase
         .from('profiles')
         .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
@@ -67,9 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('user_roles')
         .select('role')
         .eq('user_id', sessionUser.id),
+      // ดึงแค่ permission_id ก่อน ไม่ join — ป้องกัน PGRST200 เมื่อ FK หาย
       supabase
         .from('user_custom_permissions')
-        .select('custom_permissions(allowed_pages)')
+        .select('permission_id')
         .eq('user_id', sessionUser.id),
     ]);
 
@@ -84,19 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
-    console.log('[Auth] Profile loaded:', profile.username);
-
     // Roles
     const roleSet = new Set((rolesResult.data ?? []).map((r: any) => r.role));
     const is_owner = roleSet.has('moderator');
     const is_admin = roleSet.has('admin');
 
-    // Permissions
+    // Permissions — ดึง allowed_pages จาก custom_permissions แยก
     const allPages = new Set<string>();
-    (permResult.data ?? []).forEach((row: any) => {
-      const pages = row.custom_permissions?.allowed_pages;
-      if (Array.isArray(pages)) pages.forEach((p: string) => allPages.add(p));
-    });
+    const permIds = (permIdsResult.data ?? []).map((r: any) => r.permission_id).filter(Boolean);
+    if (permIds.length > 0) {
+      const { data: cpData } = await supabase
+        .from('custom_permissions')
+        .select('allowed_pages')
+        .in('id', permIds);
+      (cpData ?? []).forEach((cp: any) => {
+        if (Array.isArray(cp.allowed_pages)) {
+          cp.allowed_pages.forEach((p: string) => allPages.add(p));
+        }
+      });
+    }
+
+    console.log('[Auth] Profile loaded:', profile.username);
 
     return {
       id: profile.id,
