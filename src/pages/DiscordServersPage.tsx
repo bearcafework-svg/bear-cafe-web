@@ -482,6 +482,54 @@ export default function DiscordServersPage() {
         return;
       }
 
+      // ── ตรวจสอบว่า user เป็น owner ของ server ก่อนส่ง ──
+      // ดึง guild ID จาก invite URL ก่อน
+      const inviteMatch = inviteUrl.match(/discord(?:\.gg|\.com\/invite)\/([a-zA-Z0-9-]+)/);
+      const inviteCode = inviteMatch?.[1] ?? inviteUrl.trim();
+      const inviteRes = await fetch(`https://discord.com/api/v10/invites/${inviteCode}?with_counts=false`);
+      if (!inviteRes.ok) {
+        toast({ title: 'ลิงก์เชิญไม่ถูกต้องหรือหมดอายุ', variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+      }
+      const inviteData = await inviteRes.json();
+      const guildId = inviteData.guild?.id;
+      if (!guildId) {
+        toast({ title: 'ไม่พบข้อมูลเซิร์ฟเวอร์จากลิงก์นี้', variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ดึง guilds ของ user จาก Discord API (ต้องมี scope=guilds)
+      const discordToken = session.user?.user_metadata?.discord_access_token;
+      if (discordToken) {
+        const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+          headers: { Authorization: `Bearer ${discordToken}` },
+        });
+        if (guildsRes.ok) {
+          const guilds: Array<{ id: string; owner: boolean }> = await guildsRes.json();
+          const targetGuild = guilds.find(g => g.id === guildId);
+          if (!targetGuild) {
+            toast({
+              title: '⚠️ คุณไม่ได้อยู่ในเซิร์ฟเวอร์นี้',
+              description: 'สามารถแปะได้เฉพาะเซิร์ฟเวอร์ที่คุณเป็นสมาชิกและเป็นเจ้าของเท่านั้น',
+              variant: 'destructive',
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          if (!targetGuild.owner) {
+            toast({
+              title: '⚠️ คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้',
+              description: 'สามารถแปะได้เฉพาะเซิร์ฟเวอร์ที่คุณเป็น Owner เท่านั้น',
+              variant: 'destructive',
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-discord-invite`,
         {
