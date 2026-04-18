@@ -745,38 +745,5 @@ export function ContractsManagement() {
       )}
     </div>
   );
-}      {/* Grid */}
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-      ) : filtered.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">ไม่พบข้อมูลสัญญา</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(c => (
-            <ContractCard key={c.id} contract={c} onEdit={setEditTarget} onRefresh={fetchContracts} />
-          ))}
-        </div>
-      )}
-
-      {/* Add Dialog */}
-      <AddDialog
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSaved={() => { setAddOpen(false); fetchContracts(); }}
-        operatorId={user?.id ?? ''}
-        operatorName={user?.username ?? ''}
-      />
-
-      {/* Edit Dialog */}
-      {editTarget && (
-        <EditDialog
-          contract={editTarget}
-          onClose={() => setEditTarget(null)}
-          onSaved={() => { setEditTarget(null); fetchContracts(); }}
-          operatorName={user?.username ?? ''}
-          operatorAvatar={user?.avatar_url ?? null}
-        />
-      )}
-    </div>
-  );
+}
 }
