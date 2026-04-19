@@ -145,22 +145,27 @@ Deno.serve(async (req): Promise<Response> => {
         const guildData = await guildRes.json();
         const guildOwnerId: string = guildData.owner_id ?? "";
 
+        console.log(`Owner check: guild=${guildId}, owner=${guildOwnerId}, user=${userDiscordId}`);
+
         if (guildOwnerId && guildOwnerId !== userDiscordId) {
-          console.warn(`Owner mismatch: guild owner=${guildOwnerId}, user=${userDiscordId}`);
           return new Response(
             JSON.stringify({
               error: "คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้ เฉพาะ Owner เท่านั้นที่สามารถเพิ่มเซิร์ฟเวอร์ได้",
+              debug: { guild_owner: guildOwnerId, your_id: userDiscordId },
             }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-      } else if (guildRes.status === 403) {
-        // Bot is not in the guild — cannot verify ownership
-        // Allow submission but flag it for manual review
-        console.warn(`Bot not in guild ${guildId}, skipping owner check`);
+        // ✅ Owner confirmed — proceed
+      } else if (guildRes.status === 403 || guildRes.status === 404) {
+        // Bot not in guild — skip owner check, allow submission for manual review
+        console.warn(`Bot cannot access guild ${guildId} (${guildRes.status}), skipping owner check`);
       } else {
         console.warn(`Guild API returned ${guildRes.status} for guild ${guildId}`);
       }
+    } else {
+      // No bot token or no discord_id — skip owner check
+      console.warn(`Skipping owner check: botToken=${!!botToken}, userDiscordId=${userDiscordId}`);
     }
 
     // ── Step 3: Check duplicate ───────────────────────────────────────────────

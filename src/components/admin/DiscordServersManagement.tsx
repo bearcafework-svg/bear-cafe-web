@@ -17,8 +17,9 @@ import {
 import {
   Loader2, Check, X, ExternalLink, Users, Trash2, Pencil, Plus,
   MousePointerClick, FolderOpen, Star, ShieldCheck, Handshake,
-  GripVertical, LayoutList,
+  GripVertical, LayoutList, Clock, CheckCircle2, XCircle,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DiscordServer {
@@ -107,6 +108,13 @@ export function DiscordServersManagement() {
   // Profile map
   const [profileMap, setProfileMap] = useState<Map<string, { username: string; avatar_url: string | null }>>(new Map());
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+
+  // Confirm status dialog
+  const [confirmTarget, setConfirmTarget] = useState<{ server: DiscordServer; status: 'approved' | 'rejected' } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     try {
@@ -156,6 +164,31 @@ export function DiscordServersManagement() {
       // Revert on failure
       setServers((prev) => prev.map((s) => s.id === id ? { ...s, status: 'pending' } : s));
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  // ── Confirm status change ──────────────────────────────────────────────────
+  const handleConfirmStatus = async () => {
+    if (!confirmTarget) return;
+    setConfirmLoading(true);
+    const { server, status } = confirmTarget;
+    // Optimistic update
+    setServers((prev) => prev.map((s) => s.id === server.id ? { ...s, status } : s));
+    try {
+      const { error } = await (supabase.from('discord_servers' as any).update({ status }).eq('id', server.id)) as any;
+      if (error) throw error;
+      toast({
+        title: status === 'approved' ? '✅ อนุมัติเรียบร้อย' : '❌ ปฏิเสธเรียบร้อย',
+        className: status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white',
+      });
+      setConfirmTarget(null);
+      // Switch to the tab matching the new status
+      setActiveTab(status);
+    } catch (error: any) {
+      setServers((prev) => prev.map((s) => s.id === server.id ? { ...s, status: 'pending' } : s));
+      toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -337,6 +370,11 @@ export function DiscordServersManagement() {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const pendingServers = servers.filter((s) => s.status === 'pending');
+  const approvedServers = servers.filter((s) => s.status === 'approved');
+  const rejectedServers = servers.filter((s) => s.status === 'rejected');
+  const tabServers = activeTab === 'pending' ? pendingServers : activeTab === 'approved' ? approvedServers : rejectedServers;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -352,16 +390,51 @@ export function DiscordServersManagement() {
         </div>
       </div>
 
+      {/* ── Status Tabs ── */}
+      <div className="flex gap-1 p-1 bg-muted/40 rounded-xl w-fit">
+        {([
+          { key: 'pending', label: 'รอตรวจสอบ', count: pendingServers.length, icon: Clock, color: 'text-amber-500' },
+          { key: 'approved', label: 'อนุมัติแล้ว', count: approvedServers.length, icon: CheckCircle2, color: 'text-green-500' },
+          { key: 'rejected', label: 'ปฏิเสธ', count: rejectedServers.length, icon: XCircle, color: 'text-red-500' },
+        ] as const).map(({ key, label, count, icon: Icon, color }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+              activeTab === key
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Icon className={cn('h-3.5 w-3.5', activeTab === key ? color : '')} />
+            {label}
+            <span className={cn(
+              'text-xs px-1.5 py-0.5 rounded-full font-semibold',
+              activeTab === key
+                ? key === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                  : key === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                : 'bg-muted text-muted-foreground'
+            )}>
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Server Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           <div className="col-span-full flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
-        ) : servers.length === 0 ? (
-          <div className="col-span-full text-center py-20 text-muted-foreground">ยังไม่มีเซิร์ฟเวอร์</div>
+        ) : tabServers.length === 0 ? (
+          <div className="col-span-full text-center py-16 text-muted-foreground">
+            {activeTab === 'pending' ? 'ไม่มีเซิร์ฟเวอร์รอตรวจสอบ' : activeTab === 'approved' ? 'ยังไม่มีเซิร์ฟเวอร์ที่อนุมัติ' : 'ไม่มีเซิร์ฟเวอร์ที่ถูกปฏิเสธ'}
+          </div>
         ) : (
-          servers.map((server) => (
+          tabServers.map((server) => (
             <Card
               key={server.id}
               className="overflow-hidden border-2 border-latte/20 dark:border-coffee/20"
@@ -385,9 +458,6 @@ export function DiscordServersManagement() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1 justify-end">
-                    <Badge variant={server.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[10px]">
-                      {server.status === 'approved' ? 'อนุมัติ' : server.status === 'rejected' ? 'ปฏิเสธ' : 'รอ'}
-                    </Badge>
                     {server.is_featured && <Badge className="bg-yellow-400 text-yellow-900 text-[10px]"><Star className="h-2.5 w-2.5 mr-0.5" />Featured</Badge>}
                     {server.is_verified && <Badge className="bg-blue-500 text-white text-[10px]"><ShieldCheck className="h-2.5 w-2.5 mr-0.5" />Verified</Badge>}
                     {server.is_partner && <Badge className="bg-purple-500 text-white text-[10px]"><Handshake className="h-2.5 w-2.5 mr-0.5" />Partner</Badge>}
@@ -416,15 +486,46 @@ export function DiscordServersManagement() {
                     )}
                   </div>
                   <div className="flex gap-1.5 pt-1 flex-wrap">
+                    {/* Pending: show approve/reject with confirm dialog */}
                     {server.status === 'pending' && (
                       <>
-                        <Button size="sm" className="flex-1 bg-green-500 hover:bg-green-600 text-xs h-7" onClick={() => handleUpdateStatus(server.id, 'approved')}>
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-xs h-7"
+                          onClick={() => setConfirmTarget({ server, status: 'approved' })}
+                        >
                           <Check className="w-3 h-3 mr-1" />อนุมัติ
                         </Button>
-                        <Button size="sm" variant="destructive" className="flex-1 text-xs h-7" onClick={() => handleUpdateStatus(server.id, 'rejected')}>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1 text-xs h-7"
+                          onClick={() => setConfirmTarget({ server, status: 'rejected' })}
+                        >
                           <X className="w-3 h-3 mr-1" />ปฏิเสธ
                         </Button>
                       </>
+                    )}
+                    {/* Approved: allow reverting to pending */}
+                    {server.status === 'approved' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-7 text-amber-600 border-amber-300 hover:bg-amber-50"
+                        onClick={() => setConfirmTarget({ server, status: 'rejected' })}
+                      >
+                        <XCircle className="w-3 h-3 mr-1" />ถอนการอนุมัติ
+                      </Button>
+                    )}
+                    {/* Rejected: allow re-approving */}
+                    {server.status === 'rejected' && (
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-green-500 hover:bg-green-600 text-xs h-7"
+                        onClick={() => setConfirmTarget({ server, status: 'approved' })}
+                      >
+                        <Check className="w-3 h-3 mr-1" />อนุมัติใหม่
+                      </Button>
                     )}
                     <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleEdit(server)}><Pencil className="w-3 h-3" /></Button>
                     <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(server)}><Trash2 className="w-3 h-3" /></Button>
@@ -584,7 +685,42 @@ export function DiscordServersManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Dialog ── */}
+      {/* ── Confirm Status Dialog ── */}
+      <Dialog open={!!confirmTarget} onOpenChange={(o) => !o && setConfirmTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className={cn(
+              'flex items-center gap-2',
+              confirmTarget?.status === 'approved' ? 'text-green-600' : 'text-destructive'
+            )}>
+              {confirmTarget?.status === 'approved'
+                ? <><CheckCircle2 className="h-5 w-5" /> ยืนยันการอนุมัติ</>
+                : <><XCircle className="h-5 w-5" /> ยืนยันการปฏิเสธ</>
+              }
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              {confirmTarget?.status === 'approved'
+                ? <>อนุมัติเซิร์ฟเวอร์ <strong className="text-foreground">{confirmTarget?.server.name}</strong> ให้แสดงในหน้าสาธารณะ?</>
+                : <>ปฏิเสธเซิร์ฟเวอร์ <strong className="text-foreground">{confirmTarget?.server.name}</strong>? เซิร์ฟเวอร์จะไม่แสดงในหน้าสาธารณะ</>
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmTarget(null)} disabled={confirmLoading}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={handleConfirmStatus}
+              disabled={confirmLoading}
+              className={confirmTarget?.status === 'approved' ? 'bg-green-500 hover:bg-green-600' : ''}
+              variant={confirmTarget?.status === 'rejected' ? 'destructive' : 'default'}
+            >
+              {confirmLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {confirmTarget?.status === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>

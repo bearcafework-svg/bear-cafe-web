@@ -489,25 +489,38 @@ export default function DiscordServersPage() {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
           },
           body: JSON.stringify({ invite_url: inviteUrl, category_id: categoryId }),
         }
       );
 
       const result = await response.json();
+
+      // Handle specific error cases
+      if (response.status === 403) {
+        toast({
+          title: '⚠️ ไม่สามารถเพิ่มเซิร์ฟเวอร์ได้',
+          description: result.error || 'คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (response.status === 409) {
+        toast({
+          title: 'เซิร์ฟเวอร์นี้มีอยู่แล้ว',
+          description: result.error || 'เซิร์ฟเวอร์นี้ถูกเพิ่มในระบบแล้ว',
+          variant: 'destructive',
+        });
+        return;
+      }
       if (!response.ok || !result.success) throw new Error(result.error || `HTTP ${response.status}`);
 
-      toast({ title: 'ส่งคำขอเรียบร้อยแล้ว!', description: `เซิร์ฟเวอร์ "${result.server.name}" จะแสดงผลหลังจากได้รับการตรวจสอบ`, className: 'bg-green-500 text-white' });
+      toast({ title: 'ส่งคำขอเรียบร้อยแล้ว!', description: `เซิร์ฟเวอร์ "${result.server?.name}" จะแสดงผลหลังจากได้รับการตรวจสอบ`, className: 'bg-green-500 text-white' });
       setIsAddOpen(false);
       resetForm();
     } catch (error: any) {
-      const msg = error.message || '';
-      if (msg.includes('owner') || msg.includes('เจ้าของ')) {
-        toast({ title: '⚠️ ไม่สามารถเพิ่มเซิร์ฟเวอร์ได้', description: 'คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้', variant: 'destructive' });
-      } else {
-        toast({ title: 'เกิดข้อผิดพลาด', description: msg, variant: 'destructive' });
-      }
+      toast({ title: 'เกิดข้อผิดพลาด', description: error.message || 'ไม่สามารถเพิ่มเซิร์ฟเวอร์ได้', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -525,9 +538,49 @@ export default function DiscordServersPage() {
         toast({ title: 'คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้', variant: 'destructive' });
         return;
       }
-      const { error } = await (supabase.from('discord_servers' as any).update({ bumped_at: new Date().toISOString() } as any).eq('id', serverId)) as any;
+
+      // ── ดึงข้อมูลใหม่จาก Discord API ──────────────────────────────────────
+      let freshData: Partial<DiscordServer> = {};
+      try {
+        // Extract invite code from invite_url
+        const inviteMatch = server.invite_url.match(/discord\.gg\/([a-zA-Z0-9-]+)/);
+        if (inviteMatch) {
+          const inviteCode = inviteMatch[1];
+          const discordRes = await fetch(
+            `https://discord.com/api/v10/invites/${inviteCode}?with_counts=true`
+          );
+          if (discordRes.ok) {
+            const data = await discordRes.json();
+            freshData = {
+              member_count: data.approximate_member_count ?? server.member_count,
+              icon_url: data.guild?.icon
+                ? `https://cdn.discordapp.com/icons/${data.guild.id}/${data.guild.icon}.${data.guild.icon.startsWith('a_') ? 'gif' : 'png'}?size=256`
+                : server.icon_url,
+              banner_url: data.guild?.banner
+                ? `https://cdn.discordapp.com/banners/${data.guild.id}/${data.guild.banner}.${data.guild.banner.startsWith('a_') ? 'gif' : 'png'}?size=512`
+                : data.guild?.splash
+                ? `https://cdn.discordapp.com/splashes/${data.guild.id}/${data.guild.splash}.png?size=512`
+                : server.banner_url,
+            };
+          }
+        }
+      } catch {
+        // ถ้าดึงไม่ได้ก็ bump ต่อได้ ไม่ต้อง block
+      }
+
+      // ── อัปเดต bumped_at + ข้อมูลใหม่ ──────────────────────────────────────
+      const updatePayload = {
+        bumped_at: new Date().toISOString(),
+        ...freshData,
+      };
+
+      const { error } = await (supabase
+        .from('discord_servers' as any)
+        .update(updatePayload as any)
+        .eq('id', serverId)) as any;
       if (error) throw error;
-      toast({ title: 'ดันเซิร์ฟเวอร์สำเร็จ!', className: 'bg-green-500 text-white' });
+
+      toast({ title: 'ดันเซิร์ฟเวอร์สำเร็จ!', description: freshData.member_count ? `อัปเดตข้อมูลล่าสุด: ${freshData.member_count.toLocaleString()} สมาชิก` : undefined, className: 'bg-green-500 text-white' });
       fetchData();
     } catch (error: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });

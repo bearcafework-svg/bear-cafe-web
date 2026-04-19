@@ -575,7 +575,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             headers: {
               'Authorization': `Bearer ${session?.access_token}`,
               'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
             },
             body: JSON.stringify(body),
           }
@@ -1073,37 +1073,37 @@ export function ContractsManagement() {
       </div>
 
       {/* Filters */}
-      <Card className="border-border/50 bg-muted/30">
+      <Card className="border-border/50">
         <CardContent className="pt-4 pb-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">ผู้เช่า (Member ID)</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ผู้เช่า (Member ID)</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-9 h-9 text-sm rounded-lg"
+                  className="pl-8 h-8 text-sm"
                   placeholder="ค้นหา ID..."
                   value={searchMember}
                   onChange={e => setSearchMember(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">ผู้ดำเนินการ</Label>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ผู้ดำเนินการ</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-9 h-9 text-sm rounded-lg"
+                  className="pl-8 h-8 text-sm"
                   placeholder="ค้นหาชื่อ..."
                   value={searchOperator}
                   onChange={e => setSearchOperator(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">ประเภทสัญญา</Label>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">ประเภทสัญญา</Label>
               <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
-                <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทุกประเภท</SelectItem>
                   <SelectItem value="house">สัญญาเช่าบ้าน</SelectItem>
@@ -1112,19 +1112,19 @@ export function ContractsManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">วันที่สร้าง</Label>
-              <div className="flex gap-2 items-center">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">วันที่สร้าง</Label>
+              <div className="flex gap-1.5 items-center">
                 <Input
                   type="date"
-                  className="h-9 text-xs flex-1 rounded-lg"
+                  className="h-8 text-xs flex-1"
                   value={filterDateFrom}
                   onChange={e => setFilterDateFrom(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground shrink-0">—</span>
                 <Input
                   type="date"
-                  className="h-9 text-xs flex-1 rounded-lg"
+                  className="h-8 text-xs flex-1"
                   value={filterDateTo}
                   onChange={e => setFilterDateTo(e.target.value)}
                 />
@@ -1134,9 +1134,9 @@ export function ContractsManagement() {
           {hasFilter && (
             <button
               onClick={clearFilters}
-              className="mt-3 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+              className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
             >
-              <X className="w-3.5 h-3.5" />ล้างตัวกรอง
+              <X className="w-3 h-3" />ล้างตัวกรอง
             </button>
           )}
         </CardContent>
