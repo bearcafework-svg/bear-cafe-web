@@ -811,9 +811,11 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                           {/* Avatar */}
                           <div className="w-4 h-4 rounded-full overflow-hidden shrink-0 bg-muted">
                             {m.profile?.avatar_url ? (
-                              <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                              <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover"
+                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : m.avatar ? (
-                              <img src={m.avatar} alt="" className="w-full h-full object-cover" />
+                              <img src={m.avatar} alt="" className="w-full h-full object-cover"
+                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-[8px]">🐻</div>
                             )}
@@ -941,11 +943,13 @@ export function ContractsManagement() {
           const { data } = supabase.storage
             .from('contract-icons')
             .getPublicUrl(`type-icons/${type}.${ext}`);
-          // Try to verify the URL exists with a HEAD request
+          // ใช้ fetch GET แทน HEAD เพื่อหลีกเลี่ยง 400 Bad Request จาก Supabase Storage
           try {
-            const ts = Date.now();
-            const res = await fetch(`${data.publicUrl}?t=${ts}`, { method: 'HEAD' });
-            if (res.ok) { result[type] = `${data.publicUrl}?t=${ts}`; break; }
+            const res = await fetch(data.publicUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+            if (res.ok || res.status === 206) {
+              result[type] = `${data.publicUrl}?t=${Date.now()}`;
+              break;
+            }
           } catch { /* skip */ }
         }
       }
