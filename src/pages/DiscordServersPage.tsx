@@ -216,7 +216,6 @@ function FeaturedCarousel({ servers, onClickJoin }: {
         <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary fill-primary" />
         <div>
           <h3 className="text-sm sm:text-lg font-bold text-foreground">เซิร์ฟเวอร์แนะนำ</h3>
-          <p className="text-[10px] sm:text-xs text-muted-foreground">Featured center mode carousel</p>
         </div>
       </div>
 
@@ -360,9 +359,26 @@ function ServerCard({
   handleClickJoin, handleBump, bumpingId, openBotDialog, handleRated,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
+  const bannerRef = useRef<HTMLImageElement>(null);
+  const canAnimate = server.is_verified === true;
+
+  const handleCardMouseEnter = () => {
+    if (!canAnimate || !bannerRef.current) return;
+    bannerRef.current.style.transform = 'scale(1.1) translateX(8px)';
+  };
+
+  const handleCardMouseLeave = () => {
+    if (!canAnimate || !bannerRef.current) return;
+    bannerRef.current.style.transform = '';
+  };
 
   return (
-    <div ref={cardRef} className="h-full">
+    <div
+      ref={cardRef}
+      className="h-full"
+      onMouseEnter={handleCardMouseEnter}
+      onMouseLeave={handleCardMouseLeave}
+    >
       <Card
         className={[
           'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
@@ -374,18 +390,13 @@ function ServerCard({
         <div className="relative h-20 sm:h-28 overflow-hidden shrink-0">
           {server.banner_url
             ? <img
+                ref={bannerRef}
                 src={server.banner_url}
                 alt=""
                 className="w-full h-full object-cover"
-                style={server.is_verified === true ? {
+                style={canAnimate ? {
                   transition: 'transform 700ms ease-out',
                   willChange: 'transform',
-                } : undefined}
-                onMouseEnter={server.is_verified === true ? (e) => {
-                  (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.1) translateX(8px)';
-                } : undefined}
-                onMouseLeave={server.is_verified === true ? (e) => {
-                  (e.currentTarget as HTMLImageElement).style.transform = '';
                 } : undefined}
                 loading="lazy"
                 decoding="async"
