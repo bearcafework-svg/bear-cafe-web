@@ -18,7 +18,7 @@ export function SearchBar({ value, onChange, placeholder = 'ค้นหา...',
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-9 pr-8 h-10 rounded-xl bg-background border-border/60 focus-visible:ring-1"
+        className="pl-9 pr-8 h-9 rounded-lg bg-background border-border/60 focus-visible:ring-1 transition-colors"
       />
       {value && (
         <Button

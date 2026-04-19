@@ -196,6 +196,23 @@
     @apply bear-card cursor-pointer hover:border-primary/30 hover:scale-[1.02] transition-all duration-300;
   }
 
+  /* Admin panel card — subtle hover, consistent radius */
+  .admin-card {
+    @apply rounded-xl border border-border/60 bg-card shadow-sm
+           hover:shadow-md hover:border-border
+           transition-all duration-200;
+  }
+
+  /* Admin section header */
+  .admin-section-header {
+    @apply flex items-center justify-between gap-3 pb-3 mb-4 border-b border-border/40;
+  }
+
+  /* Admin action button — consistent height */
+  .admin-btn {
+    @apply h-9 px-3 rounded-lg text-sm font-medium transition-colors;
+  }
+
   /* Bear Button Glow */
   .bear-glow {
     @apply relative overflow-hidden;

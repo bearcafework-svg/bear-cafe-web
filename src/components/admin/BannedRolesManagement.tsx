@@ -324,11 +324,11 @@ export function BannedRolesManagement() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <ShieldX className="w-5 h-5 text-destructive" />
+      <Card className="admin-card">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <ShieldX className="w-4 h-4 text-destructive" />
               จัดการ Role ที่ถูกแบน
             </CardTitle>
             <div className="flex items-center gap-2">

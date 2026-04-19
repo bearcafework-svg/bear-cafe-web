@@ -229,11 +229,11 @@ export function NonTransferableRolesManagement() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <ShieldBan className="w-5 h-5 text-amber-500" />
+      <Card className="admin-card">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <ShieldBan className="w-4 h-4 text-amber-500" />
               บทบาทห้ามย้าย
             </CardTitle>
             <div className="flex items-center gap-2">

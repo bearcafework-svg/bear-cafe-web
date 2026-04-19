@@ -371,16 +371,16 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* Page title */}
-          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          {/* Page title — improved hierarchy */}
+          <div className="flex items-center gap-3 pb-4 border-b border-border/40">
             {activeItem && (
               <>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
                   <activeItem.icon className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-foreground">{activeItem.label}</h1>
-                  <p className="text-xs text-muted-foreground">
+                  <h1 className="text-xl font-semibold text-foreground leading-tight">{activeItem.label}</h1>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {GROUP_LABELS[activeItem.group]?.label}
                   </p>
                 </div>
@@ -559,11 +559,11 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
 
   return (
     <div className="space-y-4">
-    <Card>
-      <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+    <Card className="admin-card">
+      <CardHeader className="px-4 sm:px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Users className="w-4 h-4" />
             จัดการผู้ใช้
             <Badge variant="secondary" className="text-xs">{filteredUsers.length}</Badge>
           </CardTitle>
@@ -576,7 +576,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
             </div>
         </div>
       </CardHeader>
-      <CardContent className="px-0 sm:px-6 pb-3 sm:pb-6">
+      <CardContent className="px-0 sm:px-6 pb-4 sm:pb-6">
         {loading ? (
           <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
         ) : (

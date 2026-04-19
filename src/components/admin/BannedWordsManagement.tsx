@@ -320,11 +320,11 @@ export function BannedWordsManagement() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="admin-card">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Ban className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Ban className="w-4 h-4" />
             จัดการคำต้องห้าม
           </CardTitle>
           <div className="flex items-center gap-3">
