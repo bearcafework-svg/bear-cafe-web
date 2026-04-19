@@ -362,7 +362,7 @@ function ServerCard({
   const cardRef = useImpressionObserver(server.id);
 
   return (
-    <div ref={cardRef}>
+    <div ref={cardRef} className="h-full">
       <Card
         className={[
           'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
@@ -373,7 +373,19 @@ function ServerCard({
         {/* Banner */}
         <div className="relative h-20 sm:h-28 overflow-hidden shrink-0">
           {server.banner_url
-            ? <img src={server.banner_url} alt="" className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform" loading="lazy" decoding="async" />
+            ? <img
+                src={server.banner_url}
+                alt=""
+                className={[
+                  'w-full h-full object-cover',
+                  // Only verified servers get the pan/zoom effect on hover
+                  server.is_verified
+                    ? 'transition-transform duration-700 ease-out will-change-transform group-hover:scale-110 group-hover:translate-x-2'
+                    : '',
+                ].join(' ')}
+                loading="lazy"
+                decoding="async"
+              />
             : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
           <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
           {/* Category + Partner badge */}
@@ -943,9 +955,9 @@ export default function DiscordServersPage() {
             <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
             {filteredServers.map((server, index) => (
-              <motion.div key={server.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
+              <motion.div key={server.id} className="h-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
                 <ServerCard
                   server={server}
                   user={user}
