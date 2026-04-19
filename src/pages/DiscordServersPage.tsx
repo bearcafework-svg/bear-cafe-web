@@ -376,13 +376,17 @@ function ServerCard({
             ? <img
                 src={server.banner_url}
                 alt=""
-                className={[
-                  'w-full h-full object-cover',
-                  // Only verified servers get the pan/zoom effect on hover
-                  server.is_verified
-                    ? 'transition-transform duration-700 ease-out will-change-transform group-hover:scale-110 group-hover:translate-x-2'
-                    : '',
-                ].join(' ')}
+                className="w-full h-full object-cover"
+                style={server.is_verified === true ? {
+                  transition: 'transform 700ms ease-out',
+                  willChange: 'transform',
+                } : undefined}
+                onMouseEnter={server.is_verified === true ? (e) => {
+                  (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.1) translateX(8px)';
+                } : undefined}
+                onMouseLeave={server.is_verified === true ? (e) => {
+                  (e.currentTarget as HTMLImageElement).style.transform = '';
+                } : undefined}
                 loading="lazy"
                 decoding="async"
               />
