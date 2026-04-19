@@ -97,3 +97,9 @@ verify_jwt = false
 
 [functions.tag-warn-cancel-sync]
 verify_jwt = false
+
+[functions.get-role-members]
+verify_jwt = false
+
+[functions.resolve-discord-invite]
+verify_jwt = false

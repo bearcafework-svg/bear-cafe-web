@@ -11,24 +11,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const botToken = Deno.env.get("DISCORD_BOT_TOKEN") ?? "";
     const guildId = Deno.env.get("DISCORD_GUILD_ID") ?? "";
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    // ✅ OPTIONAL AUTH (ไม่บังคับแล้ว)
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { error } = await adminClient.auth.getUser(token);
-      if (error) {
-        console.warn("Invalid token but allowed:", error.message);
-      }
+    // botToken หรือ guildId ไม่มี → return error ทันที ไม่ต้อง loop
+    if (!botToken || !guildId) {
+      return new Response(
+        JSON.stringify({ error: "Missing DISCORD_BOT_TOKEN or DISCORD_GUILD_ID" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const body = await req.json();
@@ -37,44 +28,53 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const result: Record<string, unknown> = {};
 
-    // ─── FIX LOOP + RATE LIMIT ───
+    // ─── Fetch role members ───────────────────────────────────────────────
     if (roleId) {
       let after = "0";
       let totalWithRole = 0;
-      const members: any[] = [];
+      const members: Array<{ id: string; username: string; avatar: string | null }> = [];
       let page = 0;
+      const MAX_PAGES = 50; // safety: max 5000 members
 
-      while (true) {
+      while (page < MAX_PAGES) {
         page++;
-        if (page > 100) break; // กัน infinite
 
         const res = await fetch(
           `https://discord.com/api/v10/guilds/${guildId}/members?limit=100&after=${after}`,
           { headers: { Authorization: `Bot ${botToken}` } }
         );
 
+        // Rate limited — wait and retry (don't increment page)
         if (res.status === 429) {
-          const retry = Number((await res.json()).retry_after ?? 1);
-          await new Promise(r => setTimeout(r, retry * 1000));
+          let retryAfter = 1;
+          try {
+            const body = await res.json();
+            retryAfter = Number(body.retry_after ?? 1);
+          } catch { /* ignore */ }
+          await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 5000)));
+          page--; // don't count this as a page
           continue;
         }
 
-        if (!res.ok) break;
+        if (!res.ok) {
+          console.error("Discord members API error:", res.status, await res.text());
+          break;
+        }
 
-        const batch = await res.json();
-        if (!batch.length) break;
+        const batch: any[] = await res.json();
+        if (!Array.isArray(batch) || batch.length === 0) break;
 
         for (const m of batch) {
-          if ((m.roles ?? []).includes(roleId)) {
+          const roles: string[] = m.roles ?? [];
+          if (roles.includes(roleId)) {
             totalWithRole++;
-
             if (members.length < 5) {
-              const avatar = m.user.avatar;
+              const avatarHash = m.user?.avatar;
               members.push({
                 id: m.user.id,
-                username: m.nick || m.user.global_name || m.user.username,
-                avatar: avatar
-                  ? `https://cdn.discordapp.com/avatars/${m.user.id}/${avatar}.png?size=64`
+                username: m.nick || m.user?.global_name || m.user?.username || "Unknown",
+                avatar: avatarHash
+                  ? `https://cdn.discordapp.com/avatars/${m.user.id}/${avatarHash}.png?size=64`
                   : null,
               });
             }
@@ -82,15 +82,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
 
         after = batch[batch.length - 1].user.id;
-
-        if (batch.length < 100) break;
+        if (batch.length < 100) break; // last page
       }
 
       result.members = members;
       result.total = totalWithRole;
     }
 
-    // ─── CHANNEL ───
+    // ─── Resolve channel name ─────────────────────────────────────────────
     if (channelUrl) {
       const match = channelUrl.match(/channels\/\d+\/(\d+)/);
       if (match) {
@@ -101,7 +100,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         );
         if (res.ok) {
           const ch = await res.json();
-          result.channel_name = ch.name;
+          result.channel_name = ch.name ?? null;
           result.channel_id = channelId;
         }
       }
@@ -112,10 +111,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
 
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("get-role-members error:", err);
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: String(err) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
