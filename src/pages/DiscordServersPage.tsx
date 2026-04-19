@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, Plus, Users, Info, Loader2,
-  MessageSquare, Search, ArrowUp, Clock, Globe, MousePointerClick,
+  MessageSquare, Search, ArrowUp, Clock, Globe, Eye,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, Settings, Hash, BotIcon,
 } from 'lucide-react';
@@ -41,6 +41,7 @@ interface DiscordServer {
   category_id: string | null;
   bumped_at: string | null;
   click_count: number | null;
+  impression_count: number | null;
   is_featured: boolean | null;
   is_verified: boolean;
   is_partner: boolean;
@@ -256,7 +257,7 @@ function FeaturedCarousel({ servers, onClickJoin }: {
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[10px] sm:text-xs text-white/70">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(server.member_count || 0).toLocaleString()}</span>
-                      <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" />{(server.click_count || 0).toLocaleString()}</span>
+                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{(server.impression_count || 0).toLocaleString()}</span>
                       {(server.rating_count ?? 0) > 0 && (
                         <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{(server.avg_rating ?? 0).toFixed(1)}</span>
                       )}
@@ -309,6 +310,166 @@ const rainbowStyle = `
   animation: rainbow-border 3s linear infinite;
 }
 `;
+
+// ─── Impression Observer Hook ─────────────────────────────────────────────────
+function useImpressionObserver(serverId: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !tracked.current) {
+          tracked.current = true;
+          observer.disconnect();
+          // Fire-and-forget — don't block render
+          supabase.rpc('increment_impression', { _server_id: serverId }).then(({ error }) => {
+            if (error) console.warn('impression rpc error:', error.message);
+          });
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [serverId]);
+
+  return ref;
+}
+
+// ─── Server Card Component ────────────────────────────────────────────────────
+interface ServerCardProps {
+  server: DiscordServer;
+  user: any;
+  userId: string | null;
+  getCategoryName: (catId: string | null) => string | null;
+  getTimeSince: (dateStr: string | null) => string;
+  handleClickJoin: (server: DiscordServer) => void;
+  handleBump: (serverId: string) => void;
+  bumpingId: string | null;
+  openBotDialog: (server: DiscordServer) => void;
+  handleRated: (serverId: string, rating: number) => void;
+}
+
+function ServerCard({
+  server, user, userId, getCategoryName, getTimeSince,
+  handleClickJoin, handleBump, bumpingId, openBotDialog, handleRated,
+}: ServerCardProps) {
+  const cardRef = useImpressionObserver(server.id);
+
+  return (
+    <div ref={cardRef}>
+      <Card
+        className={[
+          'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
+          isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
+        ].join(' ')}
+        style={getHighlightStyle(server.highlight_color)}
+      >
+        {/* Banner */}
+        <div className="relative h-20 sm:h-28 overflow-hidden shrink-0">
+          {server.banner_url
+            ? <img src={server.banner_url} alt="" className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform" loading="lazy" decoding="async" />
+            : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
+          {/* Category + Partner badge */}
+          <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 flex-wrap justify-end">
+            {server.is_partner && (
+              <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+                <Handshake className="w-2.5 h-2.5" />Partner
+              </Badge>
+            )}
+            {getCategoryName(server.category_id) && (
+              <Badge className="text-[9px] sm:text-[10px] bg-white/80 dark:bg-card/80 text-foreground border-none backdrop-blur-md shadow-sm font-medium px-1.5 sm:px-2">
+                {getCategoryName(server.category_id)}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <CardContent className="p-3 sm:p-5 -mt-8 sm:-mt-12 relative flex-1 flex flex-col">
+          {/* Icon */}
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
+            {server.icon_url
+              ? <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+              : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
+          </div>
+
+          {/* Name + badges */}
+          <div className="flex items-center gap-1.5 mb-1">
+            <h3 className="font-bold text-sm sm:text-lg truncate text-foreground group-hover:text-primary transition-colors">{server.name}</h3>
+            {server.is_verified && (
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0" aria-label="Verified" />
+            )}
+          </div>
+
+          {/* Description */}
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words flex-1">
+            {server.description || 'ไม่มีคำอธิบาย'}
+          </p>
+
+          {/* Star rating */}
+          <div className="mt-2 sm:mt-3">
+            <StarRating
+              serverId={server.id}
+              myRating={server.my_rating ?? 0}
+              avgRating={server.avg_rating ?? 0}
+              ratingCount={server.rating_count ?? 0}
+              userId={userId}
+              onRated={handleRated}
+            />
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-[10px] sm:text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
+              <span className="font-medium">{(server.member_count || 0).toLocaleString()}</span>
+            </span>
+            <span className="flex items-center gap-1" title="จำนวนครั้งที่การ์ดถูกมองเห็น">
+              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
+              <span className="font-medium">{(server.impression_count || 0).toLocaleString()}</span>
+            </span>
+            {server.bumped_at && (
+              <span className="flex items-center gap-1 ml-auto">
+                <Clock className="w-3 h-3 opacity-50" />
+                <span className="opacity-60">{getTimeSince(server.bumped_at)}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-2">
+            <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
+            {/* Bot settings — only for owner */}
+            {user && server.owner_id === user.discord_id && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full h-8 w-8 p-0 shrink-0"
+                onClick={() => openBotDialog(server)}
+                title="ตั้งค่าบอทแจ้งเตือน"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm"
+              onClick={() => handleClickJoin(server)}
+            >
+              เข้าดิสคอร์ด
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DiscordServersPage() {
@@ -685,7 +846,7 @@ export default function DiscordServersPage() {
     .sort((a, b) => {
       // Partners always float to top
       if (a.is_partner !== b.is_partner) return a.is_partner ? -1 : 1;
-      if (sortMode === 'popular') return (b.click_count || 0) - (a.click_count || 0);
+      if (sortMode === 'popular') return (b.impression_count || 0) - (a.impression_count || 0);
       if (sortMode === 'rating') return (b.avg_rating || 0) - (a.avg_rating || 0);
       return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
     });
@@ -785,97 +946,18 @@ export default function DiscordServersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             {filteredServers.map((server, index) => (
               <motion.div key={server.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
-                <Card
-                  className={[
-                    'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
-                    isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
-                  ].join(' ')}
-                  style={getHighlightStyle(server.highlight_color)}
-                >
-                  {/* Banner */}
-                  <div className="relative h-20 sm:h-28 overflow-hidden shrink-0">
-                    {server.banner_url
-                      ? <img src={server.banner_url} alt="" className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform" loading="lazy" decoding="async" />
-                      : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
-                    <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
-                    {/* Category + Partner badge */}
-                    <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 flex-wrap justify-end">
-                      {server.is_partner && (
-                        <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
-                          <Handshake className="w-2.5 h-2.5" />Partner
-                        </Badge>
-                      )}
-                      {getCategoryName(server.category_id) && (
-                        <Badge className="text-[9px] sm:text-[10px] bg-white/80 dark:bg-card/80 text-foreground border-none backdrop-blur-md shadow-sm font-medium px-1.5 sm:px-2">
-                          {getCategoryName(server.category_id)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <CardContent className="p-3 sm:p-5 -mt-8 sm:-mt-12 relative flex-1 flex flex-col">
-                    {/* Icon */}
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
-                      {server.icon_url
-                        ? <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                        : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
-                    </div>
-
-                    {/* Name + badges */}
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <h3 className="font-bold text-sm sm:text-lg truncate text-foreground group-hover:text-primary transition-colors">{server.name}</h3>
-                      {server.is_verified && (
-                        <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0" aria-label="Verified" />
-                      )}
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words flex-1">
-                      {server.description || 'ไม่มีคำอธิบาย'}
-                    </p>
-
-                    {/* Star rating */}
-                    <div className="mt-2 sm:mt-3">
-                      <StarRating
-                        serverId={server.id}
-                        myRating={server.my_rating ?? 0}
-                        avgRating={server.avg_rating ?? 0}
-                        ratingCount={server.rating_count ?? 0}
-                        userId={userId}
-                        onRated={handleRated}
-                      />
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-[10px] sm:text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" /><span className="font-medium">{(server.member_count || 0).toLocaleString()}</span></span>
-                      <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" /><span className="font-medium">{(server.click_count || 0).toLocaleString()}</span></span>
-                      {server.bumped_at && (
-                        <span className="flex items-center gap-1 ml-auto"><Clock className="w-3 h-3 opacity-50" /><span className="opacity-60">{getTimeSince(server.bumped_at)}</span></span>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-2">
-                      <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
-                      {/* Bot settings — only for owner */}
-                      {user && server.owner_id === user.discord_id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full h-8 w-8 p-0 shrink-0"
-                          onClick={() => openBotDialog(server)}
-                          title="ตั้งค่าบอทแจ้งเตือน"
-                        >
-                          <Settings className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm" onClick={() => handleClickJoin(server)}>
-                        เข้าดิสคอร์ด
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ServerCard
+                  server={server}
+                  user={user}
+                  userId={userId}
+                  getCategoryName={getCategoryName}
+                  getTimeSince={getTimeSince}
+                  handleClickJoin={handleClickJoin}
+                  handleBump={handleBump}
+                  bumpingId={bumpingId}
+                  openBotDialog={openBotDialog}
+                  handleRated={handleRated}
+                />
               </motion.div>
             ))}
           </div>
