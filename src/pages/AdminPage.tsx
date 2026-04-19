@@ -25,11 +25,11 @@ import {
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan,
 } from 'lucide-react';
+import { SearchBar } from '@/components/admin/SearchBar';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
 import AdminLottery from '@/pages/AdminLottery';
 import { BannedRolesManagement } from '@/components/admin/BannedRolesManagement';
 import { BannedWordsManagement } from '@/components/admin/BannedWordsManagement';
-import { BannerManagement } from '@/components/admin/BannerManagement';
 import { CategoriesManagement } from '@/components/admin/CategoriesManagement';
 import { DiscordRolesManagement } from '@/components/admin/DiscordRolesManagement';
 import { RedeemCodesManagement } from '@/components/admin/RedeemCodesManagement';
@@ -356,7 +356,8 @@ export default function AdminPage() {
         )}
 
         {/* Content */}
-        <main className="flex-1 min-w-0 p-3 sm:p-4 lg:p-6">
+        <main className="flex-1 min-w-0 p-4 sm:p-6 overflow-auto">
+          <div className="max-w-6xl mx-auto space-y-6">
           {/* Mobile maintenance toggle */}
           {isMobile && isOwner && (
             <div className="mb-4">
@@ -390,6 +391,7 @@ export default function AdminPage() {
           <div className="animate-fade-in">
             {renderContent()}
           </div>
+          </div>{/* end max-w-6xl */}
         </main>
       </div>
     </div>
@@ -565,10 +567,13 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
             จัดการผู้ใช้
             <Badge variant="secondary" className="text-xs">{filteredUsers.length}</Badge>
           </CardTitle>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="ค้นหาผู้ใช้, Discord ID, username..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 text-sm" />
-          </div>
+          <div className="w-full sm:w-72">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="ค้นหาผู้ใช้, Discord ID, username..."
+              />
+            </div>
         </div>
       </CardHeader>
       <CardContent className="px-0 sm:px-6 pb-3 sm:pb-6">
