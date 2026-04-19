@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Home, Crown, User, Clock, Bell, Edit2, Search, RefreshCw,
-  Loader2, CheckCircle2, X, Upload, ImageIcon,
+  Loader2, CheckCircle2, X, Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -690,127 +690,160 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
 
   return (
     <>
-      <Card className={cn('border-2 transition-colors hover:shadow-sm overflow-hidden', borderColor)}>
+      <Card className={cn(
+        'border-2 transition-all duration-200 overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.01]',
+        borderColor
+      )}>
         <div className="flex">
           {/* Left: Icon column */}
-          <div className="w-16 shrink-0 flex items-center justify-center bg-muted/30 border-r border-border/40">
+          <div className="w-12 shrink-0 flex items-center justify-center bg-muted/20 border-r border-border/40">
             {iconUrl ? (
-              <img src={iconUrl} alt={contract.type} className="w-10 h-10 object-contain rounded"
+              <img src={iconUrl} alt={contract.type} className="w-11 h-11 object-contain rounded"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
-              <span className="text-2xl">{typeEmoji}</span>
+              <span className="text-3xl opacity-80">{typeEmoji}</span>
             )}
           </div>
 
           {/* Right: Info column */}
-          <div className="flex-1 min-w-0 px-3 py-2.5 space-y-1.5">
-            {/* Top row: badge + status + edit */}
-            <div className="flex items-center justify-between gap-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', typeColor)}>
-                  {typeLabel}
-                </Badge>
-                {contract.type === 'house' && statusText && (
-                  <span className={cn('text-[10px] font-medium flex items-center gap-1', statusColor)}>
-                    <span className={cn('w-1.5 h-1.5 rounded-full inline-block', statusDot)} />
+          <div className="flex-1 min-w-0 px-4 py-3 space-y-2.5">
+            {/* TOP: Type badge + action buttons */}
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="outline" className={cn('text-xs px-2 py-0.5 font-medium', typeColor)}>
+                {typeLabel}
+              </Badge>
+              <div className="flex items-center gap-1">
+                {contract.type === 'house' && (
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="h-7 w-7 shrink-0 hover:bg-primary/10 hover:text-primary transition-colors" 
+                    onClick={() => onEdit(contract)}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+                <Button
+                  size="icon" 
+                  variant="ghost"
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* MIDDLE: Main info */}
+            <div className="space-y-1.5">
+              {/* Member ID (prominent) */}
+              <div className="flex items-center gap-2">
+                <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-sm font-mono font-semibold truncate">{contract.member_id}</span>
+              </div>
+              
+              {/* Discord username (muted, smaller) */}
+              {discordName && (
+                <div className="pl-5">
+                  <span className="text-xs text-muted-foreground truncate">@{discordName}</span>
+                </div>
+              )}
+
+              {/* Role name */}
+              {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
+                <div className="flex items-center gap-2">
+                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-xs font-medium truncate">{contract.role_name}</span>
+                </div>
+              )}
+            </div>
+
+            {/* STATUS BLOCK: Time + status in highlighted row */}
+            {contract.type === 'house' && statusText && (
+              <div className="rounded-md bg-muted/40 px-2 py-1.5 space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className={cn('text-xs font-medium', statusColor)}>
+                    {contract.end_at ? formatRemaining(contract.end_at) : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={cn('w-1.5 h-1.5 rounded-full', statusDot)} />
+                  <span className={cn('text-xs font-medium', statusColor)}>
                     {statusText}
                   </span>
-                )}
-              </div>
-              {contract.type === 'house' && (
-                <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => onEdit(contract)}>
-                  <Edit2 className="w-3 h-3" />
-                </Button>
-              )}
-              <Button
-                size="icon" variant="ghost"
-                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-
-            {/* Member ID + discord name */}
-            <div className="flex items-center gap-1.5">
-              <User className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className="text-xs font-mono font-medium truncate">{contract.member_id}</span>
-              {discordName && (
-                <span className="text-[10px] text-muted-foreground truncate">(@{discordName})</span>
-              )}
-            </div>
-
-            {/* Role name */}
-            {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
-              <div className="flex items-center gap-1.5">
-                <Crown className="w-3 h-3 text-muted-foreground shrink-0" />
-                <span className="text-xs truncate">{contract.role_name}</span>
+                </div>
               </div>
             )}
 
-            {/* Time info */}
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-              <span className={cn('text-xs', contract.type === 'house' ? statusColor : 'text-muted-foreground')}>
-                {contract.type === 'personal_role'
-                  ? formatElapsed(contract.start_at)
-                  : contract.end_at ? formatRemaining(contract.end_at) : '—'}
-              </span>
-            </div>
+            {/* For non-house: simple time display */}
+            {contract.type !== 'house' && (
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">
+                  {contract.type === 'personal_role'
+                    ? formatElapsed(contract.start_at)
+                    : contract.end_at ? formatRemaining(contract.end_at) : '—'}
+                </span>
+              </div>
+            )}
 
-            {/* Room link (house only) — แสดงชื่อห้องถ้ามี */}
+            {/* Room link (house only) */}
             {contract.type === 'house' && contract.room_link && (
               <a
                 href={contract.room_link}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[10px] text-blue-400 hover:underline truncate block"
+                className="text-xs text-blue-400 hover:underline truncate block transition-colors"
               >
-                🔗 {contract.room_link}
+                🔗 ลิงก์ห้อง
               </a>
             )}
 
             {/* personal_role: channel name + role members */}
             {contract.type === 'personal_role' && (
               <>
-                {/* Channel name (ถ้ามี room_link) */}
+                {/* Channel name */}
                 {contract.room_link && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground shrink-0">#</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground shrink-0">#</span>
                     {loadingExtra ? (
                       <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
                     ) : channelName ? (
                       <a href={contract.room_link} target="_blank" rel="noreferrer"
-                        className="text-[10px] text-blue-400 hover:underline truncate">
+                        className="text-xs text-blue-400 hover:underline truncate transition-colors">
                         {channelName}
                       </a>
                     ) : (
                       <a href={contract.room_link} target="_blank" rel="noreferrer"
-                        className="text-[10px] text-blue-400 hover:underline truncate">
+                        className="text-xs text-blue-400 hover:underline truncate transition-colors">
                         ดูห้อง
                       </a>
                     )}
                   </div>
                 )}
 
-                {/* Role members */}
+                {/* Role members section with divider */}
                 {roleMembers !== null && (
-                  <div className="space-y-1 pt-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground">ผู้ถือบทบาท:</span>
+                  <div className="pt-2 mt-2 border-t border-border/40 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">ผู้ถือบทบาท:</span>
                       <span className={cn(
-                        'text-[10px] font-semibold',
-                        (roleTotal ?? 0) > 5 ? 'text-red-500' : 'text-foreground'
+                        'text-xs font-semibold px-2 py-0.5 rounded-full',
+                        (roleTotal ?? 0) > 5 
+                          ? 'bg-red-500/10 text-red-400' 
+                          : 'bg-green-500/10 text-green-400'
                       )}>
                         {roleTotal ?? roleMembers.length} คน
-                        {(roleTotal ?? 0) > 5 && ' (เกินกำหนด)'}
+                        {(roleTotal ?? 0) > 5 && ' (เกิน)'}
                       </span>
                     </div>
-                    <div className="space-y-0.5">
-                      {roleMembers.slice(0, 5).map((m, i) => (
-                        <div key={m.id} className="flex items-center gap-1.5">
-                          {/* Avatar */}
-                          <div className="w-4 h-4 rounded-full overflow-hidden shrink-0 bg-muted">
+                    
+                    {/* Avatar row - max 4 inline */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {roleMembers.slice(0, 4).map((m) => (
+                        <div key={m.id} className="flex items-center gap-1.5 bg-muted/30 rounded-md px-1.5 py-1">
+                          <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-muted">
                             {m.profile?.avatar_url ? (
                               <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover"
                                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -818,49 +851,51 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                               <img src={m.avatar} alt="" className="w-full h-full object-cover"
                                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[8px]">🐻</div>
+                              <div className="w-full h-full flex items-center justify-center text-[10px]">🐻</div>
                             )}
                           </div>
-                          <span className="text-[10px] truncate">
-                            {m.profile?.username ?? m.username ?? `ผู้ใช้ ${i + 1} (ยังไม่ได้ล็อคอิน)`}
+                          <span className="text-[10px] truncate max-w-[80px]">
+                            {m.profile?.username ?? m.username ?? 'ผู้ใช้'}
                           </span>
                         </div>
                       ))}
-                      {(roleTotal ?? 0) > 5 && (
-                        <p className="text-[10px] text-red-500">+{(roleTotal ?? 0) - 5} คนเพิ่มเติม</p>
+                      {(roleTotal ?? 0) > 4 && (
+                        <span className="text-xs text-muted-foreground font-medium">
+                          +{(roleTotal ?? 0) - 4}
+                        </span>
                       )}
                     </div>
                   </div>
                 )}
                 {loadingExtra && roleMembers === null && (
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="w-3 h-3 animate-spin" />กำลังโหลด...
                   </div>
                 )}
               </>
             )}
 
-            {/* Divider + operator + date */}
-            <div className="border-t border-border/40 pt-1.5 flex items-center justify-between gap-2">
-              <span className="text-[10px] text-muted-foreground truncate">
-                ผู้ดำเนินการ: <span className="text-foreground/70">{contract.operator_name ?? '—'}</span>
+            {/* BOTTOM: Meta info (operator + date) */}
+            <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="truncate">
+                {contract.operator_name ?? '—'}
               </span>
-              <span className="text-[10px] text-muted-foreground shrink-0">
+              <span className="shrink-0">
                 {new Date(contract.created_at).toLocaleDateString('th-TH', {
                   day: 'numeric', month: 'short', year: '2-digit',
                 })}
               </span>
             </div>
 
-            {/* Notify button (house, urgent, not expired) */}
+            {/* Notify button - full width at bottom */}
             {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
               <Button
                 size="sm"
                 variant="destructive"
-                className="w-full h-7 text-xs gap-1"
+                className="w-full h-8 text-xs font-medium gap-1.5 mt-2 rounded-md"
                 onClick={() => setNotifyOpen(true)}
               >
-                <Bell className="w-3 h-3" />กดแจ้งเตือน
+                <Bell className="w-3.5 h-3.5" />แจ้งเตือนผู้เช่า
               </Button>
             )}
           </div>
@@ -1038,37 +1073,37 @@ export function ContractsManagement() {
       </div>
 
       {/* Filters */}
-      <Card className="border-border/50">
+      <Card className="border-border/50 bg-muted/30">
         <CardContent className="pt-4 pb-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ผู้เช่า (Member ID)</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">ผู้เช่า (Member ID)</Label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-8 h-8 text-sm"
+                  className="pl-9 h-9 text-sm rounded-lg"
                   placeholder="ค้นหา ID..."
                   value={searchMember}
                   onChange={e => setSearchMember(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ผู้ดำเนินการ</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">ผู้ดำเนินการ</Label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-8 h-8 text-sm"
+                  className="pl-9 h-9 text-sm rounded-lg"
                   placeholder="ค้นหาชื่อ..."
                   value={searchOperator}
                   onChange={e => setSearchOperator(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ประเภทสัญญา</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">ประเภทสัญญา</Label>
               <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทุกประเภท</SelectItem>
                   <SelectItem value="house">สัญญาเช่าบ้าน</SelectItem>
@@ -1077,19 +1112,19 @@ export function ContractsManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">วันที่สร้าง</Label>
-              <div className="flex gap-1.5 items-center">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">วันที่สร้าง</Label>
+              <div className="flex gap-2 items-center">
                 <Input
                   type="date"
-                  className="h-8 text-xs flex-1"
+                  className="h-9 text-xs flex-1 rounded-lg"
                   value={filterDateFrom}
                   onChange={e => setFilterDateFrom(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground shrink-0">—</span>
                 <Input
                   type="date"
-                  className="h-8 text-xs flex-1"
+                  className="h-9 text-xs flex-1 rounded-lg"
                   value={filterDateTo}
                   onChange={e => setFilterDateTo(e.target.value)}
                 />
@@ -1099,9 +1134,9 @@ export function ContractsManagement() {
           {hasFilter && (
             <button
               onClick={clearFilters}
-              className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              className="mt-3 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
             >
-              <X className="w-3 h-3" />ล้างตัวกรอง
+              <X className="w-3.5 h-3.5" />ล้างตัวกรอง
             </button>
           )}
         </CardContent>
