@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { BearLogoText } from '@/components/bear-cafe/BearLogo';
 import { withRetry } from '@/lib/retry';
 import { Button } from '@/components/ui/button';
@@ -120,10 +120,13 @@ const GROUP_LABELS: Record<string, { label: string; icon: React.ElementType }> =
 };
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { section } = useParams<{ section?: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('admin_active_tab') || 'users');
+  const [activeTab, setActiveTab] = useState(
+    () => section || localStorage.getItem('admin_active_tab') || 'users'
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Admin role allowed pages from site_settings
@@ -189,6 +192,7 @@ export default function AdminPage() {
   const handleNavClick = (id: string) => {
     setActiveTab(id);
     localStorage.setItem('admin_active_tab', id);
+    navigate(`/admin/${id}`, { replace: true });
     if (isMobile) setSidebarOpen(false);
   };
 
@@ -269,12 +273,13 @@ export default function AdminPage() {
     }
   };
 
+  // Sync URL section → activeTab when navigating directly
   useEffect(() => {
-    const pathname = window.location.pathname;
-    if (pathname.endsWith('/admin/lottery')) {
-      setActiveTab('lottery');
+    if (section && section !== activeTab) {
+      setActiveTab(section);
+      localStorage.setItem('admin_active_tab', section);
     }
-  }, []);
+  }, [section]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream via-latte/30 to-peach/20 dark:from-background dark:via-background dark:to-muted/20">

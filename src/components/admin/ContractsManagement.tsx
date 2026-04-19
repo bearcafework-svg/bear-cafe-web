@@ -695,7 +695,8 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
           {/* Left: Icon column */}
           <div className="w-16 shrink-0 flex items-center justify-center bg-muted/30 border-r border-border/40">
             {iconUrl ? (
-              <img src={iconUrl} alt={contract.type} className="w-10 h-10 object-contain rounded" />
+              <img src={iconUrl} alt={contract.type} className="w-10 h-10 object-contain rounded"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
               <span className="text-2xl">{typeEmoji}</span>
             )}
@@ -934,28 +935,26 @@ export function ContractsManagement() {
 
   // Load stored icon URLs from storage on mount
   useEffect(() => {
-    async function loadTypeIcons() {
-      const types: ContractType[] = ['house', 'role', 'personal_role'];
-      const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
-      const result: TypeIcons = { house: null, role: null, personal_role: null };
-      for (const type of types) {
-        for (const ext of exts) {
-          const { data } = supabase.storage
-            .from('contract-icons')
-            .getPublicUrl(`type-icons/${type}.${ext}`);
-          // ใช้ fetch GET แทน HEAD เพื่อหลีกเลี่ยง 400 Bad Request จาก Supabase Storage
-          try {
-            const res = await fetch(data.publicUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } });
-            if (res.ok || res.status === 206) {
-              result[type] = `${data.publicUrl}?t=${Date.now()}`;
-              break;
-            }
-          } catch { /* skip */ }
+    // โหลด icon โดยตรงจาก getPublicUrl — ไม่ probe extension
+    // ถ้าไฟล์ไม่มีจริง img จะ fallback ผ่าน onError
+    const types: ContractType[] = ['house', 'role', 'personal_role'];
+    const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+    const result: TypeIcons = { house: null, role: null, personal_role: null };
+
+    // ลอง getPublicUrl ทุก ext แล้วเก็บตัวแรกที่ได้ URL (ไม่ fetch จริง)
+    // การ validate จะเกิดที่ <img onError> แทน
+    for (const type of types) {
+      for (const ext of exts) {
+        const { data } = supabase.storage
+          .from('contract-icons')
+          .getPublicUrl(`type-icons/${type}.${ext}`);
+        if (data?.publicUrl) {
+          result[type] = `${data.publicUrl}?t=${Date.now()}`;
+          break; // ใช้ png เป็น default, ถ้าไม่มีจะ fallback ที่ onError
         }
       }
-      setTypeIcons(result);
     }
-    loadTypeIcons();
+    setTypeIcons(result);
   }, []);
 
   async function fetchMemberProfiles(memberIds: string[]) {
