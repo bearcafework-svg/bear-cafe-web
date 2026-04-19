@@ -39,7 +39,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Trash2, Ban, Globe, Pencil } from 'lucide-react';
+import { Plus, Trash2, Ban, Globe, Pencil } from 'lucide-react';
+import { SearchBar } from '@/components/admin/SearchBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
@@ -327,15 +328,7 @@ export function BannedWordsManagement() {
             จัดการคำต้องห้าม
           </CardTitle>
           <div className="flex items-center gap-3">
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="ค้นหาคำ..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาคำ..." className="w-64" />
             <Button onClick={() => setDialogOpen(true)} className="gap-2">
               <Plus className="w-4 h-4" />
               เพิ่มคำต้องห้าม

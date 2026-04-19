@@ -17,8 +17,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Plus, Pencil, Trash2, Search, UserPlus, UserMinus, Key, Shield, Users, ChevronDown, ChevronUp,
+  Plus, Pencil, Trash2, UserPlus, UserMinus, Key, Shield, Users, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import { SearchBar } from '@/components/admin/SearchBar';
 
 import { ASSIGNABLE_PAGES, getPermissionGroups } from '@/lib/admin-pages';
 
@@ -571,15 +572,7 @@ export function PermissionsManagement() {
 
           {/* Search + Bulk actions */}
           <div className="space-y-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                placeholder="ค้นหาผู้ใช้, Discord ID, username..."
-                className="pl-9"
-              />
-            </div>
+            <SearchBar value={userSearch} onChange={setUserSearch} placeholder="ค้นหาผู้ใช้, Discord ID, username..." />
 
             {/* Bulk action bar */}
             <div className="flex items-center gap-2 flex-wrap">

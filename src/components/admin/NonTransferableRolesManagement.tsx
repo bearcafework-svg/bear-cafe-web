@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
 import { ShieldBan, Plus, Trash2, Search, AlertTriangle, Loader2, Pencil, Check } from 'lucide-react';
+import { SearchBar } from '@/components/admin/SearchBar';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { BulkDeleteToolbar } from '@/components/admin/BulkDeleteToolbar';
 
@@ -236,10 +237,7 @@ export function NonTransferableRolesManagement() {
               บทบาทห้ามย้าย
             </CardTitle>
             <div className="flex items-center gap-2">
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="ค้นหา Role..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
-              </div>
+              <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหา Role..." className="w-64" />
               <Button onClick={openCreateDialog} className="gap-2">
                 <Plus className="w-4 h-4" />
                 เพิ่ม Role

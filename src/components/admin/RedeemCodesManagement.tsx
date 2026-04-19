@@ -23,6 +23,7 @@ import {
   Copy, Edit, Check, ChevronsUpDown, Loader2, Plus, Power, Search, Trash2,
   ChevronLeft, ChevronRight, Pencil, RotateCcw, MinusCircle, PlusCircle,
 } from 'lucide-react';
+import { SearchBar } from '@/components/admin/SearchBar';
 import { supabase } from '@/integrations/supabase/client';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -280,10 +281,7 @@ function CodesTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative w-full lg:max-w-xs">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="ค้นหาโค้ด" className="pl-9" />
-            </div>
+            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาโค้ด" className="w-full lg:max-w-xs" />
             <div className="w-full lg:w-60">
               <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
                 <SelectTrigger><SelectValue placeholder="กรองสถานะ" /></SelectTrigger>
