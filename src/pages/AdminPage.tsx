@@ -52,6 +52,7 @@ import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
+import { BannerManagement } from '@/components/admin/BannerManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -250,28 +251,40 @@ export default function AdminPage() {
   };
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'users': return canAccessPage('users') ? <UsersManagement currentUser={user} isOwner={isOwner} /> : null;
-      case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
-      case 'banned-words': return canAccessPage('banned-words') ? <BannedWordsManagement /> : null;
-      case 'tag-warn': return canAccessPage('tag-warn') ? <TagWarnLogsManagement /> : null;
-      case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
-      case 'healing-messages': return canAccessPage('healing-messages') ? <HealingMessagesManagement /> : null;
-      case 'trading-history': return canAccessPage('trading-history') ? <TradingHistoryManagement /> : null;
-      case 'categories': return canAccessPage('categories') ? <CategoriesManagement /> : null;
-      case 'banners': return canAccessPage('banners') ? <BannerManagement /> : null;
-      case 'roles': return canAccessPage('roles') ? <DiscordRolesManagement /> : null;
-      case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
-      case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
-      case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
-      case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
-      case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
-      case 'lottery': return canAccessPage('lottery') ? <AdminLottery /> : null;
-      case 'gacha': return canAccessPage('gacha') ? <GachaManagement /> : null;
-      case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
-      case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
-      case 'permissions': return isOwner ? <PermissionsManagement /> : null;
-      default: return null;
+    try {
+      switch (activeTab) {
+        case 'users': return canAccessPage('users') ? <UsersManagement currentUser={user} isOwner={isOwner} /> : null;
+        case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
+        case 'banned-words': return canAccessPage('banned-words') ? <BannedWordsManagement /> : null;
+        case 'tag-warn': return canAccessPage('tag-warn') ? <TagWarnLogsManagement /> : null;
+        case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
+        case 'healing-messages': return canAccessPage('healing-messages') ? <HealingMessagesManagement /> : null;
+        case 'trading-history': return canAccessPage('trading-history') ? <TradingHistoryManagement /> : null;
+        case 'categories': return canAccessPage('categories') ? <CategoriesManagement /> : null;
+        case 'banners': return canAccessPage('banners') ? <BannerManagement /> : null;
+        case 'roles': return canAccessPage('roles') ? <DiscordRolesManagement /> : null;
+        case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
+        case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
+        case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
+        case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
+        case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
+        case 'lottery': return canAccessPage('lottery') ? <AdminLottery /> : null;
+        case 'gacha': return canAccessPage('gacha') ? <GachaManagement /> : null;
+        case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
+        case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
+        case 'permissions': return isOwner ? <PermissionsManagement /> : null;
+        default: return null;
+      }
+    } catch (error) {
+      console.error('Error rendering admin content:', error);
+      return (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-destructive">เกิดข้อผิดพลาดในการโหลดหน้านี้</p>
+            <Button onClick={() => window.location.reload()} className="mt-4">รีโหลดหน้า</Button>
+          </CardContent>
+        </Card>
+      );
     }
   };
 
@@ -440,14 +453,15 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
         return [profiles, roles] as const;
       });
 
-      const usersWithRoles = profiles?.map(profile => ({
+      const usersWithRoles = (profiles || []).map(profile => ({
         ...profile,
-        roles: roles?.filter(r => r.user_id === profile.id) || [],
-      })) || [];
+        roles: (roles || []).filter(r => r.user_id === profile.id),
+      }));
       setUsers(usersWithRoles);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้', variant: 'destructive' });
+      setUsers([]); // Set empty array on error to prevent undefined
     } finally {
       setLoading(false);
     }
@@ -540,12 +554,12 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
     }
   }
 
-  const filteredUsers = users.filter(u => {
+  const filteredUsers = (users || []).filter(u => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      u.username.toLowerCase().includes(q) ||
-      u.discord_id.includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.discord_id || '').includes(q) ||
       (u.discord_username ?? '').toLowerCase().includes(q)
     );
   });
@@ -787,10 +801,13 @@ function ReportsManagement() {
         return data;
       });
       const userIds = new Set<string>();
-      data?.forEach(r => { userIds.add(r.reporter_id); userIds.add(r.reported_user_id); });
+      (data || []).forEach(r => { 
+        if (r.reporter_id) userIds.add(r.reporter_id); 
+        if (r.reported_user_id) userIds.add(r.reported_user_id); 
+      });
       const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(userIds));
-      const profileMap = new Map(profiles?.map(p => [p.id, p]));
-      const reportsWithUsers = data?.map(r => ({ ...r, reporter: profileMap.get(r.reporter_id), reported_user: profileMap.get(r.reported_user_id) })) || [];
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const reportsWithUsers = (data || []).map(r => ({ ...r, reporter: profileMap.get(r.reporter_id), reported_user: profileMap.get(r.reported_user_id) }));
       setReports(reportsWithUsers);
 
       const { data: cancelData, error: cancelError } = await supabase
@@ -804,7 +821,7 @@ function ReportsManagement() {
 
       const requestUserIds = new Set<string>();
       typedCancelData.forEach((req) => {
-        requestUserIds.add(req.requested_by);
+        if (req.requested_by) requestUserIds.add(req.requested_by);
         if (req.approved_by) requestUserIds.add(req.approved_by);
       });
 
@@ -814,7 +831,7 @@ function ReportsManagement() {
           .from('profiles')
           .select('*')
           .in('id', Array.from(requestUserIds));
-        requestProfileMap = new Map(requestProfiles?.map((p) => [p.id, p]));
+        requestProfileMap = new Map((requestProfiles || []).map((p) => [p.id, p]));
       }
 
       setCancelRequests(
@@ -827,6 +844,8 @@ function ReportsManagement() {
     } catch (error) {
       console.error('Error fetching reports:', error);
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถโหลดรายงานได้', variant: 'destructive' });
+      setReports([]); // Set empty array on error
+      setCancelRequests([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
