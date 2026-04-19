@@ -44,6 +44,7 @@ Deno.serve(async (req): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const botToken = Deno.env.get("DISCORD_BOT_TOKEN") ?? "";
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
@@ -52,22 +53,28 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // ใช้ service role เพื่อ bypass RLS — verify user ด้วย getUser(token)
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify JWT จาก Authorization header
+    // Verify JWT
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "").trim();
 
     let userId: string | null = null;
+    let userDiscordId: string | null = null;
+
     if (token) {
       const { data: { user }, error } = await adminClient.auth.getUser(token);
-      if (error) {
-        console.warn("Auth warning:", error.message);
-      } else if (user) {
+      if (!error && user) {
         userId = user.id;
+        // Get discord_id from profiles
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("discord_id")
+          .eq("id", userId)
+          .single();
+        userDiscordId = profile?.discord_id ?? null;
       }
     }
 
@@ -100,7 +107,7 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Fetch invite from Discord (no bot token needed for public invites)
+    // ── Step 1: Resolve invite (public, no bot token needed) ──────────────────
     const discordRes = await fetch(
       `https://discord.com/api/v10/invites/${inviteCode}?with_counts=true&with_expiration=true`
     );
@@ -109,7 +116,7 @@ Deno.serve(async (req): Promise<Response> => {
       const errText = await discordRes.text();
       console.error("Discord invite API error:", discordRes.status, errText);
       return new Response(
-        JSON.stringify({ error: "ไม่สามารถดึงข้อมูลจาก Discord ได้", status: discordRes.status }),
+        JSON.stringify({ error: "ไม่สามารถดึงข้อมูลจาก Discord ได้ ลิงก์อาจหมดอายุหรือไม่ถูกต้อง" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -126,22 +133,37 @@ Deno.serve(async (req): Promise<Response> => {
 
     const guildId: string = guild.id;
 
-    // Lookup owner discord_id from profiles
-    let ownerDiscordId: string | null = null;
-    if (userId) {
-      const { data: profile, error: profileErr } = await adminClient
-        .from("profiles")
-        .select("discord_id")
-        .eq("id", userId)
-        .single();
-      if (profileErr) {
-        console.warn("Profile lookup error:", profileErr.message);
+    // ── Step 2: Verify ownership via Bot API ──────────────────────────────────
+    // Bot API /guilds/{id} returns owner_id — this is the authoritative check
+    if (botToken && userDiscordId) {
+      const guildRes = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}`,
+        { headers: { Authorization: `Bot ${botToken}` } }
+      );
+
+      if (guildRes.ok) {
+        const guildData = await guildRes.json();
+        const guildOwnerId: string = guildData.owner_id ?? "";
+
+        if (guildOwnerId && guildOwnerId !== userDiscordId) {
+          console.warn(`Owner mismatch: guild owner=${guildOwnerId}, user=${userDiscordId}`);
+          return new Response(
+            JSON.stringify({
+              error: "คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้ เฉพาะ Owner เท่านั้นที่สามารถเพิ่มเซิร์ฟเวอร์ได้",
+            }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else if (guildRes.status === 403) {
+        // Bot is not in the guild — cannot verify ownership
+        // Allow submission but flag it for manual review
+        console.warn(`Bot not in guild ${guildId}, skipping owner check`);
       } else {
-        ownerDiscordId = profile?.discord_id ?? null;
+        console.warn(`Guild API returned ${guildRes.status} for guild ${guildId}`);
       }
     }
 
-    // Check duplicate
+    // ── Step 3: Check duplicate ───────────────────────────────────────────────
     const { data: existing } = await adminClient
       .from("discord_servers")
       .select("id")
@@ -150,12 +172,12 @@ Deno.serve(async (req): Promise<Response> => {
 
     if (existing) {
       return new Response(
-        JSON.stringify({ error: "เซิร์ฟเวอร์นี้ถูกเพิ่มแล้ว" }),
+        JSON.stringify({ error: "เซิร์ฟเวอร์นี้ถูกเพิ่มในระบบแล้ว" }),
         { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Insert
+    // ── Step 4: Insert ────────────────────────────────────────────────────────
     const { data: newServer, error: insertError } = await adminClient
       .from("discord_servers")
       .insert({
@@ -166,7 +188,7 @@ Deno.serve(async (req): Promise<Response> => {
           buildBannerUrl(guildId, guild.banner ?? null) ||
           buildSplashUrl(guildId, guild.splash ?? null),
         invite_url: `https://discord.gg/${inviteCode}`,
-        owner_id: ownerDiscordId,
+        owner_id: userDiscordId,
         category_id,
         status: "pending",
       })

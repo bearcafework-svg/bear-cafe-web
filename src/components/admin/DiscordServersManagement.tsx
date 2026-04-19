@@ -143,6 +143,8 @@ export function DiscordServersManagement() {
 
   // ── Status update ──────────────────────────────────────────────────────────
   const handleUpdateStatus = async (id: string, status: 'approved' | 'rejected') => {
+    // Optimistic update — update UI immediately, don't wait for refetch
+    setServers((prev) => prev.map((s) => s.id === id ? { ...s, status } : s));
     try {
       const { error } = await (supabase.from('discord_servers' as any).update({ status }).eq('id', id)) as any;
       if (error) throw error;
@@ -150,8 +152,9 @@ export function DiscordServersManagement() {
         title: status === 'approved' ? 'อนุมัติเรียบร้อย' : 'ปฏิเสธเรียบร้อย',
         className: status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white',
       });
-      fetchData();
     } catch (error: any) {
+      // Revert on failure
+      setServers((prev) => prev.map((s) => s.id === id ? { ...s, status: 'pending' } : s));
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
     }
   };
