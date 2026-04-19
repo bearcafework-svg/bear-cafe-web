@@ -381,6 +381,9 @@ export function DiscordServersManagement() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">จัดการเซิร์ฟเวอร์</h2>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={fetchData} disabled={loading} className="gap-1">
+            <Loader2 className={cn('h-4 w-4', loading && 'animate-spin')} /> รีเฟรช
+          </Button>
           <Button size="sm" variant="outline" onClick={openCarousel} className="gap-1">
             <LayoutList className="h-4 w-4" /> จัดการ Carousel
           </Button>
