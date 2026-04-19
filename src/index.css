@@ -199,8 +199,9 @@
   /* Admin panel card — subtle hover, consistent radius */
   .admin-card {
     @apply rounded-xl border border-border/60 bg-card shadow-sm
-           hover:shadow-md hover:border-border
-           transition-all duration-200;
+           hover:shadow-md hover:border-border hover:scale-[1.005]
+           active:scale-[0.998]
+           transition-all duration-200 ease-out;
   }
 
   /* Admin section header */
@@ -211,6 +212,16 @@
   /* Admin action button — consistent height */
   .admin-btn {
     @apply h-9 px-3 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  /* Clickable table row */
+  .admin-row-clickable {
+    @apply cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors duration-150;
+  }
+
+  /* Loading skeleton pulse */
+  .admin-skeleton {
+    @apply rounded-lg bg-muted/50 animate-pulse;
   }
 
   /* Bear Button Glow */

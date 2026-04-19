@@ -45,6 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
 import { ShieldX, Plus, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
+import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { BulkDeleteToolbar } from '@/components/admin/BulkDeleteToolbar';
 
@@ -364,9 +365,11 @@ export function BannedRolesManagement() {
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">กำลังโหลด...</div>
           ) : filteredRoles.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              {searchQuery ? 'ไม่พบ Role ที่ค้นหา' : 'ยังไม่มี Role ที่ถูกแบน'}
-            </div>
+            <AdminEmptyState
+              icon={ShieldX}
+              title={searchQuery ? 'ไม่พบ Role ที่ค้นหา' : 'ยังไม่มี Role ที่ถูกแบน'}
+              description={searchQuery ? 'ลองเปลี่ยนคำค้นหา' : 'กด "เพิ่ม Role" เพื่อเพิ่ม Role แรก'}
+            />
           ) : (
             <Table>
               <TableHeader>

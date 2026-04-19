@@ -26,6 +26,8 @@ import {
   Key, ArrowLeftRight, ShieldBan,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
+import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
 import AdminLottery from '@/pages/AdminLottery';
 import { BannedRolesManagement } from '@/components/admin/BannedRolesManagement';
@@ -578,7 +580,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
       </CardHeader>
       <CardContent className="px-0 sm:px-6 pb-4 sm:pb-6">
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
+          <AdminSkeletonRows count={8} />
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -594,7 +596,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                 </TableHeader>
                 <TableBody>
                   {paginatedUsers.map((u) => (
-                    <TableRow key={u.id}>
+                    <TableRow key={u.id} className="admin-row-clickable">
                       <TableCell className="py-2 sm:py-3 px-2 sm:px-4">
                         <div className="flex items-center gap-2">
                           {u.avatar_url ? (
