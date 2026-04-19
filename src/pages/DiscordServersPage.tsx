@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, Plus, Users, Info, Loader2,
-  MessageSquare, Search, ArrowUp, Clock, Globe, Eye,
+  MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, Settings, Hash, BotIcon,
 } from 'lucide-react';
