@@ -188,6 +188,8 @@ Deno.serve(async (req): Promise<Response> => {
       .insert({
         discord_id: guildId,
         name: guild.name,
+        description: guild.description ?? null,
+        member_count: inviteData.approximate_member_count ?? null,
         icon_url: buildIconUrl(guildId, guild.icon ?? null),
         banner_url:
           buildBannerUrl(guildId, guild.banner ?? null) ||

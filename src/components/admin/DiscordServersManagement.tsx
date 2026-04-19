@@ -17,9 +17,10 @@ import {
 import {
   Loader2, Check, X, ExternalLink, Users, Trash2, Pencil, Plus,
   MousePointerClick, FolderOpen, Star, ShieldCheck, Handshake,
-  GripVertical, LayoutList, Clock, CheckCircle2, XCircle,
+  GripVertical, LayoutList, Clock, CheckCircle2, XCircle, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DiscordServer {
@@ -115,6 +116,9 @@ export function DiscordServersManagement() {
   const [confirmTarget, setConfirmTarget] = useState<{ server: DiscordServer; status: 'approved' | 'rejected' } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  // Per-card refresh state
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     try {
@@ -189,6 +193,26 @@ export function DiscordServersManagement() {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
     } finally {
       setConfirmLoading(false);
+    }
+  };
+
+  // ── Refresh server data from Discord ──────────────────────────────────────
+  const handleRefreshServer = async (server: DiscordServer) => {
+    setRefreshingId(server.id);
+    const result = await refreshServerFromDiscord(server.id, server.invite_url);
+    setRefreshingId(null);
+    if (result.success && result.updated) {
+      // Optimistic update
+      setServers((prev) => prev.map((s) =>
+        s.id === server.id ? { ...s, ...result.updated } : s
+      ));
+      toast({
+        title: '✅ อัปเดตข้อมูลสำเร็จ',
+        description: `${result.updated.name} — ${(result.updated.member_count ?? 0).toLocaleString()} สมาชิก`,
+        className: 'bg-green-500 text-white',
+      });
+    } else {
+      toast({ title: 'อัปเดตไม่สำเร็จ', description: result.error, variant: 'destructive' });
     }
   };
 
@@ -530,6 +554,15 @@ export function DiscordServersManagement() {
                         <Check className="w-3 h-3 mr-1" />อนุมัติใหม่
                       </Button>
                     )}
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-7 w-7 p-0"
+                      title="รีโหลดข้อมูลจาก Discord"
+                      onClick={() => handleRefreshServer(server)}
+                      disabled={refreshingId === server.id}
+                    >
+                      <RefreshCw className={cn('w-3 h-3', refreshingId === server.id && 'animate-spin')} />
+                    </Button>
                     <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleEdit(server)}><Pencil className="w-3 h-3" /></Button>
                     <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(server)}><Trash2 className="w-3 h-3" /></Button>
                     <Button size="sm" variant="outline" className="h-7 w-7 p-0" asChild>

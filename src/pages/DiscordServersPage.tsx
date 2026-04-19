@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
+import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import {
   ArrowLeft, Plus, Users, Info, Loader2,
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
-  Filter, LogIn, ShieldCheck, Handshake, Settings, Hash, BotIcon,
+  Filter, LogIn, ShieldCheck, Handshake, Settings, Hash, BotIcon, RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -352,11 +353,14 @@ interface ServerCardProps {
   bumpingId: string | null;
   openBotDialog: (server: DiscordServer) => void;
   handleRated: (serverId: string, rating: number) => void;
+  onRefresh: (server: DiscordServer) => void;
+  refreshingId: string | null;
 }
 
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, openBotDialog, handleRated,
+  onRefresh, refreshingId,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
@@ -484,6 +488,19 @@ function ServerCard({
                 <Settings className="w-3.5 h-3.5" />
               </Button>
             )}
+            {/* Refresh — only for owner */}
+            {user && server.owner_id === user.discord_id && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full h-8 w-8 p-0 shrink-0"
+                onClick={() => onRefresh(server)}
+                disabled={refreshingId === server.id}
+                title="รีโหลดข้อมูลจาก Discord"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === server.id ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
             <Button
               size="sm"
               className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm"
@@ -512,6 +529,7 @@ export default function DiscordServersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [bumpingId, setBumpingId] = useState<string | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'recent' | 'popular' | 'rating'>('recent');
   const [showMyOnly, setShowMyOnly] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
@@ -777,6 +795,25 @@ export default function DiscordServersPage() {
     }
   };
 
+  // ── Refresh server from Discord ──────────────────────────────────────────────
+  const handleRefreshServer = async (server: DiscordServer) => {
+    setRefreshingId(server.id);
+    const result = await refreshServerFromDiscord(server.id, server.invite_url);
+    setRefreshingId(null);
+    if (result.success && result.updated) {
+      setServers((prev) => prev.map((s) =>
+        s.id === server.id ? { ...s, ...result.updated } : s
+      ));
+      toast({
+        title: '✅ อัปเดตข้อมูลสำเร็จ',
+        description: `${result.updated.member_count != null ? `${result.updated.member_count.toLocaleString()} สมาชิก` : ''}`,
+        className: 'bg-green-500 text-white',
+      });
+    } else {
+      toast({ title: 'อัปเดตไม่สำเร็จ', description: result.error, variant: 'destructive' });
+    }
+  };
+
   // ── Click tracking ───────────────────────────────────────────────────────────
   const handleClickJoin = async (server: DiscordServer) => {
     // Open the invite immediately — don't block on tracking
@@ -984,6 +1021,8 @@ export default function DiscordServersPage() {
                   bumpingId={bumpingId}
                   openBotDialog={openBotDialog}
                   handleRated={handleRated}
+                  onRefresh={handleRefreshServer}
+                  refreshingId={refreshingId}
                 />
               </motion.div>
             ))}
