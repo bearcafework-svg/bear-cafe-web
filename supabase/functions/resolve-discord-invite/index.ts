@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 function extractInviteCode(input: string): string | null {
-  // Handle full URLs: discord.gg/abc, discord.com/invite/abc, etc.
   const patterns = [
     /discord\.gg\/([a-zA-Z0-9-]+)/,
     /discord\.com\/invite\/([a-zA-Z0-9-]+)/,
@@ -16,7 +15,6 @@ function extractInviteCode(input: string): string | null {
     const m = input.match(p);
     if (m) return m[1];
   }
-  // If it looks like a plain code (no slashes)
   if (/^[a-zA-Z0-9-]+$/.test(input.trim())) return input.trim();
   return null;
 }
@@ -44,151 +42,122 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Verify the user
-    const userClient = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } }
+    // ✅ FIX: ใช้ anon key + auth header (ไม่ใช้ service role verify)
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
     });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+
+    // ✅ OPTIONAL AUTH
+    let userId: string | null = null;
+    if (authHeader) {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (!error && user) {
+        userId = user.id;
+      }
     }
 
     const { invite_url, category_id } = await req.json();
+
     if (!invite_url || !category_id) {
       return new Response(JSON.stringify({ error: 'invite_url and category_id are required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const inviteCode = extractInviteCode(invite_url);
     if (!inviteCode) {
-      return new Response(JSON.stringify({ error: 'ลิงก์เชิญไม่ถูกต้อง กรุณาใช้ลิงก์ discord.gg/...' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ error: 'ลิงก์เชิญไม่ถูกต้อง' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Fetch invite data from Discord public API (no bot needed!)
     const discordRes = await fetch(
       `https://discord.com/api/v10/invites/${inviteCode}?with_counts=true&with_expiration=true`,
     );
 
     if (!discordRes.ok) {
-      const errText = await discordRes.text();
-      console.error('Discord invite API error:', discordRes.status, errText);
-      if (discordRes.status === 404) {
-        return new Response(JSON.stringify({ error: 'ลิงก์เชิญไม่ถูกต้องหรือหมดอายุแล้ว' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
       return new Response(JSON.stringify({ error: 'ไม่สามารถดึงข้อมูลจาก Discord ได้' }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const inviteData = await discordRes.json();
     const guild = inviteData.guild;
+
     if (!guild) {
-      return new Response(JSON.stringify({ error: 'ไม่พบข้อมูลเซิร์ฟเวอร์จากลิงก์นี้' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ error: 'ไม่พบเซิร์ฟเวอร์' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Get user's discord_id from profile
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('discord_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) {
-      return new Response(JSON.stringify({ error: 'ไม่พบโปรไฟล์ผู้ใช้' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    let ownerDiscordId: string | null = null;
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('discord_id')
+        .eq('id', userId)
+        .single();
+      ownerDiscordId = profile?.discord_id ?? null;
     }
 
     const guildId = guild.id;
-    const serverName = guild.name;
-    const iconUrl = buildIconUrl(guildId, guild.icon);
-    const bannerUrl = buildBannerUrl(guildId, guild.banner) || buildSplashUrl(guildId, guild.splash);
-    const memberCount = inviteData.approximate_member_count || 0;
-    const onlineCount = inviteData.approximate_presence_count || 0;
 
-    // Normalize invite URL to a clean format
-    const cleanInviteUrl = `https://discord.gg/${inviteCode}`;
-
-    // Check if server already exists
-    const { data: existing } = await adminClient
+    const { data: existing } = await supabase
       .from('discord_servers')
-      .select('id, owner_id')
+      .select('id')
       .eq('discord_id', guildId)
       .maybeSingle();
 
     if (existing) {
-      return new Response(JSON.stringify({ error: 'เซิร์ฟเวอร์นี้ถูกเพิ่มไปแล้ว' }), {
-        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ error: 'เซิร์ฟเวอร์นี้ถูกเพิ่มแล้ว' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Insert new server
-    const { data: newServer, error: insertError } = await adminClient
+    const { data: newServer, error: insertError } = await supabase
       .from('discord_servers')
       .insert({
         discord_id: guildId,
-        name: serverName,
-        description: guild.description || null,
-        icon_url: iconUrl,
-        banner_url: bannerUrl,
-        member_count: memberCount,
-        invite_url: cleanInviteUrl,
-        owner_id: profile.discord_id,
+        name: guild.name,
+        icon_url: buildIconUrl(guildId, guild.icon),
+        banner_url: buildBannerUrl(guildId, guild.banner) || buildSplashUrl(guildId, guild.splash),
+        invite_url: `https://discord.gg/${inviteCode}`,
+        owner_id: ownerDiscordId,
         category_id,
         status: 'pending',
-        bumped_at: new Date().toISOString(),
       })
       .select('id')
       .single();
 
     if (insertError) {
-      console.error('Insert error:', insertError);
-      return new Response(JSON.stringify({ error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      console.error("Insert error:", insertError);
+      return new Response(JSON.stringify({ error: 'insert failed', details: insertError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      server: {
-        id: newServer.id,
-        name: serverName,
-        icon_url: iconUrl,
-        banner_url: bannerUrl,
-        member_count: memberCount,
-        online_count: onlineCount,
-        description: guild.description,
-      }
-    }), {
+    return new Response(JSON.stringify({ success: true, id: newServer.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    console.error('Error in resolve-discord-invite:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  } catch (err) {
+    console.error("Error:", err);
+    return new Response(JSON.stringify({ error: 'Internal error', details: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
