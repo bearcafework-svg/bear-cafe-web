@@ -221,10 +221,10 @@ export default function AdminPage() {
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
                     isActive
-                      ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20'
-                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
                   )}
                 >
                   <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
@@ -378,7 +378,7 @@ export default function AdminPage() {
             {activeItem && (
               <>
                 <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
-                  <activeItem.icon className="w-5 h-5 text-primary" />
+                  <activeItem.icon className="w-5 h-5 text-primary admin-icon" />
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-foreground leading-tight">{activeItem.label}</h1>

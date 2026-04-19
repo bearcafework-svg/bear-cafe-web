@@ -23,7 +23,7 @@ export function SearchBar({ value, onChange, placeholder = 'ค้นหา...',
       {value && (
         <Button
           variant="ghost" size="icon"
-          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 active:scale-95 transition-all duration-150 rounded-md"
           onClick={() => onChange('')}
         >
           <X className="w-3.5 h-3.5" />
