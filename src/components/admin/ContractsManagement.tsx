@@ -748,22 +748,22 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               {discordName && (
                 <span className="text-xs text-muted-foreground">@{discordName}</span>
               )}
-              <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 ml-auto shrink-0', typeColor)}>
+              <Badge variant="outline" className={cn('text-xs px-2 py-0.5 ml-auto shrink-0 font-medium', typeColor)}>
                 {typeLabel}
               </Badge>
               {/* Actions */}
               <div className="flex items-center gap-0.5 shrink-0">
                 {contract.type === 'house' && (
                   <Button size="icon" variant="ghost"
-                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary"
                     onClick={() => onEdit(contract)}>
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-3.5 h-3.5" />
                   </Button>
                 )}
                 <Button size="icon" variant="ghost"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
                   onClick={() => setDeleteOpen(true)}>
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>
@@ -771,18 +771,18 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             {/* Row 2: Role name (if any) */}
             {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
               <div className="flex items-center gap-1.5">
-                <Crown className="w-3 h-3 text-amber-400 shrink-0" />
-                <span className="text-xs text-muted-foreground truncate">{contract.role_name}</span>
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-sm text-muted-foreground">{contract.role_name}</span>
               </div>
             )}
 
             {/* Row 3: Time status */}
             <div className="flex items-center gap-3 flex-wrap">
               {/* Time remaining / elapsed */}
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span className={cn(
-                  'text-xs font-medium',
+                  'text-sm font-medium',
                   contract.type === 'house' ? statusColor : 'text-muted-foreground'
                 )}>
                   {contract.type === 'personal_role'
@@ -793,48 +793,47 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
 
               {/* Status dot for house */}
               {contract.type === 'house' && statusText && (
-                <div className="flex items-center gap-1">
-                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusDot)} />
-                  <span className={cn('text-[10px] font-medium', statusColor)}>{statusText}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', statusDot)} />
+                  <span className={cn('text-xs font-medium', statusColor)}>{statusText}</span>
                 </div>
               )}
-
-              {/* Channel link */}
-              {contract.type === 'house' && contract.room_link && (
-                <a href={contract.room_link} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-auto">
-                  <span className="text-[10px]">🔗</span>
-                  {loadingHouseChannel
-                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                    : <span className="truncate max-w-[120px]">{houseChannelName ?? 'ดูห้อง'}</span>
-                  }
-                </a>
-              )}
-
-              {/* personal_role channel */}
-              {contract.type === 'personal_role' && contract.room_link && (
-                <a href={contract.room_link} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-auto">
-                  <span className="text-[10px]">#</span>
-                  {loadingExtra
-                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                    : <span className="truncate max-w-[120px]">{channelName ?? 'ดูห้อง'}</span>
-                  }
-                </a>
-              )}
             </div>
+
+            {/* Row 3b: Channel link (own row so it never truncates) */}
+            {contract.type === 'house' && contract.room_link && (
+              <a href={contract.room_link} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors w-fit">
+                <span>🔗</span>
+                {loadingHouseChannel
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <span>{houseChannelName ?? 'ดูห้อง'}</span>
+                }
+              </a>
+            )}
+
+            {contract.type === 'personal_role' && contract.room_link && (
+              <a href={contract.room_link} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors w-fit">
+                <span>#</span>
+                {loadingExtra
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <span>{channelName ?? 'ดูห้อง'}</span>
+                }
+              </a>
+            )}
 
             {/* Row 4: personal_role member count + meta */}
             <div className="flex items-center gap-3 flex-wrap">
               {contract.type === 'personal_role' && (
                 <>
                   {loadingExtra && roleTotal === null ? (
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-2.5 h-2.5 animate-spin" />โหลด...
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />โหลด...
                     </span>
                   ) : roleTotal !== null ? (
                     <span className={cn(
-                      'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                      'text-xs font-semibold px-2 py-0.5 rounded-full',
                       roleTotal > 5 ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
                     )}>
                       👥 {roleTotal.toLocaleString()} คน{roleTotal > 5 ? ' (เกิน)' : ''}
@@ -844,8 +843,8 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               )}
 
               {/* Operator + date — always at end */}
-              <div className="flex items-center gap-2 ml-auto text-[10px] text-muted-foreground/70">
-                <span className="truncate max-w-[80px]">{contract.operator_name ?? '—'}</span>
+              <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+                <span>{contract.operator_name ?? '—'}</span>
                 <span className="shrink-0">
                   {new Date(contract.created_at).toLocaleDateString('th-TH', {
                     day: 'numeric', month: 'short', year: '2-digit',
