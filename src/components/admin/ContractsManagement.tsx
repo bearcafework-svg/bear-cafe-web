@@ -77,19 +77,31 @@ const WEBHOOK_URL =
 function formatRemaining(endAt: string) {
   const diff = new Date(endAt).getTime() - Date.now();
   if (diff <= 0) return 'หมดอายุแล้ว';
-  const totalHours = Math.floor(diff / 3600000);
-  const days = Math.floor(totalHours / 24);
+  const totalMinutes = Math.floor(diff / 60000);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const totalDays = Math.floor(totalHours / 24);
+  const months = Math.floor(totalDays / 30);
+  const days = totalDays % 30;
   const hours = totalHours % 24;
-  if (days === 0) return `สัญญาคงเหลือ ${hours} ชั่วโมง`;
-  return `สัญญาคงเหลือ ${days} วัน — ${hours} ชั่วโมง`;
+  if (months > 0 && days > 0) return `สัญญาคงเหลือ ${months} เดือน ${days} วัน`;
+  if (months > 0) return `สัญญาคงเหลือ ${months} เดือน`;
+  if (days > 0 && hours > 0) return `สัญญาคงเหลือ ${days} วัน ${hours} ชั่วโมง`;
+  if (days > 0) return `สัญญาคงเหลือ ${days} วัน`;
+  return `สัญญาคงเหลือ ${hours} ชั่วโมง`;
 }
 
 function formatElapsed(startAt: string) {
   const diff = Date.now() - new Date(startAt).getTime();
   const totalHours = Math.floor(diff / 3600000);
-  const days = Math.floor(totalHours / 24);
+  const totalDays = Math.floor(totalHours / 24);
+  const months = Math.floor(totalDays / 30);
+  const days = totalDays % 30;
   const hours = totalHours % 24;
-  return `สร้างมาแล้ว ${days} วัน — ${hours} ชั่วโมง`;
+  if (months > 0 && days > 0) return `สร้างมาแล้ว ${months} เดือน ${days} วัน`;
+  if (months > 0) return `สร้างมาแล้ว ${months} เดือน`;
+  if (days > 0 && hours > 0) return `สร้างมาแล้ว ${days} วัน ${hours} ชั่วโมง`;
+  if (days > 0) return `สร้างมาแล้ว ${days} วัน`;
+  return `สร้างมาแล้ว ${hours} ชั่วโมง`;
 }
 
 function daysRemaining(endAt: string) {
@@ -591,6 +603,40 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
     fetchExtra();
   }, [contract.type, contract.discord_role_id, contract.room_link]);
 
+  // house: fetch channel name from room_link
+  const [houseChannelName, setHouseChannelName] = useState<string | null>(null);
+  const [loadingHouseChannel, setLoadingHouseChannel] = useState(false);
+
+  useEffect(() => {
+    if (contract.type !== 'house' || !contract.room_link) return;
+    if (houseChannelName !== null) return; // already loaded
+
+    async function fetchHouseChannel() {
+      setLoadingHouseChannel(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-role-members`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+            },
+            body: JSON.stringify({ channel_url: contract.room_link }),
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.channel_name) setHouseChannelName(data.channel_name);
+      } catch { /* silent */ } finally {
+        setLoadingHouseChannel(false);
+      }
+    }
+    fetchHouseChannel();
+  }, [contract.type, contract.room_link]);
+
   const days = contract.end_at ? daysRemaining(contract.end_at) : null;
 
   const borderColor =
@@ -772,7 +818,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               </div>
             )}
 
-            {/* Room link (house only) */}
+            {/* Room link (house only) — show channel name */}
             {contract.type === 'house' && contract.room_link && (
               <a
                 href={contract.room_link}
@@ -780,7 +826,14 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                 rel="noreferrer"
                 className="text-xs text-blue-400 hover:underline truncate block transition-colors"
               >
-                🔗 ลิงก์ห้อง
+                {loadingHouseChannel ? (
+                  <span className="flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    กำลังโหลด...
+                  </span>
+                ) : (
+                  <>🔗 {houseChannelName ?? 'ดูห้อง'}</>
+                )}
               </a>
             )}
 
@@ -921,8 +974,6 @@ export function ContractsManagement() {
   const [searchMember, setSearchMember] = useState('');
   const [searchOperator, setSearchOperator] = useState('');
   const [filterType, setFilterType] = useState<ContractType | 'all'>('all');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
   const [page, setPage] = useState(1);
 
   // Load stored icon URLs from storage on mount
@@ -983,14 +1034,12 @@ export function ContractsManagement() {
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [searchMember, searchOperator, filterType, filterDateFrom, filterDateTo]);
+  useEffect(() => { setPage(1); }, [searchMember, searchOperator, filterType]);
 
   const filtered = contracts.filter(c => {
     if (filterType !== 'all' && c.type !== filterType) return false;
     if (searchMember && !c.member_id.toLowerCase().includes(searchMember.toLowerCase())) return false;
     if (searchOperator && !(c.operator_name ?? '').toLowerCase().includes(searchOperator.toLowerCase())) return false;
-    if (filterDateFrom && new Date(c.created_at) < new Date(filterDateFrom)) return false;
-    if (filterDateTo && new Date(c.created_at) > new Date(filterDateTo + 'T23:59:59')) return false;
     return true;
   });
 
@@ -999,105 +1048,134 @@ export function ContractsManagement() {
 
   const clearFilters = () => {
     setSearchMember(''); setSearchOperator('');
-    setFilterType('all'); setFilterDateFrom(''); setFilterDateTo('');
+    setFilterType('all');
   };
 
-  const hasFilter = searchMember || searchOperator || filterType !== 'all' || filterDateFrom || filterDateTo;
+  const hasFilter = searchMember || searchOperator || filterType !== 'all';
 
   function handleIconUploaded(type: ContractType, url: string) {
     setTypeIcons(prev => ({ ...prev, [type]: url || null }));
   }
 
+  // Derived stats
+  const countByType = {
+    house: contracts.filter(c => c.type === 'house').length,
+    role: contracts.filter(c => c.type === 'role').length,
+    personal_role: contracts.filter(c => c.type === 'personal_role').length,
+  };
+  const urgentCount = contracts.filter(c => {
+    if (c.type !== 'house' || !c.end_at) return false;
+    return daysRemaining(c.end_at) <= 3 && daysRemaining(c.end_at) > 0;
+  }).length;
+  const expiredCount = contracts.filter(c =>
+    c.end_at && daysRemaining(c.end_at) <= 0
+  ).length;
+
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">สัญญาเช่า</h2>
-          <Badge variant="secondary" className="text-xs">{filtered.length}</Badge>
+          <Badge variant="secondary" className="text-xs">{filtered.length} / {contracts.length}</Badge>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {user?.is_owner && (
             <IconUpload typeIcons={typeIcons} onUploaded={handleIconUploaded} />
           )}
-          <Button variant="outline" size="sm" onClick={fetchContracts} disabled={loading}>
-            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+          <Button variant="outline" size="sm" onClick={fetchContracts} disabled={loading} className="gap-1.5">
+            <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+            รีเฟรช
           </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" />เพิ่มข้อมูล
+          <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
+            <Plus className="w-3.5 h-3.5" />เพิ่มสัญญา
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-border/50">
-        <CardContent className="pt-4 pb-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ผู้เช่า (Member ID)</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-8 h-8 text-sm"
-                  placeholder="ค้นหา ID..."
-                  value={searchMember}
-                  onChange={e => setSearchMember(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ผู้ดำเนินการ</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-8 h-8 text-sm"
-                  placeholder="ค้นหาชื่อ..."
-                  value={searchOperator}
-                  onChange={e => setSearchOperator(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">ประเภทสัญญา</Label>
-              <Select value={filterType} onValueChange={v => setFilterType(v as ContractType | 'all')}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทุกประเภท</SelectItem>
-                  <SelectItem value="house">สัญญาเช่าบ้าน</SelectItem>
-                  <SelectItem value="role">สัญญาเช่ายศ</SelectItem>
-                  <SelectItem value="personal_role">สัญญายศส่วนตัว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">วันที่สร้าง</Label>
-              <div className="flex gap-1.5 items-center">
-                <Input
-                  type="date"
-                  className="h-8 text-xs flex-1"
-                  value={filterDateFrom}
-                  onChange={e => setFilterDateFrom(e.target.value)}
-                />
-                <span className="text-xs text-muted-foreground shrink-0">—</span>
-                <Input
-                  type="date"
-                  className="h-8 text-xs flex-1"
-                  value={filterDateTo}
-                  onChange={e => setFilterDateTo(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-          {hasFilter && (
-            <button
-              onClick={clearFilters}
-              className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            >
-              <X className="w-3 h-3" />ล้างตัวกรอง
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {/* Type counts — clickable quick-filter */}
+        {([
+          { key: 'all', label: 'ทั้งหมด', count: contracts.length, color: 'bg-muted/60 hover:bg-muted' },
+          { key: 'house', label: '🏠 บ้าน', count: countByType.house, color: 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400' },
+          { key: 'role', label: '👑 ยศ', count: countByType.role, color: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400' },
+          { key: 'personal_role', label: '⭐ ยศส่วนตัว', count: countByType.personal_role, color: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400' },
+        ] as const).map(({ key, label, count, color }) => (
+          <button
+            key={key}
+            onClick={() => { setFilterType(key as ContractType | 'all'); setPage(1); }}
+            className={cn(
+              'rounded-xl px-3 py-2.5 text-left transition-all border',
+              color,
+              filterType === key ? 'ring-2 ring-primary border-primary/40' : 'border-border/40'
+            )}
+          >
+            <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
+            <p className="text-xl font-bold leading-tight">{count}</p>
+          </button>
+        ))}
+        {/* Urgent alert */}
+        <button
+          onClick={() => { setFilterType('house'); setPage(1); }}
+          className={cn(
+            'rounded-xl px-3 py-2.5 text-left transition-all border',
+            urgentCount > 0
+              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30'
+              : 'bg-muted/40 border-border/40 opacity-60'
+          )}
+        >
+          <p className="text-[11px] text-muted-foreground font-medium">🚨 ใกล้หมด</p>
+          <p className={cn('text-xl font-bold leading-tight', urgentCount > 0 && 'text-red-400')}>{urgentCount}</p>
+        </button>
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search member */}
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-9 text-sm"
+            placeholder="ค้นหา Member ID..."
+            value={searchMember}
+            onChange={e => setSearchMember(e.target.value)}
+          />
+          {searchMember && (
+            <button onClick={() => setSearchMember('')} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        {/* Search operator */}
+        <div className="relative flex-1 min-w-[140px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-9 text-sm"
+            placeholder="ค้นหาผู้ดำเนินการ..."
+            value={searchOperator}
+            onChange={e => setSearchOperator(e.target.value)}
+          />
+          {searchOperator && (
+            <button onClick={() => setSearchOperator('')} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {/* Clear all */}
+        {hasFilter && (
+          <button
+            onClick={clearFilters}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-muted/50"
+          >
+            <X className="w-3 h-3" />ล้างทั้งหมด
+          </button>
+        )}
+        {/* Result count */}
+        <span className="text-xs text-muted-foreground ml-auto">
+          {filtered.length} รายการ
+        </span>
+      </div>
 
       {/* Grid */}
       {loading ? (
@@ -1123,27 +1201,16 @@ export function ContractsManagement() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-2 border-t border-border/40">
           <p className="text-xs text-muted-foreground">
-            หน้า {page} / {totalPages} ({filtered.length} รายการ)
+            หน้า <span className="font-medium text-foreground">{page}</span> / {totalPages}
+            <span className="ml-2 text-muted-foreground/60">({filtered.length} รายการ)</span>
           </p>
           <div className="flex gap-1">
-            <Button
-              variant="outline" size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="h-7 px-2 text-xs"
-            >
-              ก่อนหน้า
-            </Button>
-            <Button
-              variant="outline" size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="h-7 px-2 text-xs"
-            >
-              ถัดไป
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page <= 1} className="h-7 px-2 text-xs">«</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="h-7 px-2 text-xs">ก่อนหน้า</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="h-7 px-2 text-xs">ถัดไป</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(totalPages)} disabled={page >= totalPages} className="h-7 px-2 text-xs">»</Button>
           </div>
         </div>
       )}
