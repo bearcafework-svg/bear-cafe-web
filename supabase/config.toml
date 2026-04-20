@@ -103,3 +103,6 @@ verify_jwt = false
 
 [functions.resolve-discord-invite]
 verify_jwt = false
+
+[functions.get-random-healing]
+verify_jwt = false
