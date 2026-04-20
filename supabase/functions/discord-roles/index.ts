@@ -84,10 +84,12 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Check if user has page access (supports owner, admin, and custom permissions)
-    const { data: hasAccess } = await adminClient.rpc('has_page_access', {
+    // Check if user has page access
+    // Allow: owner, admin, anyone with 'roles' OR 'contracts' page permission
+    // (contracts admins need discord roles for personal_role contract creation)
+    const { data: hasAccess } = await adminClient.rpc('has_any_page_access', {
       _user_id: profile.id,
-      _page: 'roles',
+      _pages: ['roles', 'contracts'],
     });
 
     if (!hasAccess) {
