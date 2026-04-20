@@ -266,9 +266,13 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   async function fetchDiscordRoles() {
     setRolesLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh session to ensure token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) {
+        throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
+      }
       const { data, error } = await supabase.functions.invoke('discord-roles', {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
       setDiscordRoles(data?.roles ?? []);

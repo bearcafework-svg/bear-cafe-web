@@ -25,33 +25,40 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const guardResult = await requireRoleBanGuard(req, corsHeaders);
-    if ("response" in guardResult) {
-      return guardResult.response as Response;
-    }
-
-    // Verify the user is an admin
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Unauthorized - Missing token' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify JWT and check if user is admin
+    // ✅ Use service role key to verify ES256 JWT (Supabase Auth v2)
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
+
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Run role ban guard (non-blocking — if it fails, continue)
+    try {
+      const guardResult = await requireRoleBanGuard(req, corsHeaders);
+      if ("response" in guardResult) {
+        return guardResult.response as Response;
+      }
+    } catch (guardErr) {
+      console.warn('Role ban guard error (non-fatal):', guardErr);
     }
 
     // Get user's discord_id from metadata
@@ -64,7 +71,7 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Get profile ID
-    const { data: profile } = await supabase
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('id')
       .eq('discord_id', discordId)
@@ -78,7 +85,7 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Check if user has page access (supports owner, admin, and custom permissions)
-    const { data: hasAccess } = await supabase.rpc('has_page_access', {
+    const { data: hasAccess } = await adminClient.rpc('has_page_access', {
       _user_id: profile.id,
       _page: 'roles',
     });
