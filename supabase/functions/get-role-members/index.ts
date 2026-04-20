@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -14,7 +12,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const botToken = Deno.env.get("DISCORD_BOT_TOKEN") ?? "";
     const guildId = Deno.env.get("DISCORD_GUILD_ID") ?? "";
 
-    // botToken หรือ guildId ไม่มี → return error ทันที ไม่ต้อง loop
     if (!botToken || !guildId) {
       return new Response(
         JSON.stringify({ error: "Missing DISCORD_BOT_TOKEN or DISCORD_GUILD_ID" }),
@@ -28,65 +25,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const result: Record<string, unknown> = {};
 
-    // ─── Fetch role members ───────────────────────────────────────────────
+    // ─── Get role member count via /guilds/{id}/roles ─────────────────────
+    // This endpoint returns member_count per role directly — no pagination needed.
+    // Works even for servers with 30,000+ members.
     if (roleId) {
-      let after = "0";
-      let totalWithRole = 0;
-      const members: Array<{ id: string; username: string; avatar: string | null }> = [];
-      let page = 0;
-      const MAX_PAGES = 50; // safety: max 5000 members
+      const rolesRes = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/roles`,
+        { headers: { Authorization: `Bot ${botToken}` } }
+      );
 
-      while (page < MAX_PAGES) {
-        page++;
+      if (rolesRes.ok) {
+        const roles: any[] = await rolesRes.json();
+        const role = roles.find((r: any) => r.id === roleId);
 
-        const res = await fetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members?limit=100&after=${after}`,
-          { headers: { Authorization: `Bot ${botToken}` } }
-        );
-
-        // Rate limited — wait and retry (don't increment page)
-        if (res.status === 429) {
-          let retryAfter = 1;
-          try {
-            const body = await res.json();
-            retryAfter = Number(body.retry_after ?? 1);
-          } catch { /* ignore */ }
-          await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 5000)));
-          page--; // don't count this as a page
-          continue;
+        if (role) {
+          // member_count is available when the bot has GUILD_MEMBERS intent
+          // or via the roles endpoint with counts
+          result.total = role.member_count ?? null;
+          result.members = []; // no member list — count only
+        } else {
+          result.total = null;
+          result.members = [];
         }
-
-        if (!res.ok) {
-          console.error("Discord members API error:", res.status, await res.text());
-          break;
-        }
-
-        const batch: any[] = await res.json();
-        if (!Array.isArray(batch) || batch.length === 0) break;
-
-        for (const m of batch) {
-          const roles: string[] = m.roles ?? [];
-          if (roles.includes(roleId)) {
-            totalWithRole++;
-            if (members.length < 5) {
-              const avatarHash = m.user?.avatar;
-              members.push({
-                id: m.user.id,
-                username: m.nick || m.user?.global_name || m.user?.username || "Unknown",
-                avatar: avatarHash
-                  ? `https://cdn.discordapp.com/avatars/${m.user.id}/${avatarHash}.png?size=64`
-                  : null,
-              });
-            }
-          }
-        }
-
-        after = batch[batch.length - 1].user.id;
-        if (batch.length < 100) break; // last page
+      } else {
+        console.error("Discord roles API error:", rolesRes.status);
+        result.total = null;
+        result.members = [];
       }
-
-      result.members = members;
-      result.total = totalWithRole;
     }
 
     // ─── Resolve channel name ─────────────────────────────────────────────

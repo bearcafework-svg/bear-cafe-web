@@ -550,15 +550,14 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   }
 
   // personal_role: role members + channel name
-  const [roleMembers, setRoleMembers] = useState<Array<{ id: string; username: string; avatar: string | null; profile?: { avatar_url: string | null; username: string } | null }> | null>(null);
   const [roleTotal, setRoleTotal] = useState<number | null>(null);
   const [channelName, setChannelName] = useState<string | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
 
-  // Auto-fetch for personal_role cards
+  // Auto-fetch for personal_role cards — count only, no member list
   useEffect(() => {
     if (contract.type !== 'personal_role') return;
-    if (roleMembers !== null) return; // already loaded
+    if (roleTotal !== null) return; // already loaded
 
     async function fetchExtra() {
       setLoadingExtra(true);
@@ -583,22 +582,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
         if (!res.ok) return;
         const data = await res.json();
 
-        if (data.members) {
-          // Enrich with profiles table
-          const ids: string[] = data.members.map((m: any) => m.id);
-          const { data: profiles } = await (supabase as any)
-            .from('profiles')
-            .select('discord_id, username, avatar_url')
-            .in('discord_id', ids);
-          const profileMap: Record<string, any> = {};
-          (profiles ?? []).forEach((p: any) => { profileMap[p.discord_id] = p; });
-
-          setRoleMembers(data.members.map((m: any) => ({
-            ...m,
-            profile: profileMap[m.id] ?? null,
-          })));
-          setRoleTotal(data.total ?? data.members.length);
-        }
+        if (data.total != null) setRoleTotal(data.total);
         if (data.channel_name) setChannelName(data.channel_name);
       } catch { /* silent */ } finally {
         setLoadingExtra(false);
@@ -824,50 +808,23 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                 )}
 
                 {/* Role members section with divider */}
-                {roleMembers !== null && (
-                  <div className="pt-2 mt-2 border-t border-border/40 space-y-1.5">
+                {roleTotal !== null && (
+                  <div className="pt-2 mt-2 border-t border-border/40">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">ผู้ถือบทบาท:</span>
                       <span className={cn(
                         'text-xs font-semibold px-2 py-0.5 rounded-full',
-                        (roleTotal ?? 0) > 5 
-                          ? 'bg-red-500/10 text-red-400' 
+                        roleTotal > 5
+                          ? 'bg-red-500/10 text-red-400'
                           : 'bg-green-500/10 text-green-400'
                       )}>
-                        {roleTotal ?? roleMembers.length} คน
-                        {(roleTotal ?? 0) > 5 && ' (เกิน)'}
+                        {roleTotal.toLocaleString()} คน
+                        {roleTotal > 5 && ' (เกิน)'}
                       </span>
-                    </div>
-                    
-                    {/* Avatar row - max 4 inline */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {roleMembers.slice(0, 4).map((m) => (
-                        <div key={m.id} className="flex items-center gap-1.5 bg-muted/30 rounded-md px-1.5 py-1">
-                          <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-muted">
-                            {m.profile?.avatar_url ? (
-                              <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover"
-                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            ) : m.avatar ? (
-                              <img src={m.avatar} alt="" className="w-full h-full object-cover"
-                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[10px]">🐻</div>
-                            )}
-                          </div>
-                          <span className="text-[10px] truncate max-w-[80px]">
-                            {m.profile?.username ?? m.username ?? 'ผู้ใช้'}
-                          </span>
-                        </div>
-                      ))}
-                      {(roleTotal ?? 0) > 4 && (
-                        <span className="text-xs text-muted-foreground font-medium">
-                          +{(roleTotal ?? 0) - 4}
-                        </span>
-                      )}
                     </div>
                   </div>
                 )}
-                {loadingExtra && roleMembers === null && (
+                {loadingExtra && roleTotal === null && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="w-3 h-3 animate-spin" />กำลังโหลด...
                   </div>
