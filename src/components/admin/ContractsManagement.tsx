@@ -720,197 +720,155 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
 
   return (
     <>
-      <Card className={cn(
-        'border-2 transition-all duration-200 overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.01]',
-        borderColor
+      <div className={cn(
+        'group relative rounded-xl border-l-4 bg-card transition-all duration-200',
+        'hover:shadow-md hover:bg-muted/20',
+        borderColor.replace('border-', 'border-l-'),
+        'border border-border/40'
       )}>
-        <div className="flex">
-          {/* Left: Icon column */}
-          <div className="w-12 shrink-0 flex items-center justify-center bg-muted/20 border-r border-border/40">
+        {/* ── Main row ── */}
+        <div className="flex items-start gap-3 px-4 py-3">
+
+          {/* Icon */}
+          <div className="shrink-0 w-9 h-9 rounded-lg bg-muted/40 flex items-center justify-center mt-0.5">
             {iconUrl ? (
-              <img src={iconUrl} alt={contract.type} className="w-11 h-11 object-contain rounded"
+              <img src={iconUrl} alt={contract.type} className="w-7 h-7 object-contain rounded"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
-              <span className="text-3xl opacity-80">{typeEmoji}</span>
+              <span className="text-lg leading-none">{typeEmoji}</span>
             )}
           </div>
 
-          {/* Right: Info column */}
-          <div className="flex-1 min-w-0 px-4 py-3 space-y-2.5">
-            {/* TOP: Type badge + action buttons */}
-            <div className="flex items-center justify-between gap-2">
-              <Badge variant="outline" className={cn('text-xs px-2 py-0.5 font-medium', typeColor)}>
+          {/* Content */}
+          <div className="flex-1 min-w-0 space-y-1">
+
+            {/* Row 1: Member ID + type badge + actions */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono font-bold text-sm tracking-tight">{contract.member_id}</span>
+              {discordName && (
+                <span className="text-xs text-muted-foreground">@{discordName}</span>
+              )}
+              <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 ml-auto shrink-0', typeColor)}>
                 {typeLabel}
               </Badge>
-              <div className="flex items-center gap-1">
+              {/* Actions */}
+              <div className="flex items-center gap-0.5 shrink-0">
                 {contract.type === 'house' && (
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="h-7 w-7 shrink-0 hover:bg-primary/10 hover:text-primary transition-colors" 
-                    onClick={() => onEdit(contract)}
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
+                  <Button size="icon" variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                    onClick={() => onEdit(contract)}>
+                    <Edit2 className="w-3 h-3" />
                   </Button>
                 )}
-                <Button
-                  size="icon" 
-                  variant="ghost"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <X className="w-3.5 h-3.5" />
+                <Button size="icon" variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}>
+                  <X className="w-3 h-3" />
                 </Button>
               </div>
             </div>
 
-            {/* MIDDLE: Main info */}
-            <div className="space-y-1.5">
-              {/* Member ID (prominent) */}
-              <div className="flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="text-sm font-mono font-semibold truncate">{contract.member_id}</span>
-              </div>
-              
-              {/* Discord username (muted, smaller) */}
-              {discordName && (
-                <div className="pl-5">
-                  <span className="text-xs text-muted-foreground truncate">@{discordName}</span>
-                </div>
-              )}
-
-              {/* Role name */}
-              {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
-                <div className="flex items-center gap-2">
-                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="text-xs font-medium truncate">{contract.role_name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* STATUS BLOCK: Time + status in highlighted row */}
-            {contract.type === 'house' && statusText && (
-              <div className="rounded-md bg-muted/40 px-2 py-1.5 space-y-1">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <span className={cn('text-xs font-medium', statusColor)}>
-                    {contract.end_at ? formatRemaining(contract.end_at) : '—'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={cn('w-1.5 h-1.5 rounded-full', statusDot)} />
-                  <span className={cn('text-xs font-medium', statusColor)}>
-                    {statusText}
-                  </span>
-                </div>
+            {/* Row 2: Role name (if any) */}
+            {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
+              <div className="flex items-center gap-1.5">
+                <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                <span className="text-xs text-muted-foreground truncate">{contract.role_name}</span>
               </div>
             )}
 
-            {/* For non-house: simple time display */}
-            {contract.type !== 'house' && (
-              <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground">
+            {/* Row 3: Time status */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Time remaining / elapsed */}
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+                <span className={cn(
+                  'text-xs font-medium',
+                  contract.type === 'house' ? statusColor : 'text-muted-foreground'
+                )}>
                   {contract.type === 'personal_role'
                     ? formatElapsed(contract.start_at)
                     : contract.end_at ? formatRemaining(contract.end_at) : '—'}
                 </span>
               </div>
-            )}
 
-            {/* Room link (house only) — show channel name */}
-            {contract.type === 'house' && contract.room_link && (
-              <a
-                href={contract.room_link}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-blue-400 hover:underline truncate block transition-colors"
-              >
-                {loadingHouseChannel ? (
-                  <span className="flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    กำลังโหลด...
-                  </span>
-                ) : (
-                  <>🔗 {houseChannelName ?? 'ดูห้อง'}</>
-                )}
-              </a>
-            )}
+              {/* Status dot for house */}
+              {contract.type === 'house' && statusText && (
+                <div className="flex items-center gap-1">
+                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusDot)} />
+                  <span className={cn('text-[10px] font-medium', statusColor)}>{statusText}</span>
+                </div>
+              )}
 
-            {/* personal_role: channel name + role members */}
-            {contract.type === 'personal_role' && (
-              <>
-                {/* Channel name */}
-                {contract.room_link && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground shrink-0">#</span>
-                    {loadingExtra ? (
-                      <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                    ) : channelName ? (
-                      <a href={contract.room_link} target="_blank" rel="noreferrer"
-                        className="text-xs text-blue-400 hover:underline truncate transition-colors">
-                        {channelName}
-                      </a>
-                    ) : (
-                      <a href={contract.room_link} target="_blank" rel="noreferrer"
-                        className="text-xs text-blue-400 hover:underline truncate transition-colors">
-                        ดูห้อง
-                      </a>
-                    )}
-                  </div>
-                )}
+              {/* Channel link */}
+              {contract.type === 'house' && contract.room_link && (
+                <a href={contract.room_link} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-auto">
+                  <span className="text-[10px]">🔗</span>
+                  {loadingHouseChannel
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <span className="truncate max-w-[120px]">{houseChannelName ?? 'ดูห้อง'}</span>
+                  }
+                </a>
+              )}
 
-                {/* Role members section with divider */}
-                {roleTotal !== null && (
-                  <div className="pt-2 mt-2 border-t border-border/40">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">ผู้ถือบทบาท:</span>
-                      <span className={cn(
-                        'text-xs font-semibold px-2 py-0.5 rounded-full',
-                        roleTotal > 5
-                          ? 'bg-red-500/10 text-red-400'
-                          : 'bg-green-500/10 text-green-400'
-                      )}>
-                        {roleTotal.toLocaleString()} คน
-                        {roleTotal > 5 && ' (เกิน)'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {loadingExtra && roleTotal === null && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />กำลังโหลด...
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* BOTTOM: Meta info (operator + date) */}
-            <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span className="truncate">
-                {contract.operator_name ?? '—'}
-              </span>
-              <span className="shrink-0">
-                {new Date(contract.created_at).toLocaleDateString('th-TH', {
-                  day: 'numeric', month: 'short', year: '2-digit',
-                })}
-              </span>
+              {/* personal_role channel */}
+              {contract.type === 'personal_role' && contract.room_link && (
+                <a href={contract.room_link} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-auto">
+                  <span className="text-[10px]">#</span>
+                  {loadingExtra
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <span className="truncate max-w-[120px]">{channelName ?? 'ดูห้อง'}</span>
+                  }
+                </a>
+              )}
             </div>
 
-            {/* Notify button - full width at bottom */}
-            {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
-              <Button
-                size="sm"
-                variant="destructive"
-                className="w-full h-8 text-xs font-medium gap-1.5 mt-2 rounded-md"
-                onClick={() => setNotifyOpen(true)}
-              >
-                <Bell className="w-3.5 h-3.5" />แจ้งเตือนผู้เช่า
-              </Button>
-            )}
+            {/* Row 4: personal_role member count + meta */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {contract.type === 'personal_role' && (
+                <>
+                  {loadingExtra && roleTotal === null ? (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />โหลด...
+                    </span>
+                  ) : roleTotal !== null ? (
+                    <span className={cn(
+                      'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                      roleTotal > 5 ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
+                    )}>
+                      👥 {roleTotal.toLocaleString()} คน{roleTotal > 5 ? ' (เกิน)' : ''}
+                    </span>
+                  ) : null}
+                </>
+              )}
+
+              {/* Operator + date — always at end */}
+              <div className="flex items-center gap-2 ml-auto text-[10px] text-muted-foreground/70">
+                <span className="truncate max-w-[80px]">{contract.operator_name ?? '—'}</span>
+                <span className="shrink-0">
+                  {new Date(contract.created_at).toLocaleDateString('th-TH', {
+                    day: 'numeric', month: 'short', year: '2-digit',
+                  })}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </Card>
+
+        {/* Notify button — only when urgent */}
+        {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
+          <div className="px-4 pb-3 pt-0">
+            <Button
+              size="sm" variant="destructive"
+              className="w-full h-7 text-xs font-medium gap-1.5 rounded-lg"
+              onClick={() => setNotifyOpen(true)}
+            >
+              <Bell className="w-3 h-3" />แจ้งเตือนผู้เช่า
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Delete confirm dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -1185,7 +1143,7 @@ export function ContractsManagement() {
       ) : paginated.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground text-sm">ไม่พบข้อมูลสัญญา</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="space-y-1.5">
           {paginated.map(c => (
             <ContractCard
               key={c.id}
