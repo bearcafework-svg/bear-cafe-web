@@ -249,16 +249,20 @@ export default function PointsPage() {
           try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-              const { data: apiData } = await supabase.functions.invoke('discord-roles', {
+              // Use get-user-discord-roles which is accessible to all authenticated users
+              // (unlike discord-roles which requires admin page access)
+              const { data: userRolesData } = await supabase.functions.invoke('get-user-discord-roles', {
                 headers: { Authorization: `Bearer ${session.access_token}` },
               });
-              const match = (apiData?.roles ?? []).find(
+              const match = (userRolesData?.roles ?? []).find(
                 (r: { id: string }) => r.id === data.granted?.roleGranted,
               );
               if (match) {
                 roleName = roleName || match.name;
-                roleEmoji = roleEmoji || match.icon || match.unicode_emoji || undefined;
-                roleColor = roleColor || match.color || undefined;
+                // match.icon is already a full CDN URL from get-user-discord-roles
+                roleEmoji = roleEmoji || match.icon || undefined;
+                // Convert integer color to hex string
+                roleColor = roleColor || (match.color ? `#${match.color.toString(16).padStart(6, '0')}` : undefined);
               }
             }
           } catch {
