@@ -29,12 +29,32 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    // IP-based rate limiting
+    // IP-based rate limiting — checked after auth to allow owner bypass
     const clientIp = getClientIp(req);
     const rateLimitKey = `session-create:${clientIp}`;
     const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMIT, RATE_WINDOW_MS);
+    // (actual enforcement happens after owner check below)
 
-    if (!rateLimitResult.allowed) {
+    const guardResult = await requireRoleBanGuard(req, corsHeaders);
+    if ("response" in guardResult) {
+      return guardResult.response as Response;
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if user is owner — owners bypass IP rate limit
+    const { data: profileRole } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", guardResult.user.id)
+      .maybeSingle();
+
+    const isOwner = profileRole?.role === "owner";
+
+    // Apply IP rate limit only for non-owners
+    if (!isOwner && !rateLimitResult.allowed) {
       console.log(`Rate limit exceeded for IP: ${clientIp}`);
       return new Response(
         JSON.stringify({
@@ -49,11 +69,6 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const guardResult = await requireRoleBanGuard(req, corsHeaders);
-    if ("response" in guardResult) {
-      return guardResult.response as Response;
-    }
-
     const payload = (await req.json()) as SessionCreatePayload;
     if (!payload.category_id || !payload.duration_minutes || !payload.ends_at) {
       return new Response(
@@ -62,9 +77,7 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // supabase client already initialized above for owner check
 
 const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc(
       "has_active_session",
@@ -179,7 +192,7 @@ const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc
               type: 2,
               style: 5,
               label: "︲เช็คแต้มของคุณ",
-              emoji: { id: "1212856675053346897", name: "bearcafe_star", animated: false },
+              emoji: { id: "1212856675053346897", name: "bearcafe_star" },
               url: "https://discord.com/channels/1144251788493602848/1145305334806741122",
             }],
           }],

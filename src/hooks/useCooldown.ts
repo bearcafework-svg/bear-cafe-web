@@ -18,6 +18,7 @@ interface CooldownState {
 export function useCooldown(userId: string | null): CooldownState {
   const { user } = useAuth();
   const isAdmin = user?.is_admin ?? false;
+  const isOwner = user?.is_owner ?? false;
   const [isOnCooldown, setIsOnCooldown] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [lastSessionAt, setLastSessionAt] = useState<Date | null>(null);
@@ -27,8 +28,8 @@ export function useCooldown(userId: string | null): CooldownState {
   const { notifyCooldownEnd } = useNotifications();
 
   const fetchLastSession = useCallback(async () => {
-    // Admins bypass cooldown
-    if (isAdmin) {
+    // Admins and Owners bypass cooldown
+    if (isAdmin || isOwner) {
       setIsOnCooldown(false);
       setRemainingSeconds(0);
       setIsLoading(false);
