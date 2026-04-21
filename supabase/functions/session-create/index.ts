@@ -159,12 +159,12 @@ const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc
         if (profile?.avatar_url) avatarUrl = profile.avatar_url;
       } catch { /* silent */ }
 
-      // Send activity embed to channel
-      const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL") || "";
+      // Send activity embed to channel via Bot API
       const channelId = "1264915852214538280";
       const botToken = Deno.env.get("DISCORD_BOT_TOKEN") || "";
 
       if (botToken) {
+        // NOTE: custom_id is NOT allowed on Link Buttons (style 5) — omit it
         const embedBody = {
           content: `<@${discordId}>`,
           embeds: [{
@@ -181,13 +181,12 @@ const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc
               label: "︲เช็คแต้มของคุณ",
               emoji: { id: "1212856675053346897", name: "bearcafe_star", animated: false },
               url: "https://discord.com/channels/1144251788493602848/1145305334806741122",
-              custom_id: "p_293719382784217094",
             }],
           }],
         };
 
         try {
-          await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+          const discordRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
             method: "POST",
             headers: {
               Authorization: `Bot ${botToken}`,
@@ -195,6 +194,10 @@ const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc
             },
             body: JSON.stringify(embedBody),
           });
+          if (!discordRes.ok) {
+            const errText = await discordRes.text();
+            console.error("Discord embed failed:", discordRes.status, errText);
+          }
         } catch (embedErr) {
           console.error("Failed to send activity embed:", embedErr);
         }

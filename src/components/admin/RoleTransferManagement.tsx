@@ -118,11 +118,30 @@ export function RoleTransferManagement() {
     try {
       const { data, error } = await supabase
         .from('role_transfer_logs' as any)
-        .select('*, profiles:transferred_by(username, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      setLogs((data as any) || []);
+
+      const rows = (data as any[]) || [];
+
+      // Fetch operator profiles separately (no FK relationship)
+      const operatorIds = [...new Set(rows.map((r: any) => r.transferred_by).filter(Boolean))];
+      const profileMap: Record<string, { username: string; avatar_url: string | null }> = {};
+      if (operatorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', operatorIds);
+        (profiles || []).forEach((p: any) => {
+          profileMap[p.id] = { username: p.username, avatar_url: p.avatar_url };
+        });
+      }
+
+      setLogs(rows.map((r: any) => ({
+        ...r,
+        profiles: r.transferred_by ? (profileMap[r.transferred_by] ?? null) : null,
+      })));
     } catch (e) {
       console.error('Error fetching transfer logs:', e);
     } finally {

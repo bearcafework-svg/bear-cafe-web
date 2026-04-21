@@ -701,11 +701,11 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
       components: [{
         type: 1,
         components: [{
-          type: 2, style: 5,
+          type: 2,
+          style: 5,
           emoji: { id: '1212856675053346897', name: 'bearcafe_star' },
           label: '︲ต่อบ้านเช่าของคุณ',
           url: 'https://discord.com/channels/1144251788493602848/1202239170219868190',
-          custom_id: 'p_293720581038149639',
         }],
       }],
     };
