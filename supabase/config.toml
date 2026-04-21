@@ -106,3 +106,6 @@ verify_jwt = false
 
 [functions.get-random-healing]
 verify_jwt = false
+
+[functions.get-role-info]
+verify_jwt = false
