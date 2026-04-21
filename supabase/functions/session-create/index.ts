@@ -119,6 +119,88 @@ const { data: hasActiveSession, error: activeSessionError } = await supabase.rpc
       );
     }
 
+    // ── Add random points 5-15 and send activity embed ────────────────────────
+    const discordId = guardResult.user.user_metadata?.discord_id
+      || guardResult.user.user_metadata?.provider_id;
+
+    if (discordId) {
+      const pointsToAdd = Math.floor(Math.random() * 11) + 5; // 5-15
+
+      // Upsert points
+      try {
+        const { data: existing } = await supabase
+          .from("user_points")
+          .select("points")
+          .eq("discord_id", discordId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("user_points")
+            .update({ points: existing.points + pointsToAdd })
+            .eq("discord_id", discordId);
+        } else {
+          await supabase
+            .from("user_points")
+            .insert({ discord_id: discordId, points: pointsToAdd });
+        }
+      } catch (pointsErr) {
+        console.error("Failed to add points:", pointsErr);
+      }
+
+      // Get avatar_url from profiles
+      let avatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png";
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("discord_id", discordId)
+          .maybeSingle();
+        if (profile?.avatar_url) avatarUrl = profile.avatar_url;
+      } catch { /* silent */ }
+
+      // Send activity embed to channel
+      const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL") || "";
+      const channelId = "1264915852214538280";
+      const botToken = Deno.env.get("DISCORD_BOT_TOKEN") || "";
+
+      if (botToken) {
+        const embedBody = {
+          content: `<@${discordId}>`,
+          embeds: [{
+            description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pointsToAdd}** จากการใช้ **\`"ระบบหาเพื่อน"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
+            color: 16768911,
+            thumbnail: { url: avatarUrl },
+          }],
+          attachments: [],
+          components: [{
+            type: 1,
+            components: [{
+              type: 2,
+              style: 5,
+              label: "︲เช็คแต้มของคุณ",
+              emoji: { id: "1212856675053346897", name: "bearcafe_star", animated: false },
+              url: "https://discord.com/channels/1144251788493602848/1145305334806741122",
+              custom_id: "p_293719382784217094",
+            }],
+          }],
+        };
+
+        try {
+          await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(embedBody),
+          });
+        } catch (embedErr) {
+          console.error("Failed to send activity embed:", embedErr);
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ session: data }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

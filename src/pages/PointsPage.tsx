@@ -265,6 +265,10 @@ export default function PointsPage() {
             // ignore – fallback gracefully
           }
         }
+
+        // Final fallback: use role ID as name if still missing
+        if (!roleName) roleName = `ยศพิเศษ (${data.granted.roleGranted.slice(-6)})`;
+        if (!roleEmoji) roleEmoji = '🎭';
       }
 
       const rawRedeem = data.pointsNow ?? (typeof data.points === 'number' ? data.points : Number(data.points));

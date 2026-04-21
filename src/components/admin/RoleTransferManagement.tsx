@@ -71,7 +71,7 @@ export function RoleTransferManagement() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [transferResult, setTransferResult] = useState<{ transferred: number; skipped: number } | null>(null);
   const [logs, setLogs] = useState<TransferLog[]>([]);
-  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const { toast } = useToast();
 
@@ -131,8 +131,8 @@ export function RoleTransferManagement() {
   }, []);
 
   useEffect(() => {
-    if (logsOpen && logs.length === 0) fetchLogs();
-  }, [logsOpen]);
+    fetchLogs();
+  }, [fetchLogs]);
 
   // Auto-preview when source is selected
   useEffect(() => {
