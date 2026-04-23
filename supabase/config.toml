@@ -112,3 +112,6 @@ verify_jwt = false
 
 [functions.send-contract-notify]
 verify_jwt = false
+
+[functions.voice-activity-points]
+verify_jwt = false
