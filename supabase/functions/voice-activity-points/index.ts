@@ -176,7 +176,7 @@ async function handleNotification(
     const embedPayload = {
       content: `<@${discordId}>`,
       embeds: [{
-        description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pending}** จากการใช้ **\`"ระบบหาเพื่อน"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
+        description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pending}** จากการ **\`"ลงห้องบนคาเฟ่หมี"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
         color: 16768911,
         thumbnail: { url: avatarUrl },
       }],
