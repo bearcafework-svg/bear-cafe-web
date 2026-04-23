@@ -26,12 +26,20 @@ Deno.serve(async (req): Promise<Response> => {
     const member_id: string = body.member_id ?? "";
     const end_unix: number = body.end_unix ?? 0;
     const room_link: string = body.room_link ?? "-";
-    // Default to the contracts notification channel
-    const channelId: string = body.channel_id ?? "1495041976918216734";
+    // Channel ที่บอทจะส่งข้อความแจ้งเตือนสัญญาเช่าบ้าน
+    // ต้องเป็น Channel ID จริงที่บอทมีสิทธิ์ส่งข้อความ
+    const channelId: string = body.channel_id ?? Deno.env.get("DISCORD_CONTRACT_NOTIFY_CHANNEL_ID") ?? "";
 
     if (!member_id || !end_unix) {
       return new Response(
         JSON.stringify({ error: "member_id and end_unix are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!channelId) {
+      return new Response(
+        JSON.stringify({ error: "Missing channel_id — set DISCORD_CONTRACT_NOTIFY_CHANNEL_ID env var or pass channel_id in body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

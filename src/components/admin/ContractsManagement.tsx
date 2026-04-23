@@ -30,7 +30,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Plus, Home, Crown, User, Clock, Bell, Edit2, Search, RefreshCw,
@@ -341,6 +341,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>เพิ่มสัญญาเช่า</DialogTitle>
+          <DialogDescription>เลือกประเภทสัญญาและกรอกข้อมูล</DialogDescription>
         </DialogHeader>
 
         {step === 1 ? (
@@ -513,7 +514,7 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>แก้ไขสัญญาเช่าบ้าน</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>แก้ไขสัญญาเช่าบ้าน</DialogTitle><DialogDescription aria-describedby={undefined} /></DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
             <Label>วันที่สิ้นสุด</Label>
@@ -691,23 +692,36 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
     const endUnix = Math.floor(new Date(contract.end_at).getTime() / 1000);
     const member_id = contract.member_id;
     const room_link = contract.room_link ?? '-';
-
+    const body = {
+  content: `<@${member_id}>`,
+  embeds: [{
+    color: 16758671,
+    description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n  - __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n  - __\`ห้องของคุณ\`__: ${room_link}\n  - __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
+    image: {
+      url: 'https://media.discordapp.net/attachments/1144675871798591569/1483156690663772191/804546f5f502196f.png?ex=69eb010e&is=69e9af8e&hm=e99e7cb4b90b1253f97047eee1379e965f7065172b2efeb0b377868d957b1a7c&=&format=webp&quality=lossless', // 👈 ภาพใหญ่ด้านล่าง embed
+    },
+    // หรือถ้าอยากได้ภาพเล็กมุมขวา ใช้ thumbnail แทน:
+    // thumbnail: { url: 'https://example.com/your-image.png' },
+  }],
+  attachments: [],
+  components: [{
+    type: 1,
+    components: [{
+      type: 2,
+      style: 5,
+      emoji: { id: '1212856675053346897', name: 'bearcafe_star' },
+      label: '︲ต่อบ้านเช่าของคุณ',
+      url: 'https://discord.com/channels/1144251788493602848/1202239170219868190',
+    }],
+  }],
+};
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contract-notify`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
-            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ member_id, end_unix: endUnix, room_link }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error ?? `HTTP ${res.status}`);
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast({ title: 'ส่งการแจ้งเตือนสำเร็จ' });
     } catch (e: any) {
       toast({ title: 'ส่งไม่สำเร็จ', description: e.message, variant: 'destructive' });
@@ -874,6 +888,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <X className="w-4 h-4" />ยืนยันการลบ
             </DialogTitle>
+            <DialogDescription>การลบไม่สามารถย้อนกลับได้</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             ลบสัญญา <span className="font-medium text-foreground">{
@@ -894,7 +909,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
       {/* Notify confirm dialog */}
       <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>ยืนยันการแจ้งเตือน</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>ยืนยันการแจ้งเตือน</DialogTitle><DialogDescription aria-describedby={undefined} /></DialogHeader>
           <p className="text-sm text-muted-foreground">
             ส่งการแจ้งเตือนไปยัง <span className="font-mono">{contract.member_id}</span> ว่าบ้านเช่าใกล้หมดอายุ?
           </p>
