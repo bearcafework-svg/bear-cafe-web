@@ -109,3 +109,6 @@ verify_jwt = false
 
 [functions.get-role-info]
 verify_jwt = false
+
+[functions.send-contract-notify]
+verify_jwt = false

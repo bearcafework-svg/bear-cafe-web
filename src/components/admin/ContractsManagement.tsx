@@ -691,31 +691,23 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
     const endUnix = Math.floor(new Date(contract.end_at).getTime() / 1000);
     const member_id = contract.member_id;
     const room_link = contract.room_link ?? '-';
-    const body = {
-      content: `<@${member_id}>`,
-      embeds: [{
-        color: 16758671,
-        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n  - __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n  - __\`ห้องของคุณ\`__: ${room_link}\n  - __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>\n# สามารถต่อบ้านเช่าได้ที่ <#1202239170219868190> <:cuteplant:1152834055528783872>`,
-      }],
-      attachments: [],
-      components: [{
-        type: 1,
-        components: [{
-          type: 2,
-          style: 5,
-          emoji: { id: '1212856675053346897', name: 'bearcafe_star' },
-          label: '︲ต่อบ้านเช่าของคุณ',
-          url: 'https://discord.com/channels/1144251788493602848/1202239170219868190',
-        }],
-      }],
-    };
+
     try {
-      const res = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contract-notify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ member_id, end_unix: endUnix, room_link }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? `HTTP ${res.status}`);
       toast({ title: 'ส่งการแจ้งเตือนสำเร็จ' });
     } catch (e: any) {
       toast({ title: 'ส่งไม่สำเร็จ', description: e.message, variant: 'destructive' });
