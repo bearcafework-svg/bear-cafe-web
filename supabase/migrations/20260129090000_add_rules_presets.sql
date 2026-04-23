@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.rules_presets (
 
 ALTER TABLE public.rules_presets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage rules presets" ON public.rules_presets;
 CREATE POLICY "Admins can manage rules presets"
 ON public.rules_presets
 FOR ALL

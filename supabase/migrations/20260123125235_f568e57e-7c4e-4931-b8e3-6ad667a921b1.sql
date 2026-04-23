@@ -22,21 +22,25 @@ ALTER TABLE public.match_queue ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WIT
 ALTER TABLE public.match_queue ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
+DROP POLICY IF EXISTS "Users can view all waiting queue entries" ON public.match_queue;
 CREATE POLICY "Users can view all waiting queue entries"
 ON public.match_queue
 FOR SELECT
 USING (true);
 
+DROP POLICY IF EXISTS "Users can insert own queue entry" ON public.match_queue;
 CREATE POLICY "Users can insert own queue entry"
 ON public.match_queue
 FOR INSERT
 WITH CHECK (user_id = get_profile_by_discord_id(get_jwt_discord_id()));
 
+DROP POLICY IF EXISTS "Users can update own queue entry" ON public.match_queue;
 CREATE POLICY "Users can update own queue entry"
 ON public.match_queue
 FOR UPDATE
 USING (user_id = get_profile_by_discord_id(get_jwt_discord_id()));
 
+DROP POLICY IF EXISTS "Users can delete own queue entry" ON public.match_queue;
 CREATE POLICY "Users can delete own queue entry"
 ON public.match_queue
 FOR DELETE

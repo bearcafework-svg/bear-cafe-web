@@ -11,18 +11,21 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 
 -- Anyone can view settings
+DROP POLICY IF EXISTS "Anyone can view site settings" ON public.site_settings;
 CREATE POLICY "Anyone can view site settings"
 ON public.site_settings
 FOR SELECT
 USING (true);
 
 -- Only moderators (Owners) can update settings
+DROP POLICY IF EXISTS "Owners can update site settings" ON public.site_settings;
 CREATE POLICY "Owners can update site settings"
 ON public.site_settings
 FOR UPDATE
 USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'moderator'::app_role));
 
 -- Only moderators (Owners) can insert settings
+DROP POLICY IF EXISTS "Owners can insert site settings" ON public.site_settings;
 CREATE POLICY "Owners can insert site settings"
 ON public.site_settings
 FOR INSERT

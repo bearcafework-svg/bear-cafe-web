@@ -12,12 +12,14 @@ CREATE TABLE IF NOT EXISTS public.rules_presets (
 ALTER TABLE public.rules_presets ENABLE ROW LEVEL SECURITY;
 
 -- Policy: ทุกคนดูได้
+DROP POLICY IF EXISTS "Anyone can view rules presets" ON public.rules_presets;
 CREATE POLICY "Anyone can view rules presets"
 ON public.rules_presets
 FOR SELECT
 USING (true);
 
 -- Policy: Admin จัดการได้
+DROP POLICY IF EXISTS "Admins can manage rules presets" ON public.rules_presets;
 CREATE POLICY "Admins can manage rules presets"
 ON public.rules_presets
 FOR ALL
@@ -37,6 +39,7 @@ FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 2. เพิ่ม Policy ให้ Admin สามารถ UPDATE profiles ได้ (สำหรับแบนผู้ใช้)
+DROP POLICY IF EXISTS "Admins can update all profiles" ON public.profiles;
 CREATE POLICY "Admins can update all profiles"
 ON public.profiles
 FOR UPDATE

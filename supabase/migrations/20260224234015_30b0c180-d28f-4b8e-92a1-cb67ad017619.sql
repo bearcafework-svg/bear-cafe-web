@@ -12,11 +12,13 @@ CREATE TABLE IF NOT EXISTS public.non_transferable_roles (
 ALTER TABLE public.non_transferable_roles ENABLE ROW LEVEL SECURITY;
 
 -- Anyone can view
+DROP POLICY IF EXISTS "Anyone can view non-transferable roles" ON public.non_transferable_roles;
 CREATE POLICY "Anyone can view non-transferable roles"
   ON public.non_transferable_roles FOR SELECT
   USING (true);
 
 -- Admins can manage
+DROP POLICY IF EXISTS "Admins can manage non-transferable roles" ON public.non_transferable_roles;
 CREATE POLICY "Admins can manage non-transferable roles"
   ON public.non_transferable_roles FOR ALL
   USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));
@@ -38,14 +40,17 @@ CREATE TABLE IF NOT EXISTS public.role_transfer_logs (
 
 ALTER TABLE public.role_transfer_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can view transfer logs" ON public.role_transfer_logs;
 CREATE POLICY "Admins can view transfer logs"
   ON public.role_transfer_logs FOR SELECT
   USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));
 
+DROP POLICY IF EXISTS "Admins can insert transfer logs" ON public.role_transfer_logs;
 CREATE POLICY "Admins can insert transfer logs"
   ON public.role_transfer_logs FOR INSERT
   WITH CHECK (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));
 
+DROP POLICY IF EXISTS "Admins can update transfer logs" ON public.role_transfer_logs;
 CREATE POLICY "Admins can update transfer logs"
   ON public.role_transfer_logs FOR UPDATE
   USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));

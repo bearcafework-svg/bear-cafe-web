@@ -28,6 +28,7 @@ CREATE UNIQUE INDEX tag_warn_cancel_requests_pending_unique
 
 ALTER TABLE public.tag_warn_cancel_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can create cancel requests" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Admins can create cancel requests"
   ON public.tag_warn_cancel_requests
   FOR INSERT
@@ -37,6 +38,7 @@ CREATE POLICY "Admins can create cancel requests"
     AND (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator'))
   );
 
+DROP POLICY IF EXISTS "Admins can read own or owners can read all" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Admins can read own or owners can read all"
   ON public.tag_warn_cancel_requests
   FOR SELECT
@@ -46,6 +48,7 @@ CREATE POLICY "Admins can read own or owners can read all"
     OR public.has_role(auth.uid(), 'moderator')
   );
 
+DROP POLICY IF EXISTS "Owners can update cancel requests" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Owners can update cancel requests"
   ON public.tag_warn_cancel_requests
   FOR UPDATE

@@ -1,11 +1,13 @@
 -- Add INSERT policy for profiles table to allow service role inserts
 -- The service role key should bypass RLS, but we need to ensure the policy exists
 
--- First, drop all existing policies on profiles
+-- Drop ALL existing policies on profiles (idempotent)
 DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Moderators can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Service role has full access" ON public.profiles;
 
 -- Recreate policies with PERMISSIVE instead of RESTRICTIVE
 CREATE POLICY "Users can view own profile"

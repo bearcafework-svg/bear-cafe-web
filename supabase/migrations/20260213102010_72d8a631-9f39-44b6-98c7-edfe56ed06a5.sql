@@ -19,18 +19,21 @@ CREATE TABLE IF NOT EXISTS public.tag_warn_cancel_requests (
 ALTER TABLE public.tag_warn_cancel_requests ENABLE ROW LEVEL SECURITY;
 
 -- Admins can view all cancel requests
+DROP POLICY IF EXISTS "Admins can view cancel requests" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Admins can view cancel requests"
   ON public.tag_warn_cancel_requests
   FOR SELECT
   USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));
 
 -- Admins can create cancel requests
+DROP POLICY IF EXISTS "Admins can create cancel requests" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Admins can create cancel requests"
   ON public.tag_warn_cancel_requests
   FOR INSERT
   WITH CHECK (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));
 
 -- Owners (moderator role) can update cancel requests (approve/reject)
+DROP POLICY IF EXISTS "Owners can update cancel requests" ON public.tag_warn_cancel_requests;
 CREATE POLICY "Owners can update cancel requests"
   ON public.tag_warn_cancel_requests
   FOR UPDATE

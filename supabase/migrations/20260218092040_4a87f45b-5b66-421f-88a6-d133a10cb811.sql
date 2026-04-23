@@ -14,11 +14,13 @@ CREATE TABLE IF NOT EXISTS public.custom_permissions (
 ALTER TABLE public.custom_permissions ENABLE ROW LEVEL SECURITY;
 
 -- Only Owner (moderator role) can manage
+DROP POLICY IF EXISTS "Owners can manage custom permissions" ON public.custom_permissions;
 CREATE POLICY "Owners can manage custom permissions"
 ON public.custom_permissions FOR ALL
 USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'moderator'::app_role));
 
 -- Authenticated users can view permissions (needed for access checks)
+DROP POLICY IF EXISTS "Authenticated can view custom permissions" ON public.custom_permissions;
 CREATE POLICY "Authenticated can view custom permissions"
 ON public.custom_permissions FOR SELECT
 USING (true);
@@ -36,16 +38,19 @@ CREATE TABLE IF NOT EXISTS public.user_custom_permissions (
 ALTER TABLE public.user_custom_permissions ENABLE ROW LEVEL SECURITY;
 
 -- Owner can manage assignments
+DROP POLICY IF EXISTS "Owners can manage permission assignments" ON public.user_custom_permissions;
 CREATE POLICY "Owners can manage permission assignments"
 ON public.user_custom_permissions FOR ALL
 USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'moderator'::app_role));
 
 -- Users can view their own assignments
+DROP POLICY IF EXISTS "Users can view own permission assignments" ON public.user_custom_permissions;
 CREATE POLICY "Users can view own permission assignments"
 ON public.user_custom_permissions FOR SELECT
 USING (user_id = get_profile_by_discord_id(get_jwt_discord_id()));
 
 -- Admins can view all assignments (for admin page access check)
+DROP POLICY IF EXISTS "Admins can view all permission assignments" ON public.user_custom_permissions;
 CREATE POLICY "Admins can view all permission assignments"
 ON public.user_custom_permissions FOR SELECT
 USING (has_role(get_profile_by_discord_id(get_jwt_discord_id()), 'admin'::app_role));

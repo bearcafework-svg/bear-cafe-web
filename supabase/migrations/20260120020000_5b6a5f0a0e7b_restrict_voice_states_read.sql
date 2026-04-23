@@ -1,6 +1,7 @@
 -- Restrict voice_states reads to authenticated users
 DROP POLICY IF EXISTS "Anyone can view voice states" ON public.voice_states;
 
+DROP POLICY IF EXISTS "Authenticated users can view voice states" ON public.voice_states;
 CREATE POLICY "Authenticated users can view voice states"
 ON public.voice_states
 FOR SELECT
