@@ -135,7 +135,8 @@ async function handleNotification(
   db: SupabaseClient,
   discordId: string,
   earned: number,
-  botToken: string
+  botToken: string,
+  channelName: string = "ห้องพูดคุย"
 ): Promise<void> {
   try {
     const { data: buf } = await db
@@ -172,7 +173,7 @@ async function handleNotification(
     const embedPayload = {
       content: `<@${discordId}>`,
       embeds: [{
-        description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pending}** จากการ **\`"ลงห้องบนคาเฟ่หมี"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
+        description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pending}** จากการลงห้อง **\`"${channelName}"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
         color: 16768911,
         thumbnail: { url: avatarUrl },
       }],
@@ -233,6 +234,7 @@ Deno.serve(async (req): Promise<Response> => {
     const userId    = String(body.userId ?? "");
     const duration  = Number(body.duration ?? 0);
     const userCount = Number(body.userCount ?? 1);
+    const channelName = String(body.channelName ?? "ห้องพูดคุย");
 
     if (!eventId || !userId) {
       return new Response(JSON.stringify({ error: "eventId and userId required" }),
@@ -277,7 +279,7 @@ Deno.serve(async (req): Promise<Response> => {
     const { actualEarned, newPoints, maxCap } = result;
 
     if (botToken && actualEarned > 0) {
-      handleNotification(db, userId, actualEarned, botToken).catch((err) => {
+      handleNotification(db, userId, actualEarned, botToken, channelName).catch((err) => {
         console.error("[vap] notification unhandled:", err);
       });
     }
