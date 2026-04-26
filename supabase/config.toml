@@ -115,3 +115,6 @@ verify_jwt = false
 
 [functions.voice-activity-points]
 verify_jwt = false
+
+[functions.fortune-test]
+verify_jwt = false

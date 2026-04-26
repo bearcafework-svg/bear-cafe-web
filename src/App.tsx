@@ -23,6 +23,7 @@ import LotteryPage from "./pages/LotteryPage";
 import GachaPage from "./pages/GachaPage";
 import DiscordServersPage from "./pages/DiscordServersPage";
 import HealingMessagePage from "./pages/HealingMessagePage";
+import MeeDooDuang from "./pages/MeeDooDuang";
 import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
 
@@ -90,6 +91,7 @@ function AppRoutes() {
       <Route path="/gacha" element={<ProtectedRoute><GachaPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
+      <Route path="/meedooduang" element={<ProtectedRoute><MeeDooDuang /></ProtectedRoute>} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
