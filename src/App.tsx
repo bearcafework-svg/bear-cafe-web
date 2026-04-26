@@ -91,7 +91,7 @@ function AppRoutes() {
       <Route path="/gacha" element={<ProtectedRoute><GachaPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
-      <Route path="/meedooduang" element={<ProtectedRoute><MeeDooDuang /></ProtectedRoute>} />
+      <Route path="/meedooduang" element={<MeeDooDuang />} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
