@@ -1,4 +1,4 @@
-﻿ import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,12 +30,12 @@ async function generateAlias(): Promise<string> {
   ]);
   const pList = (prefixes as any[]) ?? [];
   const mList = (menus as any[]) ?? [];
-  const prefix = pList.length > 0 ? pickRandom(pList).word : 'นุ่มนิ่ม';
-  const menu = mList.length > 0 ? pickRandom(mList).word : 'ลาเต้';
+  const prefix = pList.length > 0 ? pickRandom(pList).word : '\u0e19\u0e38\u0e48\u0e21\u0e19\u0e34\u0e48\u0e21';
+  const menu = mList.length > 0 ? pickRandom(mList).word : '\u0e25\u0e32\u0e40\u0e15\u0e49';
   return `${prefix}${menu}`;
 }
 
-export default function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             () {
+export default function SecretChatMenu() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -104,8 +104,12 @@ export default function                                                         
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf6f1]">
         <div className="text-center space-y-3">
-          <p className="text-[#7c5c3e] font-medium">กรุณาเข้าสู่ระบบก่อนใช้งาน Secret Table</p>
-          <Button onClick={() => navigate('/login')} variant="outline">เข้าสู่ระบบ</Button>
+          <p className="text-[#7c5c3e] font-medium">
+            {'\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e02\u0e49\u0e32\u0e2a\u0e39\u0e48\u0e23\u0e30\u0e1a\u0e1a\u0e01\u0e48\u0e2d\u0e19\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19 Secret Table'}
+          </p>
+          <Button onClick={() => navigate('/login')} variant="outline">
+            {'\u0e40\u0e02\u0e49\u0e32\u0e2a\u0e39\u0e48\u0e23\u0e30\u0e1a\u0e1a'}
+          </Button>
         </div>
       </div>
     );
@@ -123,9 +127,13 @@ export default function                                                         
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1 className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">Secret Table</h1>
+          <h1 className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">
+            Secret Table
+          </h1>
           <p className="text-xs text-[#9c7c5e] dark:text-[#7c5c3e]">
-            {step === 'topic' ? 'เลือกบรรยากาศที่ต้องการ' : 'ตั้งตัวตนสมมติ'}
+            {step === 'topic'
+              ? '\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e1a\u0e23\u0e23\u0e22\u0e32\u0e01\u0e32\u0e28\u0e17\u0e35\u0e48\u0e15\u0e49\u0e2d\u0e07\u0e01\u0e32\u0e23'
+              : '\u0e15\u0e31\u0e49\u0e07\u0e15\u0e31\u0e27\u0e15\u0e19\u0e2a\u0e21\u0e21\u0e15\u0e34'}
           </p>
         </div>
       </header>
@@ -141,7 +149,7 @@ export default function                                                         
               className="space-y-4"
             >
               <p className="text-sm text-[#7c5c3e] dark:text-[#9c7c5e] text-center">
-                เลือกบรรยากาศที่อยากพูดคุยวันนี้
+                {'\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e1a\u0e23\u0e23\u0e22\u0e32\u0e01\u0e32\u0e28\u0e17\u0e35\u0e48\u0e2d\u0e22\u0e32\u0e01\u0e1e\u0e39\u0e14\u0e04\u0e38\u0e22\u0e27\u0e31\u0e19\u0e19\u0e35\u0e49'}
               </p>
               {loadingTopics ? (
                 <div className="flex justify-center py-12">
@@ -196,7 +204,9 @@ export default function                                                         
               </div>
 
               <div className="text-center space-y-2">
-                <p className="text-xs text-[#9c7c5e] uppercase tracking-wider">ชื่อสมมติของคุณ</p>
+                <p className="text-xs text-[#9c7c5e] uppercase tracking-wider">
+                  {'\u0e0a\u0e37\u0e48\u0e2d\u0e2a\u0e21\u0e21\u0e15\u0e34\u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13'}
+                </p>
                 <div className="flex items-center justify-center gap-3">
                   {rollingAlias ? (
                     <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e]" />
@@ -214,9 +224,13 @@ export default function                                                         
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs text-[#9c7c5e] uppercase tracking-wider text-center">เลือกรูปโปรไฟล์</p>
+                <p className="text-xs text-[#9c7c5e] uppercase tracking-wider text-center">
+                  {'\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e23\u0e39\u0e1b\u0e42\u0e1b\u0e23\u0e44\u0e1f\u0e25\u0e4c'}
+                </p>
                 {profiles.length === 0 ? (
-                  <p className="text-center text-sm text-[#9c7c5e]">ยังไม่มีโปรไฟล์ (แอดมินต้องเพิ่มก่อน)</p>
+                  <p className="text-center text-sm text-[#9c7c5e]">
+                    {'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e42\u0e1b\u0e23\u0e44\u0e1f\u0e25\u0e4c (\u0e41\u0e2d\u0e14\u0e21\u0e34\u0e19\u0e15\u0e49\u0e2d\u0e07\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e01\u0e48\u0e2d\u0e19)'}
+                  </p>
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                     {profiles.map(p => (
@@ -238,10 +252,16 @@ export default function                                                         
 
               {selectedProfile && (
                 <div className="bg-white dark:bg-[#221810] rounded-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 flex items-center gap-3">
-                  <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-12 h-12 rounded-full object-cover" />
+                  <img
+                    src={selectedProfile.image_url}
+                    alt={selectedProfile.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
                   <div>
                     <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8]">{alias || '...'}</p>
-                    <p className="text-xs text-[#9c7c5e]">{selectedProfile.name} — ตัวตนสมมติของคุณ</p>
+                    <p className="text-xs text-[#9c7c5e]">
+                      {selectedProfile.name} {'\u2014 \u0e15\u0e31\u0e27\u0e15\u0e19\u0e2a\u0e21\u0e21\u0e15\u0e34\u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -253,7 +273,7 @@ export default function                                                         
                   className="flex items-center gap-2 text-sm text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  สุ่มใหม่ทั้งหมด
+                  {'\u0e2a\u0e38\u0e48\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'}
                 </button>
               </div>
 
@@ -263,13 +283,18 @@ export default function                                                         
                 className="w-full h-12 bg-[#c8956c] hover:bg-[#b07d58] text-white font-semibold rounded-xl text-base"
               >
                 {entering ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> กำลังหาคู่สนทนา...</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    {'\u0e01\u0e33\u0e25\u0e31\u0e07\u0e2b\u0e32\u0e04\u0e39\u0e48\u0e2a\u0e19\u0e17\u0e19\u0e32...'}
+                  </>
                 ) : (
-                  'นั่งโต๊ะลับ'
+                  '\u0e19\u0e31\u0e48\u0e07\u0e42\u0e15\u0e4a\u0e30\u0e25\u0e31\u0e1a'
                 )}
               </Button>
 
-              <p className="text-center text-xs text-[#9c7c5e]">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
+              <p className="text-center text-xs text-[#9c7c5e]">
+                {'\u0e15\u0e31\u0e27\u0e15\u0e19\u0e08\u0e23\u0e34\u0e07\u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13\u0e08\u0e30\u0e16\u0e39\u0e01\u0e40\u0e01\u0e47\u0e1a\u0e40\u0e1b\u0e47\u0e19\u0e04\u0e27\u0e32\u0e21\u0e25\u0e31\u0e1a'}
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
