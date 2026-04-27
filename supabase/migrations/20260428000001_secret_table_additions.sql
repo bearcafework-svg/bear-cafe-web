@@ -30,6 +30,12 @@ ALTER TABLE chat_sessions
 ALTER TABLE chat_profiles   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_violations ENABLE ROW LEVEL SECURITY;
 
+-- Drop first to avoid "already exists" on re-run
+DROP POLICY IF EXISTS "chat_profiles_read"    ON chat_profiles;
+DROP POLICY IF EXISTS "chat_profiles_write"   ON chat_profiles;
+DROP POLICY IF EXISTS "violations_admin_read" ON chat_violations;
+DROP POLICY IF EXISTS "violations_insert"     ON chat_violations;
+
 -- Profiles: public read, owner/admin write
 CREATE POLICY "chat_profiles_read"  ON chat_profiles FOR SELECT USING (true);
 CREATE POLICY "chat_profiles_write" ON chat_profiles FOR ALL
@@ -53,5 +59,20 @@ INSERT INTO chat_profiles (name, image_url, sort_order) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Realtime for violations (admin monitor)
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_violations;
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_profiles;
+-- Guard against "already member of publication" error when re-running
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'chat_violations'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_violations;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'chat_profiles'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_profiles;
+  END IF;
+END $$;
