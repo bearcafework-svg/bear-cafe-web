@@ -36,6 +36,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'discord-servers', label: 'จัดการเซิร์ฟเวอร์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
+  { id: 'secret-table', label: 'Secret Table', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */

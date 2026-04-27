@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan,
+  Key, ArrowLeftRight, ShieldBan, Coffee,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -53,6 +53,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
+import { SecretTableManagement } from '@/components/admin/SecretTableManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -106,6 +107,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'discord-servers': Settings,
   'staff': Users,
   'permissions': Key,
+  'secret-table': Coffee,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -273,6 +275,7 @@ export default function AdminPage() {
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
         case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
+        case 'secret-table': return isOwner ? <SecretTableManagement /> : null;
         default: return null;
       }
     } catch (error) {

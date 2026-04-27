@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Loader2, CloudRain } from 'lucide-react';
+import { ChevronLeft, Loader2, CloudRain, Music2, VolumeX } from 'lucide-react';
 import bearMascot from '@/assets/bear-mascot.png';
 
 let charSrc = bearMascot;
@@ -18,11 +18,16 @@ interface TarotCard { name: string; meaning: string; prediction: string; img: st
 interface TarotData { unk: string; cards: Record<string, TarotCard>; }
 
 const GIST_URL = 'https://gist.githubusercontent.com/rxbbitz/cfca499dec156918995b03dddb9fb158/raw/tarot.json';
-const USES_KEY = 'meedooduang_uses';
-const DEFAULT_USES = 3;
-const TYPEWRITER_SPEED = 30;
-const DIALOG_H_PORTRAIT = 220;
-const DIALOG_H_LANDSCAPE = 200;
+const TYPEWRITER_SPEED = 28;
+// Dialog box heights — portrait needs more room for 3 lines of text
+const DIALOG_H_PORTRAIT = 240;
+const DIALOG_H_LANDSCAPE = 210;
+// Card sizes — bigger for the "grand reveal" feel
+const CARD_W = 90;
+const CARD_H = 136;
+
+// Intro greeting shown via typewriter on step 1
+const INTRO_TEXT = 'สวัสดีน้าา วันนี้มีเรื่องอะไรอยากให้พี่หมีช่วยชี้นำทางไหมคะ?';
 
 type Step = 'question' | 'select' | 'result';
 
@@ -136,32 +141,48 @@ const STARS = Array.from({ length: 35 }, (_, i) => ({
   dur: 2 + (i % 4), delay: (i * 0.3) % 3, size: i % 5 === 0 ? 1.5 : 1,
 }));
 
+// ─── Shared card style constants ─────────────────────────────────────────────
+const CARD_BACK_INNER = (
+  <>
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.35), transparent 65%)',
+    }} />
+    {/* Ornamental lines */}
+    <div style={{
+      position: 'absolute', inset: 8,
+      border: '1px solid rgba(251,191,36,0.2)',
+      borderRadius: 6,
+    }} />
+    <div style={{
+      fontSize: 10, fontWeight: 700, color: 'rgba(251,191,36,0.75)',
+      letterSpacing: '0.2em', textTransform: 'uppercase', zIndex: 1,
+    }}>
+      TAROT
+    </div>
+  </>
+);
+
 // ─── Card Back ────────────────────────────────────────────────────────────────
 function CardBack({ selected, onClick }: { selected: boolean; onClick: () => void }) {
   return (
     <motion.div
       onClick={onClick}
-      animate={{ scale: selected ? 1.08 : 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      whileHover={{ y: -6, scale: 1.04 }}
+      animate={{ scale: selected ? 1.1 : 1, y: selected ? -8 : 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 22 }}
       style={{
-        width: 80, height: 120, borderRadius: 12, cursor: 'pointer',
-        background: 'linear-gradient(135deg, #1e0a3c, #2d1b4e)',
-        border: `2px solid ${selected ? 'rgba(251,191,36,0.8)' : 'rgba(139,92,246,0.4)'}`,
-        boxShadow: selected ? '0 0 16px rgba(251,191,36,0.4)' : '0 0 8px rgba(139,92,246,0.2)',
+        width: CARD_W, height: CARD_H, borderRadius: 14, cursor: 'pointer',
+        background: 'linear-gradient(160deg, #1e0a3c 0%, #2d1b4e 60%, #1a0a2e 100%)',
+        border: `1.5px solid ${selected ? 'rgba(251,191,36,0.9)' : 'rgba(139,92,246,0.45)'}`,
+        boxShadow: selected
+          ? '0 0 24px rgba(251,191,36,0.45), 0 8px 24px rgba(0,0,0,0.5)'
+          : '0 4px 16px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         userSelect: 'none', flexShrink: 0, position: 'relative', overflow: 'hidden',
       }}
     >
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(circle at center, rgba(139,92,246,0.3), transparent 70%)',
-      }} />
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: 'rgba(251,191,36,0.9)',
-        letterSpacing: '0.15em', textTransform: 'uppercase',
-      }}>
-        TAROT
-      </div>
+      {CARD_BACK_INNER}
     </motion.div>
   );
 }
@@ -175,33 +196,45 @@ function CardFace({ card, delay }: { card: TarotCard; delay: number }) {
   }, [delay]);
 
   return (
-    <div style={{ width: 80, height: 120, perspective: 600, flexShrink: 0 }}>
+    <div style={{ width: CARD_W, height: CARD_H, perspective: 800, flexShrink: 0 }}>
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.6, ease: 'easeInOut' }}
+        transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
         style={{ width: '100%', height: '100%', transformStyle: 'preserve-3d', position: 'relative' }}
       >
-        {/* Back */}
+        {/* Back face */}
         <div style={{
           position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-          borderRadius: 12, background: 'linear-gradient(135deg,#1e0a3c,#2d1b4e)',
-          border: '2px solid rgba(139,92,246,0.4)',
+          borderRadius: 14,
+          background: 'linear-gradient(160deg, #1e0a3c 0%, #2d1b4e 60%, #1a0a2e 100%)',
+          border: '1.5px solid rgba(139,92,246,0.45)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
         }}>
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: 'rgba(251,191,36,0.9)',
-            letterSpacing: '0.15em', textTransform: 'uppercase',
-          }}>
-            TAROT
-          </div>
+          {CARD_BACK_INNER}
         </div>
-        {/* Front */}
+        {/* Front face */}
         <div style={{
           position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-          transform: 'rotateY(180deg)', borderRadius: 12, overflow: 'hidden',
-          border: '2px solid rgba(251,191,36,0.6)',
+          transform: 'rotateY(180deg)', borderRadius: 14, overflow: 'hidden',
+          border: '1.5px solid rgba(251,191,36,0.7)',
+          boxShadow: flipped ? '0 0 28px rgba(251,191,36,0.3), 0 8px 24px rgba(0,0,0,0.5)' : 'none',
         }}>
           <img src={card.img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {/* Card name overlay */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
+            padding: '16px 6px 6px',
+            textAlign: 'center',
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, color: 'rgba(251,191,36,0.9)',
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+            }}>
+              {card.name}
+            </span>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -213,13 +246,21 @@ export default function MeeDooDuang() {
   const navigate = useNavigate();
   const { on: rainOn, toggle: toggleRain, getCtx } = useRain();
 
+  // BGM state (separate from rain)
+  const [bgmOn, setBgmOn] = useState(false);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const toggleBgm = useCallback(() => {
+    if (!bgmRef.current) return;
+    if (bgmOn) { bgmRef.current.pause(); setBgmOn(false); }
+    else { bgmRef.current.play().catch(() => {}); setBgmOn(true); }
+  }, [bgmOn]);
+
   const [tarotData, setTarotData] = useState<TarotData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [isPortrait, setIsPortrait] = useState(() => window.matchMedia('(orientation: portrait)').matches);
 
-  // Step state
+  // Step state — no userQuestion needed anymore
   const [step, setStep] = useState<Step>('question');
-  const [userQuestion, setUserQuestion] = useState('');
 
   // Card selection (step 2)
   const [poolCards, setPoolCards] = useState<TarotCard[]>([]);
@@ -232,17 +273,14 @@ export default function MeeDooDuang() {
   const [loading, setLoading] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [maxSegLen, setMaxSegLen] = useState(160);
 
-  const [uses, setUses] = useState<number>(() => {
-    const v = localStorage.getItem(USES_KEY);
-    return v !== null ? parseInt(v, 10) : DEFAULT_USES;
-  });
+  // ── Intro typewriter (step 1) ──
+  const { shown: introShown, done: introDone } = useTypewriter(INTRO_TEXT, step === 'question');
 
   const calcMaxLen = useCallback(() => {
     const w = dialogRef.current?.offsetWidth ?? window.innerWidth;
-    const charsPerLine = Math.floor((w - 64) / 8.5);
+    const charsPerLine = Math.floor((w - 80) / 8.5);
     const lines = isPortrait ? 3 : 2;
     setMaxSegLen(Math.min(220, Math.max(120, charsPerLine * lines)));
   }, [isPortrait]);
@@ -286,12 +324,9 @@ export default function MeeDooDuang() {
 
   // Step 2 → 3: confirm selection
   const confirmSelection = useCallback(async () => {
-    if (selectedIdxs.length !== 3 || uses <= 0) return;
+    if (selectedIdxs.length !== 3) return;
     const chosen = selectedIdxs.map(i => poolCards[i]);
     setChosenCards(chosen);
-    const newUses = uses - 1;
-    setUses(newUses);
-    localStorage.setItem(USES_KEY, String(newUses));
     setStep('result');
     setSegments([]); setSegIdx(0);
     setLoading(true);
@@ -299,7 +334,7 @@ export default function MeeDooDuang() {
     try {
       const { data, error } = await supabase.functions.invoke('fortune-test', {
         body: {
-          question: userQuestion.trim() || null,
+          question: null,
           cardName: chosen.map(c => c.name).join(', '),
           meaning: chosen.map(c => c.meaning).join(' | '),
           prediction: chosen.map(c => c.prediction).join(' | '),
@@ -312,12 +347,11 @@ export default function MeeDooDuang() {
     } finally {
       setLoading(false);
     }
-  }, [selectedIdxs, poolCards, uses, userQuestion, maxSegLen]);
+  }, [selectedIdxs, poolCards, maxSegLen]);
 
   // Reset all the way to step 1
   const resetAll = useCallback(() => {
     setStep('question');
-    setUserQuestion('');
     setPoolCards([]); setSelectedIdxs([]);
     setChosenCards([]); setSegments([]); setSegIdx(0);
   }, []);
@@ -337,320 +371,353 @@ export default function MeeDooDuang() {
   const dialogH = isPortrait ? DIALOG_H_PORTRAIT : DIALOG_H_LANDSCAPE;
   const bgSrc = isPortrait ? bgPortraitSrc : bgLandscapeSrc;
 
+  // Shared name-plate style
+  const namePlateStyle: React.CSSProperties = {
+    display: 'inline-block',
+    background: 'rgba(0,0,0,0.7)',
+    border: '1px solid rgba(251,191,36,0.45)',
+    borderRadius: '6px 6px 0 0',
+    padding: '4px 16px',
+    marginBottom: -1,
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#fbbf24',
+    letterSpacing: '0.06em',
+    textShadow: '0 1px 6px rgba(251,191,36,0.4)',
+  };
+
+  // Shared dialog inner box style
+  const dialogBoxStyle: React.CSSProperties = {
+    background: 'rgba(5,2,18,0.78)',
+    border: '1px solid rgba(251,191,36,0.35)',
+    borderRadius: 10,
+    padding: isPortrait ? '14px 18px 12px' : '12px 20px 10px',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    boxShadow: '0 -4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+  };
+
   return (
     <div
       className="fixed inset-0 overflow-hidden select-none"
       style={{ cursor: step === 'result' && !loading ? 'pointer' : 'default' }}
       onClick={handleScreenClick}
     >
-      <audio id="bgm" loop />
+      {/* BGM audio element — src can be swapped for a real file later */}
+      <audio ref={bgmRef} id="bgm" loop src="" />
 
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e]"
-        style={bgSrc ? { backgroundImage: `url(${bgSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} />
-      <div className="absolute inset-0 bg-black/35" />
+      {/* ── Background ── */}
+      <div
+        className="absolute inset-0"
+        style={bgSrc
+          ? { backgroundImage: `url(${bgSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+          : { background: 'linear-gradient(160deg, #0d0520 0%, #1a0a2e 40%, #2d1b4e 70%, #1a0a2e 100%)' }
+        }
+      />
+      <div className="absolute inset-0 bg-black/40" />
 
-      {/* Stars */}
+      {/* ── Stars ── */}
       <div className="absolute inset-0 pointer-events-none">
         {STARS.map(s => (
           <motion.div key={s.id} className="absolute rounded-full bg-white"
             style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size }}
-            animate={{ opacity: [0.15, 0.7, 0.15] }}
+            animate={{ opacity: [0.1, 0.65, 0.1] }}
             transition={{ duration: s.dur, repeat: Infinity, delay: s.delay }} />
         ))}
       </div>
 
       {/* ── HUD ── */}
-      <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3"
-        onClick={e => e.stopPropagation()}>
-        <Button variant="ghost" size="icon"
+      <div
+        className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Back button */}
+        <Button
+          variant="ghost" size="icon"
           onClick={() => step === 'select' ? setStep('question') : navigate('/')}
-          className="text-white/60 hover:text-white hover:bg-white/10 rounded-xl w-8 h-8">
+          className="text-white/50 hover:text-white hover:bg-white/10 rounded-xl w-8 h-8"
+        >
           <ChevronLeft className="w-4 h-4" />
         </Button>
+
+        {/* Right cluster */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 border border-white/10 rounded-full px-3 py-1.5"
-            style={{ background: 'rgba(0,0,0,0.55)' }}>
-            <div style={{
-              width: 16, height: 16, borderRadius: '50%',
-              background: 'radial-gradient(circle at 30% 30%, rgba(251,191,36,0.9), rgba(139,92,246,0.8))',
-              boxShadow: '0 0 8px rgba(251,191,36,0.4)',
-            }} />
-            <span className="text-white text-xs font-bold">{uses}</span>
-            <span className="text-white/40 text-xs">ครั้ง</span>
-            <button className="text-violet-300 text-xs font-medium hover:text-violet-200 ml-1 leading-none">+</button>
-          </div>
-          <button onClick={toggleRain}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${rainOn ? 'bg-blue-500/40 text-blue-300' : 'bg-white/10 text-white/40 hover:text-white/70'}`}>
+
+          {/* Rain toggle */}
+          <button
+            onClick={toggleRain}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              rainOn
+                ? 'bg-sky-500/30 text-sky-300 border border-sky-400/40'
+                : 'bg-white/8 text-white/35 hover:text-white/60 border border-white/10'
+            }`}
+            title={rainOn ? 'ปิดเสียงฝน' : 'เปิดเสียงฝน'}
+          >
             <CloudRain className="w-3.5 h-3.5" />
+          </button>
+
+          {/* BGM toggle */}
+          <button
+            onClick={toggleBgm}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              bgmOn
+                ? 'bg-violet-500/30 text-violet-300 border border-violet-400/40'
+                : 'bg-white/8 text-white/35 hover:text-white/60 border border-white/10'
+            }`}
+            title={bgmOn ? 'ปิดเพลง' : 'เปิดเพลง'}
+          >
+            {bgmOn ? <Music2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
       {/* ── Character sprite ── */}
-      <div className="absolute left-0 right-0 z-10 flex justify-center pointer-events-none"
-        style={{ bottom: 0, alignItems: 'flex-end' }}>
-        <motion.img src={charSrc} alt="character" className="object-contain"
-          style={{ height: isPortrait ? '62vh' : '72vh', filter: 'drop-shadow(0 0 28px rgba(168,85,247,0.25))', transformOrigin: 'bottom center' }}
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }} />
+      <div
+        className="absolute left-0 right-0 z-10 flex pointer-events-none"
+        style={{
+          bottom: 0,
+          alignItems: 'flex-end',
+          // Shift slightly left for VN feel
+          justifyContent: isPortrait ? 'center' : 'flex-start',
+          paddingLeft: isPortrait ? 0 : '8vw',
+        }}
+      >
+        <motion.img
+          src={charSrc}
+          alt="character"
+          className="object-contain"
+          style={{
+            height: isPortrait ? '58vh' : '70vh',
+            filter: 'drop-shadow(0 0 32px rgba(168,85,247,0.22))',
+            transformOrigin: 'bottom center',
+          }}
+          animate={{ y: [0, -7, 0] }}
+          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </div>
 
-      {/* ── Step 2: Card selection area (above dialog) ── */}
+      {/* ── Card area (above dialog) ── */}
       <AnimatePresence>
         {(step === 'select' || step === 'result') && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.4 }}
             className="absolute left-0 right-0 z-30 flex justify-center items-end gap-3 px-4"
-            style={{ bottom: dialogH + 16 }}
+            style={{ bottom: dialogH + 20 }}
             onClick={e => e.stopPropagation()}
           >
             {step === 'select' && poolCards.map((_, idx) => (
               <CardBack key={idx} selected={selectedIdxs.includes(idx)} onClick={() => toggleCard(idx)} />
             ))}
             {step === 'result' && chosenCards.map((c, idx) => (
-              <CardFace key={idx} card={c} delay={idx * 300 + 200} />
+              <CardFace key={idx} card={c} delay={idx * 320 + 200} />
             ))}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── Dialog box ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-20" onClick={e => e.stopPropagation()}>
-        <div ref={dialogRef} style={{
-          background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.65) 60%, rgba(0,0,0,0.0) 100%)',
-          height: dialogH, padding: '20px 32px 20px 32px',
-          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 6,
-        }}>
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20"
+        style={{ padding: isPortrait ? '0 12px 16px' : '0 20px 20px' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Name plate */}
+        <div>
+          <span style={namePlateStyle}>น้องหมีพยากรณ์</span>
+        </div>
 
-          {/* ── STEP 1: Question input ── */}
+        {/* Dialog inner box */}
+        <div ref={dialogRef} style={{ ...dialogBoxStyle, minHeight: dialogH - 32 }}>
+
+          {/* ── STEP 1: Intro greeting via typewriter ── */}
           {step === 'question' && (
-            <>
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ 
-                  fontSize: 18, 
-                  fontWeight: 600, 
-                  color: '#fbbf24', 
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  letterSpacing: '0.02em',
-                  textShadow: '0 2px 8px rgba(251,191,36,0.3)',
-                }}>
-                  น้องหมีพยากรณ์
-                </span>
-              </div>
-              <p style={{ 
-                color: 'rgba(255,255,255,0.9)', 
-                fontSize: 15, 
-                lineHeight: 1.7, 
-                margin: '0 0 12px',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{
+                color: 'rgba(255,255,255,0.92)',
+                fontSize: isPortrait ? 15 : 14,
+                lineHeight: 1.85,
+                margin: 0,
+                minHeight: '3.7em',
               }}>
-                มีเรื่องอะไรอยู่ในใจคะ?
+                {introShown}
+                {!introDone && (
+                  <motion.span
+                    style={{ color: '#a78bfa', marginLeft: 1 }}
+                    animate={{ opacity: [1, 0, 1] }}
+                    transition={{ duration: 0.7, repeat: Infinity }}
+                  >
+                    |
+                  </motion.span>
+                )}
               </p>
-              <input
-                ref={inputRef}
-                value={userQuestion}
-                onChange={e => setUserQuestion(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && userQuestion.trim()) goToSelect(); }}
-                placeholder="พิมพ์คำถามของคุณที่นี่..."
-                style={{
-                  background: 'rgba(255,255,255,0.05)', 
-                  border: '1px solid rgba(167,139,250,0.3)',
-                  borderRadius: 8,
-                  color: '#fff', 
-                  fontSize: 14, 
-                  width: '100%', 
-                  outline: 'none',
-                  padding: '10px 12px', 
-                  caretColor: '#a78bfa',
-                  transition: 'all 0.2s',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(167,139,250,0.6)';
-                  e.target.style.background = 'rgba(255,255,255,0.08)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'rgba(167,139,250,0.3)';
-                  e.target.style.background = 'rgba(255,255,255,0.05)';
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                <button
-                  onClick={() => goToSelect()}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    color: 'rgba(255,255,255,0.4)', 
-                    fontSize: 13, 
-                    cursor: 'pointer', 
-                    padding: 0,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                  }}
-                >
-                  ข้ามได้
-                </button>
-                <button
-                  onClick={() => { if (userQuestion.trim() || true) goToSelect(); }}
-                  disabled={loadingData}
-                  style={{
-                    background: userQuestion.trim() ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : 'rgba(255,255,255,0.1)',
-                    color: '#fff', 
-                    border: 'none', 
-                    borderRadius: 8,
-                    padding: '8px 20px', 
-                    fontSize: 14, 
-                    fontWeight: 600,
-                    cursor: loadingData ? 'not-allowed' : 'pointer',
-                    opacity: loadingData ? 0.4 : 1,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    boxShadow: userQuestion.trim() ? '0 4px 12px rgba(124,58,237,0.3)' : 'none',
-                  }}
-                >
-                  {loadingData ? 'กำลังโหลด...' : 'ถัดไป'}
-                </button>
-              </div>
-            </>
+
+              {/* Show button only after intro text finishes */}
+              <AnimatePresence>
+                {introDone && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{ display: 'flex', justifyContent: 'flex-end' }}
+                  >
+                    <button
+                      onClick={goToSelect}
+                      disabled={loadingData}
+                      style={{
+                        background: loadingData ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#7c3aed,#5b21b6)',
+                        color: '#fff',
+                        border: '1px solid rgba(167,139,250,0.4)',
+                        borderRadius: 8,
+                        padding: '9px 24px',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        cursor: loadingData ? 'not-allowed' : 'pointer',
+                        opacity: loadingData ? 0.45 : 1,
+                        letterSpacing: '0.04em',
+                        boxShadow: loadingData ? 'none' : '0 4px 16px rgba(124,58,237,0.35)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {loadingData ? 'กำลังโหลด...' : 'เริ่มดูดวง'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
 
           {/* ── STEP 2: Card selection ── */}
           {step === 'select' && (
-            <>
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ 
-                  fontSize: 18, 
-                  fontWeight: 600, 
-                  color: '#fbbf24', 
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  letterSpacing: '0.02em',
-                  textShadow: '0 2px 8px rgba(251,191,36,0.3)',
-                }}>
-                  น้องหมีพยากรณ์
-                </span>
-              </div>
-              <p style={{ 
-                color: 'rgba(255,255,255,0.9)', 
-                fontSize: 15, 
-                lineHeight: 1.7, 
-                margin: '0 0 12px',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{
+                color: 'rgba(255,255,255,0.92)',
+                fontSize: isPortrait ? 15 : 14,
+                lineHeight: 1.85,
+                margin: 0,
               }}>
                 เลือกไพ่ที่ดึงดูดใจคุณ 3 ใบนะคะ
               </p>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button
                   onClick={() => { setSelectedIdxs([]); drawPool(); }}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    color: 'rgba(255,255,255,0.4)', 
-                    fontSize: 13, 
-                    cursor: 'pointer', 
-                    padding: 0,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  style={{
+                    background: 'none', border: 'none',
+                    color: 'rgba(255,255,255,0.35)', fontSize: 13,
+                    cursor: 'pointer', padding: 0,
                   }}
                 >
-                  เริ่มใหม่
+                  สับไพ่ใหม่
                 </button>
-                <span style={{ 
-                  color: selectedIdxs.length === 3 ? '#fbbf24' : 'rgba(255,255,255,0.6)', 
-                  fontSize: 13, 
-                  fontWeight: 600,
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                <span style={{
+                  color: selectedIdxs.length === 3 ? '#fbbf24' : 'rgba(255,255,255,0.45)',
+                  fontSize: 13, fontWeight: 600,
+                  transition: 'color 0.2s',
                 }}>
-                  เลือกแล้ว {selectedIdxs.length}/3
+                  {selectedIdxs.length} / 3
                 </span>
                 <button
                   onClick={() => { if (selectedIdxs.length === 3) confirmSelection(); }}
-                  disabled={selectedIdxs.length !== 3 || uses <= 0}
+                  disabled={selectedIdxs.length !== 3}
                   style={{
-                    background: selectedIdxs.length === 3 ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : 'rgba(255,255,255,0.1)',
-                    color: '#fff', 
-                    border: 'none', 
+                    background: selectedIdxs.length === 3
+                      ? 'linear-gradient(135deg,#7c3aed,#5b21b6)'
+                      : 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    border: '1px solid rgba(167,139,250,0.35)',
                     borderRadius: 8,
-                    padding: '8px 20px', 
-                    fontSize: 14, 
-                    fontWeight: 600,
+                    padding: '9px 24px',
+                    fontSize: 14, fontWeight: 600,
                     cursor: selectedIdxs.length === 3 ? 'pointer' : 'not-allowed',
-                    opacity: selectedIdxs.length === 3 && uses > 0 ? 1 : 0.4,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    boxShadow: selectedIdxs.length === 3 ? '0 4px 12px rgba(124,58,237,0.3)' : 'none',
+                    opacity: selectedIdxs.length === 3 ? 1 : 0.4,
+                    boxShadow: selectedIdxs.length === 3
+                      ? '0 4px 16px rgba(124,58,237,0.35)' : 'none',
+                    transition: 'all 0.2s',
                   }}
                 >
-                  {uses <= 0 ? 'หมดครั้ง' : 'ยืนยัน'}
+                  ยืนยัน
                 </button>
               </div>
-            </>
+            </div>
           )}
 
           {/* ── STEP 3: Fortune result ── */}
           {step === 'result' && (
-            <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Card names as sub-header */}
               {chosenCards.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <span style={{ 
-                    fontSize: 16, 
-                    fontWeight: 600, 
-                    color: '#fbbf24', 
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    letterSpacing: '0.05em',
-                    textShadow: '0 2px 8px rgba(251,191,36,0.3)',
-                  }}>
-                    {chosenCards.map(c => c.name).join(' · ')}
-                  </span>
+                <div style={{
+                  fontSize: 11, fontWeight: 600,
+                  color: 'rgba(251,191,36,0.7)',
+                  letterSpacing: '0.1em', textTransform: 'uppercase',
+                }}>
+                  {chosenCards.map(c => c.name).join('  ·  ')}
                 </div>
               )}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
+
+              {/* Fortune text */}
+              <div style={{ minHeight: '3.5em' }}>
                 {loading ? (
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 10, 
-                    color: 'rgba(255,255,255,0.5)',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                  }}>
-                    <Loader2 style={{ width: 16, height: 16 }} className="animate-spin" />
-                    <span style={{ fontSize: 15 }}>กำลังดูดวงให้...</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.4)' }}>
+                    <Loader2 style={{ width: 15, height: 15 }} className="animate-spin" />
+                    <span style={{ fontSize: 14 }}>กำลังดูดวงให้...</span>
                   </div>
                 ) : (
-                  <p style={{ 
-                    color: 'rgba(255,255,255,0.95)', 
-                    fontSize: 15, 
-                    lineHeight: 1.8, 
+                  <p style={{
+                    color: 'rgba(255,255,255,0.93)',
+                    fontSize: isPortrait ? 15 : 14,
+                    lineHeight: 1.85,
                     margin: 0,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
                   }}>
                     {shown}
-                    {!done && <span className="animate-pulse" style={{ color: '#a78bfa', marginLeft: 2 }}>▌</span>}
+                    {!done && (
+                      <motion.span
+                        style={{ color: '#a78bfa', marginLeft: 1 }}
+                        animate={{ opacity: [1, 0, 1] }}
+                        transition={{ duration: 0.7, repeat: Infinity }}
+                      >
+                        |
+                      </motion.span>
+                    )}
                   </p>
                 )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 24, marginTop: 4 }}>
+
+              {/* Advance / finish controls */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minHeight: 28 }}>
                 {!loading && done && !isLast && (
-                  <motion.span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}
+                  <motion.div
+                    style={{ color: 'rgba(255,255,255,0.45)', fontSize: 18, lineHeight: 1 }}
                     animate={{ opacity: [0.3, 1, 0.3], y: [0, 4, 0] }}
-                    transition={{ duration: 0.9, repeat: Infinity }}>▼</motion.span>
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    ▼
+                  </motion.div>
                 )}
                 {!loading && isLast && done && (
-                  <button
+                  <motion.button
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
                     onClick={(e) => { e.stopPropagation(); resetAll(); }}
-                    style={{ 
-                      background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', 
-                      border: 'none', 
-                      color: '#fff', 
-                      borderRadius: 8, 
-                      padding: '8px 20px', 
-                      fontSize: 13, 
-                      fontWeight: 600,
+                    style={{
+                      background: 'linear-gradient(135deg,#7c3aed,#5b21b6)',
+                      border: '1px solid rgba(167,139,250,0.4)',
+                      color: '#fff',
+                      borderRadius: 8,
+                      padding: '8px 22px',
+                      fontSize: 13, fontWeight: 600,
                       cursor: 'pointer',
-                      fontFamily: 'system-ui, -apple-system, sans-serif',
-                      boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
+                      boxShadow: '0 4px 16px rgba(124,58,237,0.3)',
+                      letterSpacing: '0.04em',
                     }}
                   >
                     ดูดวงใหม่
-                  </button>
+                  </motion.button>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

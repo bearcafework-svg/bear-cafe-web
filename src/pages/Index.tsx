@@ -10,6 +10,7 @@ import { Footer } from '@/components/bear-cafe/Footer';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
 import { CategoryGuidance } from '@/components/bear-cafe/CategoryGuidance';
 import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
+import { SecretTableWidget } from '@/components/bear-cafe/SecretTableWidget';
 import { useCooldown } from '@/hooks/useCooldown';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
@@ -225,6 +226,15 @@ export default function Index() {
               transition={{ delay: 0.05 }}
             >
               <CategoryGuidance />
+            </motion.div>
+
+            {/* Secret Table Widget */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08 }}
+            >
+              <SecretTableWidget />
             </motion.div>
 
             {/* Category Grid */}

@@ -26,6 +26,8 @@ import HealingMessagePage from "./pages/HealingMessagePage";
 import MeeDooDuang from "./pages/MeeDooDuang";
 import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
+import SecretChatMenu from "./pages/SecretChatMenu";
+import SecretChatRoom from "./pages/SecretChatRoom";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +96,8 @@ function AppRoutes() {
       <Route path="/meedooduang" element={<MeeDooDuang />} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
+      <Route path="/secret-chat" element={<ProtectedRoute><SecretChatMenu /></ProtectedRoute>} />
+      <Route path="/secret-chat/room" element={<ProtectedRoute><SecretChatRoom /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       
