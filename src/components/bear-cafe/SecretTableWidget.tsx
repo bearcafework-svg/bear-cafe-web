@@ -41,7 +41,7 @@ export function SecretTableWidget() {
           ☕
         </div>
         <div>
-          <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">Secret Table</p>
+          <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">คาเฟ่ลับ</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             {/* Live dot */}
             <span className="relative flex h-2 w-2">
@@ -59,7 +59,7 @@ export function SecretTableWidget() {
         onClick={() => navigate(isAuthenticated ? '/secret-chat' : '/login')}
         className="shrink-0 bg-[#c8956c] hover:bg-[#b07d58] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
       >
-        นั่งโต๊ะลับ
+        เข้าคาเฟ่ลับ
       </button>
     </motion.div>
   );

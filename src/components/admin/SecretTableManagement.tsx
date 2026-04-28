@@ -900,6 +900,200 @@ function SimilarMoodTab() {
   );
 }
 
+// ─── Roles Tab ────────────────────────────────────────────────────────────────
+interface ChatRole {
+  id: string;
+  key: string;
+  label: string;
+  sub: string;
+  image_url: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+const ROLE_KEY_OPTIONS = [
+  { value: 'talk',   label: 'Talk' },
+  { value: 'listen', label: 'Listen' },
+  { value: 'both',   label: 'Both' },
+  { value: 'chill',  label: 'Chill' },
+];
+
+function RolesTab() {
+  const { toast } = useToast();
+  const [roles, setRoles] = useState<ChatRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ChatRole | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ label: '', sub: '', image_url: '', is_active: true });
+
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    const { data } = await (supabase as any)
+      .from('chat_roles')
+      .select('*')
+      .order('sort_order');
+    setRoles(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
+
+  function openEdit(r: ChatRole) {
+    setEditing(r);
+    setForm({ label: r.label, sub: r.sub, image_url: r.image_url ?? '', is_active: r.is_active });
+    setDialogOpen(true);
+  }
+
+  async function handleSave() {
+    if (!form.label.trim() || !form.sub.trim()) {
+      toast({ title: 'กรุณากรอกชื่อและคำอธิบาย', variant: 'destructive' });
+      return;
+    }
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('chat_roles')
+        .update({
+          label: form.label.trim(),
+          sub: form.sub.trim(),
+          image_url: form.image_url.trim() || null,
+          is_active: form.is_active,
+        })
+        .eq('id', editing.id);
+      if (error) throw error;
+      toast({ title: 'อัปเดต Role แล้ว' });
+      setDialogOpen(false);
+      fetchRoles();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(r: ChatRole) {
+    await (supabase as any).from('chat_roles').update({ is_active: !r.is_active }).eq('id', r.id);
+    setRoles(prev => prev.map(x => x.id === r.id ? { ...x, is_active: !r.is_active } : x));
+  }
+
+  const ROLE_ICONS: Record<string, string> = { talk: '💬', listen: '👂', both: '🤝', chill: '☕' };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        จัดการบทบาทที่ผู้ใช้เลือกก่อนเข้าห้องแชท (แก้ไขได้ ลบไม่ได้เพราะผูกกับ logic การจับคู่)
+      </p>
+
+      {loading ? (
+        <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {roles.map(r => (
+            <div
+              key={r.id}
+              className={`rounded-2xl border p-4 flex gap-3 items-start transition-opacity ${
+                r.is_active ? 'border-border' : 'border-border/40 opacity-60'
+              }`}
+            >
+              {/* Image or icon */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-muted flex items-center justify-center text-2xl">
+                {r.image_url
+                  ? <img src={r.image_url} alt={r.label} className="w-full h-full object-cover" />
+                  : ROLE_ICONS[r.key] ?? '💬'}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm">{r.label}</span>
+                  <Badge variant="outline" className="text-[10px] font-mono">{r.key}</Badge>
+                  <Badge
+                    variant={r.is_active ? 'default' : 'secondary'}
+                    className="text-[10px] cursor-pointer ml-auto"
+                    onClick={() => toggleActive(r)}
+                  >
+                    {r.is_active ? 'เปิด' : 'ปิด'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{r.sub}</p>
+              </div>
+
+              <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => openEdit(r)}>
+                <Edit className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              แก้ไข Role: {editing && (ROLE_ICONS[editing.key] ?? '')} {editing?.label}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>ชื่อที่แสดง *</Label>
+              <Input
+                value={form.label}
+                onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                placeholder="เช่น Talk, Listen"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>คำอธิบาย *</Label>
+              <Input
+                value={form.sub}
+                onChange={e => setForm(f => ({ ...f, sub: e.target.value }))}
+                placeholder="เช่น อยากเล่า ระบาย หรือแชร์เรื่องราว"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>รูปภาพ (URL)</Label>
+              <Input
+                value={form.image_url}
+                onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
+                placeholder="https://..."
+              />
+              {form.image_url && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={form.image_url}
+                    alt="preview"
+                    className="w-14 h-14 rounded-xl object-cover border border-border"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, image_url: '' }))}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    ลบรูป
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>เปิดใช้งาน</Label>
+              <Switch
+                checked={form.is_active}
+                onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export function SecretTableManagement() {
   return (
@@ -931,6 +1125,9 @@ export function SecretTableManagement() {
             <TabsTrigger value="similar-mood" className="gap-2">
               <GitMerge className="w-4 h-4" /> Similar Mood
             </TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2">
+              <User className="w-4 h-4" /> บทบาท
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="topics"><TopicsTab /></TabsContent>
@@ -943,6 +1140,7 @@ export function SecretTableManagement() {
           </TabsContent>
           <TabsContent value="monitor"><MonitorTab /></TabsContent>
           <TabsContent value="similar-mood"><SimilarMoodTab /></TabsContent>
+          <TabsContent value="roles"><RolesTab /></TabsContent>
         </Tabs>
       </CardContent>
     </Card>

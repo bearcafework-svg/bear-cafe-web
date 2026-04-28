@@ -523,7 +523,7 @@ export default function SecretChatRoom() {
             </>
           ) : (
             <div>
-              <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm">Secret Table</p>
+              <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
               <p className="text-xs text-[#9c7c5e]">{topicName}</p>
             </div>
           )}
