@@ -148,7 +148,7 @@ function TopicsTab() {
 
   const fetchTopics = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('chat_topics')
       .select('*')
       .order('sort_order', { ascending: true });
@@ -192,11 +192,11 @@ function TopicsTab() {
         is_active: form.is_active,
       };
       if (editing) {
-        const { error } = await supabase.from('chat_topics').update(payload).eq('id', editing.id);
+        const { error } = await (supabase as any).from('chat_topics').update(payload).eq('id', editing.id);
         if (error) throw error;
         toast({ title: 'อัปเดตหัวข้อแล้ว' });
       } else {
-        const { error } = await supabase.from('chat_topics').insert({ ...payload, sort_order: topics.length });
+        const { error } = await (supabase as any).from('chat_topics').insert({ ...payload, sort_order: topics.length });
         if (error) throw error;
         toast({ title: 'เพิ่มหัวข้อแล้ว' });
       }
@@ -212,14 +212,14 @@ function TopicsTab() {
   async function handleDelete(t: ChatTopic) {
     if (!confirm('ลบหัวข้อนี้?')) return;
     await deleteOldImage(t.image_url ?? '');
-    const { error } = await supabase.from('chat_topics').delete().eq('id', t.id);
+    const { error } = await (supabase as any).from('chat_topics').delete().eq('id', t.id);
     if (error) { toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'ลบหัวข้อแล้ว' });
     fetchTopics();
   }
 
   async function toggleActive(t: ChatTopic) {
-    await supabase.from('chat_topics').update({ is_active: !t.is_active }).eq('id', t.id);
+    await (supabase as any).from('chat_topics').update({ is_active: !t.is_active }).eq('id', t.id);
     setTopics(prev => prev.map(x => x.id === t.id ? { ...x, is_active: !t.is_active } : x));
   }
 
@@ -411,7 +411,7 @@ function ProfilesTab() {
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('chat_profiles').select('*').order('sort_order');
+    const { data } = await (supabase as any).from('chat_profiles').select('*').order('sort_order');
     setProfiles(data ?? []);
     setLoading(false);
   }, []);
@@ -439,11 +439,11 @@ function ProfilesTab() {
     try {
       const payload = { name: form.name.trim(), image_url: form.image_url, is_active: form.is_active };
       if (editing) {
-        const { error } = await supabase.from('chat_profiles').update(payload).eq('id', editing.id);
+        const { error } = await (supabase as any).from('chat_profiles').update(payload).eq('id', editing.id);
         if (error) throw error;
         toast({ title: 'อัปเดตโปรไฟล์แล้ว' });
       } else {
-        const { error } = await supabase.from('chat_profiles').insert({ ...payload, sort_order: profiles.length });
+        const { error } = await (supabase as any).from('chat_profiles').insert({ ...payload, sort_order: profiles.length });
         if (error) throw error;
         toast({ title: 'เพิ่มโปรไฟล์แล้ว' });
       }
@@ -462,7 +462,7 @@ function ProfilesTab() {
       const path = p.image_url.split('/chat-profile-images/').pop();
       if (path) await supabase.storage.from('chat-profile-images').remove([path]);
     } catch {}
-    const { error } = await supabase.from('chat_profiles').delete().eq('id', p.id);
+    const { error } = await (supabase as any).from('chat_profiles').delete().eq('id', p.id);
     if (error) { toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' }); return; }
     toast({ title: 'ลบโปรไฟล์แล้ว' });
     fetchProfiles();
@@ -539,7 +539,7 @@ function MonitorTab() {
   const [loading, setLoading] = useState(true);
 
   const fetchViolations = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('chat_violations')
       .select('*, profile:profiles(username, discord_id, avatar_url)')
       .order('created_at', { ascending: false })
@@ -674,7 +674,7 @@ function SimilarMoodTab() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [topicsRes, configRes] = await Promise.all([
-      supabase.from('chat_topics').select('id, name').eq('is_active', true).order('sort_order'),
+      (supabase as any).from('chat_topics').select('id, name').eq('is_active', true).order('sort_order'),
       (supabase as any).from('chat_config').select('value').eq('key', CONFIG_KEY).maybeSingle(),
     ]);
     setTopics(topicsRes.data ?? []);
