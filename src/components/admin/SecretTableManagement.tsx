@@ -953,12 +953,20 @@ function RolesTab() {
     if (!editing) return;
     setSaving(true);
     try {
+      // Delete old image from storage if replaced
+      if (editing.image_url && editing.image_url !== form.image_url) {
+        try {
+          const oldPath = editing.image_url.split('/chat-role-images/').pop();
+          if (oldPath) await supabase.storage.from('chat-role-images').remove([oldPath]);
+        } catch {}
+      }
+
       const { error } = await (supabase as any)
         .from('chat_roles')
         .update({
           label: form.label.trim(),
           sub: form.sub.trim(),
-          image_url: form.image_url.trim() || null,
+          image_url: form.image_url || null,
           is_active: form.is_active,
         })
         .eq('id', editing.id);
@@ -1052,29 +1060,13 @@ function RolesTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>รูปภาพ (URL)</Label>
-              <Input
-                value={form.image_url}
-                onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-                placeholder="https://..."
+              <Label>รูปภาพ</Label>
+              <ImageUploadField
+                currentUrl={form.image_url}
+                onUploaded={url => setForm(f => ({ ...f, image_url: url }))}
+                onRemove={() => setForm(f => ({ ...f, image_url: '' }))}
+                bucket="chat-role-images"
               />
-              {form.image_url && (
-                <div className="mt-2 flex items-center gap-3">
-                  <img
-                    src={form.image_url}
-                    alt="preview"
-                    className="w-14 h-14 rounded-xl object-cover border border-border"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, image_url: '' }))}
-                    className="text-xs text-destructive hover:underline"
-                  >
-                    ลบรูป
-                  </button>
-                </div>
-              )}
             </div>
             <div className="flex items-center justify-between">
               <Label>เปิดใช้งาน</Label>
