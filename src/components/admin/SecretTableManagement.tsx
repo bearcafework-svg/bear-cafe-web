@@ -226,7 +226,7 @@ function TopicsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">จัดการหัวข้อ/บรรยากาศที่ผู้ใช้เลือกก่อนเข้าห้องแชท</p>
+        <p className="text-sm text-muted-foreground">จัดการหมวดหมู่การสนทนาที่ผู้ใช้เลือกก่อนเข้าห้องแชท</p>
         <Button onClick={openCreate} size="sm" className="gap-2">
           <Plus className="w-4 h-4" /> เพิ่มหัวข้อ
         </Button>
@@ -914,7 +914,7 @@ export function SecretTableManagement() {
         <Tabs defaultValue="topics">
           <TabsList className="mb-4 flex-wrap h-auto gap-1">
             <TabsTrigger value="topics" className="gap-2">
-              <Tag className="w-4 h-4" /> หัวข้อ
+              <Tag className="w-4 h-4" /> หมวดหมู่
             </TabsTrigger>
             <TabsTrigger value="profiles" className="gap-2">
               <User className="w-4 h-4" /> โปรไฟล์

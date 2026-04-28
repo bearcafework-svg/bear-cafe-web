@@ -56,6 +56,26 @@ function isSimilarMood(a: string, b: string, map: Record<string, string[]>): boo
   return (map[a]?.includes(b) ?? false) || (map[b]?.includes(a) ?? false);
 }
 
+// Role compatibility matrix
+// talk ↔ listen, both ↔ any, chill ↔ chill|both
+function isCompatibleRole(a: string, b: string): boolean {
+  if (a === 'both' || b === 'both') return true;
+  if (a === 'talk'   && b === 'listen') return true;
+  if (a === 'listen' && b === 'talk')   return true;
+  if (a === 'chill'  && b === 'chill')  return true;
+  return false;
+}
+
+// Score a candidate: higher = better match
+function matchScore(myTopicId: string, myRole: string, candidate: any, moodConfig: SimilarMoodConfig): number {
+  let score = 0;
+  if (candidate.topic_id === myTopicId) score += 10;
+  else if (moodConfig.enabled && isSimilarMood(myTopicId, candidate.topic_id, moodConfig.map)) score += 5;
+  else return -1; // not eligible
+  if (isCompatibleRole(myRole ?? 'both', candidate.role ?? 'both')) score += 3;
+  return score;
+}
+
 function useRainAmbient() {
   const ctxRef = useRef<AudioContext | null>(null);
   const srcRef = useRef<AudioBufferSourceNode | null>(null);
@@ -198,7 +218,7 @@ export default function SecretChatRoom() {
     else { bgmRef.current.play().catch(() => {}); setBgmOn(true); }
   }, [bgmOn]);
 
-  const { topicId, topicName, alias, avatar } = (location.state as any) ?? {};
+  const { topicId, topicName, alias, avatar, role } = (location.state as any) ?? {};
 
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -264,39 +284,30 @@ export default function SecretChatRoom() {
       const elapsedSeconds = (Date.now() - matchStartRef.current) / 1000;
       const inSimilarPhase = moodConfig.enabled && elapsedSeconds >= moodConfig.similar_phase_delay_seconds;
 
-      // Phase 1 (0 – delay): same topic only
-      // Phase 2 (delay+): same topic OR similar mood
       let query = (supabase as any)
         .from('chat_queue')
         .select('*')
         .neq('user_id', user.id)
         .order('joined_at', { ascending: true })
-        .limit(20); // fetch a few to filter client-side in similar phase
+        .limit(20);
 
       if (!inSimilarPhase) {
-        // Strict: same topic
         query = query.eq('topic_id', topicId);
       }
-      // In similar phase we fetch broadly and filter below
 
       const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
 
-      // Find best candidate
-      let partner = null;
+      // Find best candidate using score
+      let best: any = null;
+      let bestScore = -1;
       for (const candidate of queue) {
-        if (candidate.topic_id === topicId) {
-          // Exact match — always preferred
-          partner = candidate;
-          break;
-        }
-        if (inSimilarPhase && isSimilarMood(topicId, candidate.topic_id, moodConfig.map)) {
-          partner = candidate;
-          // Don't break — keep looking for exact match
-        }
+        const score = matchScore(topicId, role ?? 'both', candidate, moodConfig);
+        if (score > bestScore) { bestScore = score; best = candidate; }
       }
 
-      if (!partner) return;
+      if (!best || bestScore < 0) return;
+      const partner = best;
 
       const { data: sess, error } = await (supabase as any)
         .from('chat_sessions')
@@ -308,6 +319,8 @@ export default function SecretChatRoom() {
           user_b_alias: partner.alias,
           user_a_avatar: avatar,
           user_b_avatar: partner.avatar,
+          user_a_role: role ?? 'both',
+          user_b_role: partner.role ?? 'both',
           duration_seconds: SESSION_DURATION,
         })
         .select()
