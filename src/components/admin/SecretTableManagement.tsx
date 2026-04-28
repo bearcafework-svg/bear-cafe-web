@@ -14,7 +14,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Edit, Coffee, Tag, Type, Upload, X, AlertTriangle, User, ShieldAlert } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Plus, Trash2, Edit, Coffee, Tag, Type, Upload, X, AlertTriangle, User, ShieldAlert, GitMerge, RotateCcw } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -642,6 +645,261 @@ function MonitorTab() {
   );
 }
 
+// ─── Similar Mood Tab ─────────────────────────────────────────────────────────
+const CONFIG_KEY = 'similar_mood';
+
+interface SimilarMoodConfig {
+  enabled: boolean;
+  similar_phase_delay_seconds: number;
+  map: Record<string, string[]>;
+}
+
+const DEFAULT_CONFIG: SimilarMoodConfig = {
+  enabled: true,
+  similar_phase_delay_seconds: 15,
+  map: {},
+};
+
+function SimilarMoodTab() {
+  const { toast } = useToast();
+  const [topics, setTopics] = useState<{ id: string; name: string }[]>([]);
+  const [config, setConfig] = useState<SimilarMoodConfig>(DEFAULT_CONFIG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // For adding a new mapping row
+  const [fromTopic, setFromTopic] = useState('');
+  const [toTopics, setToTopics] = useState<string[]>([]);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const [topicsRes, configRes] = await Promise.all([
+      supabase.from('chat_topics').select('id, name').eq('is_active', true).order('sort_order'),
+      (supabase as any).from('chat_config').select('value').eq('key', CONFIG_KEY).maybeSingle(),
+    ]);
+    setTopics(topicsRes.data ?? []);
+    if (configRes.data?.value) {
+      setConfig({ ...DEFAULT_CONFIG, ...configRes.data.value });
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Normalize: ensure bidirectional entries
+  function normalizeBidirectional(map: Record<string, string[]>): Record<string, string[]> {
+    const result: Record<string, string[]> = {};
+    for (const [a, bList] of Object.entries(map)) {
+      if (!result[a]) result[a] = [];
+      for (const b of bList) {
+        if (!result[a].includes(b)) result[a].push(b);
+        if (!result[b]) result[b] = [];
+        if (!result[b].includes(a)) result[b].push(a);
+      }
+    }
+    // Remove empty entries
+    return Object.fromEntries(Object.entries(result).filter(([, v]) => v.length > 0));
+  }
+
+  async function saveConfig(updated: SimilarMoodConfig) {
+    setSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('chat_config')
+        .upsert({ key: CONFIG_KEY, value: updated, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setConfig(updated);
+      toast({ title: 'บันทึกการตั้งค่าแล้ว' });
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addMapping() {
+    if (!fromTopic || toTopics.length === 0) return;
+    // Validate: no self-mapping
+    if (toTopics.includes(fromTopic)) {
+      toast({ title: 'ไม่สามารถเลือก mood เดียวกันได้', variant: 'destructive' });
+      return;
+    }
+    const newMap = { ...config.map };
+    newMap[fromTopic] = [...new Set([...(newMap[fromTopic] ?? []), ...toTopics])];
+    const normalized = normalizeBidirectional(newMap);
+    saveConfig({ ...config, map: normalized });
+    setFromTopic('');
+    setToTopics([]);
+  }
+
+  function removeMapping(fromId: string, toId: string) {
+    const newMap = { ...config.map };
+    newMap[fromId] = (newMap[fromId] ?? []).filter(id => id !== toId);
+    if (newMap[fromId].length === 0) delete newMap[fromId];
+    // Also remove reverse
+    if (newMap[toId]) {
+      newMap[toId] = newMap[toId].filter(id => id !== fromId);
+      if (newMap[toId].length === 0) delete newMap[toId];
+    }
+    saveConfig({ ...config, map: newMap });
+  }
+
+  function resetToDefault() {
+    if (!confirm('รีเซ็ต mapping ทั้งหมด?')) return;
+    saveConfig({ ...config, map: {} });
+  }
+
+  function getTopicName(id: string) {
+    return topics.find(t => t.id === id)?.name ?? id.slice(0, 8);
+  }
+
+  // Deduplicate display: only show A→B, not B→A again
+  const displayPairs: [string, string][] = [];
+  const seen = new Set<string>();
+  for (const [a, bList] of Object.entries(config.map)) {
+    for (const b of bList) {
+      const key = [a, b].sort().join('|');
+      if (!seen.has(key)) { seen.add(key); displayPairs.push([a, b]); }
+    }
+  }
+
+  const availableToTopics = topics.filter(t => t.id !== fromTopic);
+
+  if (loading) return <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Header controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Similar Mood Matching</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            กำหนด mood ที่ใกล้เคียงกัน ระบบจะจับคู่ข้ามหัวข้อได้หลังรอ {config.similar_phase_delay_seconds} วินาที
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">เปิดใช้งาน</Label>
+            <Switch
+              checked={config.enabled}
+              onCheckedChange={v => saveConfig({ ...config, enabled: v })}
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={resetToDefault} className="gap-1.5 text-destructive hover:text-destructive">
+            <RotateCcw className="w-3.5 h-3.5" /> รีเซ็ต
+          </Button>
+        </div>
+      </div>
+
+      {/* Delay setting */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+        <Label className="text-sm shrink-0">รอก่อนจับคู่ข้าม mood (วินาที)</Label>
+        <Input
+          type="number"
+          min={5}
+          max={120}
+          value={config.similar_phase_delay_seconds}
+          onChange={e => setConfig(c => ({ ...c, similar_phase_delay_seconds: Number(e.target.value) }))}
+          onBlur={() => saveConfig(config)}
+          className="w-24"
+        />
+      </div>
+
+      {/* Add mapping */}
+      <div className="space-y-3 p-4 rounded-xl border border-border bg-card">
+        <p className="text-sm font-medium">เพิ่ม Mapping ใหม่</p>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="space-y-1.5 min-w-[160px]">
+            <Label className="text-xs text-muted-foreground">จาก Mood</Label>
+            <Select value={fromTopic} onValueChange={setFromTopic}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="เลือก mood..." />
+              </SelectTrigger>
+              <SelectContent>
+                {topics.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 flex-1 min-w-[200px]">
+            <Label className="text-xs text-muted-foreground">ใกล้เคียงกับ (เลือกได้หลาย)</Label>
+            <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-border min-h-[38px] bg-background">
+              {availableToTopics.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setToTopics(prev =>
+                    prev.includes(t.id) ? prev.filter(x => x !== t.id) : [...prev, t.id]
+                  )}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                    toTopics.includes(t.id)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  {t.name}
+                </button>
+              ))}
+              {availableToTopics.length === 0 && (
+                <span className="text-xs text-muted-foreground">เลือก "จาก Mood" ก่อน</span>
+              )}
+            </div>
+          </div>
+
+          <Button
+            onClick={addMapping}
+            disabled={!fromTopic || toTopics.length === 0 || saving}
+            size="sm"
+            className="gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> เพิ่ม
+          </Button>
+        </div>
+      </div>
+
+      {/* Current mappings */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Mapping ปัจจุบัน</p>
+        {displayPairs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+            ยังไม่มี mapping — ระบบจะจับคู่เฉพาะ mood เดียวกัน
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {displayPairs.map(([a, b]) => (
+              <div key={`${a}|${b}`} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-2 text-sm">
+                  <Badge variant="outline" className="font-medium">{getTopicName(a)}</Badge>
+                  <span className="text-muted-foreground text-xs">↔</span>
+                  <Badge variant="outline" className="font-medium">{getTopicName(b)}</Badge>
+                  <span className="text-[10px] text-muted-foreground">(bidirectional)</span>
+                </div>
+                <button
+                  onClick={() => removeMapping(a, b)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Config preview */}
+      <details className="text-xs">
+        <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+          ดู JSON config
+        </summary>
+        <pre className="mt-2 p-3 rounded-lg bg-muted text-[11px] overflow-auto max-h-48">
+          {JSON.stringify(config, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export function SecretTableManagement() {
   return (
@@ -670,6 +928,9 @@ export function SecretTableManagement() {
             <TabsTrigger value="monitor" className="gap-2 data-[state=active]:bg-red-100 data-[state=active]:text-red-700 dark:data-[state=active]:bg-red-950 dark:data-[state=active]:text-red-400">
               <ShieldAlert className="w-4 h-4" /> สังเกตการณ์
             </TabsTrigger>
+            <TabsTrigger value="similar-mood" className="gap-2">
+              <GitMerge className="w-4 h-4" /> Similar Mood
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="topics"><TopicsTab /></TabsContent>
@@ -681,6 +942,7 @@ export function SecretTableManagement() {
             <WordListTab table="chat_name_menus" label="ชื่อเมนู" placeholder="เช่น ลาเต้" />
           </TabsContent>
           <TabsContent value="monitor"><MonitorTab /></TabsContent>
+          <TabsContent value="similar-mood"><SimilarMoodTab /></TabsContent>
         </Tabs>
       </CardContent>
     </Card>

@@ -32,6 +32,30 @@ interface ChatProfile {
 
 const SESSION_DURATION = 7 * 60;
 
+// ─── Similar Mood config loader ───────────────────────────────────────────────
+interface SimilarMoodConfig {
+  enabled: boolean;
+  similar_phase_delay_seconds: number;
+  map: Record<string, string[]>;
+}
+
+async function loadSimilarMoodConfig(): Promise<SimilarMoodConfig> {
+  try {
+    const { data } = await (supabase as any)
+      .from('chat_config')
+      .select('value')
+      .eq('key', 'similar_mood')
+      .maybeSingle();
+    if (data?.value) return { enabled: true, similar_phase_delay_seconds: 15, map: {}, ...data.value };
+  } catch {}
+  return { enabled: false, similar_phase_delay_seconds: 15, map: {} };
+}
+
+// Bidirectional check: A→B or B→A
+function isSimilarMood(a: string, b: string, map: Record<string, string[]>): boolean {
+  return (map[a]?.includes(b) ?? false) || (map[b]?.includes(a) ?? false);
+}
+
 function useRainAmbient() {
   const ctxRef = useRef<AudioContext | null>(null);
   const srcRef = useRef<AudioBufferSourceNode | null>(null);
@@ -186,6 +210,9 @@ export default function SecretChatRoom() {
   const [showRating, setShowRating] = useState(false);
   const [bannedWarning, setBannedWarning] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ChatProfile[]>([]);
+  // Similar mood config + phase tracking
+  const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
+  const matchStartRef = useRef<number>(Date.now());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -197,6 +224,7 @@ export default function SecretChatRoom() {
 
   useEffect(() => {
     loadBannedWords().then(setBannedWords);
+    loadSimilarMoodConfig().then(setMoodConfig);
     (supabase as any)
       .from('chat_profiles')
       .select('id, name, image_url')
@@ -229,17 +257,46 @@ export default function SecretChatRoom() {
   useEffect(() => {
     if (!user || !topicId || matchStatus !== 'waiting') return;
 
+    // Record when we started waiting (for similar-phase delay)
+    matchStartRef.current = Date.now();
+
     const tryMatch = async () => {
-      const { data: queue } = await (supabase as any)
+      const elapsedSeconds = (Date.now() - matchStartRef.current) / 1000;
+      const inSimilarPhase = moodConfig.enabled && elapsedSeconds >= moodConfig.similar_phase_delay_seconds;
+
+      // Phase 1 (0 – delay): same topic only
+      // Phase 2 (delay+): same topic OR similar mood
+      let query = (supabase as any)
         .from('chat_queue')
         .select('*')
-        .eq('topic_id', topicId)
         .neq('user_id', user.id)
         .order('joined_at', { ascending: true })
-        .limit(1);
+        .limit(20); // fetch a few to filter client-side in similar phase
 
+      if (!inSimilarPhase) {
+        // Strict: same topic
+        query = query.eq('topic_id', topicId);
+      }
+      // In similar phase we fetch broadly and filter below
+
+      const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
-      const partner = queue[0];
+
+      // Find best candidate
+      let partner = null;
+      for (const candidate of queue) {
+        if (candidate.topic_id === topicId) {
+          // Exact match — always preferred
+          partner = candidate;
+          break;
+        }
+        if (inSimilarPhase && isSimilarMood(topicId, candidate.topic_id, moodConfig.map)) {
+          partner = candidate;
+          // Don't break — keep looking for exact match
+        }
+      }
+
+      if (!partner) return;
 
       const { data: sess, error } = await (supabase as any)
         .from('chat_sessions')
@@ -287,7 +344,7 @@ export default function SecretChatRoom() {
       supabase.removeChannel(queueChannel);
       (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
     };
-  }, [user, topicId, alias, avatar, matchStatus]);
+  }, [user, topicId, alias, avatar, matchStatus, moodConfig]);
 
   useEffect(() => {
     if (!session || !user) return;
@@ -517,6 +574,11 @@ export default function SecretChatRoom() {
             <div>
               <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8]">กำลังหาคู่สนทนา...</p>
               <p className="text-sm text-[#9c7c5e] mt-1">รอสักครู่ กำลังจับคู่ในหัวข้อ {topicName}</p>
+              {moodConfig.enabled && (
+                <p className="text-xs text-[#c8b09a] mt-1">
+                  หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง
+                </p>
+              )}
             </div>
             <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e]" />
           </div>
