@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, Trash2, Edit, Coffee, Tag, Type, Upload, X, AlertTriangle, User, ShieldAlert, GitMerge, RotateCcw } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
+import { ChatMusicManagement } from './ChatMusicManagement';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ChatTopic {
@@ -1120,6 +1121,9 @@ export function SecretTableManagement() {
             <TabsTrigger value="roles" className="gap-2">
               <User className="w-4 h-4" /> บทบาท
             </TabsTrigger>
+            <TabsTrigger value="music" className="gap-2">
+              <Coffee className="w-4 h-4" /> เพลง BGM
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="topics"><TopicsTab /></TabsContent>
@@ -1133,6 +1137,7 @@ export function SecretTableManagement() {
           <TabsContent value="monitor"><MonitorTab /></TabsContent>
           <TabsContent value="similar-mood"><SimilarMoodTab /></TabsContent>
           <TabsContent value="roles"><RolesTab /></TabsContent>
+          <TabsContent value="music"><ChatMusicManagement /></TabsContent>
         </Tabs>
       </CardContent>
     </Card>

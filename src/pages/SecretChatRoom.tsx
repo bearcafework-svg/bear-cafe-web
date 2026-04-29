@@ -121,42 +121,56 @@ function useRainAmbient() {
 interface Track { title: string; src: string; }
 interface MusicCategory { label: string; tracks: Track[]; }
 
-const MUSIC_LIBRARY: MusicCategory[] = [
+const MUSIC_FALLBACK: MusicCategory[] = [
   {
     label: 'Lo-fi Chill',
     tracks: [
       { title: 'Cozy Rain', src: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
       { title: 'Late Night Study', src: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749d4e4.mp3' },
-      { title: 'Coffee Shop', src: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3' },
-    ],
-  },
-  {
-    label: 'Ambient',
-    tracks: [
-      { title: 'Forest Morning', src: 'https://cdn.pixabay.com/audio/2022/03/10/audio_270f49d8c5.mp3' },
-      { title: 'Ocean Waves', src: 'https://cdn.pixabay.com/audio/2022/03/24/audio_c8f4e5e5e5.mp3' },
-      { title: 'Soft Piano', src: 'https://cdn.pixabay.com/audio/2022/04/27/audio_1e5e5e5e5e.mp3' },
-    ],
-  },
-  {
-    label: 'Jazz Cafe',
-    tracks: [
-      { title: 'Smooth Evening', src: 'https://cdn.pixabay.com/audio/2022/08/02/audio_2dde668d05.mp3' },
-      { title: 'Mellow Groove', src: 'https://cdn.pixabay.com/audio/2022/10/25/audio_946b4e5e5e.mp3' },
     ],
   },
 ];
 
+async function loadMusicLibrary(): Promise<MusicCategory[]> {
+  try {
+    const [catRes, trackRes] = await Promise.all([
+      (supabase as any).from('chat_music_categories').select('id, label, sort_order').order('sort_order'),
+      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, sort_order').order('sort_order'),
+    ]);
+    const cats: any[] = catRes.data ?? [];
+    const allTracks: any[] = trackRes.data ?? [];
+    const lib: MusicCategory[] = cats
+      .map(c => ({
+        label: c.label,
+        tracks: allTracks.filter(t => t.category_id === c.id).map(t => ({ title: t.title, src: t.src })),
+      }))
+      .filter(c => c.tracks.length > 0);
+    return lib.length > 0 ? lib : MUSIC_FALLBACK;
+  } catch {
+    return MUSIC_FALLBACK;
+  }
+}
+
 type LoopMode = 'none' | 'one' | 'all';
 
 function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
+  const [library, setLibrary] = useState<MusicCategory[]>(MUSIC_FALLBACK);
   const [playing, setPlaying] = useState(false);
   const [catIdx, setCatIdx] = useState(0);
   const [trackIdx, setTrackIdx] = useState(0);
   const [loopMode, setLoopMode] = useState<LoopMode>('all');
 
-  const currentCat = MUSIC_LIBRARY[catIdx];
-  const currentTrack = currentCat.tracks[trackIdx];
+  // Load library from DB on mount
+  useEffect(() => {
+    loadMusicLibrary().then(lib => {
+      setLibrary(lib);
+      setCatIdx(0);
+      setTrackIdx(0);
+    });
+  }, []);
+
+  const currentCat = library[Math.min(catIdx, library.length - 1)] ?? MUSIC_FALLBACK[0];
+  const currentTrack = currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)] ?? currentCat.tracks[0];
 
   // Load track when it changes
   useEffect(() => {
@@ -207,8 +221,8 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setTrackIdx(ti);
     setPlaying(true);
     const el = audioRef.current;
-    if (el) { el.src = MUSIC_LIBRARY[ci].tracks[ti].src; el.play().catch(() => {}); }
-  }, []);
+    if (el) { el.src = library[ci].tracks[ti].src; el.play().catch(() => {}); }
+  }, [library]);
 
   const cycleLoop = useCallback(() => {
     setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
