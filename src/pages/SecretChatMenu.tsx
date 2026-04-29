@@ -4,9 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Loader2, Coffee } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Coffee, ChevronRight } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface ChatCategory {
   id: string;
   name: string;
@@ -22,12 +21,11 @@ interface ChatProfile {
 
 type ChatRole = 'talk' | 'listen' | 'both' | 'chill';
 
-// ─── Role definitions (fallback if DB empty) ──────────────────────────────────
 const ROLE_FALLBACK: { key: ChatRole; label: string; sub: string; icon: string }[] = [
-  { key: 'talk',   label: 'Talk',   sub: 'อยากเล่า ระบาย หรือแชร์เรื่องราว',  icon: '💬' },
-  { key: 'listen', label: 'Listen', sub: 'อยากฟัง รับฟัง และให้กำลังใจ',       icon: '👂' },
-  { key: 'both',   label: 'Both',   sub: 'คุยได้ทั้งสองฝ่าย ยืดหยุ่น',         icon: '🤝' },
-  { key: 'chill',  label: 'Chill',  sub: 'ชิล ๆ ไม่จริงจัง แค่อยากคุย',        icon: '☕' },
+  { key: 'talk',   label: 'Talk',   sub: 'อยากเล่า ระบาย หรือแชร์เรื่องราว', icon: '💬' },
+  { key: 'listen', label: 'Listen', sub: 'อยากฟัง รับฟัง และให้กำลังใจ',      icon: '👂' },
+  { key: 'both',   label: 'Both',   sub: 'คุยได้ทั้งสองฝ่าย ยืดหยุ่น',        icon: '🤝' },
+  { key: 'chill',  label: 'Chill',  sub: 'ชิล ๆ ไม่จริงจัง แค่อยากคุย',       icon: '☕' },
 ];
 
 const ROLE_ICONS: Record<string, string> = { talk: '💬', listen: '👂', both: '🤝', chill: '☕' };
@@ -42,23 +40,25 @@ interface DBRole {
   sort_order: number;
 }
 
-// ─── Category theme colors ────────────────────────────────────────────────────
-// Maps category name (lowercase) → bg gradient classes
-const CATEGORY_THEMES: Record<string, { bg: string; accent: string; border: string }> = {
-  heal:          { bg: 'from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/20',       accent: '#e879a0', border: 'border-rose-200 dark:border-rose-900/50' },
-  casual:        { bg: 'from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20', accent: '#f59e0b', border: 'border-amber-200 dark:border-amber-900/50' },
-  'deep talk':   { bg: 'from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/20', accent: '#8b5cf6', border: 'border-violet-200 dark:border-violet-900/50' },
-  'open mind':   { bg: 'from-sky-50 to-cyan-50 dark:from-sky-950/30 dark:to-cyan-950/20',         accent: '#0ea5e9', border: 'border-sky-200 dark:border-sky-900/50' },
-  'same interest': { bg: 'from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20', accent: '#10b981', border: 'border-emerald-200 dark:border-emerald-900/50' },
+const CATEGORY_THEMES: Record<string, { bg: string; card: string; accent: string; pill: string }> = {
+  heal:            { bg: 'from-rose-100 via-pink-50 to-rose-50 dark:from-rose-950/50 dark:via-pink-950/30 dark:to-rose-950/20',       card: 'bg-white/80 dark:bg-rose-950/20',   accent: '#e879a0', pill: 'bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300' },
+  casual:          { bg: 'from-amber-100 via-orange-50 to-amber-50 dark:from-amber-950/50 dark:via-orange-950/30 dark:to-amber-950/20', card: 'bg-white/80 dark:bg-amber-950/20',  accent: '#f59e0b', pill: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' },
+  'deep talk':     { bg: 'from-violet-100 via-purple-50 to-violet-50 dark:from-violet-950/50 dark:via-purple-950/30 dark:to-violet-950/20', card: 'bg-white/80 dark:bg-violet-950/20', accent: '#8b5cf6', pill: 'bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300' },
+  'open mind':     { bg: 'from-sky-100 via-cyan-50 to-sky-50 dark:from-sky-950/50 dark:via-cyan-950/30 dark:to-sky-950/20',             card: 'bg-white/80 dark:bg-sky-950/20',    accent: '#0ea5e9', pill: 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300' },
+  'same interest': { bg: 'from-emerald-100 via-teal-50 to-emerald-50 dark:from-emerald-950/50 dark:via-teal-950/30 dark:to-emerald-950/20', card: 'bg-white/80 dark:bg-emerald-950/20', accent: '#10b981', pill: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' },
 };
 
-const DEFAULT_THEME = { bg: 'from-[#fdf8f3] to-[#f5ede4] dark:from-[#1a1410] dark:to-[#221810]', accent: '#c8956c', border: 'border-[#e8d9c8] dark:border-[#3a2a1e]' };
+const DEFAULT_THEME = {
+  bg: 'from-[#fdf8f3] via-[#f9f0e8] to-[#f5ede4] dark:from-[#1a1410] dark:via-[#1e1812] dark:to-[#221810]',
+  card: 'bg-white/80 dark:bg-[#2a1e14]/60',
+  accent: '#c8956c',
+  pill: 'bg-[#f0e6d8] text-[#7c5c3e] dark:bg-[#3a2a1e] dark:text-[#c8956c]',
+};
 
-function getCategoryTheme(name: string) {
+function getTheme(name: string) {
   return CATEGORY_THEMES[name.toLowerCase()] ?? DEFAULT_THEME;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -75,7 +75,6 @@ async function generateAlias(): Promise<string> {
   return `${prefix}${menu}`;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function SecretChatMenu() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -88,13 +87,13 @@ export default function SecretChatMenu() {
   const [step, setStep] = useState<'category' | 'role'>('category');
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory | null>(null);
   const [selectedRole, setSelectedRole] = useState<ChatRole>('both');
-
   const [alias, setAlias] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<ChatProfile | null>(null);
   const [rollingAlias, setRollingAlias] = useState(false);
   const [entering, setEntering] = useState(false);
 
-  const theme = selectedCategory ? getCategoryTheme(selectedCategory.name) : DEFAULT_THEME;
+  const theme = selectedCategory ? getTheme(selectedCategory.name) : DEFAULT_THEME;
+  const roles = dbRoles.length > 0 ? dbRoles : ROLE_FALLBACK;
 
   useEffect(() => {
     Promise.all([
@@ -137,13 +136,7 @@ export default function SecretChatMenu() {
       });
       if (error) throw error;
       navigate('/secret-chat/room', {
-        state: {
-          topicId: selectedCategory.id,
-          topicName: selectedCategory.name,
-          alias,
-          avatar: selectedProfile.id,
-          role: selectedRole,
-        },
+        state: { topicId: selectedCategory.id, topicName: selectedCategory.name, alias, avatar: selectedProfile.id, role: selectedRole },
       });
     } catch (e: any) {
       console.error(e);
@@ -154,15 +147,13 @@ export default function SecretChatMenu() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#fdf8f3] to-[#f5ede4] dark:from-[#1a1410] dark:to-[#221810]">
-        <div className="text-center space-y-4 px-6">
-          <div className="w-14 h-14 rounded-2xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-3xl mx-auto">
-            ☕
-          </div>
+        <div className="text-center space-y-5 px-8 max-w-sm">
+          <div className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl mx-auto shadow-lg">☕</div>
           <div>
-            <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-lg">คาเฟ่ลับ</p>
-            <p className="text-sm text-[#9c7c5e] mt-1">กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
+            <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">คาเฟ่ลับ</h1>
+            <p className="text-sm text-[#9c7c5e] mt-2 leading-relaxed">พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน<br />กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
           </div>
-          <Button onClick={() => navigate('/login')} className="bg-[#c8956c] hover:bg-[#b07d58] text-white">
+          <Button onClick={() => navigate('/login')} className="w-full h-12 bg-[#c8956c] hover:bg-[#b07d58] text-white text-base font-semibold rounded-xl">
             เข้าสู่ระบบ
           </Button>
         </div>
@@ -171,265 +162,258 @@ export default function SecretChatMenu() {
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br transition-all duration-500 ${theme.bg}`}>
+    <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 ${theme.bg}`}>
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/70 dark:bg-black/30 backdrop-blur-md border-b border-white/40 dark:border-white/10 px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
+      <header className="sticky top-0 z-30 bg-white/60 dark:bg-black/30 backdrop-blur-xl border-b border-white/30 dark:border-white/10">
+        <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center gap-3">
           <Button
-            variant="ghost"
-            size="icon"
+            variant="ghost" size="icon"
             onClick={() => step === 'role' ? setStep('category') : navigate('/')}
-            className="rounded-xl w-9 h-9 text-[#7c5c3e] hover:bg-white/50 dark:hover:bg-white/10"
+            className="rounded-xl w-9 h-9 text-[#7c5c3e] hover:bg-white/50 dark:hover:bg-white/10 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
 
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-[#c8956c]/20 flex items-center justify-center shrink-0">
-              <Coffee className="w-4 h-4 text-[#c8956c]" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${theme.accent}25` }}>
+              <Coffee className="w-4.5 h-4.5" style={{ color: theme.accent }} />
             </div>
-            <div className="min-w-0">
-              <h1 className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">คาเฟ่ลับ</h1>
-              <p className="text-[10px] text-[#9c7c5e] truncate">
-                {step === 'category' ? 'เลือกหมวดสนทนา' : 'เลือกบทบาทของคุณ'}
+            <div>
+              <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">คาเฟ่ลับ</h1>
+              <p className="text-[11px] text-[#9c7c5e]">
+                {step === 'category' ? 'เลือกหมวดสนทนา' : `${selectedCategory?.name} · เลือกบทบาท`}
               </p>
             </div>
           </div>
 
-          {/* Step dots */}
+          {/* Step indicator */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {(['category', 'role'] as const).map(s => (
-              <div
-                key={s}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  step === s ? 'w-5 bg-[#c8956c]' : 'w-2 bg-[#c8956c]/30'
-                }`}
-              />
+            {(['category', 'role'] as const).map((s, i) => (
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={`h-2 rounded-full transition-all duration-300 ${step === s ? 'w-6' : 'w-2 opacity-40'}`}
+                  style={{ background: theme.accent }} />
+              </div>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-6">
+      <main className="max-w-2xl mx-auto px-4 py-6 pb-10">
         <AnimatePresence mode="wait">
 
           {/* ── Step 1: Category ── */}
           {step === 'category' && (
-            <motion.div
-              key="category"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="space-y-5"
-            >
-              {/* Hero section */}
-              <div className="text-center space-y-2 pt-2 pb-1">
-                <div className="w-16 h-16 rounded-2xl bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-white/50 dark:border-white/10 flex items-center justify-center text-3xl mx-auto shadow-sm">
+            <motion.div key="category" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
+
+              {/* Hero */}
+              <div className="text-center space-y-3 pt-4">
+                <motion.div
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-20 h-20 rounded-3xl bg-white/70 dark:bg-white/10 backdrop-blur-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-4xl mx-auto shadow-lg"
+                >
                   ☕
-                </div>
+                </motion.div>
                 <div>
-                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">คาเฟ่ลับ</h2>
-                  <p className="text-xs text-[#9c7c5e] mt-1 leading-relaxed max-w-xs mx-auto">
-                    พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน คุยได้อย่างสบายใจในแบบของคุณ
+                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">คาเฟ่ลับ</h2>
+                  <p className="text-sm text-[#9c7c5e] mt-1.5 leading-relaxed max-w-sm mx-auto">
+                    พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน<br />คุยได้อย่างสบายใจในแบบของคุณ
                   </p>
                 </div>
               </div>
 
-              <p className="text-sm font-medium text-[#7c5c3e] dark:text-[#c8956c] text-center">
-                วันนี้อยากคุยเรื่องอะไร?
-              </p>
+              <div>
+                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
+                  วันนี้อยากคุยเรื่องอะไร?
+                </p>
 
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#9c7c5e]" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2.5">
-                  {categories.map((cat, i) => {
-                    const t = getCategoryTheme(cat.name);
-                    return (
-                      <motion.button
-                        key={cat.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => { setSelectedCategory(cat); setStep('role'); }}
-                        className={`w-full text-left rounded-2xl border p-4 transition-all bg-white/70 dark:bg-black/20 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-black/30 shadow-sm hover:shadow-md ${t.border}`}
-                      >
-                        <div className="flex items-center gap-3.5">
-                          {cat.image_url ? (
-                            <img src={cat.image_url} alt={cat.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
-                          ) : (
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#f0e6d8] to-[#e8d9c8] dark:from-[#3a2a1e] dark:to-[#2a1e14] flex items-center justify-center text-xl shrink-0">
-                              ☕
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{cat.name}</p>
-                            {cat.description && (
-                              <p className="text-xs text-[#9c7c5e] dark:text-[#7c5c3e] mt-0.5 leading-relaxed line-clamp-2">
-                                {cat.description}
-                              </p>
+                {loading ? (
+                  <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-[#9c7c5e]" /></div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {categories.map((cat, i) => {
+                      const t = getTheme(cat.name);
+                      return (
+                        <motion.button
+                          key={cat.id}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.06 }}
+                          whileHover={{ y: -3, scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => { setSelectedCategory(cat); setStep('role'); }}
+                          className="group w-full text-left rounded-2xl border border-white/60 dark:border-white/10 p-5 transition-all bg-white/70 dark:bg-black/20 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-black/30 shadow-sm hover:shadow-lg"
+                        >
+                          <div className="flex items-start gap-4">
+                            {cat.image_url ? (
+                              <img src={cat.image_url} alt={cat.name} className="w-14 h-14 rounded-2xl object-cover shrink-0 shadow-sm" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm" style={{ background: `${t.accent}20` }}>
+                                ☕
+                              </div>
                             )}
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{cat.name}</p>
+                              {cat.description && (
+                                <p className="text-xs text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
+                              )}
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-[#c8b09a] dark:text-[#5a4030] shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
                           </div>
-                          <div className="shrink-0 text-[#c8b09a] dark:text-[#5a4030]">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
           {/* ── Step 2: Role + Identity ── */}
           {step === 'role' && selectedCategory && (
-            <motion.div
-              key="role"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="space-y-5"
-            >
-              {/* Category badge */}
+            <motion.div key="role" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
+
+              {/* Category pill */}
               <div className="flex justify-center pt-2">
-                <span
-                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-white/70 dark:bg-black/20 backdrop-blur-sm border shadow-sm"
-                  style={{ borderColor: `${theme.accent}40`, color: theme.accent }}
-                >
+                <span className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full shadow-sm ${theme.pill}`}>
                   {selectedCategory.image_url
-                    ? <img src={selectedCategory.image_url} className="w-4 h-4 rounded object-cover" alt="" />
-                    : '☕'
-                  }
+                    ? <img src={selectedCategory.image_url} className="w-5 h-5 rounded-md object-cover" alt="" />
+                    : '☕'}
                   {selectedCategory.name}
                 </span>
               </div>
 
               {/* Role selection */}
-              <div className="space-y-2.5">
-                <p className="text-sm font-medium text-[#7c5c3e] dark:text-[#c8956c] text-center">
+              <div>
+                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
                   คุณอยากเป็นฝ่ายไหนในการสนทนา?
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(dbRoles.length > 0 ? dbRoles : ROLE_FALLBACK).map(r => (
-                    <button
-                      key={r.key}
-                      onClick={() => setSelectedRole(r.key)}
-                      className={`rounded-2xl border p-3.5 text-left transition-all backdrop-blur-sm ${
-                        selectedRole === r.key
-                          ? 'bg-white/90 dark:bg-black/40 shadow-md'
-                          : 'bg-white/50 dark:bg-black/10 hover:bg-white/70 dark:hover:bg-black/20'
-                      }`}
-                      style={{
-                        borderColor: selectedRole === r.key ? theme.accent : `${theme.accent}30`,
-                        boxShadow: selectedRole === r.key ? `0 0 0 2px ${theme.accent}30` : undefined,
-                      }}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        {/* Image or icon */}
-                        {r.image_url ? (
-                          <img
-                            src={r.image_url}
-                            alt={r.label}
-                            className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5"
-                          />
-                        ) : (
-                          <span className="text-xl leading-none mt-0.5 shrink-0">
-                            {ROLE_ICONS[r.key] ?? '💬'}
-                          </span>
-                        )}
-                        <div>
-                          <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{r.label}</p>
-                          <p className="text-[11px] text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Alias */}
-              <div className="space-y-2">
-                <p className="text-xs text-[#9c7c5e] uppercase tracking-wider text-center font-medium">ชื่อสมมติ</p>
-                <div className="flex items-center justify-center gap-3 bg-white/60 dark:bg-black/20 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/50 dark:border-white/10">
-                  {rollingAlias ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e]" />
-                  ) : (
-                    <span className="text-lg font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-center">{alias}</span>
-                  )}
-                  <button
-                    onClick={rollAlias}
-                    disabled={rollingAlias}
-                    className="w-8 h-8 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-[#7c5c3e] hover:bg-[#e8d9c8] transition-colors shrink-0"
-                    title="สุ่มใหม่"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Profile selection */}
-              {profiles.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-[#9c7c5e] uppercase tracking-wider text-center font-medium">รูปโปรไฟล์</p>
-                  <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                    {profiles.map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => setSelectedProfile(p)}
-                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                          selectedProfile?.id === p.id
-                            ? 'ring-2 ring-offset-1 shadow-md'
-                            : 'border-transparent hover:border-white/60 opacity-70 hover:opacity-100'
+                <div className="grid grid-cols-2 gap-3">
+                  {roles.map(r => {
+                    const active = selectedRole === r.key;
+                    return (
+                      <motion.button
+                        key={r.key}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setSelectedRole(r.key)}
+                        className={`rounded-2xl border-2 p-4 text-left transition-all backdrop-blur-sm ${
+                          active ? 'shadow-lg' : 'border-white/40 dark:border-white/10 bg-white/50 dark:bg-black/10 hover:bg-white/70 dark:hover:bg-black/20'
                         }`}
-                        style={selectedProfile?.id === p.id ? { borderColor: theme.accent } : {}}
+                        style={active ? {
+                          borderColor: theme.accent,
+                          background: `${theme.accent}12`,
+                          boxShadow: `0 4px 20px ${theme.accent}25`,
+                        } : {}}
                       >
-                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                        <div className="flex flex-col gap-2.5">
+                          {r.image_url ? (
+                            <img src={r.image_url} alt={r.label} className="w-10 h-10 rounded-xl object-cover" />
+                          ) : (
+                            <span className="text-2xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
+                          )}
+                          <div>
+                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{r.label}</p>
+                            <p className="text-[11px] text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
+                          </div>
+                        </div>
+                        {active && (
+                          <div className="mt-2 flex justify-end">
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: theme.accent }}>
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Alias + Profile row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Alias */}
+                <div>
+                  <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">ชื่อสมมติ</p>
+                  <div className="flex items-center gap-3 bg-white/70 dark:bg-black/20 backdrop-blur-sm rounded-2xl px-4 py-3.5 border border-white/50 dark:border-white/10 shadow-sm">
+                    {rollingAlias ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e] mx-auto" />
+                    ) : (
+                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-base">{alias}</span>
+                    )}
+                    <button
+                      onClick={rollAlias}
+                      disabled={rollingAlias}
+                      className="w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0"
+                      style={{ background: `${theme.accent}20`, color: theme.accent }}
+                      title="สุ่มใหม่"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-              )}
+
+                {/* Profile */}
+                {profiles.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">รูปโปรไฟล์</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {profiles.slice(0, 10).map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedProfile(p)}
+                          className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                            selectedProfile?.id === p.id ? 'shadow-md scale-105' : 'border-transparent opacity-60 hover:opacity-90 hover:scale-105'
+                          }`}
+                          style={selectedProfile?.id === p.id ? { borderColor: theme.accent } : {}}
+                        >
+                          <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Preview card */}
               {selectedProfile && (
-                <div className="bg-white/70 dark:bg-black/20 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-white/10 p-3.5 flex items-center gap-3 shadow-sm">
-                  <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-white/50" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{alias || '...'}</p>
-                    <p className="text-xs text-[#9c7c5e]">
-                      {(dbRoles.length > 0 ? dbRoles : ROLE_FALLBACK).find(r => r.key === selectedRole)?.label} · {selectedCategory.name}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white/80 dark:bg-black/25 backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 p-4 flex items-center gap-4 shadow-sm"
+                >
+                  <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-12 h-12 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base truncate">{alias || '...'}</p>
+                    <p className="text-xs text-[#9c7c5e] mt-0.5">
+                      {roles.find(r => r.key === selectedRole)?.label} · {selectedCategory.name}
                     </p>
                   </div>
-                  <div className="text-xs px-2 py-1 rounded-full font-medium shrink-0" style={{ background: `${theme.accent}20`, color: theme.accent }}>
-                    พร้อม
-                  </div>
-                </div>
+                  <span className="text-xs font-semibold px-3 py-1.5 rounded-full shrink-0" style={{ background: `${theme.accent}20`, color: theme.accent }}>
+                    พร้อมแล้ว
+                  </span>
+                </motion.div>
               )}
 
-              {/* Enter button */}
-              <button
+              {/* CTA */}
+              <motion.button
+                whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={enterQueue}
                 disabled={entering || !alias || !selectedProfile}
-                className="w-full h-12 rounded-xl text-white font-semibold text-base transition-all disabled:opacity-40 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
-                style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent}cc)` }}
+                className="w-full h-14 rounded-2xl text-white font-bold text-base transition-all disabled:opacity-40 shadow-xl flex items-center justify-center gap-2"
+                style={{ background: `linear-gradient(135deg, ${theme.accent} 0%, ${theme.accent}bb 100%)` }}
               >
                 {entering ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> กำลังหาคู่...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> กำลังหาคู่สนทนา...</>
                 ) : (
-                  'เข้าคาเฟ่ลับ'
+                  <>เข้าคาเฟ่ลับ <ChevronRight className="w-5 h-5" /></>
                 )}
-              </button>
+              </motion.button>
 
-              <p className="text-center text-xs text-[#9c7c5e]">
-                ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ
-              </p>
+              <p className="text-center text-xs text-[#9c7c5e]">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
             </motion.div>
           )}
 

@@ -509,122 +509,108 @@ export default function SecretChatRoom() {
         <div className="flex items-center gap-3">
           {matchStatus === 'matched' && session ? (
             <>
-              <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
                 {partnerImg
                   ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
                   : <span className="text-xl">🐻</span>}
               </div>
               <div>
-                <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">
-                  {partnerAlias}
-                </p>
-                <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">{partnerAlias}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                  </span>
+                  <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
+                </div>
               </div>
             </>
           ) : (
             <div>
-              <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
-              <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
+              <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {matchStatus === 'matched' && (
-            <div className={`flex items-center gap-1 text-xs font-mono font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+            <div className={`flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-full border transition-colors ${
               isUrgent
                 ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
                 : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
             }`}>
-              <Clock className="w-3 h-3" />
+              <Clock className="w-3.5 h-3.5" />
               {countdownDisplay}
             </div>
           )}
 
-          <button
-            onClick={toggleRain}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${
-              rainOn
-                ? 'bg-sky-100 text-sky-500 border-sky-200'
-                : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
-            }`}
-          >
-            <CloudRain className="w-3.5 h-3.5" />
+          <button onClick={toggleRain} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+            <CloudRain className="w-4 h-4" />
           </button>
-
-          <button
-            onClick={toggleBgm}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${
-              bgmOn
-                ? 'bg-violet-100 text-violet-500 border-violet-200'
-                : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
-            }`}
-          >
-            {bgmOn ? <Music2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+          <button onClick={toggleBgm} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${bgmOn ? 'bg-violet-100 text-violet-500 border-violet-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+            {bgmOn ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
-
-          <button
-            onClick={leaveTable}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all"
-            title="ออกจากโต๊ะ"
-          >
-            <LogOut className="w-3.5 h-3.5" />
+          <button onClick={leaveTable} className="w-9 h-9 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4 max-w-3xl mx-auto w-full">
         {matchStatus === 'waiting' && (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+          <div className="flex flex-col items-center justify-center h-full gap-5 text-center">
             <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="w-16 h-16 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-3xl"
+              animate={{ scale: [1, 1.06, 1], rotate: [0, 3, -3, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl shadow-lg"
             >
               ☕
             </motion.div>
-            <div>
-              <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8]">กำลังหาคู่สนทนา...</p>
-              <p className="text-sm text-[#9c7c5e] mt-1">รอสักครู่ กำลังจับคู่ในหัวข้อ {topicName}</p>
+            <div className="space-y-1.5">
+              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">กำลังหาคู่สนทนา...</p>
+              <p className="text-sm text-[#9c7c5e]">รอสักครู่ กำลังจับคู่ในหัวข้อ <span className="font-medium text-[#7c5c3e] dark:text-[#c8956c]">{topicName}</span></p>
               {moodConfig.enabled && (
-                <p className="text-xs text-[#c8b09a] mt-1">
-                  หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง
-                </p>
+                <p className="text-xs text-[#c8b09a] mt-1">หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง</p>
               )}
             </div>
-            <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e]" />
+            <div className="flex gap-1.5">
+              {[0, 0.2, 0.4].map((d, i) => (
+                <motion.div key={i} className="w-2 h-2 rounded-full bg-[#c8956c]"
+                  animate={{ y: [0, -8, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: d }} />
+              ))}
+            </div>
           </div>
         )}
 
         {matchStatus === 'matched' && messages.length === 0 && (
-          <div className="text-center py-4">
-            <span className="text-xs text-[#9c7c5e] bg-[#f0e6d8] dark:bg-[#3a2a1e] px-3 py-1.5 rounded-full">
-              จับคู่สำเร็จ — มีเวลา {Math.floor(SESSION_DURATION / 60)} นาที เริ่มสนทนาได้เลย
-            </span>
-          </div>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-center py-6">
+            <div className="bg-[#f0e6d8] dark:bg-[#3a2a1e] rounded-2xl px-5 py-3 text-center max-w-xs">
+              <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c]">จับคู่สำเร็จแล้ว</p>
+              <p className="text-xs text-[#9c7c5e] mt-1">มีเวลา {Math.floor(SESSION_DURATION / 60)} นาที เริ่มสนทนาได้เลย</p>
+            </div>
+          </motion.div>
         )}
 
         <AnimatePresence initial={false}>
           {messages.map(msg => (
             <motion.div
               key={msg.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex gap-2 ${isMyMessage(msg) ? 'flex-row-reverse' : 'flex-row'}`}
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className={`flex gap-3 ${isMyMessage(msg) ? 'flex-row-reverse' : 'flex-row'}`}
             >
               {!isMyMessage(msg) && (
-                <div className="w-8 h-8 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 self-end">
-                  {partnerImg
-                    ? <img src={partnerImg} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-base">🐻</span>}
+                <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
+                  {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
                 </div>
               )}
-              <div className={`max-w-[72%] space-y-0.5 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
-                <span className="text-[10px] text-[#9c7c5e] px-1">
+              <div className={`max-w-[75%] sm:max-w-[65%] space-y-1 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
+                <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
                   {isMyMessage(msg) ? myAlias : partnerAlias}
                 </span>
-                <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
                   isMyMessage(msg)
                     ? 'bg-[#c8956c] text-white rounded-br-sm'
                     : 'bg-white dark:bg-[#2a1e14] text-[#4a3728] dark:text-[#e8d9c8] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-bl-sm'
@@ -637,25 +623,14 @@ export default function SecretChatRoom() {
         </AnimatePresence>
 
         {partnerTyping && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex gap-2 items-end"
-          >
-            <div className="w-8 h-8 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0">
-              {partnerImg
-                ? <img src={partnerImg} alt="" className="w-full h-full object-cover" />
-                : <span className="text-base">🐻</span>}
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex gap-3 items-end">
+            <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+              {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
             </div>
-            <div className="bg-white dark:bg-[#2a1e14] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
+            <div className="bg-white dark:bg-[#2a1e14] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl rounded-bl-sm px-5 py-3.5 flex gap-1.5 items-center shadow-sm">
               {[0, 0.15, 0.3].map((delay, i) => (
-                <motion.div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-[#9c7c5e]"
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay }}
-                />
+                <motion.div key={i} className="w-2 h-2 rounded-full bg-[#c8b09a]"
+                  animate={{ y: [0, -5, 0] }} transition={{ duration: 0.7, repeat: Infinity, delay }} />
               ))}
             </div>
           </motion.div>
@@ -666,31 +641,28 @@ export default function SecretChatRoom() {
 
       {/* Input */}
       {matchStatus === 'matched' && (
-        <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-4 py-3">
-          <div className="flex gap-2 items-end max-w-2xl mx-auto">
-            <div className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-2.5 focus-within:border-[#c8956c] transition-colors">
+        <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-4 sm:px-6 py-4">
+          <div className="flex gap-3 items-end max-w-3xl mx-auto">
+            <div className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-3 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all">
               <textarea
                 value={input}
                 onChange={e => handleInputChange(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 placeholder="พิมพ์ข้อความ..."
                 rows={1}
                 className="w-full bg-transparent text-sm text-[#4a3728] dark:text-[#e8d9c8] placeholder:text-[#c8b09a] resize-none outline-none leading-relaxed"
-                style={{ maxHeight: 100 }}
+                style={{ maxHeight: 120 }}
               />
             </div>
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={sendMessage}
               disabled={!input.trim() || sending}
-              className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0"
+              className="w-11 h-11 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+            </motion.button>
           </div>
         </div>
       )}
