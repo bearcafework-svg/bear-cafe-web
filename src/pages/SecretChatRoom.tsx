@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle } from 'lucide-react';
+import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ChevronDown, ListMusic, X } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -117,6 +117,238 @@ function useRainAmbient() {
   return { on, toggle };
 }
 
+// ─── Music Player ─────────────────────────────────────────────────────────────
+interface Track { title: string; src: string; }
+interface MusicCategory { label: string; tracks: Track[]; }
+
+const MUSIC_LIBRARY: MusicCategory[] = [
+  {
+    label: 'Lo-fi Chill',
+    tracks: [
+      { title: 'Cozy Rain', src: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
+      { title: 'Late Night Study', src: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749d4e4.mp3' },
+      { title: 'Coffee Shop', src: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3' },
+    ],
+  },
+  {
+    label: 'Ambient',
+    tracks: [
+      { title: 'Forest Morning', src: 'https://cdn.pixabay.com/audio/2022/03/10/audio_270f49d8c5.mp3' },
+      { title: 'Ocean Waves', src: 'https://cdn.pixabay.com/audio/2022/03/24/audio_c8f4e5e5e5.mp3' },
+      { title: 'Soft Piano', src: 'https://cdn.pixabay.com/audio/2022/04/27/audio_1e5e5e5e5e.mp3' },
+    ],
+  },
+  {
+    label: 'Jazz Cafe',
+    tracks: [
+      { title: 'Smooth Evening', src: 'https://cdn.pixabay.com/audio/2022/08/02/audio_2dde668d05.mp3' },
+      { title: 'Mellow Groove', src: 'https://cdn.pixabay.com/audio/2022/10/25/audio_946b4e5e5e.mp3' },
+    ],
+  },
+];
+
+type LoopMode = 'none' | 'one' | 'all';
+
+function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
+  const [playing, setPlaying] = useState(false);
+  const [catIdx, setCatIdx] = useState(0);
+  const [trackIdx, setTrackIdx] = useState(0);
+  const [loopMode, setLoopMode] = useState<LoopMode>('all');
+
+  const currentCat = MUSIC_LIBRARY[catIdx];
+  const currentTrack = currentCat.tracks[trackIdx];
+
+  // Load track when it changes
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.src = currentTrack.src;
+    el.loop = loopMode === 'one';
+    if (playing) el.play().catch(() => {});
+  }, [catIdx, trackIdx]);
+
+  // Sync loop attribute
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.loop = loopMode === 'one';
+  }, [loopMode]);
+
+  // Auto-advance on track end
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onEnded = () => {
+      if (loopMode === 'one') return; // handled by loop attr
+      if (loopMode === 'all' || trackIdx < currentCat.tracks.length - 1) {
+        const next = (trackIdx + 1) % currentCat.tracks.length;
+        setTrackIdx(next);
+      } else {
+        setPlaying(false);
+      }
+    };
+    el.addEventListener('ended', onEnded);
+    return () => el.removeEventListener('ended', onEnded);
+  }, [loopMode, trackIdx, catIdx]);
+
+  const toggle = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) { el.pause(); setPlaying(false); }
+    else { el.play().catch(() => {}); setPlaying(true); }
+  }, [playing]);
+
+  const skipNext = useCallback(() => {
+    const next = (trackIdx + 1) % currentCat.tracks.length;
+    setTrackIdx(next);
+    if (!playing) setPlaying(true);
+  }, [trackIdx, currentCat, playing]);
+
+  const selectTrack = useCallback((ci: number, ti: number) => {
+    setCatIdx(ci);
+    setTrackIdx(ti);
+    setPlaying(true);
+    const el = audioRef.current;
+    if (el) { el.src = MUSIC_LIBRARY[ci].tracks[ti].src; el.play().catch(() => {}); }
+  }, []);
+
+  const cycleLoop = useCallback(() => {
+    setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
+  }, []);
+
+  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx };
+}
+
+// ─── Music Player Panel ───────────────────────────────────────────────────────
+function MusicPanel({
+  player, onClose,
+}: {
+  player: ReturnType<typeof useMusicPlayer>;
+  onClose: () => void;
+}) {
+  const [activeCat, setActiveCat] = useState(player.catIdx);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ duration: 0.18 }}
+      className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#1e1410] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50"
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Now playing */}
+      <div className="px-4 py-3 bg-[#f5ede4] dark:bg-[#2a1e14] border-b border-[#e8d9c8] dark:border-[#3a2a1e]">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <ListMusic className="w-3.5 h-3.5 text-[#c8956c]" />
+            <span className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c]">เพลงที่กำลังเล่น</span>
+          </div>
+          <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <p className="text-sm font-bold text-[#4a3728] dark:text-[#e8d9c8] truncate">{player.currentTrack.title}</p>
+        <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
+
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-3 mt-3">
+          {/* Loop */}
+          <button
+            onClick={player.cycleLoop}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+              player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
+            }`}
+            title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
+          >
+            {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+          </button>
+
+          {/* Play/Pause */}
+          <button
+            onClick={player.toggle}
+            className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-md"
+          >
+            {player.playing ? (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Skip */}
+          <button
+            onClick={player.skipNext}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
+            title="เพลงถัดไป"
+          >
+            <SkipForward className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto">
+        {MUSIC_LIBRARY.map((cat, ci) => (
+          <button
+            key={ci}
+            onClick={() => setActiveCat(ci)}
+            className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors ${
+              activeCat === ci
+                ? 'text-[#c8956c] border-b-2 border-[#c8956c]'
+                : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Track list */}
+      <div className="max-h-44 overflow-y-auto">
+        {MUSIC_LIBRARY[activeCat].tracks.map((track, ti) => {
+          const isActive = activeCat === player.catIdx && ti === player.trackIdx;
+          return (
+            <button
+              key={ti}
+              onClick={() => player.selectTrack(activeCat, ti)}
+              className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
+                isActive
+                  ? 'bg-[#f5ede4] dark:bg-[#2a1e14]'
+                  : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
+              }`}
+            >
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                isActive ? 'bg-[#c8956c]' : 'bg-[#f0e6d8] dark:bg-[#3a2a1e]'
+              }`}>
+                {isActive && player.playing ? (
+                  <motion.div className="flex gap-0.5 items-end h-3">
+                    {[0, 0.1, 0.2].map((d, i) => (
+                      <motion.div key={i} className="w-0.5 bg-white rounded-full"
+                        animate={{ height: ['4px', '10px', '4px'] }}
+                        transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
+                    ))}
+                  </motion.div>
+                ) : (
+                  <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-white' : 'text-[#9c7c5e]'}`} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </div>
+              <span className={`text-xs truncate ${isActive ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#7c5c3e] dark:text-[#9c7c5e]'}`}>
+                {track.title}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 async function loadBannedWords(): Promise<string[]> {
   const { data } = await supabase.from('banned_words').select('word');
   return (data ?? []).map((r: any) => r.word.toLowerCase());
@@ -210,13 +442,9 @@ export default function SecretChatRoom() {
   const { user } = useAuth();
   const { on: rainOn, toggle: toggleRain } = useRainAmbient();
 
-  const [bgmOn, setBgmOn] = useState(false);
-  const bgmRef = useRef<HTMLAudioElement | null>(null);
-  const toggleBgm = useCallback(() => {
-    if (!bgmRef.current) return;
-    if (bgmOn) { bgmRef.current.pause(); setBgmOn(false); }
-    else { bgmRef.current.play().catch(() => {}); setBgmOn(true); }
-  }, [bgmOn]);
+  const bgmRef = useRef<HTMLAudioElement>(null);
+  const player = useMusicPlayer(bgmRef);
+  const [showMusicPanel, setShowMusicPanel] = useState(false);
 
   const { topicId, topicName, alias, avatar, role } = (location.state as any) ?? {};
 
@@ -487,8 +715,8 @@ export default function SecretChatRoom() {
   const isMyMessage = (msg: Message) => msg.sender_id === user?.id;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410]">
-      <audio ref={bgmRef} loop src="" />
+    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden">
+      <audio ref={bgmRef} />
 
       <AnimatePresence>
         {bannedWarning && (
@@ -505,60 +733,85 @@ export default function SecretChatRoom() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-b border-[#e8d9c8] dark:border-[#3a2a1e] px-4 py-3 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          {matchStatus === 'matched' && session ? (
-            <>
-              <div className="w-10 h-10 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
-                {partnerImg
-                  ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
-                  : <span className="text-xl">🐻</span>}
-              </div>
-              <div>
-                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">{partnerAlias}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                  </span>
-                  <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
+      <header className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-b border-[#e8d9c8] dark:border-[#3a2a1e] z-20">
+        <div className="px-5 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {matchStatus === 'matched' && session ? (
+              <>
+                <div className="w-12 h-12 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
+                  {partnerImg
+                    ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
+                    : <span className="text-2xl">🐻</span>}
+                </div>
+                <div>
+                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">{partnerAlias}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-xl shrink-0">
+                  ☕
+                </div>
+                <div>
+                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">คาเฟ่ลับ</p>
+                  <p className="text-xs text-[#9c7c5e]">{topicName}</p>
                 </div>
               </div>
-            </>
-          ) : (
-            <div>
-              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
-              <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2">
-          {matchStatus === 'matched' && (
-            <div className={`flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-full border transition-colors ${
-              isUrgent
-                ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
-                : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
-            }`}>
-              <Clock className="w-3.5 h-3.5" />
-              {countdownDisplay}
-            </div>
-          )}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {matchStatus === 'matched' && (
+              <div className={`flex items-center gap-1.5 text-sm font-mono font-bold px-3.5 py-2 rounded-full border transition-colors ${
+                isUrgent
+                  ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
+                  : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
+              }`}>
+                <Clock className="w-4 h-4" />
+                {countdownDisplay}
+              </div>
+            )}
 
-          <button onClick={toggleRain} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
-            <CloudRain className="w-4 h-4" />
-          </button>
-          <button onClick={toggleBgm} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${bgmOn ? 'bg-violet-100 text-violet-500 border-violet-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
-            {bgmOn ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
-          <button onClick={leaveTable} className="w-9 h-9 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
-            <LogOut className="w-4 h-4" />
-          </button>
+            <button onClick={toggleRain} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+              <CloudRain className="w-5 h-5" />
+            </button>
+
+            {/* Music player button + panel */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMusicPanel(v => !v)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${
+                  player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
+                }`}
+                title="เพลง"
+              >
+                {player.playing ? <Music2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
+
+              <AnimatePresence>
+                {showMusicPanel && (
+                  <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
+                )}
+              </AnimatePresence>
+            </div>
+
+            <button onClick={leaveTable} className="w-10 h-10 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4 max-w-3xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
         {matchStatus === 'waiting' && (
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center">
             <motion.div
@@ -637,6 +890,7 @@ export default function SecretChatRoom() {
         )}
 
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input */}
