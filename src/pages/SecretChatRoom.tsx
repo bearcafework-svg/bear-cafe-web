@@ -623,105 +623,132 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
 }
 
 // ─── Tutorial ─────────────────────────────────────────────────────────────────
+// Steps 0-2: shown while waiting for match
+// Steps 3-4: shown after match
 interface TutorialStep {
-  target: string;   // CSS selector hint (for positioning label)
+  refKey: string;
   title: string;
   desc: string;
-  position: 'bottom-left' | 'bottom-right' | 'bottom-center';
+  tooltipSide: 'below' | 'above';
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
-  { target: 'rain',  title: 'เสียงฝน',    desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                position: 'bottom-right' },
-  { target: 'music', title: 'เพลง BGM',   desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ progress bar',  position: 'bottom-right' },
-  { target: 'leave', title: 'ออกจากโต๊ะ', desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',          position: 'bottom-right' },
-  { target: 'timer', title: 'นับถอยหลัง', desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',  position: 'bottom-right' },
-  { target: 'input', title: 'ช่องพิมพ์',  desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ', position: 'bottom-center' },
+  { refKey: 'rain',  title: 'เสียงฝน',     desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                    tooltipSide: 'below' },
+  { refKey: 'music', title: 'เพลง BGM',    desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ progress bar',               tooltipSide: 'below' },
+  { refKey: 'leave', title: 'ออกจากโต๊ะ',  desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                               tooltipSide: 'below' },
+  { refKey: 'timer', title: 'นับถอยหลัง',  desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',                    tooltipSide: 'below' },
+  { refKey: 'input', title: 'ช่องพิมพ์',   desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',              tooltipSide: 'above' },
 ];
 
+// Ref map passed down from main component
+type TutorialRefs = Record<string, React.RefObject<HTMLElement>>;
+
 function TutorialOverlay({
-  step, total, onNext, onSkip,
+  step, total, onNext, onSkip, refs,
 }: {
   step: number;
   total: number;
   onNext: () => void;
   onSkip: () => void;
+  refs: TutorialRefs;
 }) {
   const s = TUTORIAL_STEPS[step];
-  if (!s) return null;
+  const [ringRect, setRingRect] = useState<DOMRect | null>(null);
 
+  // Measure target element on each step change
+  useEffect(() => {
+    const el = refs[s?.refKey]?.current;
+    if (!el) { setRingRect(null); return; }
+    const update = () => setRingRect(el.getBoundingClientRect());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [step, s?.refKey]);
+
+  if (!s) return null;
   const isLast = step === total - 1;
 
-  // Position the tooltip based on step
-  const posClass = {
-    'bottom-right':  'top-16 right-4',
-    'bottom-left':   'top-16 left-4',
-    'bottom-center': 'bottom-24 left-1/2 -translate-x-1/2',
-  }[s.position];
-
-  // Highlight ring position
-  const ringClass = {
-    rain:  'top-3 right-[88px]',
-    music: 'top-3 right-[52px]',
-    leave: 'top-3 right-3',
-    timer: 'top-3 right-[136px]',
-    input: 'bottom-3 right-3 left-3',
-  }[s.target] ?? 'top-3 right-3';
-
-  const ringSize = s.target === 'input'
-    ? 'h-14 rounded-2xl'
-    : 'w-11 h-11 rounded-full';
+  const PAD = 6; // padding around the highlight ring
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none">
       {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={onSkip} />
+      <div className="absolute inset-0 bg-black/55 pointer-events-auto" onClick={onSkip} />
 
-      {/* Highlight ring */}
-      <motion.div
-        key={s.target}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className={`absolute ${ringClass} ${ringSize} border-2 border-[#c8956c] shadow-[0_0_0_4px_rgba(200,149,108,0.3)] pointer-events-none`}
-        style={{ zIndex: 61 }}
-      />
+      {/* Highlight ring — positioned from measured rect */}
+      {ringRect && (
+        <motion.div
+          key={s.refKey}
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2 }}
+          className="absolute pointer-events-none"
+          style={{
+            zIndex: 61,
+            left:   ringRect.left   - PAD,
+            top:    ringRect.top    - PAD,
+            width:  ringRect.width  + PAD * 2,
+            height: ringRect.height + PAD * 2,
+            borderRadius: ringRect.height > 40 ? 16 : 9999,
+            border: '2px solid #c8956c',
+            boxShadow: '0 0 0 4px rgba(200,149,108,0.3)',
+          }}
+        />
+      )}
 
-      {/* Tooltip */}
-      <motion.div
-        key={`tip-${step}`}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`absolute ${posClass} w-72 bg-white dark:bg-[#221810] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 pointer-events-auto`}
-        style={{ zIndex: 62 }}
-      >
-        {/* Arrow indicator */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 rounded-full bg-[#c8956c] flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {step + 1}
-          </div>
-          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{s.title}</p>
-        </div>
-        <p className="text-xs text-[#7c5c3e] dark:text-[#9c7c5e] leading-relaxed mb-4">{s.desc}</p>
-
-        <div className="flex items-center justify-between">
-          <button onClick={onSkip} className="text-xs text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
-            ข้ามทั้งหมด
-          </button>
-          <div className="flex items-center gap-3">
-            {/* Dots */}
-            <div className="flex gap-1">
-              {Array.from({ length: total }).map((_, i) => (
-                <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-4 bg-[#c8956c]' : 'w-1.5 bg-[#e8d9c8]'}`} />
-              ))}
+      {/* Tooltip — positioned relative to ring */}
+      {ringRect && (
+        <motion.div
+          key={`tip-${step}`}
+          initial={{ opacity: 0, y: s.tooltipSide === 'below' ? -6 : 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: 0.05 }}
+          className="absolute w-72 bg-white dark:bg-[#221810] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 pointer-events-auto"
+          style={{
+            zIndex: 62,
+            // Place below or above the ring, clamp to viewport
+            top: s.tooltipSide === 'below'
+              ? Math.min(ringRect.bottom + PAD + 8, window.innerHeight - 200)
+              : undefined,
+            bottom: s.tooltipSide === 'above'
+              ? Math.min(window.innerHeight - ringRect.top + PAD + 8, window.innerHeight - 200)
+              : undefined,
+            // Align right edge with ring, but keep inside viewport
+            right: Math.max(8, window.innerWidth - ringRect.right - PAD),
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-full bg-[#c8956c] flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {step + 1}
             </div>
-            <button
-              onClick={onNext}
-              className="px-4 py-1.5 rounded-xl bg-[#c8956c] hover:bg-[#b07d58] text-white text-xs font-semibold transition-colors"
-            >
-              {isLast ? 'เสร็จแล้ว' : 'ถัดไป'}
-            </button>
+            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{s.title}</p>
           </div>
-        </div>
-      </motion.div>
+          <p className="text-xs text-[#7c5c3e] dark:text-[#9c7c5e] leading-relaxed mb-4">{s.desc}</p>
+
+          <div className="flex items-center justify-between">
+            <button onClick={onSkip} className="text-xs text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
+              ข้ามทั้งหมด
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1">
+                {Array.from({ length: total }).map((_, i) => (
+                  <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-4 bg-[#c8956c]' : 'w-1.5 bg-[#e8d9c8]'}`} />
+                ))}
+              </div>
+              <button
+                onClick={onNext}
+                className="px-4 py-1.5 rounded-xl bg-[#c8956c] hover:bg-[#b07d58] text-white text-xs font-semibold transition-colors"
+              >
+                {isLast ? 'เสร็จแล้ว' : 'ถัดไป'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -762,6 +789,25 @@ export default function SecretChatRoom() {
     const next = tutorialStep + 1;
     if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
   };
+
+  // Refs for tutorial highlight — attached to actual DOM elements
+  const tutorialRefs: TutorialRefs = {
+    rain:  useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
+    music: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
+    leave: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
+    timer: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
+    input: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
+  };
+
+  // Advance tutorial to post-match steps when matched
+  useEffect(() => {
+    if (matchStatus === 'matched' && tutorialStep === 3) {
+      // already at post-match step, do nothing
+    } else if (matchStatus === 'matched' && tutorialStep >= 0 && tutorialStep < 3) {
+      // skip waiting steps, jump to post-match
+      setTutorialStep(3);
+    }
+  }, [matchStatus]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -975,16 +1021,19 @@ export default function SecretChatRoom() {
 
   const leaveTable = useCallback(async () => {
     if (session) {
+      // Has matched — end session and show rating
       await (supabase as any)
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', session.id);
+      setMatchStatus('ended');
+      setShowRating(true);
     } else {
+      // Still waiting — just remove from queue, no rating
       await (supabase as any).from('chat_queue').delete().eq('user_id', user?.id);
+      navigate('/');
     }
-    setMatchStatus('ended');
-    setShowRating(true);
-  }, [session, user?.id]);
+  }, [session, user?.id, navigate]);
 
   const submitRating = useCallback(async (stars: number) => {
     setShowRating(false);
@@ -1027,6 +1076,7 @@ export default function SecretChatRoom() {
             total={TUTORIAL_STEPS.length}
             onNext={nextTutorial}
             onSkip={skipTutorial}
+            refs={tutorialRefs}
           />
         )}
       </AnimatePresence>
@@ -1082,7 +1132,9 @@ export default function SecretChatRoom() {
 
           <div className="flex items-center gap-2.5 shrink-0">
             {matchStatus === 'matched' && (
-              <div className={`flex items-center gap-1.5 text-sm font-mono font-bold px-3.5 py-2 rounded-full border transition-colors ${
+              <div
+                ref={tutorialRefs.timer as React.RefObject<HTMLDivElement>}
+                className={`flex items-center gap-1.5 text-sm font-mono font-bold px-3.5 py-2 rounded-full border transition-colors ${
                 isUrgent
                   ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
                   : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
@@ -1092,7 +1144,8 @@ export default function SecretChatRoom() {
               </div>
             )}
 
-            <button onClick={toggleRain} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+            <button onClick={toggleRain} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}
+              ref={tutorialRefs.rain as React.RefObject<HTMLButtonElement>}>
               <CloudRain className="w-5 h-5" />
             </button>
 
@@ -1100,6 +1153,7 @@ export default function SecretChatRoom() {
             <div className="relative">
               <button
                 onClick={() => setShowMusicPanel(v => !v)}
+                ref={tutorialRefs.music as React.RefObject<HTMLButtonElement>}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${
                   player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
                 }`}
@@ -1115,7 +1169,8 @@ export default function SecretChatRoom() {
               </AnimatePresence>
             </div>
 
-            <button onClick={leaveTable} className="w-10 h-10 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+            <button onClick={leaveTable} className="w-10 h-10 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ"
+              ref={tutorialRefs.leave as React.RefObject<HTMLButtonElement>}>
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -1215,7 +1270,10 @@ export default function SecretChatRoom() {
       {matchStatus === 'matched' && (
         <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-4 sm:px-6 py-4">
           <div className="flex gap-3 items-end max-w-4xl mx-auto">
-            <div className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-3 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all">
+            <div
+              ref={tutorialRefs.input as React.RefObject<HTMLDivElement>}
+              className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-3 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
+            >
               <textarea
                 value={input}
                 onChange={e => handleInputChange(e.target.value)}

@@ -253,9 +253,9 @@ export default function SecretChatMenu() {
                               </div>
                             )}
                             <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{cat.name}</p>
+                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">{cat.name}</p>
                               {cat.description && (
-                                <p className="text-xs text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
+                                <p className="text-sm text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
                               )}
                             </div>
                             <ChevronRight className="w-4 h-4 text-[#c8b09a] dark:text-[#5a4030] shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
@@ -313,8 +313,8 @@ export default function SecretChatMenu() {
                             <span className="text-2xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
                           )}
                           <div>
-                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{r.label}</p>
-                            <p className="text-[11px] text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
+                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{r.label}</p>
+                            <p className="text-xs text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
                           </div>
                         </div>
                         {active && (
@@ -333,7 +333,7 @@ export default function SecretChatMenu() {
               </div>
 
               {/* Alias + Profile row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {/* Alias */}
                 <div>
                   <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">ชื่อสมมติ</p>
@@ -341,48 +341,78 @@ export default function SecretChatMenu() {
                     {rollingAlias ? (
                       <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e] mx-auto" />
                     ) : (
-                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-base">{alias}</span>
+                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-lg">{alias}</span>
                     )}
                     <button
                       onClick={rollAlias}
                       disabled={rollingAlias}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0"
+                      className="w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
                       style={{ background: `${theme.accent}20`, color: theme.accent }}
                       title="สุ่มใหม่"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Profile */}
+                {/* Profile — game-style horizontal scroll selector */}
                 {profiles.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">รูปโปรไฟล์</p>
-                    <div className="grid grid-cols-5 gap-2">
-                      {profiles.slice(0, 10).map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => setSelectedProfile(p)}
-                          className={`flex flex-col items-center gap-1 transition-all ${
-                            selectedProfile?.id === p.id ? 'scale-105' : 'opacity-60 hover:opacity-90 hover:scale-105'
-                          }`}
-                        >
-                          <div
-                            className={`w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                              selectedProfile?.id === p.id ? 'shadow-md' : 'border-transparent'
-                            }`}
-                            style={selectedProfile?.id === p.id ? { borderColor: theme.accent } : {}}
-                          >
-                            <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                          </div>
-                          <span className={`text-[10px] leading-tight text-center truncate w-full px-0.5 ${
-                            selectedProfile?.id === p.id ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#9c7c5e]'
-                          }`}>
-                            {p.name}
-                          </span>
-                        </button>
-                      ))}
+                    <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-3">รูปโปรไฟล์</p>
+                    <div className="relative">
+                      {/* Scrollable track */}
+                      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        {profiles.map(p => {
+                          const active = selectedProfile?.id === p.id;
+                          return (
+                            <motion.button
+                              key={p.id}
+                              onClick={() => setSelectedProfile(p)}
+                              whileTap={{ scale: 0.93 }}
+                              className="flex flex-col items-center gap-2 shrink-0 snap-center"
+                              style={{ width: 80 }}
+                            >
+                              {/* Avatar frame */}
+                              <div
+                                className="relative w-16 h-16 rounded-2xl overflow-hidden transition-all duration-200"
+                                style={{
+                                  border: active ? `3px solid ${theme.accent}` : '3px solid transparent',
+                                  boxShadow: active ? `0 0 0 3px ${theme.accent}40, 0 8px 20px ${theme.accent}30` : '0 2px 8px rgba(0,0,0,0.1)',
+                                  transform: active ? 'scale(1.08)' : 'scale(1)',
+                                }}
+                              >
+                                <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                                {/* Selected checkmark */}
+                                {active && (
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                                    style={{ background: theme.accent }}
+                                  >
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </motion.div>
+                                )}
+                              </div>
+                              {/* Name — full, no truncate */}
+                              <span
+                                className="text-[11px] leading-tight text-center w-full font-medium break-words"
+                                style={{ color: active ? theme.accent : '#9c7c5e' }}
+                              >
+                                {p.name}
+                              </span>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                      {/* Fade edges hint */}
+                      {profiles.length > 4 && (
+                        <div className="absolute right-0 top-0 bottom-2 w-8 pointer-events-none"
+                          style={{ background: `linear-gradient(to right, transparent, ${theme.accent}15)` }} />
+                      )}
                     </div>
                   </div>
                 )}
