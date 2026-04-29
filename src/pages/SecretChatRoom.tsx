@@ -228,7 +228,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
   }, []);
 
-  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx };
+  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library };
 }
 
 // ─── Music Player Panel ───────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ function MusicPanel({
 
       {/* Category tabs */}
       <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto">
-        {MUSIC_LIBRARY.map((cat, ci) => (
+        {player.library.map((cat, ci) => (
           <button
             key={ci}
             onClick={() => setActiveCat(ci)}
@@ -323,7 +323,7 @@ function MusicPanel({
 
       {/* Track list */}
       <div className="max-h-44 overflow-y-auto">
-        {MUSIC_LIBRARY[activeCat].tracks.map((track, ti) => {
+        {player.library[activeCat]?.tracks.map((track, ti) => {
           const isActive = activeCat === player.catIdx && ti === player.trackIdx;
           return (
             <button
