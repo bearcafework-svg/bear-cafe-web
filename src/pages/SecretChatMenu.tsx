@@ -198,7 +198,7 @@ export default function SecretChatMenu() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 pb-10">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-12">
         <AnimatePresence mode="wait">
 
           {/* ── Step 1: Category ── */}
@@ -364,12 +364,23 @@ export default function SecretChatMenu() {
                         <button
                           key={p.id}
                           onClick={() => setSelectedProfile(p)}
-                          className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                            selectedProfile?.id === p.id ? 'shadow-md scale-105' : 'border-transparent opacity-60 hover:opacity-90 hover:scale-105'
+                          className={`flex flex-col items-center gap-1 transition-all ${
+                            selectedProfile?.id === p.id ? 'scale-105' : 'opacity-60 hover:opacity-90 hover:scale-105'
                           }`}
-                          style={selectedProfile?.id === p.id ? { borderColor: theme.accent } : {}}
                         >
-                          <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                          <div
+                            className={`w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                              selectedProfile?.id === p.id ? 'shadow-md' : 'border-transparent'
+                            }`}
+                            style={selectedProfile?.id === p.id ? { borderColor: theme.accent } : {}}
+                          >
+                            <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                          </div>
+                          <span className={`text-[10px] leading-tight text-center truncate w-full px-0.5 ${
+                            selectedProfile?.id === p.id ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#9c7c5e]'
+                          }`}>
+                            {p.name}
+                          </span>
                         </button>
                       ))}
                     </div>

@@ -277,6 +277,8 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
   const W = 280;
   const H = 28;
   const filled = (progress / 100) * W;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragging = useRef(false);
 
   // Generate stable wave path
   const wavePath = Array.from({ length: POINTS + 1 }, (_, i) => {
@@ -286,21 +288,43 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
     return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
   }).join(' ');
 
-  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-    onSeek(pct);
+  function getPct(clientX: number): number {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  }
+
+  // Mouse events
+  function onMouseDown(e: React.MouseEvent) {
+    dragging.current = true;
+    onSeek(getPct(e.clientX));
+    const onMove = (ev: MouseEvent) => { if (dragging.current) onSeek(getPct(ev.clientX)); };
+    const onUp   = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  // Touch events
+  function onTouchStart(e: React.TouchEvent) {
+    dragging.current = true;
+    onSeek(getPct(e.touches[0].clientX));
+    const onMove = (ev: TouchEvent) => { if (dragging.current) onSeek(getPct(ev.touches[0].clientX)); };
+    const onEnd  = () => { dragging.current = false; window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd); };
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onEnd);
   }
 
   const thumbX = (progress / 100) * W;
 
   return (
-    <div className="relative w-full px-1 py-1 cursor-pointer" style={{ touchAction: 'none' }}>
+    <div className="relative w-full px-1 py-1 cursor-pointer select-none" style={{ touchAction: 'none' }}>
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         style={{ height: H }}
-        onClick={handleClick}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
       >
         {/* Background wave */}
         <path d={wavePath} fill="none" stroke="rgba(200,149,108,0.2)" strokeWidth="2.5" strokeLinecap="round" />
@@ -316,7 +340,7 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
           y={H / 2 - 10}
           width="20"
           height="20"
-          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}
+          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))', cursor: 'grab' }}
         />
       </svg>
     </div>
@@ -598,6 +622,110 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
   );
 }
 
+// ─── Tutorial ─────────────────────────────────────────────────────────────────
+interface TutorialStep {
+  target: string;   // CSS selector hint (for positioning label)
+  title: string;
+  desc: string;
+  position: 'bottom-left' | 'bottom-right' | 'bottom-center';
+}
+
+const TUTORIAL_STEPS: TutorialStep[] = [
+  { target: 'rain',  title: 'เสียงฝน',    desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                position: 'bottom-right' },
+  { target: 'music', title: 'เพลง BGM',   desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ progress bar',  position: 'bottom-right' },
+  { target: 'leave', title: 'ออกจากโต๊ะ', desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',          position: 'bottom-right' },
+  { target: 'timer', title: 'นับถอยหลัง', desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',  position: 'bottom-right' },
+  { target: 'input', title: 'ช่องพิมพ์',  desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ', position: 'bottom-center' },
+];
+
+function TutorialOverlay({
+  step, total, onNext, onSkip,
+}: {
+  step: number;
+  total: number;
+  onNext: () => void;
+  onSkip: () => void;
+}) {
+  const s = TUTORIAL_STEPS[step];
+  if (!s) return null;
+
+  const isLast = step === total - 1;
+
+  // Position the tooltip based on step
+  const posClass = {
+    'bottom-right':  'top-16 right-4',
+    'bottom-left':   'top-16 left-4',
+    'bottom-center': 'bottom-24 left-1/2 -translate-x-1/2',
+  }[s.position];
+
+  // Highlight ring position
+  const ringClass = {
+    rain:  'top-3 right-[88px]',
+    music: 'top-3 right-[52px]',
+    leave: 'top-3 right-3',
+    timer: 'top-3 right-[136px]',
+    input: 'bottom-3 right-3 left-3',
+  }[s.target] ?? 'top-3 right-3';
+
+  const ringSize = s.target === 'input'
+    ? 'h-14 rounded-2xl'
+    : 'w-11 h-11 rounded-full';
+
+  return (
+    <div className="fixed inset-0 z-[60] pointer-events-none">
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={onSkip} />
+
+      {/* Highlight ring */}
+      <motion.div
+        key={s.target}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className={`absolute ${ringClass} ${ringSize} border-2 border-[#c8956c] shadow-[0_0_0_4px_rgba(200,149,108,0.3)] pointer-events-none`}
+        style={{ zIndex: 61 }}
+      />
+
+      {/* Tooltip */}
+      <motion.div
+        key={`tip-${step}`}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`absolute ${posClass} w-72 bg-white dark:bg-[#221810] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 pointer-events-auto`}
+        style={{ zIndex: 62 }}
+      >
+        {/* Arrow indicator */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-full bg-[#c8956c] flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {step + 1}
+          </div>
+          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{s.title}</p>
+        </div>
+        <p className="text-xs text-[#7c5c3e] dark:text-[#9c7c5e] leading-relaxed mb-4">{s.desc}</p>
+
+        <div className="flex items-center justify-between">
+          <button onClick={onSkip} className="text-xs text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
+            ข้ามทั้งหมด
+          </button>
+          <div className="flex items-center gap-3">
+            {/* Dots */}
+            <div className="flex gap-1">
+              {Array.from({ length: total }).map((_, i) => (
+                <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-4 bg-[#c8956c]' : 'w-1.5 bg-[#e8d9c8]'}`} />
+              ))}
+            </div>
+            <button
+              onClick={onNext}
+              className="px-4 py-1.5 rounded-xl bg-[#c8956c] hover:bg-[#b07d58] text-white text-xs font-semibold transition-colors"
+            >
+              {isLast ? 'เสร็จแล้ว' : 'ถัดไป'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function SecretChatRoom() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -623,6 +751,17 @@ export default function SecretChatRoom() {
   // Similar mood config + phase tracking
   const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
   const matchStartRef = useRef<number>(Date.now());
+
+  // Tutorial state — show once per session, stored in localStorage
+  const TUTORIAL_KEY = 'cafe_room_tutorial_done';
+  const [tutorialStep, setTutorialStep] = useState<number>(() =>
+    localStorage.getItem(TUTORIAL_KEY) ? -1 : 0
+  );
+  const skipTutorial = () => { setTutorialStep(-1); localStorage.setItem(TUTORIAL_KEY, '1'); };
+  const nextTutorial = () => {
+    const next = tutorialStep + 1;
+    if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -880,6 +1019,18 @@ export default function SecretChatRoom() {
     <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden">
       <audio ref={bgmRef} />
 
+      {/* Tutorial overlay */}
+      <AnimatePresence>
+        {tutorialStep >= 0 && (
+          <TutorialOverlay
+            step={tutorialStep}
+            total={TUTORIAL_STEPS.length}
+            onNext={nextTutorial}
+            onSkip={skipTutorial}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {bannedWarning && (
           <motion.div
@@ -973,7 +1124,7 @@ export default function SecretChatRoom() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-8 py-5 space-y-4">
         {matchStatus === 'waiting' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 text-center px-6">
             <motion.div
@@ -1063,7 +1214,7 @@ export default function SecretChatRoom() {
       {/* Input */}
       {matchStatus === 'matched' && (
         <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-4 sm:px-6 py-4">
-          <div className="flex gap-3 items-end max-w-3xl mx-auto">
+          <div className="flex gap-3 items-end max-w-4xl mx-auto">
             <div className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-3 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all">
               <textarea
                 value={input}
