@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, Music2, FolderMusic, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Edit, Music2, Folder, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface MusicCategory {
@@ -25,7 +25,7 @@ interface MusicTrack {
   sort_order: number;
 }
 
-// ─── Category Form Dialog ─────────────────────────────────────────────────────
+// â”€â”€â”€ Category Form Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function CategoryDialog({
   open, onClose, editing, onSaved,
 }: {
@@ -43,24 +43,24 @@ function CategoryDialog({
   }, [editing, open]);
 
   async function handleSave() {
-    if (!label.trim()) { toast({ title: 'กรุณากรอกชื่อหมวด', variant: 'destructive' }); return; }
+    if (!label.trim()) { toast({ title: 'à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­à¸«à¸¡à¸§à¸”', variant: 'destructive' }); return; }
     setSaving(true);
     try {
       if (editing) {
         const { error } = await (supabase as any).from('chat_music_categories').update({ label: label.trim() }).eq('id', editing.id);
         if (error) throw error;
-        toast({ title: 'อัปเดตหมวดแล้ว' });
+        toast({ title: 'à¸­à¸±à¸›à¹€à¸”à¸•à¸«à¸¡à¸§à¸”à¹à¸¥à¹‰à¸§' });
       } else {
         const { data: existing } = await (supabase as any).from('chat_music_categories').select('sort_order').order('sort_order', { ascending: false }).limit(1);
         const nextOrder = ((existing?.[0]?.sort_order ?? -1) as number) + 1;
         const { error } = await (supabase as any).from('chat_music_categories').insert({ label: label.trim(), sort_order: nextOrder });
         if (error) throw error;
-        toast({ title: 'เพิ่มหมวดแล้ว' });
+        toast({ title: 'à¹€à¸žà¸´à¹ˆà¸¡à¸«à¸¡à¸§à¸”à¹à¸¥à¹‰à¸§' });
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+      toast({ title: 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”', description: e.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -70,30 +70,30 @@ function CategoryDialog({
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{editing ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่'}</DialogTitle>
+          <DialogTitle>{editing ? 'à¹à¸à¹‰à¹„à¸‚à¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆ' : 'à¹€à¸žà¸´à¹ˆà¸¡à¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆà¹ƒà¸«à¸¡à¹ˆ'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>ชื่อหมวดหมู่ *</Label>
+            <Label>à¸Šà¸·à¹ˆà¸­à¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆ *</Label>
             <Input
               value={label}
               onChange={e => setLabel(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSave()}
-              placeholder="เช่น Lo-fi Chill, Jazz Cafe"
+              placeholder="à¹€à¸Šà¹ˆà¸™ Lo-fi Chill, Jazz Cafe"
               autoFocus
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>à¸¢à¸à¹€à¸¥à¸´à¸</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? 'à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...' : 'à¸šà¸±à¸™à¸—à¸¶à¸'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── Track Form Dialog ────────────────────────────────────────────────────────
+// â”€â”€â”€ Track Form Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TrackDialog({
   open, onClose, editing, categoryId, onSaved,
 }: {
@@ -113,7 +113,7 @@ function TrackDialog({
 
   async function handleSave() {
     if (!form.title.trim() || !form.src.trim()) {
-      toast({ title: 'กรุณากรอกชื่อเพลงและ URL', variant: 'destructive' });
+      toast({ title: 'à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­à¹€à¸žà¸¥à¸‡à¹à¸¥à¸° URL', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -123,7 +123,7 @@ function TrackDialog({
           .update({ title: form.title.trim(), src: form.src.trim() })
           .eq('id', editing.id);
         if (error) throw error;
-        toast({ title: 'อัปเดตเพลงแล้ว' });
+        toast({ title: 'à¸­à¸±à¸›à¹€à¸”à¸•à¹€à¸žà¸¥à¸‡à¹à¸¥à¹‰à¸§' });
       } else {
         const { data: existing } = await (supabase as any).from('chat_music_tracks')
           .select('sort_order').eq('category_id', categoryId)
@@ -132,12 +132,12 @@ function TrackDialog({
         const { error } = await (supabase as any).from('chat_music_tracks')
           .insert({ category_id: categoryId, title: form.title.trim(), src: form.src.trim(), sort_order: nextOrder });
         if (error) throw error;
-        toast({ title: 'เพิ่มเพลงแล้ว' });
+        toast({ title: 'à¹€à¸žà¸´à¹ˆà¸¡à¹€à¸žà¸¥à¸‡à¹à¸¥à¹‰à¸§' });
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+      toast({ title: 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”', description: e.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -147,40 +147,40 @@ function TrackDialog({
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? 'แก้ไขเพลง' : 'เพิ่มเพลงใหม่'}</DialogTitle>
+          <DialogTitle>{editing ? 'à¹à¸à¹‰à¹„à¸‚à¹€à¸žà¸¥à¸‡' : 'à¹€à¸žà¸´à¹ˆà¸¡à¹€à¸žà¸¥à¸‡à¹ƒà¸«à¸¡à¹ˆ'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>ชื่อเพลง *</Label>
+            <Label>à¸Šà¸·à¹ˆà¸­à¹€à¸žà¸¥à¸‡ *</Label>
             <Input
               value={form.title}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="เช่น Cozy Rain, Late Night Study"
+              placeholder="à¹€à¸Šà¹ˆà¸™ Cozy Rain, Late Night Study"
               autoFocus
             />
           </div>
           <div className="space-y-1.5">
-            <Label>URL เพลง (MP3/OGG) *</Label>
+            <Label>URL à¹€à¸žà¸¥à¸‡ (MP3/OGG) *</Label>
             <Input
               value={form.src}
               onChange={e => setForm(f => ({ ...f, src: e.target.value }))}
               placeholder="https://example.com/music.mp3"
             />
             <p className="text-[11px] text-muted-foreground">
-              รองรับ URL ตรงของไฟล์เสียง เช่น จาก Pixabay, SoundCloud CDN หรือ Supabase Storage
+              à¸£à¸­à¸‡à¸£à¸±à¸š URL à¸•à¸£à¸‡à¸‚à¸­à¸‡à¹„à¸Ÿà¸¥à¹Œà¹€à¸ªà¸µà¸¢à¸‡ à¹€à¸Šà¹ˆà¸™ à¸ˆà¸²à¸ Pixabay, SoundCloud CDN à¸«à¸£à¸·à¸­ Supabase Storage
             </p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>à¸¢à¸à¹€à¸¥à¸´à¸</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? 'à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...' : 'à¸šà¸±à¸™à¸—à¸¶à¸'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function ChatMusicManagement() {
   const { toast } = useToast();
   const [categories, setCategories] = useState<MusicCategory[]>([]);
@@ -209,18 +209,18 @@ export function ChatMusicManagement() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   async function deleteCategory(cat: MusicCategory) {
-    if (!confirm(`ลบหมวด "${cat.label}" และเพลงทั้งหมดในหมวดนี้?`)) return;
+    if (!confirm(`à¸¥à¸šà¸«à¸¡à¸§à¸” "${cat.label}" à¹à¸¥à¸°à¹€à¸žà¸¥à¸‡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸™à¸«à¸¡à¸§à¸”à¸™à¸µà¹‰?`)) return;
     const { error } = await (supabase as any).from('chat_music_categories').delete().eq('id', cat.id);
-    if (error) { toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' }); return; }
-    toast({ title: 'ลบหมวดแล้ว' });
+    if (error) { toast({ title: 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”', variant: 'destructive' }); return; }
+    toast({ title: 'à¸¥à¸šà¸«à¸¡à¸§à¸”à¹à¸¥à¹‰à¸§' });
     fetchAll();
   }
 
   async function deleteTrack(track: MusicTrack) {
-    if (!confirm(`ลบเพลง "${track.title}"?`)) return;
+    if (!confirm(`à¸¥à¸šà¹€à¸žà¸¥à¸‡ "${track.title}"?`)) return;
     const { error } = await (supabase as any).from('chat_music_tracks').delete().eq('id', track.id);
-    if (error) { toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' }); return; }
-    toast({ title: 'ลบเพลงแล้ว' });
+    if (error) { toast({ title: 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”', variant: 'destructive' }); return; }
+    toast({ title: 'à¸¥à¸šà¹€à¸žà¸¥à¸‡à¹à¸¥à¹‰à¸§' });
     fetchAll();
   }
 
@@ -240,31 +240,31 @@ export function ChatMusicManagement() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Music2 className="w-5 h-5" />
-            จัดการเพลง BGM
-            <Badge variant="secondary" className="text-xs">{totalTracks} เพลง</Badge>
+            à¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸žà¸¥à¸‡ BGM
+            <Badge variant="secondary" className="text-xs">{totalTracks} à¹€à¸žà¸¥à¸‡</Badge>
           </CardTitle>
           <Button
             size="sm"
             className="gap-2"
             onClick={() => setCatDialog({ open: true, editing: null })}
           >
-            <Plus className="w-4 h-4" /> เพิ่มหมวดหมู่
+            <Plus className="w-4 h-4" /> à¹€à¸žà¸´à¹ˆà¸¡à¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆ
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          เพลงที่เพิ่มที่นี่จะแสดงใน Music Player ของห้องแชท
+          à¹€à¸žà¸¥à¸‡à¸—à¸µà¹ˆà¹€à¸žà¸´à¹ˆà¸¡à¸—à¸µà¹ˆà¸™à¸µà¹ˆà¸ˆà¸°à¹à¸ªà¸”à¸‡à¹ƒà¸™ Music Player à¸‚à¸­à¸‡à¸«à¹‰à¸­à¸‡à¹à¸Šà¸—
         </p>
       </CardHeader>
 
       <CardContent className="space-y-3">
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
+          <div className="text-center py-8 text-muted-foreground text-sm">à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”...</div>
         ) : categories.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <FolderMusic className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">ยังไม่มีหมวดหมู่</p>
+            <Folder className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆ</p>
             <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => setCatDialog({ open: true, editing: null })}>
-              <Plus className="w-4 h-4" /> เพิ่มหมวดหมู่แรก
+              <Plus className="w-4 h-4" /> à¹€à¸žà¸´à¹ˆà¸¡à¸«à¸¡à¸§à¸”à¸«à¸¡à¸¹à¹ˆà¹à¸£à¸
             </Button>
           </div>
         ) : (
@@ -277,9 +277,9 @@ export function ChatMusicManagement() {
                 <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors">
                   <button onClick={() => toggleExpand(cat.id)} className="flex items-center gap-2 flex-1 text-left">
                     {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
-                    <FolderMusic className="w-4 h-4 text-[#c8956c] shrink-0" />
+                    <Folder className="w-4 h-4 text-[#c8956c] shrink-0" />
                     <span className="font-semibold text-sm">{cat.label}</span>
-                    <Badge variant="outline" className="text-[10px] ml-1">{catTracks.length} เพลง</Badge>
+                    <Badge variant="outline" className="text-[10px] ml-1">{catTracks.length} à¹€à¸žà¸¥à¸‡</Badge>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button variant="ghost" size="icon" className="h-7 w-7"
@@ -292,7 +292,7 @@ export function ChatMusicManagement() {
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs"
                       onClick={() => setTrackDialog({ open: true, editing: null, categoryId: cat.id })}>
-                      <Plus className="w-3 h-3" /> เพิ่มเพลง
+                      <Plus className="w-3 h-3" /> à¹€à¸žà¸´à¹ˆà¸¡à¹€à¸žà¸¥à¸‡
                     </Button>
                   </div>
                 </div>
@@ -302,7 +302,7 @@ export function ChatMusicManagement() {
                   <div className="divide-y divide-border/50">
                     {catTracks.length === 0 ? (
                       <div className="px-4 py-4 text-center text-sm text-muted-foreground">
-                        ยังไม่มีเพลงในหมวดนี้
+                        à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸žà¸¥à¸‡à¹ƒà¸™à¸«à¸¡à¸§à¸”à¸™à¸µà¹‰
                       </div>
                     ) : (
                       catTracks.map((track, i) => (
