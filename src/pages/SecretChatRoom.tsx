@@ -166,20 +166,25 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
       setLibrary(lib);
       setCatIdx(0);
       setTrackIdx(0);
+      // Set src immediately so first play works
+      const el = audioRef.current;
+      if (el && lib[0]?.tracks[0]) {
+        el.src = lib[0].tracks[0].src;
+      }
     });
   }, []);
 
   const currentCat = library[Math.min(catIdx, library.length - 1)] ?? MUSIC_FALLBACK[0];
   const currentTrack = currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)] ?? currentCat.tracks[0];
 
-  // Load track when it changes
+  // Load track when catIdx, trackIdx, or library changes
   useEffect(() => {
     const el = audioRef.current;
-    if (!el) return;
+    if (!el || !currentTrack?.src) return;
     el.src = currentTrack.src;
     el.loop = loopMode === 'one';
     if (playing) el.play().catch(() => {});
-  }, [catIdx, trackIdx]);
+  }, [catIdx, trackIdx, library]);
 
   // Sync loop attribute
   useEffect(() => {
@@ -206,9 +211,18 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   const toggle = useCallback(() => {
     const el = audioRef.current;
     if (!el) return;
-    if (playing) { el.pause(); setPlaying(false); }
-    else { el.play().catch(() => {}); setPlaying(true); }
-  }, [playing]);
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      // Ensure src is set (in case library loaded after mount)
+      if (!el.src || el.src === window.location.href) {
+        el.src = currentTrack.src;
+      }
+      el.play().catch(() => {});
+      setPlaying(true);
+    }
+  }, [playing, currentTrack]);
 
   const skipNext = useCallback(() => {
     const next = (trackIdx + 1) % currentCat.tracks.length;
