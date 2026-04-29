@@ -342,11 +342,16 @@ function TrackEditDialog({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ title: '', src: '', category_id: '' });
+  const [form, setForm] = useState({ title: '', src: '', category_id: '', image_url: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setForm({ title: editing?.title ?? '', src: editing?.src ?? '', category_id: editing?.category_id ?? categories[0]?.id ?? '' });
+    setForm({
+      title: editing?.title ?? '',
+      src: editing?.src ?? '',
+      category_id: editing?.category_id ?? categories[0]?.id ?? '',
+      image_url: (editing as any)?.image_url ?? '',
+    });
   }, [editing, open]);
 
   async function handleSave() {
@@ -354,7 +359,7 @@ function TrackEditDialog({
     setSaving(true);
     try {
       const { error } = await (supabase as any).from('chat_music_tracks')
-        .update({ title: form.title.trim(), src: form.src.trim(), category_id: form.category_id })
+        .update({ title: form.title.trim(), src: form.src.trim(), category_id: form.category_id, image_url: form.image_url.trim() || null })
         .eq('id', editing!.id);
       if (error) throw error;
       toast({ title: 'อัปเดตเพลงแล้ว' });
@@ -384,6 +389,14 @@ function TrackEditDialog({
             <Label>URL เพลง</Label>
             <Input value={form.src} onChange={e => setForm(f => ({ ...f, src: e.target.value }))} placeholder="https://..." />
             <p className="text-[11px] text-muted-foreground">URL จะอัปเดตอัตโนมัติถ้าอัปโหลดผ่านระบบ</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>รูปปก (URL) — แสดงบนแผ่นเสียง</Label>
+            <Input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://..." />
+            {form.image_url && (
+              <img src={form.image_url} alt="cover" className="w-16 h-16 rounded-xl object-cover border border-border mt-1"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            )}
           </div>
         </div>
         <DialogFooter>

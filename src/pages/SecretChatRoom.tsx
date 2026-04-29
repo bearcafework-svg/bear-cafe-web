@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ChevronDown, ListMusic, X } from 'lucide-react';
+import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 
 interface Message {
   id: string;
@@ -118,7 +119,7 @@ function useRainAmbient() {
 }
 
 // ─── Music Player ─────────────────────────────────────────────────────────────
-interface Track { title: string; src: string; }
+interface Track { title: string; src: string; image_url?: string | null; }
 interface MusicCategory { label: string; tracks: Track[]; }
 
 const MUSIC_FALLBACK: MusicCategory[] = [
@@ -135,14 +136,14 @@ async function loadMusicLibrary(): Promise<MusicCategory[]> {
   try {
     const [catRes, trackRes] = await Promise.all([
       (supabase as any).from('chat_music_categories').select('id, label, sort_order').order('sort_order'),
-      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, sort_order').order('sort_order'),
+      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, image_url, sort_order').order('sort_order'),
     ]);
     const cats: any[] = catRes.data ?? [];
     const allTracks: any[] = trackRes.data ?? [];
     const lib: MusicCategory[] = cats
       .map(c => ({
         label: c.label,
-        tracks: allTracks.filter(t => t.category_id === c.id).map(t => ({ title: t.title, src: t.src })),
+        tracks: allTracks.filter(t => t.category_id === c.id).map(t => ({ title: t.title, src: t.src, image_url: t.image_url ?? null })),
       }))
       .filter(c => c.tracks.length > 0);
     return lib.length > 0 ? lib : MUSIC_FALLBACK;
@@ -159,6 +160,8 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   const [catIdx, setCatIdx] = useState(0);
   const [trackIdx, setTrackIdx] = useState(0);
   const [loopMode, setLoopMode] = useState<LoopMode>('all');
+  const [progress, setProgress] = useState(0);   // 0–100
+  const [duration, setDuration] = useState(0);   // seconds
 
   // Load library from DB on mount
   useEffect(() => {
@@ -190,6 +193,22 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   useEffect(() => {
     if (audioRef.current) audioRef.current.loop = loopMode === 'one';
   }, [loopMode]);
+
+  // Progress tracking
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onTime = () => {
+      if (el.duration) setProgress((el.currentTime / el.duration) * 100);
+    };
+    const onMeta = () => setDuration(el.duration || 0);
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('loadedmetadata', onMeta);
+    return () => {
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('loadedmetadata', onMeta);
+    };
+  }, []);
 
   // Auto-advance on track end
   useEffect(() => {
@@ -242,7 +261,101 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
   }, []);
 
-  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library };
+  const seek = useCallback((pct: number) => {
+    const el = audioRef.current;
+    if (!el || !el.duration) return;
+    el.currentTime = (pct / 100) * el.duration;
+    setProgress(pct);
+  }, []);
+
+  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek };
+}
+
+// ─── Wave Progress Bar ────────────────────────────────────────────────────────
+function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: number) => void }) {
+  const POINTS = 40;
+  const W = 280;
+  const H = 28;
+  const filled = (progress / 100) * W;
+
+  // Generate stable wave path
+  const wavePath = Array.from({ length: POINTS + 1 }, (_, i) => {
+    const x = (i / POINTS) * W;
+    const amp = 4 + Math.sin(i * 0.9) * 3;
+    const y = H / 2 + Math.sin(i * 0.7) * amp;
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+
+  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    onSeek(pct);
+  }
+
+  const thumbX = (progress / 100) * W;
+
+  return (
+    <div className="relative w-full px-1 py-1 cursor-pointer" style={{ touchAction: 'none' }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ height: H }}
+        onClick={handleClick}
+      >
+        {/* Background wave */}
+        <path d={wavePath} fill="none" stroke="rgba(200,149,108,0.2)" strokeWidth="2.5" strokeLinecap="round" />
+        {/* Filled wave (clip to progress) */}
+        <clipPath id="wave-clip">
+          <rect x="0" y="0" width={filled} height={H} />
+        </clipPath>
+        <path d={wavePath} fill="none" stroke="#c8956c" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#wave-clip)" />
+        {/* HoneyJar thumb */}
+        <image
+          href={honeyJarIcon}
+          x={thumbX - 10}
+          y={H / 2 - 10}
+          width="20"
+          height="20"
+          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+// ─── Vinyl Disc ───────────────────────────────────────────────────────────────
+function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) {
+  return (
+    <div className="relative flex items-center justify-center">
+      {/* Outer ring */}
+      <motion.div
+        animate={{ rotate: playing ? 360 : 0 }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+        className="w-28 h-28 rounded-full flex items-center justify-center"
+        style={{
+          background: 'conic-gradient(from 0deg, #2a1a0e, #4a2e1a, #2a1a0e, #3a2410, #2a1a0e)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 0 12px rgba(0,0,0,0.4)',
+        }}
+      >
+        {/* Grooves */}
+        {[38, 44, 50].map(r => (
+          <div key={r} className="absolute rounded-full border border-white/5" style={{ width: r * 2, height: r * 2 }} />
+        ))}
+        {/* Center image */}
+        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/40 shadow-inner z-10">
+          {imageUrl ? (
+            <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06] flex items-center justify-center">
+              <Music2 className="w-6 h-6 text-[#c8956c]/60" />
+            </div>
+          )}
+        </div>
+        {/* Center hole */}
+        <div className="absolute w-3 h-3 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
+      </motion.div>
+    </div>
+  );
 }
 
 // ─── Music Player Panel ───────────────────────────────────────────────────────
@@ -254,35 +367,59 @@ function MusicPanel({
 }) {
   const [activeCat, setActiveCat] = useState(player.catIdx);
 
+  function formatTime(sec: number) {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  const currentSec = player.duration ? (player.progress / 100) * player.duration : 0;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      initial={{ opacity: 0, y: 10, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.97 }}
-      transition={{ duration: 0.18 }}
-      className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#1e1410] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50"
+      exit={{ opacity: 0, y: 10, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50"
       onClick={e => e.stopPropagation()}
     >
-      {/* Now playing */}
-      <div className="px-4 py-3 bg-[#f5ede4] dark:bg-[#2a1e14] border-b border-[#e8d9c8] dark:border-[#3a2a1e]">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
+      {/* Now playing — vinyl + info */}
+      <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06]">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
             <ListMusic className="w-3.5 h-3.5 text-[#c8956c]" />
             <span className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c]">เพลงที่กำลังเล่น</span>
           </div>
-          <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
-            <X className="w-3.5 h-3.5" />
+          <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors p-0.5">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-sm font-bold text-[#4a3728] dark:text-[#e8d9c8] truncate">{player.currentTrack.title}</p>
-        <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
+
+        {/* Vinyl disc */}
+        <div className="flex justify-center mb-3">
+          <VinylDisc imageUrl={player.currentTrack.image_url} playing={player.playing} />
+        </div>
+
+        {/* Track info */}
+        <div className="text-center mb-3">
+          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack.title}</p>
+          <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
+        </div>
+
+        {/* Wave progress */}
+        <WaveProgress progress={player.progress} onSeek={player.seek} />
+        <div className="flex justify-between text-[10px] text-[#9c7c5e] px-1 -mt-0.5">
+          <span>{formatTime(currentSec)}</span>
+          <span>{formatTime(player.duration)}</span>
+        </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-3 mt-3">
-          {/* Loop */}
+        <div className="flex items-center justify-center gap-4 mt-3">
           <button
             onClick={player.cycleLoop}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
               player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
             }`}
             title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
@@ -290,27 +427,25 @@ function MusicPanel({
             {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
           </button>
 
-          {/* Play/Pause */}
           <button
             onClick={player.toggle}
-            className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-md"
+            className="w-12 h-12 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-lg"
           >
             {player.playing ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="6" y="4" width="4" height="16" rx="1" />
                 <rect x="14" y="4" width="4" height="16" rx="1" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
           </button>
 
-          {/* Skip */}
           <button
             onClick={player.skipNext}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
             title="เพลงถัดไป"
           >
             <SkipForward className="w-4 h-4" />
@@ -319,7 +454,7 @@ function MusicPanel({
       </div>
 
       {/* Category tabs */}
-      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto">
+      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto bg-white dark:bg-[#1a0e06]">
         {player.library.map((cat, ci) => (
           <button
             key={ci}
@@ -336,7 +471,7 @@ function MusicPanel({
       </div>
 
       {/* Track list */}
-      <div className="max-h-44 overflow-y-auto">
+      <div className="max-h-40 overflow-y-auto bg-white dark:bg-[#1a0e06]">
         {player.library[activeCat]?.tracks.map((track, ti) => {
           const isActive = activeCat === player.catIdx && ti === player.trackIdx;
           return (
@@ -344,24 +479,23 @@ function MusicPanel({
               key={ti}
               onClick={() => player.selectTrack(activeCat, ti)}
               className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
-                isActive
-                  ? 'bg-[#f5ede4] dark:bg-[#2a1e14]'
-                  : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
+                isActive ? 'bg-[#f5ede4] dark:bg-[#2a1a0e]' : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
               }`}
             >
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                isActive ? 'bg-[#c8956c]' : 'bg-[#f0e6d8] dark:bg-[#3a2a1e]'
-              }`}>
-                {isActive && player.playing ? (
-                  <motion.div className="flex gap-0.5 items-end h-3">
+              {/* Thumbnail or indicator */}
+              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-[#f0e6d8] dark:bg-[#3a2a1e]">
+                {track.image_url ? (
+                  <img src={track.image_url} alt="" className="w-full h-full object-cover" />
+                ) : isActive && player.playing ? (
+                  <motion.div className="flex gap-0.5 items-end h-4">
                     {[0, 0.1, 0.2].map((d, i) => (
-                      <motion.div key={i} className="w-0.5 bg-white rounded-full"
-                        animate={{ height: ['4px', '10px', '4px'] }}
+                      <motion.div key={i} className="w-0.5 bg-[#c8956c] rounded-full"
+                        animate={{ height: ['4px', '12px', '4px'] }}
                         transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
                     ))}
                   </motion.div>
                 ) : (
-                  <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-white' : 'text-[#9c7c5e]'}`} fill="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-[#c8956c]' : 'text-[#9c7c5e]'}`} fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z" />
                   </svg>
                 )}
@@ -841,25 +975,30 @@ export default function SecretChatRoom() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
         {matchStatus === 'waiting' && (
-          <div className="flex flex-col items-center justify-center h-full gap-5 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 text-center px-6">
             <motion.div
-              animate={{ scale: [1, 1.06, 1], rotate: [0, 3, -3, 0] }}
+              animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl shadow-lg"
+              className="w-28 h-28 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-6xl shadow-xl"
             >
               ☕
             </motion.div>
-            <div className="space-y-1.5">
-              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">กำลังหาคู่สนทนา...</p>
-              <p className="text-sm text-[#9c7c5e]">รอสักครู่ กำลังจับคู่ในหัวข้อ <span className="font-medium text-[#7c5c3e] dark:text-[#c8956c]">{topicName}</span></p>
+            <div className="space-y-2">
+              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">กำลังหาคู่สนทนา...</p>
+              <p className="text-sm text-[#9c7c5e] leading-relaxed">
+                รอสักครู่ กำลังจับคู่ในหัวข้อ{' '}
+                <span className="font-semibold text-[#7c5c3e] dark:text-[#c8956c]">{topicName}</span>
+              </p>
               {moodConfig.enabled && (
-                <p className="text-xs text-[#c8b09a] mt-1">หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง</p>
+                <p className="text-xs text-[#c8b09a]">
+                  หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง
+                </p>
               )}
             </div>
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               {[0, 0.2, 0.4].map((d, i) => (
-                <motion.div key={i} className="w-2 h-2 rounded-full bg-[#c8956c]"
-                  animate={{ y: [0, -8, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: d }} />
+                <motion.div key={i} className="w-3 h-3 rounded-full bg-[#c8956c]"
+                  animate={{ y: [0, -10, 0] }} transition={{ duration: 0.9, repeat: Infinity, delay: d }} />
               ))}
             </div>
           </div>

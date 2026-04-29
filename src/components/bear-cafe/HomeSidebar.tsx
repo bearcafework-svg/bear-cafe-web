@@ -78,7 +78,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="px-4 py-2.5 flex-1 space-y-1 min-h-0 [@media(max-height:820px)]:py-1.5 [@media(max-height:820px)]:space-y-0.5">
+      <nav className="px-4 py-2.5 flex-1 space-y-1 min-h-0 overflow-y-auto [@media(max-height:820px)]:py-1.5 [@media(max-height:820px)]:space-y-0.5">
         
         {/* สลับโหมด */}
         <button
@@ -201,7 +201,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
       </nav>
 
       {/* Mascot Message */}
-      <div className="shrink-0 [@media(max-height:900px)]:scale-[0.95] [@media(max-height:900px)]:origin-top [@media(max-height:760px)]:scale-[0.88]">
+      <div className="shrink-0 [@media(max-height:900px)]:scale-[0.95] [@media(max-height:900px)]:origin-top [@media(max-height:760px)]:scale-[0.88] [@media(max-height:680px)]:hidden">
         <MascotMessage />
       </div>
 
@@ -221,7 +221,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
       </div>
 
       {/* Social Links */}
-      <div className="p-3 flex items-center justify-center gap-3 shrink-0 [@media(max-height:820px)]:py-2 [@media(max-height:820px)]:gap-2">
+      <div className="p-3 pb-safe flex items-center justify-center gap-3 shrink-0 [@media(max-height:820px)]:py-2 [@media(max-height:820px)]:gap-2" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <a
           href="https://discord.gg/bearcafe"
           target="_blank"
