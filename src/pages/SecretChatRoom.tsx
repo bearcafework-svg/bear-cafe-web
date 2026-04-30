@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ListMusic, X } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
+import pixelCoffeeIcon from '@/assets/pixel-coffee.gif';
 
 interface Message {
   id: string;
@@ -280,7 +281,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
 }
 
 // ─── Wave Progress Bar ────────────────────────────────────────────────────────
-function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: number) => void }) {
+function WaveProgress({ progress, onSeek, disabled = false }: { progress: number; onSeek: (pct: number) => void; disabled?: boolean }) {
   const POINTS = 40;
   const W = 280;
   const H = 28;
@@ -304,6 +305,7 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
 
   // Mouse events
   function onMouseDown(e: React.MouseEvent) {
+    if (disabled) return;
     dragging.current = true;
     onSeek(getPct(e.clientX));
     const onMove = (ev: MouseEvent) => { if (dragging.current) onSeek(getPct(ev.clientX)); };
@@ -314,6 +316,7 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
 
   // Touch events
   function onTouchStart(e: React.TouchEvent) {
+    if (disabled) return;
     dragging.current = true;
     onSeek(getPct(e.touches[0].clientX));
     const onMove = (ev: TouchEvent) => { if (dragging.current) onSeek(getPct(ev.touches[0].clientX)); };
@@ -325,7 +328,10 @@ function WaveProgress({ progress, onSeek }: { progress: number; onSeek: (pct: nu
   const thumbX = (progress / 100) * W;
 
   return (
-    <div className="relative w-full px-1 py-1 cursor-pointer select-none" style={{ touchAction: 'none' }}>
+    <div
+      className="relative w-full px-1 py-1 select-none"
+      style={{ touchAction: 'none', cursor: disabled ? 'default' : 'pointer' }}
+    >
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -400,13 +406,15 @@ function MusicPanel({
   const [activeCat, setActiveCat] = useState(player.catIdx);
 
   function formatTime(sec: number) {
-    if (!sec || isNaN(sec)) return '0:00';
+    if (!sec || !isFinite(sec) || isNaN(sec)) return '0:00';
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  const currentSec = player.duration ? (player.progress / 100) * player.duration : 0;
+  const currentSec = (player.duration && isFinite(player.duration))
+    ? (player.progress / 100) * player.duration
+    : 0;
 
   return (
     <motion.div
@@ -444,7 +452,11 @@ function MusicPanel({
         </div>
 
         {/* Wave progress */}
-        <WaveProgress progress={player.progress} onSeek={player.seek} />
+        <WaveProgress
+          progress={player.progress}
+          onSeek={player.seek}
+          disabled={!player.duration || !isFinite(player.duration)}
+        />
         <div className="flex justify-between text-[10px] text-[#9c7c5e] px-1 -mt-0.5">
           <span>{formatTime(currentSec)}</span>
           <span>{formatTime(player.duration)}</span>
@@ -1203,9 +1215,9 @@ export default function SecretChatRoom() {
               <motion.div
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl mx-auto shadow-lg"
+                className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center mx-auto shadow-lg overflow-hidden"
               >
-                ☕
+                <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
               </motion.div>
               <div className="space-y-1.5">
                 <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">จับคู่สำเร็จแล้ว!</p>
@@ -1277,12 +1289,12 @@ export default function SecretChatRoom() {
               </>
             ) : (
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-base shrink-0">
-                  ☕
+                <div className="w-10 h-10 rounded-xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center shrink-0 overflow-hidden">
+                  <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
-                  <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
+                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">คาเฟ่ลับ</p>
+                  <p className="text-xs text-[#9c7c5e]">{topicName}</p>
                 </div>
               </div>
             )}
@@ -1304,7 +1316,7 @@ export default function SecretChatRoom() {
 
             <button onClick={toggleRain}
               ref={rainRef}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
               <CloudRain className="w-4 h-4" />
             </button>
 
@@ -1313,7 +1325,7 @@ export default function SecretChatRoom() {
               <button
                 onClick={() => setShowMusicPanel(v => !v)}
                 ref={musicRef}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
                   player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
                 }`}
                 title="เพลง"
@@ -1330,7 +1342,7 @@ export default function SecretChatRoom() {
 
             <button onClick={leaveTable}
               ref={leaveRef}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -1345,9 +1357,9 @@ export default function SecretChatRoom() {
             <motion.div
               animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-28 h-28 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-6xl shadow-xl"
+              className="w-32 h-32 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center shadow-xl overflow-hidden"
             >
-              ☕
+              <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
             </motion.div>
             <div className="space-y-2">
               <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">กำลังหาคู่สนทนา...</p>
