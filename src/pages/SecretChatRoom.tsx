@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef, useCallback } from 'react';
+﻿import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -659,14 +659,9 @@ function TutorialOverlay({
   useEffect(() => {
     const el = refs[s?.refKey]?.current;
     if (!el) { setRingRect(null); return; }
-    // rAF to ensure DOM has painted before measuring
-    let raf = requestAnimationFrame(() => {
-      const update = () => setRingRect(el.getBoundingClientRect());
-      update();
-      window.addEventListener('resize', update);
-      window.addEventListener('scroll', update, true);
-    });
     const update = () => setRingRect(el.getBoundingClientRect());
+    // rAF ensures DOM has painted before first measure
+    const raf = requestAnimationFrame(update);
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
@@ -674,7 +669,7 @@ function TutorialOverlay({
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
-  }, [step, s?.refKey, refs]);
+  }, [step, s?.refKey]);
 
   if (!s) return null;
   const isLast = step === total - 1;
@@ -797,13 +792,20 @@ export default function SecretChatRoom() {
     if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
   };
 
-  // Refs for tutorial highlight — must be stable (not recreated each render)
-  const rainRef  = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const musicRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const leaveRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const timerRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const inputRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
-  const tutorialRefs: TutorialRefs = { rain: rainRef, music: musicRef, leave: leaveRef, timer: timerRef, input: inputRef };
+  // Refs for tutorial highlight — typed correctly so React attaches them
+  const rainRef  = useRef<HTMLButtonElement>(null);
+  const musicRef = useRef<HTMLButtonElement>(null);
+  const leaveRef = useRef<HTMLButtonElement>(null);
+  const timerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
+  // Stable object — only recreated if refs themselves change (they don't)
+  const tutorialRefs = useMemo<TutorialRefs>(() => ({
+    rain:  rainRef  as React.RefObject<HTMLElement>,
+    music: musicRef as React.RefObject<HTMLElement>,
+    leave: leaveRef as React.RefObject<HTMLElement>,
+    timer: timerRef as React.RefObject<HTMLElement>,
+    input: inputRef as React.RefObject<HTMLElement>,
+  }), []);
 
   // Advance tutorial to post-match steps when matched
   useEffect(() => {
@@ -813,27 +815,16 @@ export default function SecretChatRoom() {
     }
   }, [matchStatus, tutorialStep]);
 
-  // Auto-play music when matched — wait for library to be ready
+  // Auto-play music when matched
+  // player.toggle() syncs both the audio element AND the playing state
+  // We wait until library is loaded (player.currentTrack.src exists) before toggling
   const autoPlayedRef = useRef(false);
   useEffect(() => {
-    if (matchStatus === 'matched' && !autoPlayedRef.current) {
-      autoPlayedRef.current = true;
-      const el = bgmRef.current;
-      if (!el) return;
-      // If src already set (library loaded), play immediately; otherwise wait for canplay
-      const tryPlay = () => {
-        if (!player.playing) {
-          el.play().catch(() => {});
-          // sync player state via toggle only if not already playing
-        }
-      };
-      if (el.src && el.src !== window.location.href) {
-        el.play().catch(() => {});
-      } else {
-        el.addEventListener('canplay', tryPlay, { once: true });
-      }
-    }
-  }, [matchStatus]);
+    if (matchStatus !== 'matched' || autoPlayedRef.current || player.playing) return;
+    if (!player.currentTrack?.src) return; // library not loaded yet
+    autoPlayedRef.current = true;
+    player.toggle();
+  }, [matchStatus, player.currentTrack?.src, player.playing]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -1159,7 +1150,7 @@ export default function SecretChatRoom() {
           <div className="flex items-center gap-2 shrink-0">
             {matchStatus === 'matched' && (
               <div
-                ref={timerRef as React.RefObject<HTMLDivElement>}
+                ref={timerRef}
                 className={`flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1.5 rounded-full border transition-colors ${
                 isUrgent
                   ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
@@ -1171,7 +1162,7 @@ export default function SecretChatRoom() {
             )}
 
             <button onClick={toggleRain}
-              ref={rainRef as React.RefObject<HTMLButtonElement>}
+              ref={rainRef}
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
               <CloudRain className="w-4 h-4" />
             </button>
@@ -1180,7 +1171,7 @@ export default function SecretChatRoom() {
             <div className="relative">
               <button
                 onClick={() => setShowMusicPanel(v => !v)}
-                ref={musicRef as React.RefObject<HTMLButtonElement>}
+                ref={musicRef}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${
                   player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
                 }`}
@@ -1197,7 +1188,7 @@ export default function SecretChatRoom() {
             </div>
 
             <button onClick={leaveTable}
-              ref={leaveRef as React.RefObject<HTMLButtonElement>}
+              ref={leaveRef}
               className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
               <LogOut className="w-4 h-4" />
             </button>
@@ -1299,7 +1290,7 @@ export default function SecretChatRoom() {
         <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-3 sm:px-5 py-3">
           <div className="flex gap-2 items-end max-w-4xl mx-auto">
             <div
-              ref={inputRef as React.RefObject<HTMLDivElement>}
+              ref={inputRef}
               className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-xl px-3.5 py-2.5 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
             >
               <textarea
