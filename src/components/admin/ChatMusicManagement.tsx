@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Trash2, Edit, Music2, Folder, ChevronDown, ChevronRight,
-  Upload, FileAudio, X, Check,
+  Upload, FileAudio, X, Check, Play, Square, Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MusicCategory {
   id: string;
@@ -41,6 +42,100 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+// ─── FFmpeg Converter (dynamic import — only loads when needed) ───────────────
+interface ConvertResult {
+  blob: Blob;
+  originalSize: number;
+  convertedSize: number;
+}
+
+async function convertToWebm(
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<ConvertResult> {
+  // Dynamic import: @ffmpeg/ffmpeg is NOT bundled into the main chunk
+  const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+  const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
+
+  const ffmpeg = new FFmpeg();
+
+  // Load core via CDN to avoid bundling ~30 MB into the app
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
+
+  ffmpeg.on('progress', ({ progress }) => {
+    onProgress(Math.min(99, Math.round(progress * 100)));
+  });
+
+  const ext = file.name.split('.').pop() ?? 'mp3';
+  const inputName = `input.${ext}`;
+  const outputName = 'output.webm';
+
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+  await ffmpeg.exec([
+    '-i', inputName,
+    '-c:a', 'libopus',
+    '-b:a', '64k',
+    '-vbr', 'on',
+    '-compression_level', '10',
+    outputName,
+  ]);
+
+  const data = await ffmpeg.readFile(outputName);
+  const blob = new Blob([data as Uint8Array], { type: 'audio/webm' });
+
+  await ffmpeg.deleteFile(inputName).catch(() => {});
+  await ffmpeg.deleteFile(outputName).catch(() => {});
+  ffmpeg.terminate();
+
+  return { blob, originalSize: file.size, convertedSize: blob.size };
+}
+
+// ─── Gapless Loop Preview (Web Audio API) ────────────────────────────────────
+function useGaplessPreview() {
+  const ctxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const stop = useCallback(() => {
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    setPlaying(false);
+  }, []);
+
+  const play = useCallback(async (blob: Blob) => {
+    stop();
+    if (!ctxRef.current || ctxRef.current.state === 'closed') {
+      ctxRef.current = new AudioContext();
+    }
+    const ctx = ctxRef.current;
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+    const src = ctx.createBufferSource();
+    src.buffer = audioBuffer;
+    src.loop = true; // gapless via Web Audio API
+    src.connect(ctx.destination);
+    src.start(0);
+    sourceRef.current = src;
+    setPlaying(true);
+  }, [stop]);
+
+  // Cleanup on unmount — prevent memory leak
+  useEffect(() => () => {
+    stop();
+    ctxRef.current?.close().catch(() => {});
+    ctxRef.current = null;
+  }, [stop]);
+
+  return { playing, play, stop };
+}
+
 // ─── Upload Tab ───────────────────────────────────────────────────────────────
 function UploadTab({
   categories,
@@ -51,18 +146,24 @@ function UploadTab({
 }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const preview = useGaplessPreview();
 
   interface UploadItem {
     file: File;
     title: string;
     categoryId: string;
-    status: 'pending' | 'uploading' | 'done' | 'error';
+    status: 'pending' | 'converting' | 'uploading' | 'done' | 'error';
     progress: number;
+    convertProgress: number;
+    originalSize: number;
+    convertedSize: number | null;
+    convertedBlob: Blob | null;
     error?: string;
   }
 
   const [items, setItems] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
@@ -71,10 +172,14 @@ function UploadTab({
       .filter(f => f.type.startsWith('audio/') || f.name.match(/\.(mp3|ogg|wav|flac|aac)$/i))
       .map(f => ({
         file: f,
-        title: f.name.replace(/\.[^.]+$/, ''), // strip extension as default title
+        title: f.name.replace(/\.[^.]+$/, ''),
         categoryId: defaultCat,
-        status: 'pending',
+        status: 'pending' as const,
         progress: 0,
+        convertProgress: 0,
+        originalSize: f.size,
+        convertedSize: null,
+        convertedBlob: null,
       }));
     if (newItems.length === 0) {
       toast({ title: 'ไม่พบไฟล์เสียง', description: 'รองรับ MP3, OGG, WAV, FLAC, AAC', variant: 'destructive' });
@@ -84,11 +189,24 @@ function UploadTab({
   }
 
   function removeItem(idx: number) {
+    if (previewIdx === idx) { preview.stop(); setPreviewIdx(null); }
     setItems(prev => prev.filter((_, i) => i !== idx));
   }
 
   function updateItem(idx: number, patch: Partial<UploadItem>) {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, ...patch } : item));
+  }
+
+  async function togglePreview(idx: number) {
+    const item = items[idx];
+    if (!item.convertedBlob) return;
+    if (previewIdx === idx && preview.playing) {
+      preview.stop();
+      setPreviewIdx(null);
+    } else {
+      setPreviewIdx(idx);
+      await preview.play(item.convertedBlob);
+    }
   }
 
   async function uploadAll() {
@@ -104,24 +222,37 @@ function UploadTab({
       const item = items[idx];
       if (item.status !== 'pending') continue;
 
-      updateItem(idx, { status: 'uploading', progress: 10 });
+      // ── Step 1: Convert with ffmpeg.wasm ──
+      updateItem(idx, { status: 'converting', progress: 5, convertProgress: 0 });
+      let convertedBlob: Blob;
+      let convertedSize = 0;
 
       try {
-        // 1. Upload file to storage
-        const ext = item.file.name.split('.').pop() ?? 'mp3';
-        const path = `${Date.now()}_${sanitizeFilename(item.title)}.${ext}`;
+        const result = await convertToWebm(item.file, (pct) => {
+          updateItem(idx, { convertProgress: pct, progress: Math.round(pct * 0.6) });
+        });
+        convertedBlob = result.blob;
+        convertedSize = result.convertedSize;
+        updateItem(idx, { convertedBlob, convertedSize, progress: 65 });
+      } catch (e: any) {
+        updateItem(idx, { status: 'error', progress: 0, error: `แปลงไฟล์ไม่สำเร็จ: ${e.message}` });
+        continue;
+      }
+
+      // ── Step 2: Upload .webm to Supabase Storage ──
+      updateItem(idx, { status: 'uploading', progress: 70 });
+      try {
+        const path = `${Date.now()}_${sanitizeFilename(item.title)}.webm`;
         const { error: uploadError } = await supabase.storage
           .from('chat-music')
-          .upload(path, item.file, { contentType: item.file.type || 'audio/mpeg' });
-
+          .upload(path, convertedBlob, { contentType: 'audio/webm' });
         if (uploadError) throw uploadError;
-        updateItem(idx, { progress: 70 });
+        updateItem(idx, { progress: 85 });
 
-        // 2. Get public URL
         const { data: urlData } = supabase.storage.from('chat-music').getPublicUrl(path);
         const publicUrl = urlData.publicUrl;
 
-        // 3. Insert track record
+        // ── Step 3: Insert DB record ──
         const { data: existing } = await (supabase as any)
           .from('chat_music_tracks')
           .select('sort_order')
@@ -138,8 +269,8 @@ function UploadTab({
             src: publicUrl,
             sort_order: nextOrder,
           });
-
         if (dbError) throw dbError;
+
         updateItem(idx, { status: 'done', progress: 100 });
       } catch (e: any) {
         updateItem(idx, { status: 'error', progress: 0, error: e.message });
@@ -157,7 +288,7 @@ function UploadTab({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        อัปโหลดไฟล์เสียงโดยตรง ระบบจะบันทึกลง Supabase Storage และเพิ่มเข้าหมวดหมู่ที่เลือกอัตโนมัติ
+        อัปโหลดไฟล์เสียง ระบบจะ <strong>แปลงเป็น WebM (Opus 64kbps)</strong> อัตโนมัติก่อนอัปโหลด เพื่อลดขนาดและรองรับ Gapless Loop
       </p>
 
       {/* Drop zone */}
@@ -177,7 +308,7 @@ function UploadTab({
         />
         <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
         <p className="font-medium text-sm">คลิกหรือลากไฟล์มาวางที่นี่</p>
-        <p className="text-xs text-muted-foreground mt-1">รองรับ MP3, OGG, WAV, FLAC, AAC (สูงสุด 20 MB ต่อไฟล์)</p>
+        <p className="text-xs text-muted-foreground mt-1">รองรับ MP3, OGG, WAV, FLAC, AAC · จะแปลงเป็น WebM อัตโนมัติ</p>
       </div>
 
       {/* File list */}
@@ -187,91 +318,141 @@ function UploadTab({
             <p className="text-sm font-medium">{items.length} ไฟล์ · {doneCount} เสร็จแล้ว</p>
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                size="sm"
+                variant="outline" size="sm"
                 onClick={() => setItems(prev => prev.filter(i => i.status !== 'done'))}
                 disabled={doneCount === 0}
               >
                 ล้างรายการที่เสร็จ
               </Button>
               <Button
-                size="sm"
-                className="gap-2"
+                size="sm" className="gap-2"
                 onClick={uploadAll}
                 disabled={uploading || pendingCount === 0 || categories.length === 0}
               >
-                <Upload className="w-4 h-4" />
-                {uploading ? 'กำลังอัปโหลด...' : `อัปโหลด ${pendingCount} ไฟล์`}
+                {uploading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Upload className="w-4 h-4" />}
+                {uploading ? 'กำลังประมวลผล...' : `แปลง & อัปโหลด ${pendingCount} ไฟล์`}
               </Button>
             </div>
           </div>
 
-          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-            {items.map((item, idx) => (
-              <div
-                key={idx}
-                className={`rounded-xl border p-3 space-y-2 transition-colors ${
-                  item.status === 'done' ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20' :
-                  item.status === 'error' ? 'border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20' :
-                  'border-border'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                    {item.status === 'done'
-                      ? <Check className="w-4 h-4 text-emerald-600" />
-                      : item.status === 'error'
-                      ? <X className="w-4 h-4 text-red-500" />
-                      : <FileAudio className="w-4 h-4 text-muted-foreground" />}
-                  </div>
+          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+            <AnimatePresence initial={false}>
+              {items.map((item, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`rounded-xl border p-3 space-y-2 transition-colors ${
+                    item.status === 'done'       ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20' :
+                    item.status === 'error'      ? 'border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20' :
+                    item.status === 'converting' ? 'border-violet-200 bg-violet-50 dark:border-violet-900/50 dark:bg-violet-950/20' :
+                    'border-border'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Status icon */}
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                      {item.status === 'done'       ? <Check className="w-4 h-4 text-emerald-600" /> :
+                       item.status === 'error'      ? <X className="w-4 h-4 text-red-500" /> :
+                       item.status === 'converting' ? <Loader2 className="w-4 h-4 text-violet-500 animate-spin" /> :
+                       item.status === 'uploading'  ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> :
+                       <FileAudio className="w-4 h-4 text-muted-foreground" />}
+                    </div>
 
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* Title input */}
-                    <Input
-                      value={item.title}
-                      onChange={e => updateItem(idx, { title: e.target.value })}
-                      placeholder="ชื่อเพลง"
-                      disabled={item.status !== 'pending'}
-                      className="h-8 text-sm"
-                    />
-
-                    {/* Category select + file info */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <select
-                        value={item.categoryId}
-                        onChange={e => updateItem(idx, { categoryId: e.target.value })}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Title input */}
+                      <Input
+                        value={item.title}
+                        onChange={e => updateItem(idx, { title: e.target.value })}
+                        placeholder="ชื่อเพลง"
                         disabled={item.status !== 'pending'}
-                        className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {categories.map(c => (
-                          <option key={c.id} value={c.id}>{c.label}</option>
-                        ))}
-                      </select>
-                      <span className="text-[11px] text-muted-foreground">
-                        {formatBytes(item.file.size)}
-                      </span>
-                      {item.status === 'error' && (
-                        <span className="text-[11px] text-red-500">{item.error}</span>
+                        className="h-8 text-sm"
+                      />
+
+                      {/* Category + size info */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={item.categoryId}
+                          onChange={e => updateItem(idx, { categoryId: e.target.value })}
+                          disabled={item.status !== 'pending'}
+                          className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.label}</option>
+                          ))}
+                        </select>
+
+                        {/* Size comparison */}
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatBytes(item.originalSize)}
+                          {item.convertedSize !== null && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                              {' → '}{formatBytes(item.convertedSize)}
+                              {' '}
+                              <span className="text-[10px]">
+                                (-{Math.round((1 - item.convertedSize / item.originalSize) * 100)}%)
+                              </span>
+                            </span>
+                          )}
+                        </span>
+
+                        {item.status === 'error' && (
+                          <span className="text-[11px] text-red-500">{item.error}</span>
+                        )}
+                      </div>
+
+                      {/* Progress: converting */}
+                      {item.status === 'converting' && (
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                            🎵 กำลังรีดไขมันเพลง... {item.convertProgress}%
+                          </span>
+                          <Progress value={item.convertProgress} className="h-1.5 [&>div]:bg-violet-500" />
+                        </div>
+                      )}
+
+                      {/* Progress: uploading */}
+                      {item.status === 'uploading' && (
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                            ☁️ กำลังอัปโหลด...
+                          </span>
+                          <Progress value={item.progress} className="h-1.5" />
+                        </div>
+                      )}
+
+                      {/* Preview loop button — shown after done */}
+                      {item.status === 'done' && item.convertedBlob && (
+                        <button
+                          onClick={() => togglePreview(idx)}
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                            previewIdx === idx && preview.playing
+                              ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          {previewIdx === idx && preview.playing
+                            ? <><Square className="w-3 h-3" /> หยุดฟัง Loop</>
+                            : <><Play className="w-3 h-3" /> ลองฟัง Gapless Loop</>}
+                        </button>
                       )}
                     </div>
 
-                    {/* Progress bar */}
-                    {item.status === 'uploading' && (
-                      <Progress value={item.progress} className="h-1.5" />
+                    {item.status === 'pending' && (
+                      <button
+                        onClick={() => removeItem(idx)}
+                        className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
-
-                  {item.status === 'pending' && (
-                    <button
-                      onClick={() => removeItem(idx)}
-                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
