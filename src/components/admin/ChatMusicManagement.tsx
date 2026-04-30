@@ -217,10 +217,13 @@ function UploadTab({
       return;
     }
     setUploading(true);
+    let successCount = 0;
 
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       if (item.status !== 'pending') continue;
+
+      console.log(`[upload] ▶ [${idx}] เริ่มประมวลผล: "${item.title}" (${formatBytes(item.file.size)}, type=${item.file.type})`);
 
       // ── Step 1: Convert with ffmpeg.wasm ──
       updateItem(idx, { status: 'converting', progress: 5, convertProgress: 0 });
@@ -228,14 +231,18 @@ function UploadTab({
       let convertedSize = 0;
 
       try {
+        console.log(`[upload] 🔄 [${idx}] เริ่มแปลงไฟล์ด้วย ffmpeg...`);
         const result = await convertToWebm(item.file, (pct) => {
           updateItem(idx, { convertProgress: pct, progress: Math.round(pct * 0.6) });
         });
         convertedBlob = result.blob;
         convertedSize = result.convertedSize;
+        console.log(`[upload] ✅ [${idx}] แปลงเสร็จ: ${formatBytes(result.originalSize)} → ${formatBytes(convertedSize)}, blob.type=${convertedBlob.type}`);
         updateItem(idx, { convertedBlob, convertedSize, progress: 65 });
       } catch (e: any) {
+        console.error(`[upload] ❌ [${idx}] แปลงไฟล์ล้มเหลว:`, e);
         updateItem(idx, { status: 'error', progress: 0, error: `แปลงไฟล์ไม่สำเร็จ: ${e.message}` });
+        toast({ title: `แปลงไฟล์ล้มเหลว: ${item.title}`, description: e.message, variant: 'destructive' });
         continue;
       }
 
@@ -243,16 +250,26 @@ function UploadTab({
       updateItem(idx, { status: 'uploading', progress: 70 });
       try {
         const path = `${Date.now()}_${sanitizeFilename(item.title)}.webm`;
-        const { error: uploadError } = await supabase.storage
+        console.log(`[upload] ☁️ [${idx}] กำลังอัปโหลดไปที่ bucket "chat-music", path="${path}", size=${formatBytes(convertedSize)}`);
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('chat-music')
           .upload(path, convertedBlob, { contentType: 'audio/webm' });
-        if (uploadError) throw uploadError;
+
+        if (uploadError) {
+          console.error(`[upload] ❌ [${idx}] Storage error:`, JSON.stringify(uploadError, null, 2));
+          throw new Error(`Storage: ${uploadError.message} (status=${(uploadError as any).statusCode ?? 'unknown'})`);
+        }
+
+        console.log(`[upload] ✅ [${idx}] อัปโหลดสำเร็จ:`, uploadData);
         updateItem(idx, { progress: 85 });
 
         const { data: urlData } = supabase.storage.from('chat-music').getPublicUrl(path);
         const publicUrl = urlData.publicUrl;
+        console.log(`[upload] 🔗 [${idx}] Public URL: ${publicUrl}`);
 
         // ── Step 3: Insert DB record ──
+        console.log(`[upload] 💾 [${idx}] บันทึกลง DB, category_id="${item.categoryId}"`);
         const { data: existing } = await (supabase as any)
           .from('chat_music_tracks')
           .select('sort_order')
@@ -269,17 +286,26 @@ function UploadTab({
             src: publicUrl,
             sort_order: nextOrder,
           });
-        if (dbError) throw dbError;
 
+        if (dbError) {
+          console.error(`[upload] ❌ [${idx}] DB error:`, JSON.stringify(dbError, null, 2));
+          throw new Error(`DB: ${dbError.message}`);
+        }
+
+        console.log(`[upload] ✅ [${idx}] บันทึก DB สำเร็จ`);
         updateItem(idx, { status: 'done', progress: 100 });
+        successCount++;
       } catch (e: any) {
+        console.error(`[upload] ❌ [${idx}] ล้มเหลว:`, e);
         updateItem(idx, { status: 'error', progress: 0, error: e.message });
+        toast({ title: `อัปโหลดล้มเหลว: ${item.title}`, description: e.message, variant: 'destructive' });
       }
     }
 
     setUploading(false);
     onUploaded();
-    toast({ title: 'อัปโหลดเสร็จแล้ว' });
+    console.log(`[upload] 🏁 เสร็จสิ้น: สำเร็จ ${successCount} ไฟล์`);
+    if (successCount > 0) toast({ title: `อัปโหลดเสร็จแล้ว ${successCount} ไฟล์` });
   }
 
   const pendingCount = items.filter(i => i.status === 'pending').length;
