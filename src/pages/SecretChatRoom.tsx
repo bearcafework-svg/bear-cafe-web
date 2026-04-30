@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ListMusic, X } from 'lucide-react';
+import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, X } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 import pixelCoffeeIcon from '@/assets/pixel-coffee.gif';
 
@@ -163,6 +163,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   const [loopMode, setLoopMode] = useState<LoopMode>('all');
   const [progress, setProgress] = useState(0);   // 0–100
   const [duration, setDuration] = useState(0);   // seconds
+  const [volume, setVolumeState] = useState(0.8); // 0–1
 
   // Load library from DB on mount
   useEffect(() => {
@@ -277,86 +278,306 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setProgress(pct);
   }, []);
 
-  return { playing, toggle, syncPlayingState, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek };
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolumeState(clamped);
+    if (audioRef.current) audioRef.current.volume = clamped;
+  }, []);
+
+  // Sync volume on mount / audio element change
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, []);
+
+  return { playing, toggle, syncPlayingState, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek, volume, setVolume };
 }
 
-// ─── Wave Progress Bar ────────────────────────────────────────────────────────
-function WaveProgress({ progress, onSeek, disabled = false }: { progress: number; onSeek: (pct: number) => void; disabled?: boolean }) {
-  const POINTS = 40;
-  const W = 280;
-  const H = 28;
-  const filled = (progress / 100) * W;
-  const svgRef = useRef<SVGSVGElement>(null);
+// ─── Volume Knob ─────────────────────────────────────────────────────────────
+// Rotary dial: drag up/down to change volume. Click the center to mute/unmute.
+function VolumeKnob({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
+  const prevVolRef = useRef(volume); // remember last non-zero volume for unmute
+  const dragStartY = useRef<number | null>(null);
+  const dragStartVol = useRef(volume);
+  const [dragging, setDragging] = useState(false);
+
+  // Map volume 0–1 → rotation -135° to +135° (270° total sweep)
+  const rotation = -135 + volume * 270;
+
+  // Arc path for the filled portion (SVG)
+  const R = 18; // radius of arc
+  const CX = 24; const CY = 24; // center
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  function arcPoint(deg: number) {
+    return {
+      x: CX + R * Math.cos(toRad(deg - 90)),
+      y: CY + R * Math.sin(toRad(deg - 90)),
+    };
+  }
+  const startDeg = -135;
+  const endDeg = startDeg + volume * 270;
+  const largeArc = volume * 270 > 180 ? 1 : 0;
+  const p1 = arcPoint(startDeg);
+  const p2 = arcPoint(endDeg);
+  const arcPath = volume > 0.005
+    ? `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${R} ${R} 0 ${largeArc} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
+    : '';
+
+  // Tick mark (pointer line on the knob face)
+  const tickAngle = rotation;
+  const tickX2 = CX + 10 * Math.cos(toRad(tickAngle - 90));
+  const tickY2 = CY + 10 * Math.sin(toRad(tickAngle - 90));
+
+  function startDrag(clientY: number) {
+    dragStartY.current = clientY;
+    dragStartVol.current = volume;
+    setDragging(true);
+  }
+
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    startDrag(e.clientY);
+    const onMove = (ev: MouseEvent) => {
+      if (dragStartY.current === null) return;
+      const delta = (dragStartY.current - ev.clientY) / 120; // 120px = full sweep
+      onChange(Math.max(0, Math.min(1, dragStartVol.current + delta)));
+    };
+    const onUp = () => {
+      setDragging(false);
+      dragStartY.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    startDrag(e.touches[0].clientY);
+    const onMove = (ev: TouchEvent) => {
+      if (dragStartY.current === null) return;
+      const delta = (dragStartY.current - ev.touches[0].clientY) / 120;
+      onChange(Math.max(0, Math.min(1, dragStartVol.current + delta)));
+    };
+    const onEnd = () => {
+      setDragging(false);
+      dragStartY.current = null;
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onEnd);
+  }
+
+  function onWheel(e: React.WheelEvent) {
+    e.preventDefault();
+    onChange(Math.max(0, Math.min(1, volume - e.deltaY / 600)));
+  }
+
+  function onClickCenter(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (volume > 0) {
+      prevVolRef.current = volume;
+      onChange(0);
+    } else {
+      onChange(prevVolRef.current > 0 ? prevVolRef.current : 0.8);
+    }
+  }
+
+  const pct = Math.round(volume * 100);
+  const isMuted = volume === 0;
+
+  return (
+    <div className="flex flex-col items-center gap-1 select-none">
+      <div
+        className="relative"
+        style={{ width: 48, height: 48, cursor: dragging ? 'ns-resize' : 'grab' }}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onWheel={onWheel}
+        title={`Volume ${pct}% — drag up/down or scroll`}
+      >
+        <svg width="48" height="48" viewBox="0 0 48 48">
+          {/* Track ring (background) */}
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(200,149,108,0.15)" strokeWidth="3.5" />
+          {/* Filled arc */}
+          {arcPath && (
+            <path d={arcPath} fill="none" stroke="#c8956c" strokeWidth="3.5" strokeLinecap="round" />
+          )}
+          {/* Knob face */}
+          <circle
+            cx={CX} cy={CY} r={13}
+            fill="url(#knob-grad)"
+            stroke="rgba(200,149,108,0.3)"
+            strokeWidth="1.5"
+            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}
+            onClick={onClickCenter}
+          />
+          <defs>
+            <radialGradient id="knob-grad" cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#5a3a22" />
+              <stop offset="100%" stopColor="#2a1a0e" />
+            </radialGradient>
+          </defs>
+          {/* Tick pointer */}
+          <line
+            x1={CX} y1={CY}
+            x2={tickX2.toFixed(2)} y2={tickY2.toFixed(2)}
+            stroke={isMuted ? 'rgba(200,149,108,0.3)' : '#c8956c'}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* Mute X */}
+          {isMuted && (
+            <>
+              <line x1="20" y1="20" x2="28" y2="28" stroke="#c8956c" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="28" y1="20" x2="20" y2="28" stroke="#c8956c" strokeWidth="1.5" strokeLinecap="round" />
+            </>
+          )}
+        </svg>
+      </div>
+      <span className="text-[10px] font-mono text-[#9c7c5e] tabular-nums w-8 text-center">
+        {isMuted ? 'mute' : `${pct}%`}
+      </span>
+    </div>
+  );
+}
+
+// ─── Animated Waveform Progress ──────────────────────────────────────────────
+function WaveProgress({ progress, onSeek, playing, disabled = false }: {
+  progress: number;
+  onSeek: (pct: number) => void;
+  playing: boolean;
+  disabled?: boolean;
+}) {
+  const W = 280;   // visible width
+  const H = 32;    // height
+  const TILE = W;  // one tile = visible width; we render 3 tiles side-by-side
+  const POINTS = 48; // points per tile
+
+  const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
-  // Generate stable wave path
-  const wavePath = Array.from({ length: POINTS + 1 }, (_, i) => {
-    const x = (i / POINTS) * W;
-    const amp = 4 + Math.sin(i * 0.9) * 3;
-    const y = H / 2 + Math.sin(i * 0.7) * amp;
-    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(' ');
+  // Build one tile of wave points (stable — same shape every render)
+  const tilePath = useMemo(() => {
+    return Array.from({ length: POINTS + 1 }, (_, i) => {
+      const x = (i / POINTS) * TILE;
+      const amp = 3.5 + Math.sin(i * 1.1) * 2.5 + Math.sin(i * 0.4) * 1.5;
+      const y = H / 2 + Math.sin(i * 0.72) * amp;
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(' ');
+  }, []);
+
+  // Three tiles concatenated: tile0, tile1 (shifted +W), tile2 (shifted +2W)
+  const fullPath = useMemo(() => {
+    const shift = (offset: number) =>
+      Array.from({ length: POINTS + 1 }, (_, i) => {
+        const x = (i / POINTS) * TILE + offset;
+        const amp = 3.5 + Math.sin(i * 1.1) * 2.5 + Math.sin(i * 0.4) * 1.5;
+        const y = H / 2 + Math.sin(i * 0.72) * amp;
+        return `${i === 0 ? (offset === 0 ? 'M' : 'L') : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      }).join(' ');
+    return `${shift(0)} ${shift(TILE)} ${shift(TILE * 2)}`;
+  }, [tilePath]);
 
   function getPct(clientX: number): number {
-    const rect = svgRef.current?.getBoundingClientRect();
+    const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return 0;
     return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
   }
 
-  // Mouse events
   function onMouseDown(e: React.MouseEvent) {
     if (disabled) return;
     dragging.current = true;
     onSeek(getPct(e.clientX));
     const onMove = (ev: MouseEvent) => { if (dragging.current) onSeek(getPct(ev.clientX)); };
-    const onUp   = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const onUp = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }
 
-  // Touch events
   function onTouchStart(e: React.TouchEvent) {
     if (disabled) return;
     dragging.current = true;
     onSeek(getPct(e.touches[0].clientX));
     const onMove = (ev: TouchEvent) => { if (dragging.current) onSeek(getPct(ev.touches[0].clientX)); };
-    const onEnd  = () => { dragging.current = false; window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd); };
+    const onEnd = () => { dragging.current = false; window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd); };
     window.addEventListener('touchmove', onMove, { passive: true });
     window.addEventListener('touchend', onEnd);
   }
 
+  // HoneyJar thumb position (0–W)
   const thumbX = (progress / 100) * W;
+  // Filled clip width
+  const filledW = (progress / 100) * W;
 
   return (
     <div
-      className="relative w-full px-1 py-1 select-none"
-      style={{ touchAction: 'none', cursor: disabled ? 'default' : 'pointer' }}
+      ref={containerRef}
+      className="relative w-full select-none overflow-hidden"
+      style={{ height: H + 8, touchAction: 'none', cursor: disabled ? 'default' : 'pointer' }}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
     >
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        style={{ height: H }}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
+      {/* SVG canvas — 3× wide so the pan animation loops seamlessly */}
+      <motion.svg
+        viewBox={`0 0 ${W * 3} ${H}`}
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', top: 4, left: 0, width: W * 3, height: H }}
+        // Infinite pan: slide left by one tile width, then snap back
+        animate={playing ? { x: [0, -W] } : { x: 0 }}
+        transition={playing
+          ? { duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }
+          : { duration: 0 }
+        }
       >
-        {/* Background wave */}
-        <path d={wavePath} fill="none" stroke="rgba(200,149,108,0.2)" strokeWidth="2.5" strokeLinecap="round" />
-        {/* Filled wave (clip to progress) */}
-        <clipPath id="wave-clip">
-          <rect x="0" y="0" width={filled} height={H} />
-        </clipPath>
-        <path d={wavePath} fill="none" stroke="#c8956c" strokeWidth="2.5" strokeLinecap="round" clipPath="url(#wave-clip)" />
-        {/* HoneyJar thumb */}
-        <image
-          href={honeyJarIcon}
-          x={thumbX - 10}
-          y={H / 2 - 10}
-          width="20"
-          height="20"
-          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))', cursor: 'grab' }}
+        {/* Background (dim) wave — full 3 tiles */}
+        <path
+          d={fullPath}
+          fill="none"
+          stroke="rgba(200,149,108,0.18)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-      </svg>
+        {/* Filled (bright) wave — clipped to progress width, fixed in screen space */}
+        {/* We use a foreignObject trick: clip is in screen coords, wave pans under it */}
+        <clipPath id="wf-fill-clip">
+          {/* This rect is in the SVG's own coordinate space (3W wide).
+              We need it to cover [0, filledW] in screen space.
+              Since the SVG element itself is being translated by Framer Motion,
+              we compensate by shifting the clip rect by the same amount.
+              But clipPath coords are in SVG user space, so we just use filledW
+              directly — the clip moves with the SVG, which is what we want:
+              the filled portion always covers the left `progress%` of the bar. */}
+          <rect x="0" y="0" width={filledW} height={H} />
+        </clipPath>
+        <path
+          d={fullPath}
+          fill="none"
+          stroke="#c8956c"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          clipPath="url(#wf-fill-clip)"
+        />
+      </motion.svg>
+
+      {/* HoneyJar thumb — positioned in screen space (not inside the panning SVG) */}
+      <img
+        src={honeyJarIcon}
+        alt=""
+        draggable={false}
+        style={{
+          position: 'absolute',
+          top: H / 2 - 10 + 4,
+          left: thumbX - 10,
+          width: 20,
+          height: 20,
+          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))',
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      />
     </div>
   );
 }
@@ -429,7 +650,7 @@ function MusicPanel({
       <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
-            <ListMusic className="w-3.5 h-3.5 text-[#c8956c]" />
+            <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }} />
             <span className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c]">เพลงที่กำลังเล่น</span>
           </div>
           <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors p-0.5">
@@ -455,6 +676,7 @@ function MusicPanel({
         <WaveProgress
           progress={player.progress}
           onSeek={player.seek}
+          playing={player.playing}
           disabled={!player.duration || !isFinite(player.duration)}
         />
         <div className="flex justify-between text-[10px] text-[#9c7c5e] px-1 -mt-0.5">
@@ -462,8 +684,9 @@ function MusicPanel({
           <span>{formatTime(player.duration)}</span>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-4 mt-3">
+        {/* Controls + Volume */}
+        <div className="flex items-center justify-center gap-3 mt-3">
+          {/* Loop */}
           <button
             onClick={player.cycleLoop}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
@@ -474,6 +697,7 @@ function MusicPanel({
             {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
           </button>
 
+          {/* Play/Pause */}
           <button
             onClick={player.toggle}
             className="w-12 h-12 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-lg"
@@ -490,6 +714,7 @@ function MusicPanel({
             )}
           </button>
 
+          {/* Skip */}
           <button
             onClick={player.skipNext}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
@@ -497,6 +722,9 @@ function MusicPanel({
           >
             <SkipForward className="w-4 h-4" />
           </button>
+
+          {/* Volume knob */}
+          <VolumeKnob volume={player.volume} onChange={player.setVolume} />
         </div>
       </div>
 
@@ -824,6 +1052,30 @@ function TutorialOverlay({
   );
 }
 
+// ─── Match notification sound (Web Audio API — no file needed) ───────────────
+function playMatchSound() {
+  try {
+    const ctx = new AudioContext();
+    // Two-tone "ding ding" chime
+    const notes = [880, 1108]; // A5, C#6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.18 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.55);
+    });
+    // Auto-close context after sound finishes
+    setTimeout(() => ctx.close(), 1500);
+  } catch {}
+}
+
 export default function SecretChatRoom() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -983,6 +1235,26 @@ export default function SecretChatRoom() {
     // Record when we started waiting (for similar-phase delay)
     matchStartRef.current = Date.now();
 
+    // ── Cleanup helper — removes THIS user's queue entry ──────────────────────
+    // Called both on unmount and on beforeunload so stale entries don't linger.
+    const cleanupQueue = () => {
+      (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+    };
+
+    // Also clean up stale entries older than 5 minutes (left by crashed sessions)
+    const cleanupStale = async () => {
+      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      await (supabase as any)
+        .from('chat_queue')
+        .delete()
+        .lt('joined_at', cutoff);
+    };
+    cleanupStale();
+
+    // beforeunload: fires when user closes tab / navigates away
+    const onBeforeUnload = () => cleanupQueue();
+    window.addEventListener('beforeunload', onBeforeUnload);
+
     const tryMatch = async () => {
       const elapsedSeconds = (Date.now() - matchStartRef.current) / 1000;
       const inSimilarPhase = moodConfig.enabled && elapsedSeconds >= moodConfig.similar_phase_delay_seconds;
@@ -1035,6 +1307,7 @@ export default function SecretChatRoom() {
         (supabase as any).from('chat_queue').delete().eq('user_id', user.id),
         (supabase as any).from('chat_queue').delete().eq('user_id', partner.user_id),
       ]);
+      playMatchSound();
       setSession(sess);
       setMatchStatus('matched');
     };
@@ -1050,6 +1323,7 @@ export default function SecretChatRoom() {
         filter: `user_b_id=eq.${user.id}`,
       }, async (payload) => {
         await (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+        playMatchSound();
         setSession(payload.new as ChatSession);
         setMatchStatus('matched');
       })
@@ -1058,7 +1332,8 @@ export default function SecretChatRoom() {
     return () => {
       clearInterval(interval);
       supabase.removeChannel(queueChannel);
-      (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      cleanupQueue();
     };
   }, [user, topicId, alias, avatar, matchStatus, moodConfig]);
 
