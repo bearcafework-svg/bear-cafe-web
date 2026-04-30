@@ -840,8 +840,8 @@ export default function SecretChatRoom() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
-    if (!user || !topicId || !alias) navigate('/secret-chat');
-  }, [user, topicId, alias, navigate]);
+    if (!topicId || !alias) navigate('/secret-chat');
+  }, [topicId, alias, navigate]);
 
   useEffect(() => {
     loadBannedWords().then(setBannedWords);

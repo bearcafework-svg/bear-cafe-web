@@ -123,7 +123,8 @@ export default function SecretChatMenu() {
   }, [profiles]);
 
   const enterQueue = useCallback(async () => {
-    if (!user || !selectedCategory || !alias || !selectedProfile) return;
+    if (!user) { navigate('/login'); return; }
+    if (!selectedCategory || !alias || !selectedProfile) return;
     setEntering(true);
     try {
       await (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
@@ -144,28 +145,11 @@ export default function SecretChatMenu() {
     }
   }, [user, selectedCategory, alias, selectedProfile, selectedRole, navigate]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#fdf8f3] to-[#f5ede4] dark:from-[#1a1410] dark:to-[#221810]">
-        <div className="text-center space-y-5 px-8 max-w-sm">
-          <div className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl mx-auto shadow-lg">☕</div>
-          <div>
-            <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">คาเฟ่ลับ</h1>
-            <p className="text-sm text-[#9c7c5e] mt-2 leading-relaxed">พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน<br />กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
-          </div>
-          <Button onClick={() => navigate('/login')} className="w-full h-12 bg-[#c8956c] hover:bg-[#b07d58] text-white text-base font-semibold rounded-xl">
-            เข้าสู่ระบบ
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 ${theme.bg}`}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/60 dark:bg-black/30 backdrop-blur-xl border-b border-white/30 dark:border-white/10">
-        <div className="max-w-2xl mx-auto px-3 py-2.5 flex items-center gap-2.5">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost" size="icon"
             onClick={() => step === 'role' ? setStep('category') : navigate('/')}
@@ -174,23 +158,23 @@ export default function SecretChatMenu() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
 
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${theme.accent}25` }}>
-              <Coffee className="w-4 h-4" style={{ color: theme.accent }} />
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${theme.accent}25` }}>
+              <Coffee className="w-4.5 h-4.5" style={{ color: theme.accent }} />
             </div>
             <div>
-              <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">คาเฟ่ลับ</h1>
-              <p className="text-[10px] text-[#9c7c5e]">
+              <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">คาเฟ่ลับ</h1>
+              <p className="text-[11px] text-[#9c7c5e]">
                 {step === 'category' ? 'เลือกหมวดสนทนา' : `${selectedCategory?.name} · เลือกบทบาท`}
               </p>
             </div>
           </div>
 
           {/* Step indicator */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {(['category', 'role'] as const).map((s) => (
-              <div key={s} className="flex items-center gap-1">
-                <div className={`h-1.5 rounded-full transition-all duration-300 ${step === s ? 'w-5' : 'w-1.5 opacity-40'}`}
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={`h-2 rounded-full transition-all duration-300 ${step === s ? 'w-6' : 'w-2 opacity-40'}`}
                   style={{ background: theme.accent }} />
               </div>
             ))}
@@ -198,7 +182,7 @@ export default function SecretChatMenu() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-3 sm:px-5 py-4 pb-10">
+      <main className="max-w-3xl mx-auto px-4 sm:px-8 py-6 pb-12">
         <AnimatePresence mode="wait">
 
           {/* ── Step 1: Category ── */}
@@ -206,59 +190,59 @@ export default function SecretChatMenu() {
             <motion.div key="category" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
 
               {/* Hero */}
-              <div className="text-center space-y-2 pt-2">
+              <div className="text-center space-y-3 pt-4">
                 <motion.div
-                  animate={{ y: [0, -5, 0] }}
+                  animate={{ y: [0, -6, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-16 h-16 rounded-2xl bg-white/70 dark:bg-white/10 backdrop-blur-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-3xl mx-auto shadow-lg"
+                  className="w-20 h-20 rounded-3xl bg-white/70 dark:bg-white/10 backdrop-blur-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-4xl mx-auto shadow-lg"
                 >
                   ☕
                 </motion.div>
                 <div>
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60 mb-0.5">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60 mb-1">
                     คาเฟ่ลับเปิดใจ
                   </p>
-                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">เลือกหมวดสนทนา</h2>
-                  <p className="text-xs text-[#9c7c5e] mt-1 leading-relaxed max-w-xs mx-auto">
-                    พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน คุยได้อย่างสบายใจ
+                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">เลือกหมวดสนทนา</h2>
+                  <p className="text-sm text-[#9c7c5e] mt-1.5 leading-relaxed max-w-sm mx-auto">
+                    พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน คุยได้อย่างสบายใจในแบบของคุณ
                   </p>
                 </div>
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-2">
+                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
                   วันนี้อยากคุยเรื่องอะไร?
                 </p>
 
                 {loading ? (
-                  <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#9c7c5e]" /></div>
+                  <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-[#9c7c5e]" /></div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {categories.map((cat, i) => {
                       const t = getTheme(cat.name);
                       return (
                         <motion.button
                           key={cat.id}
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          whileHover={{ y: -2, scale: 1.01 }}
+                          transition={{ delay: i * 0.06 }}
+                          whileHover={{ y: -3, scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => { setSelectedCategory(cat); setStep('role'); }}
-                          className="group w-full text-left rounded-xl border border-white/60 dark:border-white/10 p-4 transition-all bg-white/70 dark:bg-black/20 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-black/30 shadow-sm hover:shadow-md"
+                          className="group w-full text-left rounded-2xl border border-white/60 dark:border-white/10 p-5 transition-all bg-white/70 dark:bg-black/20 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-black/30 shadow-sm hover:shadow-lg"
                         >
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-4">
                             {cat.image_url ? (
-                              <img src={cat.image_url} alt={cat.name} className="w-11 h-11 rounded-xl object-cover shrink-0 shadow-sm" />
+                              <img src={cat.image_url} alt={cat.name} className="w-14 h-14 rounded-2xl object-cover shrink-0 shadow-sm" />
                             ) : (
-                              <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-sm" style={{ background: `${t.accent}20` }}>
+                              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm" style={{ background: `${t.accent}20` }}>
                                 ☕
                               </div>
                             )}
                             <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{cat.name}</p>
+                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">{cat.name}</p>
                               {cat.description && (
-                                <p className="text-xs text-[#9c7c5e] mt-0.5 leading-relaxed line-clamp-2">{cat.description}</p>
+                                <p className="text-sm text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
                               )}
                             </div>
                             <ChevronRight className="w-4 h-4 text-[#c8b09a] dark:text-[#5a4030] shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
@@ -274,20 +258,20 @@ export default function SecretChatMenu() {
 
           {/* ── Step 2: Role + Identity ── */}
           {step === 'role' && selectedCategory && (
-            <motion.div key="role" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
+            <motion.div key="role" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
 
               {/* Hero label */}
-              <div className="text-center pt-1">
-                <p className="text-[10px] font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60">
+              <div className="text-center pt-4 space-y-1">
+                <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60">
                   คาเฟ่ลับเปิดใจ · เลือกบทบาท
                 </p>
               </div>
 
               {/* Category pill */}
               <div className="flex justify-center">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm ${theme.pill}`}>
+                <span className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full shadow-sm ${theme.pill}`}>
                   {selectedCategory.image_url
-                    ? <img src={selectedCategory.image_url} className="w-4 h-4 rounded-md object-cover" alt="" />
+                    ? <img src={selectedCategory.image_url} className="w-5 h-5 rounded-md object-cover" alt="" />
                     : '☕'}
                   {selectedCategory.name}
                 </span>
@@ -295,10 +279,10 @@ export default function SecretChatMenu() {
 
               {/* Role selection */}
               <div>
-                <p className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-2">
+                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
                   คุณอยากเป็นฝ่ายไหนในการสนทนา?
                 </p>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   {roles.map(r => {
                     const active = selectedRole === r.key;
                     return (
@@ -307,30 +291,30 @@ export default function SecretChatMenu() {
                         whileHover={{ y: -2 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={() => setSelectedRole(r.key)}
-                        className={`rounded-xl border-2 p-3 text-left transition-all backdrop-blur-sm ${
-                          active ? 'shadow-md' : 'border-white/40 dark:border-white/10 bg-white/50 dark:bg-black/10 hover:bg-white/70 dark:hover:bg-black/20'
+                        className={`rounded-2xl border-2 p-4 text-left transition-all backdrop-blur-sm ${
+                          active ? 'shadow-lg' : 'border-white/40 dark:border-white/10 bg-white/50 dark:bg-black/10 hover:bg-white/70 dark:hover:bg-black/20'
                         }`}
                         style={active ? {
                           borderColor: theme.accent,
                           background: `${theme.accent}12`,
-                          boxShadow: `0 4px 16px ${theme.accent}25`,
+                          boxShadow: `0 4px 20px ${theme.accent}25`,
                         } : {}}
                       >
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2.5">
                           {r.image_url ? (
-                            <img src={r.image_url} alt={r.label} className="w-8 h-8 rounded-lg object-cover" />
+                            <img src={r.image_url} alt={r.label} className="w-10 h-10 rounded-xl object-cover" />
                           ) : (
-                            <span className="text-xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
+                            <span className="text-2xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
                           )}
                           <div>
-                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{r.label}</p>
-                            <p className="text-[11px] text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
+                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{r.label}</p>
+                            <p className="text-xs text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
                           </div>
                         </div>
                         {active && (
-                          <div className="mt-1.5 flex justify-end">
-                            <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: theme.accent }}>
-                              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <div className="mt-2 flex justify-end">
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: theme.accent }}>
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>
                             </div>
@@ -343,24 +327,24 @@ export default function SecretChatMenu() {
               </div>
 
               {/* Alias + Profile row */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Alias */}
                 <div>
-                  <p className="text-[10px] font-semibold text-[#9c7c5e] uppercase tracking-wider mb-1.5">ชื่อสมมติ</p>
-                  <div className="flex items-center gap-2.5 bg-white/70 dark:bg-black/20 backdrop-blur-sm rounded-xl px-3.5 py-3 border border-white/50 dark:border-white/10 shadow-sm">
+                  <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">ชื่อสมมติ</p>
+                  <div className="flex items-center gap-3 bg-white/70 dark:bg-black/20 backdrop-blur-sm rounded-2xl px-4 py-3.5 border border-white/50 dark:border-white/10 shadow-sm">
                     {rollingAlias ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#9c7c5e] mx-auto" />
+                      <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e] mx-auto" />
                     ) : (
-                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-base">{alias}</span>
+                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-lg">{alias}</span>
                     )}
                     <button
                       onClick={rollAlias}
                       disabled={rollingAlias}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0"
+                      className="w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
                       style={{ background: `${theme.accent}20`, color: theme.accent }}
                       title="สุ่มใหม่"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -368,9 +352,9 @@ export default function SecretChatMenu() {
                 {/* Profile — game-style horizontal scroll selector */}
                 {profiles.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">รูปโปรไฟล์</p>
+                    <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-3">รูปโปรไฟล์</p>
                     <div className="relative">
-                      <div className="flex gap-2.5 overflow-x-auto pb-1.5 snap-x snap-mandatory scrollbar-hide"
+                      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {profiles.map(p => {
                           const active = selectedProfile?.id === p.id;
@@ -379,16 +363,15 @@ export default function SecretChatMenu() {
                               key={p.id}
                               onClick={() => setSelectedProfile(p)}
                               whileTap={{ scale: 0.93 }}
-                              className="flex flex-col items-center gap-1.5 shrink-0 snap-center"
-                              style={{ width: 64 }}
+                              className="flex flex-col items-center gap-2 shrink-0 snap-center"
+                              style={{ width: 80 }}
                             >
                               <div
-                                className="relative rounded-xl overflow-hidden transition-all duration-200"
+                                className="relative w-16 h-16 rounded-2xl overflow-hidden transition-all duration-200"
                                 style={{
-                                  width: 48, height: 48,
-                                  border: active ? `2.5px solid ${theme.accent}` : '2.5px solid transparent',
-                                  boxShadow: active ? `0 0 0 2px ${theme.accent}40, 0 6px 16px ${theme.accent}30` : '0 2px 6px rgba(0,0,0,0.1)',
-                                  transform: active ? 'scale(1.07)' : 'scale(1)',
+                                  border: active ? `3px solid ${theme.accent}` : '3px solid transparent',
+                                  boxShadow: active ? `0 0 0 3px ${theme.accent}40, 0 8px 20px ${theme.accent}30` : '0 2px 8px rgba(0,0,0,0.1)',
+                                  transform: active ? 'scale(1.08)' : 'scale(1)',
                                 }}
                               >
                                 <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
@@ -396,17 +379,17 @@ export default function SecretChatMenu() {
                                   <motion.div
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
-                                    className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                                    className="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
                                     style={{ background: theme.accent }}
                                   >
-                                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                     </svg>
                                   </motion.div>
                                 )}
                               </div>
                               <span
-                                className="text-[10px] leading-tight text-center w-full font-medium break-words"
+                                className="text-[11px] leading-tight text-center w-full font-medium break-words"
                                 style={{ color: active ? theme.accent : '#9c7c5e' }}
                               >
                                 {p.name}
@@ -416,7 +399,7 @@ export default function SecretChatMenu() {
                         })}
                       </div>
                       {profiles.length > 4 && (
-                        <div className="absolute right-0 top-0 bottom-1.5 w-6 pointer-events-none"
+                        <div className="absolute right-0 top-0 bottom-2 w-8 pointer-events-none"
                           style={{ background: `linear-gradient(to right, transparent, ${theme.accent}15)` }} />
                       )}
                     </div>
@@ -429,16 +412,16 @@ export default function SecretChatMenu() {
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/80 dark:bg-black/25 backdrop-blur-sm rounded-xl border border-white/60 dark:border-white/10 p-3 flex items-center gap-3 shadow-sm"
+                  className="bg-white/80 dark:bg-black/25 backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 p-4 flex items-center gap-4 shadow-sm"
                 >
-                  <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm" />
+                  <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-12 h-12 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{alias || '...'}</p>
-                    <p className="text-[11px] text-[#9c7c5e] mt-0.5">
+                    <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base truncate">{alias || '...'}</p>
+                    <p className="text-xs text-[#9c7c5e] mt-0.5">
                       {roles.find(r => r.key === selectedRole)?.label} · {selectedCategory.name}
                     </p>
                   </div>
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0" style={{ background: `${theme.accent}20`, color: theme.accent }}>
+                  <span className="text-xs font-semibold px-3 py-1.5 rounded-full shrink-0" style={{ background: `${theme.accent}20`, color: theme.accent }}>
                     พร้อมแล้ว
                   </span>
                 </motion.div>
@@ -450,17 +433,17 @@ export default function SecretChatMenu() {
                 whileTap={{ scale: 0.98 }}
                 onClick={enterQueue}
                 disabled={entering || !alias || !selectedProfile}
-                className="w-full h-12 rounded-xl text-white font-bold text-sm transition-all disabled:opacity-40 shadow-lg flex items-center justify-center gap-2"
+                className="w-full h-14 rounded-2xl text-white font-bold text-base transition-all disabled:opacity-40 shadow-xl flex items-center justify-center gap-2"
                 style={{ background: `linear-gradient(135deg, ${theme.accent} 0%, ${theme.accent}bb 100%)` }}
               >
                 {entering ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> กำลังหาคู่สนทนา...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> กำลังหาคู่สนทนา...</>
                 ) : (
-                  <>เข้าคาเฟ่ลับ <ChevronRight className="w-4 h-4" /></>
+                  <>เข้าคาเฟ่ลับ <ChevronRight className="w-5 h-5" /></>
                 )}
               </motion.button>
 
-              <p className="text-center text-[11px] text-[#9c7c5e]">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
+              <p className="text-center text-xs text-[#9c7c5e]">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
             </motion.div>
           )}
 
