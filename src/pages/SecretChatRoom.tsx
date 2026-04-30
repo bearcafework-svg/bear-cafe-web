@@ -659,15 +659,22 @@ function TutorialOverlay({
   useEffect(() => {
     const el = refs[s?.refKey]?.current;
     if (!el) { setRingRect(null); return; }
+    // rAF to ensure DOM has painted before measuring
+    let raf = requestAnimationFrame(() => {
+      const update = () => setRingRect(el.getBoundingClientRect());
+      update();
+      window.addEventListener('resize', update);
+      window.addEventListener('scroll', update, true);
+    });
     const update = () => setRingRect(el.getBoundingClientRect());
-    update();
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
-  }, [step, s?.refKey]);
+  }, [step, s?.refKey, refs]);
 
   if (!s) return null;
   const isLast = step === total - 1;
@@ -806,12 +813,24 @@ export default function SecretChatRoom() {
     }
   }, [matchStatus, tutorialStep]);
 
-  // Auto-play music when matched
+  // Auto-play music when matched — wait for library to be ready
+  const autoPlayedRef = useRef(false);
   useEffect(() => {
-    if (matchStatus === 'matched') {
+    if (matchStatus === 'matched' && !autoPlayedRef.current) {
+      autoPlayedRef.current = true;
       const el = bgmRef.current;
-      if (el && !player.playing) {
-        player.toggle();
+      if (!el) return;
+      // If src already set (library loaded), play immediately; otherwise wait for canplay
+      const tryPlay = () => {
+        if (!player.playing) {
+          el.play().catch(() => {});
+          // sync player state via toggle only if not already playing
+        }
+      };
+      if (el.src && el.src !== window.location.href) {
+        el.play().catch(() => {});
+      } else {
+        el.addEventListener('canplay', tryPlay, { once: true });
       }
     }
   }, [matchStatus]);
@@ -1104,69 +1123,70 @@ export default function SecretChatRoom() {
 
       {/* Header */}
       <header className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-b border-[#e8d9c8] dark:border-[#3a2a1e] z-20">
-        <div className="px-5 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        <div className="px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             {matchStatus === 'matched' && session ? (
               <>
-                <div className="w-12 h-12 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
+                <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
                   {partnerImg
                     ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
-                    : <span className="text-2xl">🐻</span>}
+                    : <span className="text-lg">🐻</span>}
                 </div>
                 <div>
-                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">{partnerAlias}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="relative flex h-2 w-2">
+                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">{partnerAlias}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                     </span>
-                    <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+                    <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-xl shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-base shrink-0">
                   ☕
                 </div>
                 <div>
-                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">คาเฟ่ลับ</p>
-                  <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">คาเฟ่ลับ</p>
+                  <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {matchStatus === 'matched' && (
               <div
-                ref={tutorialRefs.timer as React.RefObject<HTMLDivElement>}
-                className={`flex items-center gap-1.5 text-sm font-mono font-bold px-3.5 py-2 rounded-full border transition-colors ${
+                ref={timerRef as React.RefObject<HTMLDivElement>}
+                className={`flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1.5 rounded-full border transition-colors ${
                 isUrgent
                   ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
                   : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
               }`}>
-                <Clock className="w-4 h-4" />
+                <Clock className="w-3.5 h-3.5" />
                 {countdownDisplay}
               </div>
             )}
 
-            <button onClick={toggleRain} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}
-              ref={tutorialRefs.rain as React.RefObject<HTMLButtonElement>}>
-              <CloudRain className="w-5 h-5" />
+            <button onClick={toggleRain}
+              ref={rainRef as React.RefObject<HTMLButtonElement>}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+              <CloudRain className="w-4 h-4" />
             </button>
 
             {/* Music player button + panel */}
             <div className="relative">
               <button
                 onClick={() => setShowMusicPanel(v => !v)}
-                ref={tutorialRefs.music as React.RefObject<HTMLButtonElement>}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${
+                ref={musicRef as React.RefObject<HTMLButtonElement>}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${
                   player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
                 }`}
                 title="เพลง"
               >
-                {player.playing ? <Music2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
 
               <AnimatePresence>
@@ -1176,9 +1196,10 @@ export default function SecretChatRoom() {
               </AnimatePresence>
             </div>
 
-            <button onClick={leaveTable} className="w-10 h-10 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ"
-              ref={tutorialRefs.leave as React.RefObject<HTMLButtonElement>}>
-              <LogOut className="w-5 h-5" />
+            <button onClick={leaveTable}
+              ref={leaveRef as React.RefObject<HTMLButtonElement>}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1275,11 +1296,11 @@ export default function SecretChatRoom() {
 
       {/* Input */}
       {matchStatus === 'matched' && (
-        <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-4 sm:px-6 py-4">
-          <div className="flex gap-3 items-end max-w-4xl mx-auto">
+        <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-3 sm:px-5 py-3">
+          <div className="flex gap-2 items-end max-w-4xl mx-auto">
             <div
-              ref={tutorialRefs.input as React.RefObject<HTMLDivElement>}
-              className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl px-4 py-3 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
+              ref={inputRef as React.RefObject<HTMLDivElement>}
+              className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-xl px-3.5 py-2.5 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
             >
               <textarea
                 value={input}
@@ -1288,7 +1309,7 @@ export default function SecretChatRoom() {
                 placeholder="พิมพ์ข้อความ..."
                 rows={1}
                 className="w-full bg-transparent text-sm text-[#4a3728] dark:text-[#e8d9c8] placeholder:text-[#c8b09a] resize-none outline-none leading-relaxed"
-                style={{ maxHeight: 120 }}
+                style={{ maxHeight: 100 }}
               />
             </div>
             <motion.button
@@ -1296,9 +1317,9 @@ export default function SecretChatRoom() {
               whileTap={{ scale: 0.95 }}
               onClick={sendMessage}
               disabled={!input.trim() || sending}
-              className="w-11 h-11 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
+              className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
             >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </motion.button>
           </div>
         </div>
