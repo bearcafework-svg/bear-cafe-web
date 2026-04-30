@@ -42,7 +42,8 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-// ─── FFmpeg Converter (dynamic import — only loads when needed) ───────────────
+// ─── Audio Converter (Web Audio API + MediaRecorder — no WASM needed) ─────────
+// Decodes audio via AudioContext, re-encodes via MediaRecorder to webm/opus
 interface ConvertResult {
   blob: Blob;
   originalSize: number;
@@ -53,43 +54,76 @@ async function convertToWebm(
   file: File,
   onProgress: (pct: number) => void,
 ): Promise<ConvertResult> {
-  // Dynamic import: @ffmpeg/ffmpeg is NOT bundled into the main chunk
-  const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-  const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
+  onProgress(5);
 
-  const ffmpeg = new FFmpeg();
+  // 1. Decode the source audio into raw PCM via AudioContext
+  const arrayBuffer = await file.arrayBuffer();
+  onProgress(20);
 
-  // Load core via CDN to avoid bundling ~30 MB into the app
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  const offlineCtx = new OfflineAudioContext(2, 1, 44100);
+  let audioBuffer: AudioBuffer;
+  try {
+    audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+  } catch {
+    // Fallback: try with a standard AudioContext
+    const ctx = new AudioContext();
+    audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    ctx.close();
+  }
+  onProgress(40);
+
+  // 2. Re-render through OfflineAudioContext at target sample rate
+  const sampleRate = 44100;
+  const renderCtx = new OfflineAudioContext(
+    audioBuffer.numberOfChannels,
+    Math.ceil(audioBuffer.duration * sampleRate),
+    sampleRate,
+  );
+  const src = renderCtx.createBufferSource();
+  src.buffer = audioBuffer;
+  src.connect(renderCtx.destination);
+  src.start(0);
+  const renderedBuffer = await renderCtx.startRendering();
+  onProgress(60);
+
+  // 3. Encode to webm/opus via MediaRecorder
+  // Convert AudioBuffer → MediaStream via AudioContext + createMediaStreamDestination
+  const streamCtx = new AudioContext({ sampleRate });
+  const dest = streamCtx.createMediaStreamDestination();
+  const bufSrc = streamCtx.createBufferSource();
+  bufSrc.buffer = renderedBuffer;
+  bufSrc.connect(dest);
+
+  // Pick best supported mime type
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm')
+    ? 'audio/webm'
+    : 'audio/ogg;codecs=opus';
+
+  const recorder = new MediaRecorder(dest.stream, {
+    mimeType,
+    audioBitsPerSecond: 64_000,
   });
 
-  ffmpeg.on('progress', ({ progress }) => {
-    onProgress(Math.min(99, Math.round(progress * 100)));
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  await new Promise<void>((resolve, reject) => {
+    recorder.onstop = () => resolve();
+    recorder.onerror = e => reject(new Error(`MediaRecorder error: ${(e as any).error?.message ?? 'unknown'}`));
+    recorder.start(100); // collect in 100ms chunks
+    bufSrc.start(0);
+    bufSrc.onended = () => {
+      setTimeout(() => recorder.stop(), 200); // small buffer after audio ends
+    };
   });
 
-  const ext = file.name.split('.').pop() ?? 'mp3';
-  const inputName = `input.${ext}`;
-  const outputName = 'output.webm';
+  streamCtx.close();
+  onProgress(95);
 
-  await ffmpeg.writeFile(inputName, await fetchFile(file));
-  await ffmpeg.exec([
-    '-i', inputName,
-    '-c:a', 'libopus',
-    '-b:a', '64k',
-    '-vbr', 'on',
-    '-compression_level', '10',
-    outputName,
-  ]);
-
-  const data = await ffmpeg.readFile(outputName);
-  const blob = new Blob([data as Uint8Array], { type: 'audio/webm' });
-
-  await ffmpeg.deleteFile(inputName).catch(() => {});
-  await ffmpeg.deleteFile(outputName).catch(() => {});
-  ffmpeg.terminate();
+  const blob = new Blob(chunks, { type: mimeType });
+  onProgress(100);
 
   return { blob, originalSize: file.size, convertedSize: blob.size };
 }
@@ -249,12 +283,14 @@ function UploadTab({
       // ── Step 2: Upload .webm to Supabase Storage ──
       updateItem(idx, { status: 'uploading', progress: 70 });
       try {
-        const path = `${Date.now()}_${sanitizeFilename(item.title)}.webm`;
-        console.log(`[upload] ☁️ [${idx}] กำลังอัปโหลดไปที่ bucket "chat-music", path="${path}", size=${formatBytes(convertedSize)}`);
+        const ext = convertedBlob.type.includes('ogg') ? 'ogg' : 'webm';
+        const path = `${Date.now()}_${sanitizeFilename(item.title)}.${ext}`;
+        const contentType = convertedBlob.type || 'audio/webm';
+        console.log(`[upload] ☁️ [${idx}] กำลังอัปโหลดไปที่ bucket "chat-music", path="${path}", size=${formatBytes(convertedSize)}, type=${contentType}`);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('chat-music')
-          .upload(path, convertedBlob, { contentType: 'audio/webm' });
+          .upload(path, convertedBlob, { contentType });
 
         if (uploadError) {
           console.error(`[upload] ❌ [${idx}] Storage error:`, JSON.stringify(uploadError, null, 2));
