@@ -790,22 +790,29 @@ export default function SecretChatRoom() {
     if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
   };
 
-  // Refs for tutorial highlight — attached to actual DOM elements
-  const tutorialRefs: TutorialRefs = {
-    rain:  useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
-    music: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
-    leave: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
-    timer: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
-    input: useRef<HTMLElement>(null) as React.RefObject<HTMLElement>,
-  };
+  // Refs for tutorial highlight — must be stable (not recreated each render)
+  const rainRef  = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
+  const musicRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
+  const leaveRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
+  const timerRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
+  const inputRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
+  const tutorialRefs: TutorialRefs = { rain: rainRef, music: musicRef, leave: leaveRef, timer: timerRef, input: inputRef };
 
   // Advance tutorial to post-match steps when matched
   useEffect(() => {
-    if (matchStatus === 'matched' && tutorialStep === 3) {
-      // already at post-match step, do nothing
-    } else if (matchStatus === 'matched' && tutorialStep >= 0 && tutorialStep < 3) {
+    if (matchStatus === 'matched' && tutorialStep >= 0 && tutorialStep < 3) {
       // skip waiting steps, jump to post-match
       setTutorialStep(3);
+    }
+  }, [matchStatus, tutorialStep]);
+
+  // Auto-play music when matched
+  useEffect(() => {
+    if (matchStatus === 'matched') {
+      const el = bgmRef.current;
+      if (el && !player.playing) {
+        player.toggle();
+      }
     }
   }, [matchStatus]);
 

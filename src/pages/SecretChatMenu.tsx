@@ -215,7 +215,10 @@ export default function SecretChatMenu() {
                   ☕
                 </motion.div>
                 <div>
-                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">คาเฟ่ลับ</h2>
+                  <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60 mb-1">
+                    คาเฟ่ลับเปิดใจ
+                  </p>
+                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">เลือกบทบาท</h2>
                   <p className="text-sm text-[#9c7c5e] mt-1.5 leading-relaxed max-w-sm mx-auto">
                     พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน<br />คุยได้อย่างสบายใจในแบบของคุณ
                   </p>
@@ -272,6 +275,13 @@ export default function SecretChatMenu() {
           {/* ── Step 2: Role + Identity ── */}
           {step === 'role' && selectedCategory && (
             <motion.div key="role" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
+
+              {/* Hero label */}
+              <div className="text-center pt-2 space-y-1">
+                <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60">
+                  คาเฟ่ลับเปิดใจ · เลือกบทบาท
+                </p>
+              </div>
 
               {/* Category pill */}
               <div className="flex justify-center pt-2">
