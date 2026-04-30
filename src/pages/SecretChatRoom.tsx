@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ChevronDown, ListMusic, X } from 'lucide-react';
+import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, ListMusic, X } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 
 interface Message {
@@ -243,6 +243,12 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     }
   }, [playing, currentTrack]);
 
+  // Start playback from outside the hook (e.g. inside a click handler for autoplay unlock).
+  // Caller is responsible for calling el.play() directly; this just syncs the state.
+  const syncPlayingState = useCallback((isPlaying: boolean) => {
+    setPlaying(isPlaying);
+  }, []);
+
   const skipNext = useCallback(() => {
     const next = (trackIdx + 1) % currentCat.tracks.length;
     setTrackIdx(next);
@@ -268,7 +274,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setProgress(pct);
   }, []);
 
-  return { playing, toggle, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek };
+  return { playing, toggle, syncPlayingState, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek };
 }
 
 // ─── Wave Progress Bar ────────────────────────────────────────────────────────
@@ -798,6 +804,13 @@ export default function SecretChatRoom() {
   const leaveRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
+  // "Join Table" overlay — shown when a match is found, dismissed by user click.
+  // The click IS a user gesture, so audio play is allowed by the browser.
+  const [showJoinOverlay, setShowJoinOverlay] = useState(false);
+  // isRoomReady: true only after the user has dismissed the join overlay,
+  // guaranteeing all room UI elements (timer, input) are fully mounted.
+  const [isRoomReady, setIsRoomReady] = useState(false);
+
   // Stable object — only recreated if refs themselves change (they don't)
   const tutorialRefs = useMemo<TutorialRefs>(() => ({
     rain:  rainRef  as React.RefObject<HTMLElement>,
@@ -807,24 +820,39 @@ export default function SecretChatRoom() {
     input: inputRef as React.RefObject<HTMLElement>,
   }), []);
 
-  // Advance tutorial to post-match steps when matched
+  // Advance tutorial to post-match steps ONLY after isRoomReady is true.
+  // This guarantees the timer and input elements are fully mounted and painted
+  // before TutorialOverlay tries to measure their DOMRects.
   useEffect(() => {
-    if (matchStatus === 'matched' && tutorialStep >= 0 && tutorialStep < 3) {
-      // skip waiting steps, jump to post-match
-      setTutorialStep(3);
+    if (isRoomReady && tutorialStep >= 0 && tutorialStep < 3) {
+      // Give one extra frame for the room UI to finish painting
+      const raf = requestAnimationFrame(() => setTutorialStep(3));
+      return () => cancelAnimationFrame(raf);
     }
-  }, [matchStatus, tutorialStep]);
+  }, [isRoomReady, tutorialStep]);
 
-  // Auto-play music when matched
-  // player.toggle() syncs both the audio element AND the playing state
-  // We wait until library is loaded (player.currentTrack.src exists) before toggling
-  const autoPlayedRef = useRef(false);
+  // Show the join overlay as soon as a match is found
   useEffect(() => {
-    if (matchStatus !== 'matched' || autoPlayedRef.current || player.playing) return;
-    if (!player.currentTrack?.src) return; // library not loaded yet
-    autoPlayedRef.current = true;
-    player.toggle();
-  }, [matchStatus, player.currentTrack?.src, player.playing]);
+    if (matchStatus === 'matched' && !isRoomReady) {
+      setShowJoinOverlay(true);
+    }
+  }, [matchStatus, isRoomReady]);
+
+  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed
+  const handleJoinTable = useCallback(() => {
+    setShowJoinOverlay(false);
+    setIsRoomReady(true);
+    // Start music immediately inside the click handler (user gesture context)
+    const el = bgmRef.current;
+    if (el && player.currentTrack?.src) {
+      if (!el.src || el.src === window.location.href) {
+        el.src = player.currentTrack.src;
+      }
+      el.play()
+        .then(() => player.syncPlayingState(true))
+        .catch(() => {});
+    }
+  }, [player.currentTrack?.src, player.syncPlayingState]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -859,9 +887,11 @@ export default function SecretChatRoom() {
     setShowRating(true);
   }, [session]);
 
+  // Countdown only starts after the user has joined (isRoomReady), so the timer
+  // doesn't tick away while the join overlay is displayed.
   const { remaining, display: countdownDisplay } = useCountdown(
     SESSION_DURATION,
-    matchStatus === 'matched',
+    isRoomReady && matchStatus === 'matched',
     handleExpire,
   );
   const isUrgent = remaining <= 60 && remaining > 0;
@@ -1084,6 +1114,48 @@ export default function SecretChatRoom() {
   return (
     <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden">
       <audio ref={bgmRef} />
+
+      {/* Join Table overlay — shown on match, dismissed by user click to unlock AudioContext */}
+      <AnimatePresence>
+        {showJoinOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.88, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="bg-white dark:bg-[#221810] rounded-3xl p-8 max-w-xs w-full mx-4 shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-center space-y-5"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center text-4xl mx-auto shadow-lg"
+              >
+                ☕
+              </motion.div>
+              <div className="space-y-1.5">
+                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">จับคู่สำเร็จแล้ว!</p>
+                <p className="text-sm text-[#9c7c5e] leading-relaxed">
+                  พบคู่สนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleJoinTable}
+                className="w-full h-12 rounded-2xl bg-[#c8956c] hover:bg-[#b07d58] text-white font-bold text-base transition-colors shadow-lg"
+              >
+                เข้าร่วมโต๊ะ
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Tutorial overlay */}
       <AnimatePresence>
