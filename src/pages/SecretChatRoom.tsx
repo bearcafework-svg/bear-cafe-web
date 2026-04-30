@@ -119,7 +119,7 @@ function useRainAmbient() {
 }
 
 // ─── Music Player ─────────────────────────────────────────────────────────────
-interface Track { title: string; src: string; image_url?: string | null; }
+interface Track { title: string; src: string; image_url?: string | null; artist?: string | null; }
 interface MusicCategory { label: string; tracks: Track[]; }
 
 const MUSIC_FALLBACK: MusicCategory[] = [
@@ -136,14 +136,14 @@ async function loadMusicLibrary(): Promise<MusicCategory[]> {
   try {
     const [catRes, trackRes] = await Promise.all([
       (supabase as any).from('chat_music_categories').select('id, label, sort_order').order('sort_order'),
-      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, image_url, sort_order').order('sort_order'),
+      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, image_url, artist, sort_order').order('sort_order'),
     ]);
     const cats: any[] = catRes.data ?? [];
     const allTracks: any[] = trackRes.data ?? [];
     const lib: MusicCategory[] = cats
       .map(c => ({
         label: c.label,
-        tracks: allTracks.filter(t => t.category_id === c.id).map(t => ({ title: t.title, src: t.src, image_url: t.image_url ?? null })),
+        tracks: allTracks.filter(t => t.category_id === c.id).map(t => ({ title: t.title, src: t.src, image_url: t.image_url ?? null, artist: t.artist ?? null })),
       }))
       .filter(c => c.tracks.length > 0);
     return lib.length > 0 ? lib : MUSIC_FALLBACK;
@@ -269,8 +269,10 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
 
   const seek = useCallback((pct: number) => {
     const el = audioRef.current;
-    if (!el || !el.duration) return;
-    el.currentTime = (pct / 100) * el.duration;
+    if (!el || !isFinite(el.duration) || el.duration <= 0) return;
+    const newTime = (pct / 100) * el.duration;
+    if (!isFinite(newTime)) return;
+    el.currentTime = newTime;
     setProgress(pct);
   }, []);
 
@@ -435,6 +437,9 @@ function MusicPanel({
         {/* Track info */}
         <div className="text-center mb-3">
           <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack.title}</p>
+          {player.currentTrack.artist ? (
+            <p className="text-[11px] text-[#c8956c] dark:text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
+          ) : null}
           <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
         </div>
 
@@ -530,9 +535,14 @@ function MusicPanel({
                   </svg>
                 )}
               </div>
-              <span className={`text-xs truncate ${isActive ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#7c5c3e] dark:text-[#9c7c5e]'}`}>
-                {track.title}
-              </span>
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs truncate block ${isActive ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#7c5c3e] dark:text-[#9c7c5e]'}`}>
+                  {track.title}
+                </span>
+                {track.artist && (
+                  <span className="text-[10px] text-[#c8956c] truncate block">{track.artist}</span>
+                )}
+              </div>
             </button>
           );
         })}
@@ -661,22 +671,63 @@ function TutorialOverlay({
   const s = TUTORIAL_STEPS[step];
   const [ringRect, setRingRect] = useState<DOMRect | null>(null);
 
-  // Measure target element on each step change
+  // Poll for the target element until it exists AND has a non-zero painted size.
+  // This handles Framer Motion entrance animations that start at opacity:0 / scale:0,
+  // which cause getBoundingClientRect() to return {width:0, height:0} on the first frame.
   useEffect(() => {
-    const el = refs[s?.refKey]?.current;
-    if (!el) { setRingRect(null); return; }
-    const update = () => setRingRect(el.getBoundingClientRect());
-    // rAF ensures DOM has painted before first measure
-    const raf = requestAnimationFrame(update);
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
+    // Safety: if the step definition is missing, bail out immediately.
+    if (!s?.refKey) { setRingRect(null); return; }
+
+    setRingRect(null); // reset while we wait for the new target
+
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const measure = () => {
+      const el = refs[s.refKey]?.current;
+
+      // Safety fallback: ref is completely missing — skip gracefully.
+      if (!el) {
+        console.warn(
+          `[Tutorial Debug] Step ${step} target "${s.refKey}" is null or size is 0. Waiting for Framer Motion to finish...`
+        );
+        return; // keep polling
+      }
+
+      const rect = el.getBoundingClientRect();
+
+      if (rect.width > 0 && rect.height > 0) {
+        // Element is fully painted — lock in the rect and stop polling.
+        setRingRect(rect);
+        clearInterval(intervalId);
+      } else {
+        console.warn(
+          `[Tutorial Debug] Step ${step} target "${s.refKey}" is null or size is 0. Waiting for Framer Motion to finish...`
+        );
+      }
+    };
+
+    // Start polling at 60 fps cadence (16 ms).
+    intervalId = setInterval(measure, 16);
+
+    // Also update on resize / scroll so the ring tracks the element.
+    const onResize = () => {
+      const el = refs[s.refKey]?.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) setRingRect(rect);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
+
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
+      clearInterval(intervalId);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
     };
   }, [step, s?.refKey]);
 
+  // Safety: unknown step — render nothing rather than crashing.
   if (!s) return null;
   const isLast = step === total - 1;
 
@@ -838,20 +889,38 @@ export default function SecretChatRoom() {
     }
   }, [matchStatus, isRoomReady]);
 
-  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed
+  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed.
+  // CRITICAL: el.play() MUST be the very first synchronous call so the browser's
+  // transient activation token is still valid. Any await or setState before it
+  // will cause a NotAllowedError.
   const handleJoinTable = useCallback(() => {
+    // ── 1. Trigger audio FIRST — synchronous, before any state updates ──────
+    const el = bgmRef.current;
+    if (el) {
+      if (!el.src || el.src === window.location.href) {
+        const src = player.currentTrack?.src;
+        if (src) el.src = src;
+      }
+      try {
+        const playPromise = el.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => player.syncPlayingState(true))
+            .catch((err: unknown) => {
+              const error = err as DOMException;
+              console.error('[Audio Debug] Playback failed:', error);
+              window.alert(`Audio Error: ${error.name} - ${error.message}`);
+            });
+        }
+      } catch (err: unknown) {
+        const error = err as DOMException;
+        console.error('[Audio Debug] Playback failed (sync):', error);
+        window.alert(`Audio Error: ${error.name} - ${error.message}`);
+      }
+    }
+    // ── 2. Update state AFTER play() has been called ─────────────────────────
     setShowJoinOverlay(false);
     setIsRoomReady(true);
-    // Start music immediately inside the click handler (user gesture context)
-    const el = bgmRef.current;
-    if (el && player.currentTrack?.src) {
-      if (!el.src || el.src === window.location.href) {
-        el.src = player.currentTrack.src;
-      }
-      el.play()
-        .then(() => player.syncPlayingState(true))
-        .catch(() => {});
-    }
   }, [player.currentTrack?.src, player.syncPlayingState]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);

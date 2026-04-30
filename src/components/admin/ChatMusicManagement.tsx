@@ -29,6 +29,8 @@ interface MusicTrack {
   title: string;
   src: string;
   sort_order: number;
+  artist?: string | null;
+  image_url?: string | null;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -185,6 +187,7 @@ function UploadTab({
   interface UploadItem {
     file: File;
     title: string;
+    artist: string;
     categoryId: string;
     status: 'pending' | 'converting' | 'uploading' | 'done' | 'error';
     progress: number;
@@ -207,6 +210,7 @@ function UploadTab({
       .map(f => ({
         file: f,
         title: f.name.replace(/\.[^.]+$/, ''),
+        artist: '',
         categoryId: defaultCat,
         status: 'pending' as const,
         progress: 0,
@@ -319,6 +323,7 @@ function UploadTab({
           .insert({
             category_id: item.categoryId,
             title: item.title.trim() || item.file.name,
+            artist: item.artist.trim() || null,
             src: publicUrl,
             sort_order: nextOrder,
           });
@@ -432,6 +437,14 @@ function UploadTab({
                         placeholder="ชื่อเพลง"
                         disabled={item.status !== 'pending'}
                         className="h-8 text-sm"
+                      />
+                      {/* Artist input */}
+                      <Input
+                        value={item.artist}
+                        onChange={e => updateItem(idx, { artist: e.target.value })}
+                        placeholder="ชื่อศิลปิน (ไม่บังคับ)"
+                        disabled={item.status !== 'pending'}
+                        className="h-7 text-xs"
                       />
 
                       {/* Category + size info */}
@@ -585,15 +598,16 @@ function TrackEditDialog({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ title: '', src: '', category_id: '', image_url: '' });
+  const [form, setForm] = useState({ title: '', artist: '', src: '', category_id: '', image_url: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setForm({
       title: editing?.title ?? '',
+      artist: editing?.artist ?? '',
       src: editing?.src ?? '',
       category_id: editing?.category_id ?? categories[0]?.id ?? '',
-      image_url: (editing as any)?.image_url ?? '',
+      image_url: editing?.image_url ?? '',
     });
   }, [editing, open]);
 
@@ -602,7 +616,7 @@ function TrackEditDialog({
     setSaving(true);
     try {
       const { error } = await (supabase as any).from('chat_music_tracks')
-        .update({ title: form.title.trim(), src: form.src.trim(), category_id: form.category_id, image_url: form.image_url.trim() || null })
+        .update({ title: form.title.trim(), artist: form.artist.trim() || null, src: form.src.trim(), category_id: form.category_id, image_url: form.image_url.trim() || null })
         .eq('id', editing!.id);
       if (error) throw error;
       toast({ title: 'อัปเดตเพลงแล้ว' });
@@ -627,6 +641,10 @@ function TrackEditDialog({
           <div className="space-y-1.5">
             <Label>ชื่อเพลง *</Label>
             <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
+          </div>
+          <div className="space-y-1.5">
+            <Label>ชื่อศิลปิน</Label>
+            <Input value={form.artist} onChange={e => setForm(f => ({ ...f, artist: e.target.value }))} placeholder="เช่น Nujabes, Idealism..." />
           </div>
           <div className="space-y-1.5">
             <Label>URL เพลง</Label>
@@ -740,6 +758,9 @@ function LibraryTab({
                         <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{i + 1}</div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{track.title}</p>
+                          {track.artist && (
+                            <p className="text-[11px] text-[#c8956c] truncate">{track.artist}</p>
+                          )}
                           <p className="text-[11px] text-muted-foreground truncate">{track.src}</p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
