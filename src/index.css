@@ -534,3 +534,12 @@
   outline: 2px solid #f5d87a;
   outline-offset: 2px;
 }
+
+/* ─── Secret Chat Room — Desktop 125% zoom ───────────────────────────────── */
+/* zoom: 1.25 scales the entire fixed layout including all children and fixed
+   positioned overlays. Only activates at lg (1024px+). Mobile/tablet unaffected. */
+@media (min-width: 1024px) {
+  .secret-room-zoom {
+    zoom: 1.25;
+  }
+}

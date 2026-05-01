@@ -1242,7 +1242,7 @@ export default function SecretChatRoom() {
   const isMyMessage = (msg: Message) => msg.sender_id === user?.id;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden secret-room-zoom">
       <audio ref={bgmRef} />
 
       {/* Join Table overlay — shown on match, dismissed by user click to unlock AudioContext */}
