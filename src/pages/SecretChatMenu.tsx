@@ -146,7 +146,7 @@ export default function SecretChatMenu() {
   }, [user, selectedCategory, alias, selectedProfile, selectedRole, navigate]);
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 ${theme.bg}`}>
+    <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 secret-menu-zoom ${theme.bg}`}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/60 dark:bg-black/30 backdrop-blur-xl border-b border-white/30 dark:border-white/10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
