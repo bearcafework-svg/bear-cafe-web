@@ -196,20 +196,13 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     if (audioRef.current) audioRef.current.loop = loopMode === 'one';
   }, [loopMode]);
 
-  // Progress tracking
+  // Progress tracking — kept for auto-advance logic only (not displayed)
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-    const onTime = () => {
-      if (el.duration) setProgress((el.currentTime / el.duration) * 100);
-    };
     const onMeta = () => setDuration(el.duration || 0);
-    el.addEventListener('timeupdate', onTime);
     el.addEventListener('loadedmetadata', onMeta);
-    return () => {
-      el.removeEventListener('timeupdate', onTime);
-      el.removeEventListener('loadedmetadata', onMeta);
-    };
+    return () => el.removeEventListener('loadedmetadata', onMeta);
   }, []);
 
   // Auto-advance on track end
@@ -269,15 +262,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
   }, []);
 
-  const seek = useCallback((pct: number) => {
-    const el = audioRef.current;
-    if (!el || !isFinite(el.duration) || el.duration <= 0) return;
-    const newTime = (pct / 100) * el.duration;
-    if (!isFinite(newTime)) return;
-    el.currentTime = newTime;
-    setProgress(pct);
-  }, []);
-
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
     setVolumeState(clamped);
@@ -289,298 +273,109 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     if (audioRef.current) audioRef.current.volume = volume;
   }, []);
 
-  return { playing, toggle, syncPlayingState, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, progress, duration, seek, volume, setVolume };
+  return { playing, toggle, syncPlayingState, skipNext, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, volume, setVolume };
 }
 
-// ─── Volume Knob ─────────────────────────────────────────────────────────────
-// Rotary dial: drag up/down to change volume. Click the center to mute/unmute.
-function VolumeKnob({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
-  const prevVolRef = useRef(volume); // remember last non-zero volume for unmute
-  const dragStartY = useRef<number | null>(null);
-  const dragStartVol = useRef(volume);
-  const [dragging, setDragging] = useState(false);
+// ─── Bar Waveform Visualizer ──────────────────────────────────────────────────
+// 18 vertical bars that animate randomly when playing, collapse when paused.
+const BAR_COUNT = 18;
+const BAR_SEEDS = Array.from({ length: BAR_COUNT }, (_, i) => ({
+  duration: 0.5 + ((i * 137 + 31) % 7) * 0.1,
+  delay:    ((i * 53  + 17) % 9) * 0.07,
+  maxH:     28 + ((i * 79  + 11) % 24),
+  minH:     6  + ((i * 43  +  7) % 8),
+}));
 
-  // Map volume 0–1 → rotation -135° to +135° (270° total sweep)
-  const rotation = -135 + volume * 270;
+function BarWaveform({ playing }: { playing: boolean }) {
+  return (
+    <div className="flex items-end justify-center gap-[3px] px-2" style={{ height: 56 }}>
+      {BAR_SEEDS.map((s, i) => (
+        <motion.div
+          key={i}
+          className="rounded-full"
+          style={{
+            width: 4,
+            background: 'linear-gradient(to top, #c8956c, #e8c4a0cc)',
+            originY: 1,
+          }}
+          animate={playing
+            ? { height: [s.minH, s.maxH, s.minH * 1.4, s.maxH * 0.7, s.minH] }
+            : { height: 4 }
+          }
+          transition={playing
+            ? { duration: s.duration, repeat: Infinity, ease: 'easeInOut', delay: s.delay, repeatType: 'mirror' }
+            : { duration: 0.4, ease: 'easeOut' }
+          }
+        />
+      ))}
+    </div>
+  );
+}
 
-  // Arc path for the filled portion (SVG)
-  const R = 18; // radius of arc
-  const CX = 24; const CY = 24; // center
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  function arcPoint(deg: number) {
-    return {
-      x: CX + R * Math.cos(toRad(deg - 90)),
-      y: CY + R * Math.sin(toRad(deg - 90)),
-    };
-  }
-  const startDeg = -135;
-  const endDeg = startDeg + volume * 270;
-  const largeArc = volume * 270 > 180 ? 1 : 0;
-  const p1 = arcPoint(startDeg);
-  const p2 = arcPoint(endDeg);
-  const arcPath = volume > 0.005
-    ? `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${R} ${R} 0 ${largeArc} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
-    : '';
-
-  // Tick mark (pointer line on the knob face)
-  const tickAngle = rotation;
-  const tickX2 = CX + 10 * Math.cos(toRad(tickAngle - 90));
-  const tickY2 = CY + 10 * Math.sin(toRad(tickAngle - 90));
-
-  function startDrag(clientY: number) {
-    dragStartY.current = clientY;
-    dragStartVol.current = volume;
-    setDragging(true);
-  }
-
-  function onMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    startDrag(e.clientY);
-    const onMove = (ev: MouseEvent) => {
-      if (dragStartY.current === null) return;
-      const delta = (dragStartY.current - ev.clientY) / 120; // 120px = full sweep
-      onChange(Math.max(0, Math.min(1, dragStartVol.current + delta)));
-    };
-    const onUp = () => {
-      setDragging(false);
-      dragStartY.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }
-
-  function onTouchStart(e: React.TouchEvent) {
-    startDrag(e.touches[0].clientY);
-    const onMove = (ev: TouchEvent) => {
-      if (dragStartY.current === null) return;
-      const delta = (dragStartY.current - ev.touches[0].clientY) / 120;
-      onChange(Math.max(0, Math.min(1, dragStartVol.current + delta)));
-    };
-    const onEnd = () => {
-      setDragging(false);
-      dragStartY.current = null;
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend', onEnd);
-    };
-    window.addEventListener('touchmove', onMove, { passive: true });
-    window.addEventListener('touchend', onEnd);
-  }
-
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    onChange(Math.max(0, Math.min(1, volume - e.deltaY / 600)));
-  }
-
-  function onClickCenter(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (volume > 0) {
-      prevVolRef.current = volume;
-      onChange(0);
-    } else {
-      onChange(prevVolRef.current > 0 ? prevVolRef.current : 0.8);
-    }
-  }
-
+// ─── Volume Slider ────────────────────────────────────────────────────────────
+function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
   const pct = Math.round(volume * 100);
   const isMuted = volume === 0;
+  const prevVolRef = useRef(volume > 0 ? volume : 0.8);
+
+  function toggleMute() {
+    if (volume > 0) { prevVolRef.current = volume; onChange(0); }
+    else onChange(prevVolRef.current);
+  }
 
   return (
-    <div className="flex flex-col items-center gap-1 select-none">
-      <div
-        className="relative"
-        style={{ width: 48, height: 48, cursor: dragging ? 'ns-resize' : 'grab' }}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-        onWheel={onWheel}
-        title={`Volume ${pct}% — drag up/down or scroll`}
+    <div className="flex items-center gap-2 px-1 w-full mt-1">
+      <button
+        onClick={toggleMute}
+        className="shrink-0 w-6 h-6 flex items-center justify-center text-[#9c7c5e] hover:text-[#c8956c] transition-colors"
+        title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
       >
-        <svg width="48" height="48" viewBox="0 0 48 48">
-          {/* Track ring (background) */}
-          <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(200,149,108,0.15)" strokeWidth="3.5" />
-          {/* Filled arc */}
-          {arcPath && (
-            <path d={arcPath} fill="none" stroke="#c8956c" strokeWidth="3.5" strokeLinecap="round" />
-          )}
-          {/* Knob face */}
-          <circle
-            cx={CX} cy={CY} r={13}
-            fill="url(#knob-grad)"
-            stroke="rgba(200,149,108,0.3)"
-            strokeWidth="1.5"
-            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}
-            onClick={onClickCenter}
-          />
-          <defs>
-            <radialGradient id="knob-grad" cx="40%" cy="35%" r="65%">
-              <stop offset="0%" stopColor="#5a3a22" />
-              <stop offset="100%" stopColor="#2a1a0e" />
-            </radialGradient>
-          </defs>
-          {/* Tick pointer */}
-          <line
-            x1={CX} y1={CY}
-            x2={tickX2.toFixed(2)} y2={tickY2.toFixed(2)}
-            stroke={isMuted ? 'rgba(200,149,108,0.3)' : '#c8956c'}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* Mute X */}
-          {isMuted && (
-            <>
-              <line x1="20" y1="20" x2="28" y2="28" stroke="#c8956c" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="28" y1="20" x2="20" y2="28" stroke="#c8956c" strokeWidth="1.5" strokeLinecap="round" />
-            </>
-          )}
-        </svg>
+        {isMuted ? (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3.5-3.5M12 18l3.5-3.5M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+        )}
+      </button>
+
+      <div className="relative flex-1 flex items-center" style={{ height: 28 }}>
+        <input
+          type="range"
+          min={0} max={100} step={1}
+          value={pct}
+          onChange={e => onChange(Number(e.target.value) / 100)}
+          className="vol-slider w-full"
+          style={{ '--fill': `${pct}%` } as React.CSSProperties}
+        />
+        <img
+          src={honeyJarIcon}
+          alt=""
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: `calc(${pct}% - 10px)`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 20,
+            height: 20,
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))',
+            userSelect: 'none',
+          }}
+        />
       </div>
-      <span className="text-[10px] font-mono text-[#9c7c5e] tabular-nums w-8 text-center">
-        {isMuted ? 'mute' : `${pct}%`}
+
+      <span className="shrink-0 text-[10px] font-mono text-[#9c7c5e] tabular-nums w-7 text-right">
+        {isMuted ? '—' : `${pct}`}
       </span>
     </div>
   );
 }
 
-// ─── Animated Waveform Progress ──────────────────────────────────────────────
-function WaveProgress({ progress, onSeek, playing, disabled = false }: {
-  progress: number;
-  onSeek: (pct: number) => void;
-  playing: boolean;
-  disabled?: boolean;
-}) {
-  const W = 280;   // visible width
-  const H = 32;    // height
-  const TILE = W;  // one tile = visible width; we render 3 tiles side-by-side
-  const POINTS = 48; // points per tile
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
-
-  // Build one tile of wave points (stable — same shape every render)
-  const tilePath = useMemo(() => {
-    return Array.from({ length: POINTS + 1 }, (_, i) => {
-      const x = (i / POINTS) * TILE;
-      const amp = 3.5 + Math.sin(i * 1.1) * 2.5 + Math.sin(i * 0.4) * 1.5;
-      const y = H / 2 + Math.sin(i * 0.72) * amp;
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    }).join(' ');
-  }, []);
-
-  // Three tiles concatenated: tile0, tile1 (shifted +W), tile2 (shifted +2W)
-  const fullPath = useMemo(() => {
-    const shift = (offset: number) =>
-      Array.from({ length: POINTS + 1 }, (_, i) => {
-        const x = (i / POINTS) * TILE + offset;
-        const amp = 3.5 + Math.sin(i * 1.1) * 2.5 + Math.sin(i * 0.4) * 1.5;
-        const y = H / 2 + Math.sin(i * 0.72) * amp;
-        return `${i === 0 ? (offset === 0 ? 'M' : 'L') : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-      }).join(' ');
-    return `${shift(0)} ${shift(TILE)} ${shift(TILE * 2)}`;
-  }, [tilePath]);
-
-  function getPct(clientX: number): number {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return 0;
-    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-  }
-
-  function onMouseDown(e: React.MouseEvent) {
-    if (disabled) return;
-    dragging.current = true;
-    onSeek(getPct(e.clientX));
-    const onMove = (ev: MouseEvent) => { if (dragging.current) onSeek(getPct(ev.clientX)); };
-    const onUp = () => { dragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }
-
-  function onTouchStart(e: React.TouchEvent) {
-    if (disabled) return;
-    dragging.current = true;
-    onSeek(getPct(e.touches[0].clientX));
-    const onMove = (ev: TouchEvent) => { if (dragging.current) onSeek(getPct(ev.touches[0].clientX)); };
-    const onEnd = () => { dragging.current = false; window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd); };
-    window.addEventListener('touchmove', onMove, { passive: true });
-    window.addEventListener('touchend', onEnd);
-  }
-
-  // HoneyJar thumb position (0–W)
-  const thumbX = (progress / 100) * W;
-  // Filled clip width
-  const filledW = (progress / 100) * W;
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full select-none overflow-hidden"
-      style={{ height: H + 8, touchAction: 'none', cursor: disabled ? 'default' : 'pointer' }}
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-    >
-      {/* SVG canvas — 3× wide so the pan animation loops seamlessly */}
-      <motion.svg
-        viewBox={`0 0 ${W * 3} ${H}`}
-        preserveAspectRatio="none"
-        style={{ position: 'absolute', top: 4, left: 0, width: W * 3, height: H }}
-        // Infinite pan: slide left by one tile width, then snap back
-        animate={playing ? { x: [0, -W] } : { x: 0 }}
-        transition={playing
-          ? { duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }
-          : { duration: 0 }
-        }
-      >
-        {/* Background (dim) wave — full 3 tiles */}
-        <path
-          d={fullPath}
-          fill="none"
-          stroke="rgba(200,149,108,0.18)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Filled (bright) wave — clipped to progress width, fixed in screen space */}
-        {/* We use a foreignObject trick: clip is in screen coords, wave pans under it */}
-        <clipPath id="wf-fill-clip">
-          {/* This rect is in the SVG's own coordinate space (3W wide).
-              We need it to cover [0, filledW] in screen space.
-              Since the SVG element itself is being translated by Framer Motion,
-              we compensate by shifting the clip rect by the same amount.
-              But clipPath coords are in SVG user space, so we just use filledW
-              directly — the clip moves with the SVG, which is what we want:
-              the filled portion always covers the left `progress%` of the bar. */}
-          <rect x="0" y="0" width={filledW} height={H} />
-        </clipPath>
-        <path
-          d={fullPath}
-          fill="none"
-          stroke="#c8956c"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          clipPath="url(#wf-fill-clip)"
-        />
-      </motion.svg>
-
-      {/* HoneyJar thumb — positioned in screen space (not inside the panning SVG) */}
-      <img
-        src={honeyJarIcon}
-        alt=""
-        draggable={false}
-        style={{
-          position: 'absolute',
-          top: H / 2 - 10 + 4,
-          left: thumbX - 10,
-          width: 20,
-          height: 20,
-          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))',
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }}
-      />
-    </div>
-  );
-}
 
 // ─── Vinyl Disc ───────────────────────────────────────────────────────────────
 function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) {
@@ -626,17 +421,6 @@ function MusicPanel({
 }) {
   const [activeCat, setActiveCat] = useState(player.catIdx);
 
-  function formatTime(sec: number) {
-    if (!sec || !isFinite(sec) || isNaN(sec)) return '0:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  }
-
-  const currentSec = (player.duration && isFinite(player.duration))
-    ? (player.progress / 100) * player.duration
-    : 0;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.96 }}
@@ -646,7 +430,7 @@ function MusicPanel({
       className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50"
       onClick={e => e.stopPropagation()}
     >
-      {/* Now playing — vinyl + info */}
+      {/* Now playing header */}
       <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
@@ -667,37 +451,26 @@ function MusicPanel({
         <div className="text-center mb-3">
           <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack.title}</p>
           {player.currentTrack.artist ? (
-            <p className="text-[11px] text-[#c8956c] dark:text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
+            <p className="text-[11px] text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
           ) : null}
           <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
         </div>
 
-        {/* Wave progress */}
-        <WaveProgress
-          progress={player.progress}
-          onSeek={player.seek}
-          playing={player.playing}
-          disabled={!player.duration || !isFinite(player.duration)}
-        />
-        <div className="flex justify-between text-[10px] text-[#9c7c5e] px-1 -mt-0.5">
-          <span>{formatTime(currentSec)}</span>
-          <span>{formatTime(player.duration)}</span>
-        </div>
+        {/* Bar waveform visualizer */}
+        <BarWaveform playing={player.playing} />
 
-        {/* Controls + Volume */}
-        <div className="flex items-center justify-center gap-3 mt-3">
-          {/* Loop */}
+        {/* Controls row */}
+        <div className="flex items-center justify-center gap-4 mt-3">
           <button
             onClick={player.cycleLoop}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
               player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
             }`}
-            title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
+            title={player.loopMode === 'none' ? 'ไม่วน้ำ' : player.loopMode === 'all' ? 'วน้ำทั้งหมด' : 'วน้ำเพลงนี้'}
           >
             {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
           </button>
 
-          {/* Play/Pause */}
           <button
             onClick={player.toggle}
             className="w-12 h-12 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-lg"
@@ -714,7 +487,6 @@ function MusicPanel({
             )}
           </button>
 
-          {/* Skip */}
           <button
             onClick={player.skipNext}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
@@ -722,9 +494,11 @@ function MusicPanel({
           >
             <SkipForward className="w-4 h-4" />
           </button>
+        </div>
 
-          {/* Volume knob */}
-          <VolumeKnob volume={player.volume} onChange={player.setVolume} />
+        {/* Volume slider */}
+        <div className="mt-3">
+          <VolumeSlider volume={player.volume} onChange={player.setVolume} />
         </div>
       </div>
 
@@ -757,7 +531,6 @@ function MusicPanel({
                 isActive ? 'bg-[#f5ede4] dark:bg-[#2a1a0e]' : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
               }`}
             >
-              {/* Thumbnail or indicator */}
               <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-[#f0e6d8] dark:bg-[#3a2a1e]">
                 {track.image_url ? (
                   <img src={track.image_url} alt="" className="w-full h-full object-cover" />
@@ -790,6 +563,7 @@ function MusicPanel({
     </motion.div>
   );
 }
+
 
 async function loadBannedWords(): Promise<string[]> {
   const { data } = await supabase.from('banned_words').select('word');
