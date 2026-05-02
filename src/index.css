@@ -544,9 +544,9 @@
   }
 }
 
-/* ─── Secret Chat Menu — Desktop 125% zoom ───────────────────────────────── */
+/* ─── Secret Chat Menu — Desktop 90% zoom ────────────────────────────────── */
 @media (min-width: 1024px) {
   .secret-menu-zoom {
-    zoom: 1.25;
+    zoom: 0.9;
   }
 }
