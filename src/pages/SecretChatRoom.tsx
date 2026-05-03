@@ -24,6 +24,8 @@ interface ChatSession {
   user_b_alias: string;
   user_a_avatar: string;
   user_b_avatar: string;
+  user_a_role: string;
+  user_b_role: string;
   status: string;
   duration_seconds: number;
   started_at: string | null;
@@ -1047,12 +1049,45 @@ export default function SecretChatRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-navigate when session ends and user returns from background (mobile/tablet)
+  // Handles the case where the timer expired while the app was backgrounded
+  useEffect(() => {
+    if (matchStatus !== 'ended') return;
+    // If rating dialog is not showing (already dismissed or skipped), go home
+    if (!showRating) {
+      navigate('/');
+    }
+  }, [matchStatus, showRating, navigate]);
+
+  // When user returns from background, check if session has already ended
+  useEffect(() => {
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!session?.id || matchStatus === 'ended') return;
+      const { data } = await (supabase as any)
+        .from('chat_sessions')
+        .select('status, ended_at')
+        .eq('id', session.id)
+        .single();
+      if (data?.status === 'ended') {
+        setMatchStatus('ended');
+        setShowRating(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [session?.id, matchStatus]);
+
   const handleExpire = useCallback(async () => {
     if (!session) return;
-    await (supabase as any)
-      .from('chat_sessions')
-      .update({ status: 'ended', ended_at: new Date().toISOString() })
-      .eq('id', session.id);
+    // Only PATCH if session is still active — avoids 400 on already-ended sessions
+    if (session.status === 'active') {
+      await (supabase as any)
+        .from('chat_sessions')
+        .update({ status: 'ended', ended_at: new Date().toISOString() })
+        .eq('id', session.id)
+        .eq('status', 'active'); // guard: only update if still active
+    }
     setMatchStatus('ended');
     setShowRating(true);
   }, [session]);
@@ -1271,15 +1306,11 @@ export default function SecretChatRoom() {
       );
 
       if (modError) {
-        // Edge Function returned an error — block the message, show error toast
+        // Edge Function returned an error — log it but fail open (allow message)
+        // 503 = Edge Function not deployed yet, don't punish users for infra issues
         console.error('[sendMessage] moderation error:', modError);
-        setBannedWarning('__error__');
-        setTimeout(() => setBannedWarning(null), 5000);
-        setSending(false);
-        return;
-      }
-
-      if (modResult?.isFlagged === true) {
+        // Fall through to insert the message
+      } else if (modResult?.isFlagged === true) {
         // Edge Function already:
         //   • inserted violation into chat_violations (Realtime → admin)
         //   • inserted system warning into chat_messages (both users see it)
@@ -1297,10 +1328,14 @@ export default function SecretChatRoom() {
       setSending(false);
 
     } catch (err) {
-      // Network/timeout error — block the message and show error toast
+      // Network/timeout error — fail open, allow message through
+      // Don't block users due to infra issues
       console.error('[sendMessage] unexpected error:', err);
-      setBannedWarning('__error__');
-      setTimeout(() => setBannedWarning(null), 5000);
+      await (supabase as any).from('chat_messages').insert({
+        session_id: session.id,
+        sender_id: user.id,
+        content,
+      });
       setSending(false);
     }
   }, [input, session, user, sending, bannedWords]);
@@ -1355,6 +1390,14 @@ export default function SecretChatRoom() {
   const partnerAvatarKey = session
     ? (session.user_a_id === user?.id ? session.user_b_avatar : session.user_a_avatar)
     : '';
+  const partnerRole = session
+    ? (session.user_a_id === user?.id ? session.user_b_role : session.user_a_role)
+    : null;
+
+  // Thai role labels
+  const ROLE_TH: Record<string, string> = {
+    talk: '💬 Talk', listen: '👂 Listen', both: '🤝 Both', chill: '☕ Chill',
+  };
 
   const getAvatarImg = (key: string) => profiles.find(p => p.id === key)?.image_url ?? null;
   const partnerImg = getAvatarImg(partnerAvatarKey);
@@ -1474,7 +1517,12 @@ export default function SecretChatRoom() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                     </span>
-                    <p className="text-[11px] text-[#9c7c5e]">{topicName}</p>
+                    <p className="text-[11px] text-[#9c7c5e]">
+                      {topicName}
+                      {partnerRole && partnerRole !== 'both' && (
+                        <span className="ml-1 opacity-70">· {ROLE_TH[partnerRole] ?? partnerRole}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
               </>

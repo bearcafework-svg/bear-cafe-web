@@ -189,6 +189,8 @@ function UploadTab({
     title: string;
     artist: string;
     categoryId: string;
+    imageFile: File | null;
+    imageUrl: string;
     status: 'pending' | 'converting' | 'uploading' | 'done' | 'error';
     progress: number;
     convertProgress: number;
@@ -212,6 +214,8 @@ function UploadTab({
         title: f.name.replace(/\.[^.]+$/, ''),
         artist: '',
         categoryId: defaultCat,
+        imageFile: null,
+        imageUrl: '',
         status: 'pending' as const,
         progress: 0,
         convertProgress: 0,
@@ -318,6 +322,20 @@ function UploadTab({
           .limit(1);
         const nextOrder = ((existing?.[0]?.sort_order ?? -1) as number) + 1;
 
+        // Upload cover image if provided
+        let coverUrl: string | null = null;
+        if (item.imageFile) {
+          const imgExt = item.imageFile.name.split('.').pop() ?? 'jpg';
+          const imgPath = `covers/${Date.now()}_${sanitizeFilename(item.title)}.${imgExt}`;
+          const { error: imgErr } = await supabase.storage
+            .from('chat-music')
+            .upload(imgPath, item.imageFile, { contentType: item.imageFile.type });
+          if (!imgErr) {
+            const { data: imgUrl } = supabase.storage.from('chat-music').getPublicUrl(imgPath);
+            coverUrl = imgUrl.publicUrl;
+          }
+        }
+
         const { error: dbError } = await (supabase as any)
           .from('chat_music_tracks')
           .insert({
@@ -325,6 +343,7 @@ function UploadTab({
             title: item.title.trim() || item.file.name,
             artist: item.artist.trim() || null,
             src: publicUrl,
+            image_url: coverUrl,
             sort_order: nextOrder,
           });
 
@@ -446,6 +465,41 @@ function UploadTab({
                         disabled={item.status !== 'pending'}
                         className="h-7 text-xs"
                       />
+
+                      {/* Cover image upload */}
+                      {item.status === 'pending' && (
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer">
+                            <input
+                              type="file" accept="image/*" className="hidden"
+                              onChange={e => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                  const url = URL.createObjectURL(f);
+                                  updateItem(idx, { imageFile: f, imageUrl: url });
+                                }
+                                e.target.value = '';
+                              }}
+                            />
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt="cover" className="w-8 h-8 rounded-lg object-cover border border-border" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary/50 transition-colors">
+                                <Upload className="w-3.5 h-3.5 text-muted-foreground/50" />
+                              </div>
+                            )}
+                          </label>
+                          {item.imageUrl && (
+                            <button
+                              onClick={() => updateItem(idx, { imageFile: null, imageUrl: '' })}
+                              className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              ลบรูป
+                            </button>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">รูปปก (ไม่บังคับ)</span>
+                        </div>
+                      )}
 
                       {/* Category + size info */}
                       <div className="flex items-center gap-2 flex-wrap">
@@ -600,6 +654,8 @@ function TrackEditDialog({
   const { toast } = useToast();
   const [form, setForm] = useState({ title: '', artist: '', src: '', category_id: '', image_url: '' });
   const [saving, setSaving] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setForm({
@@ -611,16 +667,54 @@ function TrackEditDialog({
     });
   }, [editing, open]);
 
+  async function handleImageUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'กรุณาเลือกไฟล์รูปภาพ', variant: 'destructive' });
+      return;
+    }
+    setUploadingImg(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `covers/${Date.now()}_${sanitizeFilename(file.name.replace(/\.[^.]+$/, ''))}.${ext}`;
+      const { error } = await supabase.storage.from('chat-music').upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('chat-music').getPublicUrl(path);
+      setForm(f => ({ ...f, image_url: urlData.publicUrl }));
+      toast({ title: 'อัปโหลดรูปปกแล้ว' });
+    } catch (e: any) {
+      toast({ title: 'อัปโหลดรูปล้มเหลว', description: e.message, variant: 'destructive' });
+    } finally {
+      setUploadingImg(false);
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!form.image_url) return;
+    // Try to delete from storage if it's our bucket
+    const match = form.image_url.match(/chat-music\/(.+)$/);
+    if (match) {
+      await supabase.storage.from('chat-music').remove([match[1]]);
+    }
+    setForm(f => ({ ...f, image_url: '' }));
+  }
+
   async function handleSave() {
     if (!form.title.trim()) { toast({ title: 'กรุณากรอกชื่อเพลง', variant: 'destructive' }); return; }
     setSaving(true);
     try {
       const { error } = await (supabase as any).from('chat_music_tracks')
-        .update({ title: form.title.trim(), artist: form.artist.trim() || null, src: form.src.trim(), category_id: form.category_id, image_url: form.image_url.trim() || null })
+        .update({
+          title: form.title.trim(),
+          artist: form.artist.trim() || null,
+          src: form.src.trim(),
+          category_id: form.category_id,
+          image_url: form.image_url.trim() || null,
+        })
         .eq('id', editing!.id);
       if (error) throw error;
       toast({ title: 'อัปเดตเพลงแล้ว' });
-      onSaved(); onClose();
+      onSaved();
+      onClose();
     } catch (e: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -651,18 +745,60 @@ function TrackEditDialog({
             <Input value={form.src} onChange={e => setForm(f => ({ ...f, src: e.target.value }))} placeholder="https://..." />
             <p className="text-[11px] text-muted-foreground">URL จะอัปเดตอัตโนมัติถ้าอัปโหลดผ่านระบบ</p>
           </div>
+
+          {/* Cover image — upload or remove */}
           <div className="space-y-1.5">
-            <Label>รูปปก (URL) — แสดงบนแผ่นเสียง</Label>
-            <Input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://..." />
-            {form.image_url && (
-              <img src={form.image_url} alt="cover" className="w-16 h-16 rounded-xl object-cover border border-border mt-1"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <Label>รูปปก — แสดงบนแผ่นเสียง</Label>
+            <input
+              ref={imgInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ''; }}
+            />
+            {form.image_url ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={form.image_url}
+                  alt="cover"
+                  className="w-16 h-16 rounded-xl object-cover border border-border"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    type="button" variant="outline" size="sm" className="gap-1.5 h-7 text-xs"
+                    onClick={() => imgInputRef.current?.click()}
+                    disabled={uploadingImg}
+                  >
+                    {uploadingImg ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                    เปลี่ยนรูป
+                  </Button>
+                  <Button
+                    type="button" variant="ghost" size="sm" className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive"
+                    onClick={handleRemoveImage}
+                    disabled={uploadingImg}
+                  >
+                    <Trash2 className="w-3 h-3" /> ลบรูป
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button" variant="outline" size="sm" className="gap-2 w-full"
+                onClick={() => imgInputRef.current?.click()}
+                disabled={uploadingImg}
+              >
+                {uploadingImg
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> กำลังอัปโหลด...</>
+                  : <><Upload className="w-4 h-4" /> อัปโหลดรูปปก</>
+                }
+              </Button>
             )}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving || uploadingImg}>ยกเลิก</Button>
+          <Button onClick={handleSave} disabled={saving || uploadingImg}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -788,9 +924,11 @@ export function ChatMusicManagement() {
   const [categories, setCategories] = useState<MusicCategory[]>([]);
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  // Keep active tab stable — don't reset to 'upload' on data refresh
+  const [activeTab, setActiveTab] = useState<'upload' | 'library'>('upload');
 
   const fetchAll = useCallback(async () => {
-    setLoading(true);
+    // Fetch without resetting loading to avoid tab flicker
     const [catRes, trackRes] = await Promise.all([
       (supabase as any).from('chat_music_categories').select('*').order('sort_order'),
       (supabase as any).from('chat_music_tracks').select('*').order('sort_order'),
@@ -819,7 +957,7 @@ export function ChatMusicManagement() {
         {loading ? (
           <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
         ) : (
-          <Tabs defaultValue="upload">
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'upload' | 'library')}>
             <TabsList className="mb-4">
               <TabsTrigger value="upload" className="gap-2">
                 <Upload className="w-4 h-4" /> อัปโหลดเพลง
