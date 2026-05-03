@@ -1160,6 +1160,7 @@ export default function SecretChatRoom() {
   const sendMessage = useCallback(async () => {
     if (!input.trim() || !session || !user || sending) return;
 
+    // ── 1. Local banned-word check (fast, no network) ────────────────────────
     const foundWord = findBannedWord(input, bannedWords);
     if (foundWord) {
       await (supabase as any).from('chat_violations').insert({
@@ -1176,6 +1177,33 @@ export default function SecretChatRoom() {
 
     setSending(true);
     const content = input.trim();
+
+    // ── 2. AI moderation via Edge Function ───────────────────────────────────
+    try {
+      const { data: modResult, error: modError } = await supabase.functions.invoke(
+        'moderate-chat',
+        { body: { text: content } }
+      );
+
+      if (!modError && modResult?.isFlagged === true) {
+        // Blocked by AI — show polite toast, log violation, do NOT insert
+        await (supabase as any).from('chat_violations').insert({
+          session_id: session.id,
+          user_id: user.id,
+          word: '__ai_flagged__',
+          message: content,
+        });
+        setBannedWarning('__ai__');
+        setTimeout(() => setBannedWarning(null), 5000);
+        setSending(false);
+        setInput('');
+        return;
+      }
+    } catch {
+      // Moderation call failed — fail open, allow message through
+    }
+
+    // ── 3. Insert message ────────────────────────────────────────────────────
     setInput('');
     await (supabase as any).from('chat_messages').insert({
       session_id: session.id,
@@ -1309,7 +1337,10 @@ export default function SecretChatRoom() {
             className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg"
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            ข้อความถูกบล็อก — พบคำต้องห้าม
+            {bannedWarning === '__ai__'
+              ? 'ข้อความนี้อาจขัดต่อกฎของคาเฟ่ ลองปรับคำพูดดูน้า 🐻'
+              : 'ข้อความถูกบล็อก — พบคำต้องห้าม'
+            }
           </motion.div>
         )}
       </AnimatePresence>
