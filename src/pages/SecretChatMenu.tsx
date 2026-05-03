@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Loader2, Coffee, ChevronRight } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Coffee, ChevronRight, Sun, Moon } from 'lucide-react';
 
 interface ChatCategory {
   id: string;
@@ -78,6 +79,7 @@ async function generateAlias(): Promise<string> {
 export default function SecretChatMenu() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { theme: colorTheme, setTheme: setColorTheme } = useTheme();
 
   const [categories, setCategories] = useState<ChatCategory[]>([]);
   const [profiles, setProfiles] = useState<ChatProfile[]>([]);
@@ -179,6 +181,18 @@ export default function SecretChatMenu() {
               </div>
             ))}
           </div>
+
+          {/* Theme toggle */}
+          <button
+            onClick={() => setColorTheme(colorTheme === 'dark' ? 'light' : 'dark')}
+            className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[#7c5c3e] hover:bg-white/50 dark:hover:bg-white/10 transition-colors"
+            title={colorTheme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
+          >
+            {colorTheme === 'dark'
+              ? <Sun className="w-4 h-4" />
+              : <Moon className="w-4 h-4" />
+            }
+          </button>
         </div>
       </header>
 

@@ -1,9 +1,10 @@
 ﻿import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, X } from 'lucide-react';
+import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, X, Sun, Moon } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 import pixelCoffeeIcon from '@/assets/pixel-coffee.gif';
 
@@ -25,6 +26,8 @@ interface ChatSession {
   user_b_avatar: string;
   status: string;
   duration_seconds: number;
+  started_at: string | null;
+  created_at: string;
 }
 
 interface ChatProfile {
@@ -576,29 +579,78 @@ function findBannedWord(text: string, banned: string[]): string | null {
   return banned.find(w => lower.includes(w)) ?? null;
 }
 
-function useCountdown(totalSeconds: number, active: boolean, onExpire: () => void) {
+// ─── Synchronized Countdown ───────────────────────────────────────────────────
+// Computes remaining time from server-authoritative started_at timestamp so
+// both clients stay in sync even after page reload or tab switch.
+function playUrgentSound() {
+  try {
+    const ctx = new AudioContext();
+    // Three short descending beeps
+    [880, 660, 440].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.22);
+      gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.22 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.22 + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.22);
+      osc.stop(ctx.currentTime + i * 0.22 + 0.4);
+    });
+    setTimeout(() => ctx.close(), 1500);
+  } catch {}
+}
+
+function useCountdown(
+  totalSeconds: number,
+  active: boolean,
+  startedAt: string | null,   // server timestamp — used for sync
+  onExpire: () => void,
+) {
   const [remaining, setRemaining] = useState(totalSeconds);
-  const expiredRef = useRef(false);
+  const expiredRef   = useRef(false);
+  const urgentRef    = useRef(false); // prevent repeated sound
 
   useEffect(() => {
     if (!active) return;
-    expiredRef.current = false;
-    setRemaining(totalSeconds);
-    const interval = setInterval(() => {
-      setRemaining(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (!expiredRef.current) {
-            expiredRef.current = true;
-            onExpire();
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    expiredRef.current  = false;
+    urgentRef.current   = false;
+
+    const tick = () => {
+      let secs: number;
+      if (startedAt) {
+        // Server-authoritative: compute from DB timestamp
+        const elapsed = (Date.now() - new Date(startedAt).getTime()) / 1000;
+        secs = Math.max(0, Math.round(totalSeconds - elapsed));
+      } else {
+        // Fallback: decrement locally (first join, started_at not yet written)
+        setRemaining(prev => {
+          secs = prev - 1;
+          return Math.max(0, secs);
+        });
+        return;
+      }
+
+      setRemaining(secs);
+
+      // Play urgent sound once when crossing 60-second mark
+      if (secs <= 60 && secs > 0 && !urgentRef.current) {
+        urgentRef.current = true;
+        playUrgentSound();
+      }
+
+      if (secs <= 0 && !expiredRef.current) {
+        expiredRef.current = true;
+        onExpire();
+      }
+    };
+
+    tick(); // immediate first tick
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [active, totalSeconds]);
+  }, [active, totalSeconds, startedAt]);
 
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
   const ss = String(remaining % 60).padStart(2, '0');
@@ -855,6 +907,7 @@ export default function SecretChatRoom() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { on: rainOn, toggle: toggleRain } = useRainAmbient();
 
   const bgmRef = useRef<HTMLAudioElement>(null);
@@ -960,7 +1013,16 @@ export default function SecretChatRoom() {
     // ── 2. Update state AFTER play() has been called ─────────────────────────
     setShowJoinOverlay(false);
     setIsRoomReady(true);
-  }, [player.currentTrack?.src, player.syncPlayingState]);
+
+    // ── 3. Write started_at to DB so both clients can sync the countdown ─────
+    if (session?.id && !session.started_at) {
+      (supabase as any)
+        .from('chat_sessions')
+        .update({ started_at: new Date().toISOString() })
+        .eq('id', session.id)
+        .then(() => {});
+    }
+  }, [player.currentTrack?.src, player.syncPlayingState, session]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -1000,6 +1062,7 @@ export default function SecretChatRoom() {
   const { remaining, display: countdownDisplay } = useCountdown(
     SESSION_DURATION,
     isRoomReady && matchStatus === 'matched',
+    session?.started_at ?? null,
     handleExpire,
   );
   const isUrgent = remaining <= 60 && remaining > 0;
@@ -1161,52 +1224,85 @@ export default function SecretChatRoom() {
   const sendMessage = useCallback(async () => {
     if (!input.trim() || !session || !user || sending) return;
 
-    // ── 1. Local banned-word check (fast, no network) ────────────────────────
-    const foundWord = findBannedWord(input, bannedWords);
+    const content = input.trim();
+
+    // ── 1. Thai keyword fallback (fast, no network) ───────────────────────────
+    // OpenAI moderation is sometimes weak on Thai slang — catch the worst locally.
+    const THAI_BLOCKED = [
+      /ไอ้เหี้ย/i, /อีสัตว์/i, /มึง/i, /กู/i, /เย็ด/i, /สัตว์/i,
+      /ควาย/i, /หน้าหี/i, /หน้าสัด/i, /ไอ้สัด/i, /อีดอก/i,
+    ];
+    const thaiMatch = THAI_BLOCKED.find(re => re.test(content));
+    if (thaiMatch) {
+      // Log violation locally (same as banned-word path)
+      await (supabase as any).from('chat_violations').insert({
+        session_id: session.id,
+        user_id: user.id,
+        word: '__thai_keyword__',
+        message: content,
+      });
+      setBannedWarning('__thai__');
+      setTimeout(() => setBannedWarning(null), 4000);
+      return;
+    }
+
+    // ── 2. DB banned-word check ───────────────────────────────────────────────
+    const foundWord = findBannedWord(content, bannedWords);
     if (foundWord) {
       await (supabase as any).from('chat_violations').insert({
         session_id: session.id,
         user_id: user.id,
         word: foundWord,
-        message: input.trim(),
+        message: content,
       });
       setBannedWarning(foundWord);
       setTimeout(() => setBannedWarning(null), 4000);
-      setInput('');
       return;
     }
 
-    // ── 2. Lock send button immediately ──────────────────────────────────────
+    // ── 3. Lock send button — AI moderation runs ONLY on submit ──────────────
     setSending(true);
-    const content = input.trim();
-    setInput(''); // clear input right away so UX feels snappy
+    setInput(''); // clear input immediately for snappy UX
 
-    // ── 3. AI moderation via Edge Function (called ONLY on submit) ────────────
     try {
       const { data: modResult, error: modError } = await supabase.functions.invoke(
         'moderate-chat',
         { body: { text: content, session_id: session.id, user_id: user.id } }
       );
 
-      if (!modError && modResult?.isFlagged === true) {
-        // Edge Function already:
-        //   • logged violation to chat_violations (Realtime → admin sees it)
-        //   • inserted system warning into chat_messages (both users see it)
-        // Nothing more to do on the client side.
+      if (modError) {
+        // Edge Function returned an error — block the message, show error toast
+        console.error('[sendMessage] moderation error:', modError);
+        setBannedWarning('__error__');
+        setTimeout(() => setBannedWarning(null), 5000);
         setSending(false);
         return;
       }
-    } catch {
-      // Moderation call failed — fail open, allow message through
-    }
 
-    // ── 4. Insert message (only reached if NOT flagged) ───────────────────────
-    await (supabase as any).from('chat_messages').insert({
-      session_id: session.id,
-      sender_id: user.id,
-      content,
-    });
-    setSending(false);
+      if (modResult?.isFlagged === true) {
+        // Edge Function already:
+        //   • inserted violation into chat_violations (Realtime → admin)
+        //   • inserted system warning into chat_messages (both users see it)
+        // Do NOT insert the original message.
+        setSending(false);
+        return;
+      }
+
+      // ── 4. Not flagged — insert message normally ──────────────────────────
+      await (supabase as any).from('chat_messages').insert({
+        session_id: session.id,
+        sender_id: user.id,
+        content,
+      });
+      setSending(false);
+
+    } catch (err) {
+      // Network/timeout error — block the message and show error toast
+      console.error('[sendMessage] unexpected error:', err);
+      setBannedWarning('__error__');
+      setTimeout(() => setBannedWarning(null), 5000);
+      setSending(false);
+    }
   }, [input, session, user, sending, bannedWords]);
 
   const handleInputChange = useCallback((val: string) => {
@@ -1335,8 +1431,27 @@ export default function SecretChatRoom() {
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {bannedWarning === '__ai__'
               ? 'ข้อความนี้อาจขัดต่อกฎของคาเฟ่ ลองปรับคำพูดดูน้า 🐻'
+              : bannedWarning === '__thai__'
+              ? 'ข้อความถูกบล็อก — พบคำต้องห้าม'
+              : bannedWarning === '__error__'
+              ? 'ไม่สามารถส่งข้อความได้ในขณะนี้ ลองใหม่อีกครั้งน้า'
               : 'ข้อความถูกบล็อก — พบคำต้องห้าม'
             }
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Urgent time warning banner — appears at 60s remaining */}
+      <AnimatePresence>
+        {isUrgent && isRoomReady && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-500 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-lg"
+          >
+            <Clock className="w-4 h-4 shrink-0 animate-pulse" />
+            เหลือเวลาอีก {countdownDisplay} นาที รีบคุยด้วยน้า! ⏰
           </motion.div>
         )}
       </AnimatePresence>
@@ -1416,9 +1531,23 @@ export default function SecretChatRoom() {
               </AnimatePresence>
             </div>
 
+            {/* Theme toggle */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all border bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]"
+              title={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
+            >
+              {theme === 'dark'
+                ? <Sun className="w-4 h-4" />
+                : <Moon className="w-4 h-4" />
+              }
+            </button>
+
+            {/* Leave — solid red */}
             <button onClick={leaveTable}
               ref={leaveRef}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-red-500 border border-[#e8d9c8] hover:border-red-300 transition-all" title="ออกจากโต๊ะ">
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm"
+              title="ออกจากโต๊ะ">
               <LogOut className="w-4 h-4" />
             </button>
           </div>

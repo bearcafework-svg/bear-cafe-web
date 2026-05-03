@@ -3,20 +3,15 @@
  * Uses OpenAI Moderation API ONLY (FREE — zero token cost)
  * https://platform.openai.com/docs/api-reference/moderations
  *
- * Required secrets (Supabase Dashboard → Project Settings → Edge Functions → Secrets):
- *   OPENAI_API_KEY            — your OpenAI key
- *   SUPABASE_URL              — auto-injected by Supabase
- *   SUPABASE_SERVICE_ROLE_KEY — auto-injected by Supabase
+ * Auto-injected Supabase secrets (no manual setup needed):
+ *   SUPABASE_URL              — project URL
+ *   SUPABASE_SERVICE_ROLE_KEY — bypasses RLS for DB writes
  *
- * Request body:
- *   { text: string, session_id: string, user_id: string }
+ * Manual secret (set in Dashboard → Project Settings → Edge Functions → Secrets):
+ *   OPENAI_API_KEY
  *
- * Response body:
- *   { isFlagged: boolean, categories: Record<string, boolean> }
- *
- * When isFlagged === true, this function:
- *   1. Inserts a violation log into chat_violations (triggers Realtime for admin)
- *   2. Inserts a system warning message into chat_messages (visible to both users)
+ * Request:  POST { text: string, session_id: string, user_id: string }
+ * Response: { isFlagged: boolean, categories: Record<string, boolean> }
  */
 
 const corsHeaders = {
@@ -24,7 +19,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// OpenAI category key → Thai label
 const CATEGORY_TH: Record<string, string> = {
   "harassment":             "คุกคาม",
   "harassment/threatening": "คุกคาม/ข่มขู่",
@@ -41,9 +35,31 @@ const CATEGORY_TH: Record<string, string> = {
   "violence/graphic":       "ความรุนแรง/กราฟิก",
 };
 
-// Sentinel UUID used as sender_id for system messages
-// Must not match any real user UUID
+// Sentinel UUID for system messages — must not match any real user
 const SYSTEM_SENDER_ID = "00000000-0000-0000-0000-000000000000";
+
+// ── DB helper using service role (bypasses RLS) ───────────────────────────────
+async function dbInsert(
+  supabaseUrl: string,
+  serviceKey: string,
+  table: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`${supabaseUrl}/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      "apikey":        serviceKey,
+      "Authorization": `Bearer ${serviceKey}`,
+      "Content-Type":  "application/json",
+      "Prefer":        "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`[moderate-chat] INSERT ${table} failed (${res.status}): ${body}`);
+  }
+}
 
 Deno.serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -51,10 +67,12 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { text, session_id, user_id } = await req.json();
+    const body = await req.json();
+    const text       = (body.text       ?? "").trim();
+    const session_id = body.session_id  ?? null;
+    const user_id    = body.user_id     ?? null;
 
-    // ── Validate input ────────────────────────────────────────────────────────
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
+    if (!text) {
       return new Response(
         JSON.stringify({ isFlagged: false, categories: {} }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -65,35 +83,32 @@ Deno.serve(async (req): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // ── No API key → fail open (allow message, skip moderation) ──────────────
     if (!openaiKey) {
-      console.warn("[moderate-chat] OPENAI_API_KEY not set — skipping moderation");
+      console.warn("[moderate-chat] OPENAI_API_KEY not configured — skipping");
       return new Response(
         JSON.stringify({ isFlagged: false, categories: {} }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ── Call OpenAI Moderation API (FREE endpoint) ────────────────────────────
+    // ── Call OpenAI /v1/moderations (FREE) ────────────────────────────────────
+    console.log("[moderate-chat] calling OpenAI for session:", session_id);
     const modRes = await fetch("https://api.openai.com/v1/moderations", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiKey}`,
+        "Content-Type":  "application/json",
       },
-      body: JSON.stringify({
-        model: "omni-moderation-latest",
-        input: text.trim(),
-      }),
+      body: JSON.stringify({ model: "omni-moderation-latest", input: text }),
     });
 
     if (!modRes.ok) {
-      const errText = await modRes.text();
-      console.error("[moderate-chat] OpenAI error:", modRes.status, errText);
-      // Fail open on upstream error
+      const errBody = await modRes.text();
+      console.error("[moderate-chat] OpenAI error:", modRes.status, errBody);
+      // Fail CLOSED on OpenAI error — return error so frontend blocks the send
       return new Response(
-        JSON.stringify({ isFlagged: false, categories: {} }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ isFlagged: false, categories: {}, error: "moderation_unavailable" }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -101,43 +116,24 @@ Deno.serve(async (req): Promise<Response> => {
     const result  = modData.results?.[0];
 
     if (!result) {
+      console.error("[moderate-chat] unexpected OpenAI response shape:", JSON.stringify(modData));
       return new Response(
         JSON.stringify({ isFlagged: false, categories: {} }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ── Build flagged categories map ──────────────────────────────────────────
+    // ── Build flagged categories ───────────────────────────────────────────────
     const flaggedCategories: Record<string, boolean> = {};
-    for (const [key, value] of Object.entries(result.categories ?? {})) {
-      if (value === true) flaggedCategories[key] = true;
+    for (const [key, val] of Object.entries(result.categories ?? {})) {
+      if (val === true) flaggedCategories[key] = true;
     }
-
     const isFlagged = result.flagged === true;
 
-    // ── If flagged: log violation + insert system warning message ─────────────
+    console.log("[moderate-chat] result:", { isFlagged, flaggedCategories });
+
+    // ── If flagged: write violation log + system warning (both await'd) ───────
     if (isFlagged && session_id && user_id && supabaseUrl && serviceKey) {
-      const dbHeaders = {
-        "apikey":        serviceKey,
-        "Authorization": `Bearer ${serviceKey}`,
-        "Content-Type":  "application/json",
-        "Prefer":        "return=minimal",
-      };
-
-      // 1. Log to chat_violations → triggers Realtime for admin "สังเกตการณ์" tab
-      const violationInsert = fetch(`${supabaseUrl}/rest/v1/chat_violations`, {
-        method: "POST",
-        headers: dbHeaders,
-        body: JSON.stringify({
-          session_id,
-          user_id,
-          word:          "__ai_flagged__",
-          message:       text.trim(),
-          ai_categories: flaggedCategories,
-        }),
-      });
-
-      // 2. Build Thai category label string for the warning message
       const categoryLabels = Object.keys(flaggedCategories)
         .map(k => CATEGORY_TH[k] ?? k)
         .join(", ");
@@ -146,26 +142,27 @@ Deno.serve(async (req): Promise<Response> => {
         ? `🐻 รปภ. หมี: ติ๊ดๆ! ข้อความเมื่อครู่ถูกบล็อกเนื่องจากมีเนื้อหาสุ่มเสี่ยง (หมวดหมู่: ${categoryLabels}) รบกวนใช้คำสุภาพน้า`
         : "🐻 รปภ. หมี: ติ๊ดๆ! ข้อความเมื่อครู่ถูกบล็อกเนื่องจากมีเนื้อหาสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า";
 
-      // 3. Insert system warning into chat_messages (both users see it via Realtime)
-      const systemMsgInsert = fetch(`${supabaseUrl}/rest/v1/chat_messages`, {
-        method: "POST",
-        headers: dbHeaders,
-        body: JSON.stringify({
+      // Both inserts must succeed — await them so errors surface in logs
+      const results = await Promise.allSettled([
+        dbInsert(supabaseUrl, serviceKey, "chat_violations", {
+          session_id,
+          user_id,
+          word:          "__ai_flagged__",
+          message:       text,
+          ai_categories: flaggedCategories,
+        }),
+        dbInsert(supabaseUrl, serviceKey, "chat_messages", {
           session_id,
           sender_id: SYSTEM_SENDER_ID,
           content:   warningText,
           is_system: true,
         }),
-      });
+      ]);
 
-      // Run both inserts in parallel
-      const [vRes, mRes] = await Promise.all([violationInsert, systemMsgInsert]);
-
-      if (!vRes.ok) {
-        console.error("[moderate-chat] violation insert error:", await vRes.text());
-      }
-      if (!mRes.ok) {
-        console.error("[moderate-chat] system message insert error:", await mRes.text());
+      for (const r of results) {
+        if (r.status === "rejected") {
+          console.error("[moderate-chat] DB write failed:", r.reason);
+        }
       }
     }
 
@@ -175,10 +172,10 @@ Deno.serve(async (req): Promise<Response> => {
     );
 
   } catch (err) {
-    console.error("[moderate-chat] Unexpected error:", err);
+    console.error("[moderate-chat] unhandled error:", err);
     return new Response(
-      JSON.stringify({ isFlagged: false, categories: {} }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ isFlagged: false, categories: {}, error: "internal_error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
