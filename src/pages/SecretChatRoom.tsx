@@ -433,7 +433,7 @@ function MusicPanel({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.96 }}
       transition={{ duration: 0.2 }}
-      className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50"
+      className="fixed bottom-0 left-0 right-0 sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 w-full bg-white dark:bg-[#1a0e06] sm:rounded-2xl rounded-t-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50 max-h-[80vh] overflow-y-auto"
       onClick={e => e.stopPropagation()}
     >
       {/* Now playing header */}
