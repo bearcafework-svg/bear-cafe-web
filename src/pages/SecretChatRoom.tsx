@@ -11,6 +11,7 @@ interface Message {
   id: string;
   sender_id: string;
   content: string;
+  is_system?: boolean;
   created_at: string;
 }
 
@@ -1175,36 +1176,31 @@ export default function SecretChatRoom() {
       return;
     }
 
+    // ── 2. Lock send button immediately ──────────────────────────────────────
     setSending(true);
     const content = input.trim();
+    setInput(''); // clear input right away so UX feels snappy
 
-    // ── 2. AI moderation via Edge Function ───────────────────────────────────
+    // ── 3. AI moderation via Edge Function (called ONLY on submit) ────────────
     try {
       const { data: modResult, error: modError } = await supabase.functions.invoke(
         'moderate-chat',
-        { body: { text: content } }
+        { body: { text: content, session_id: session.id, user_id: user.id } }
       );
 
       if (!modError && modResult?.isFlagged === true) {
-        // Blocked by AI — show polite toast, log violation, do NOT insert
-        await (supabase as any).from('chat_violations').insert({
-          session_id: session.id,
-          user_id: user.id,
-          word: '__ai_flagged__',
-          message: content,
-        });
-        setBannedWarning('__ai__');
-        setTimeout(() => setBannedWarning(null), 5000);
+        // Edge Function already:
+        //   • logged violation to chat_violations (Realtime → admin sees it)
+        //   • inserted system warning into chat_messages (both users see it)
+        // Nothing more to do on the client side.
         setSending(false);
-        setInput('');
         return;
       }
     } catch {
       // Moderation call failed — fail open, allow message through
     }
 
-    // ── 3. Insert message ────────────────────────────────────────────────────
-    setInput('');
+    // ── 4. Insert message (only reached if NOT flagged) ───────────────────────
     await (supabase as any).from('chat_messages').insert({
       session_id: session.id,
       sender_id: user.id,
@@ -1472,32 +1468,54 @@ export default function SecretChatRoom() {
         )}
 
         <AnimatePresence initial={false}>
-          {messages.map(msg => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className={`flex gap-3 ${isMyMessage(msg) ? 'flex-row-reverse' : 'flex-row'}`}
-            >
-              {!isMyMessage(msg) && (
-                <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
-                  {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
+          {messages.map(msg => {
+            // ── System message (Bear Guard warning) ──────────────────────────
+            if (msg.is_system) {
+              return (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-center"
+                >
+                  <div className="flex items-start gap-2 max-w-[90%] bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-2xl px-4 py-2.5 shadow-sm">
+                    <span className="text-base shrink-0 mt-0.5">🐻</span>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                      {msg.content}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            }
+
+            // ── Normal message ────────────────────────────────────────────────
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className={`flex gap-3 ${isMyMessage(msg) ? 'flex-row-reverse' : 'flex-row'}`}
+              >
+                {!isMyMessage(msg) && (
+                  <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
+                    {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
+                  </div>
+                )}
+                <div className={`max-w-[75%] sm:max-w-[65%] space-y-1 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
+                  <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
+                    {isMyMessage(msg) ? myAlias : partnerAlias}
+                  </span>
+                  <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                    isMyMessage(msg)
+                      ? 'bg-[#c8956c] text-white rounded-br-sm'
+                      : 'bg-white dark:bg-[#2a1e14] text-[#4a3728] dark:text-[#e8d9c8] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-bl-sm'
+                  }`}>
+                    {msg.content}
+                  </div>
                 </div>
-              )}
-              <div className={`max-w-[75%] sm:max-w-[65%] space-y-1 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
-                <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
-                  {isMyMessage(msg) ? myAlias : partnerAlias}
-                </span>
-                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                  isMyMessage(msg)
-                    ? 'bg-[#c8956c] text-white rounded-br-sm'
-                    : 'bg-white dark:bg-[#2a1e14] text-[#4a3728] dark:text-[#e8d9c8] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-bl-sm'
-                }`}>
-                  {msg.content}
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
 
         {partnerTyping && (

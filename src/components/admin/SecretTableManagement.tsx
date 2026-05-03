@@ -53,9 +53,27 @@ interface Violation {
   user_id: string;
   word: string;
   message: string;
+  ai_categories: Record<string, boolean> | null;
   created_at: string;
   profile?: { username: string; discord_id: string; avatar_url: string | null };
 }
+
+// Map OpenAI category keys → Thai labels
+const AI_CATEGORY_TH: Record<string, string> = {
+  "harassment":             "คุกคาม",
+  "harassment/threatening": "คุกคาม/ข่มขู่",
+  "hate":                   "เกลียดชัง",
+  "hate/threatening":       "เกลียดชัง/ข่มขู่",
+  "illicit":                "ผิดกฎหมาย",
+  "illicit/violent":        "ผิดกฎหมาย/รุนแรง",
+  "self-harm":              "ทำร้ายตัวเอง",
+  "self-harm/intent":       "ตั้งใจทำร้ายตัวเอง",
+  "self-harm/instructions": "วิธีทำร้ายตัวเอง",
+  "sexual":                 "อนาจาร",
+  "sexual/minors":          "อนาจาร/เด็ก",
+  "violence":               "ความรุนแรง",
+  "violence/graphic":       "ความรุนแรง/กราฟิก",
+};
 
 // ─── Image Upload helper ──────────────────────────────────────────────────────
 async function uploadTopicImage(file: File, bucket: string): Promise<string> {
@@ -568,7 +586,7 @@ function MonitorTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">แชทที่มีการใช้คำต้องห้าม — อัปเดตแบบ Realtime</p>
+        <p className="text-sm text-muted-foreground">แชทที่มีการใช้คำต้องห้าม หรือถูก AI ตรวจจับ — อัปเดตแบบ Realtime</p>
         <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -609,6 +627,12 @@ function MonitorTab() {
                   <Badge variant="destructive" className="gap-1 text-xs">
                     <AlertTriangle className="w-3 h-3" /> สุ่มเสี่ยง
                   </Badge>
+                  {/* AI Guardian badge — shown when flagged by OpenAI */}
+                  {v.word === '__ai_flagged__' && (
+                    <Badge className="gap-1 text-xs bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-700">
+                      🤖 AI Guardian
+                    </Badge>
+                  )}
                   <span className="font-semibold text-sm text-red-700 dark:text-red-400">
                     {v.profile?.username ?? v.user_id.slice(0, 8)}
                   </span>
@@ -620,12 +644,28 @@ function MonitorTab() {
                   <span className="text-xs text-muted-foreground ml-auto">{formatTime(v.created_at)}</span>
                 </div>
 
-                {/* Offending word */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">คำต้องห้าม:</span>
-                  <code className="text-xs bg-red-200 dark:bg-red-900/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded font-mono">
-                    {v.word}
-                  </code>
+                {/* Offending word / AI categories */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {v.word === '__ai_flagged__' && v.ai_categories && Object.keys(v.ai_categories).length > 0 ? (
+                    <>
+                      <span className="text-xs text-muted-foreground">AI ตรวจพบ:</span>
+                      {Object.keys(v.ai_categories).map(cat => (
+                        <span
+                          key={cat}
+                          className="text-xs bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium"
+                        >
+                          {AI_CATEGORY_TH[cat] ?? cat}
+                        </span>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs text-muted-foreground">คำต้องห้าม:</span>
+                      <code className="text-xs bg-red-200 dark:bg-red-900/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded font-mono">
+                        {v.word}
+                      </code>
+                    </>
+                  )}
                 </div>
 
                 {/* Full message */}
