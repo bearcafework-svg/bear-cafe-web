@@ -419,6 +419,8 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
 }
 
 // ─── Music Player Panel ───────────────────────────────────────────────────────
+// Desktop: dropdown from the music button (absolute)
+// Mobile (<640px): centered modal with backdrop + X button
 function MusicPanel({
   player, onClose,
 }: {
@@ -426,16 +428,33 @@ function MusicPanel({
   onClose: () => void;
 }) {
   const [activeCat, setActiveCat] = useState(player.catIdx);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 10, scale: 0.96 }}
-      transition={{ duration: 0.2 }}
-      className="fixed bottom-0 left-0 right-0 sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 w-full bg-white dark:bg-[#1a0e06] sm:rounded-2xl rounded-t-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50 max-h-[80vh] overflow-y-auto"
-      onClick={e => e.stopPropagation()}
-    >
+    <>
+      {/* Mobile-only backdrop */}
+      {isMobile && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]"
+          onClick={onClose}
+        />
+      )}
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        transition={{ duration: 0.2, type: 'spring', stiffness: 320, damping: 28 }}
+        className={
+          isMobile
+            ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm max-h-[85vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]'
+            : 'absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50'
+        }
+        onClick={e => e.stopPropagation()}
+      >
       {/* Now playing header */}
       <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06]">
         <div className="flex items-center justify-between mb-3">
@@ -472,7 +491,7 @@ function MusicPanel({
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
               player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
             }`}
-            title={player.loopMode === 'none' ? 'ไม่วน้ำ' : player.loopMode === 'all' ? 'วน้ำทั้งหมด' : 'วน้ำเพลงนี้'}
+            title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
           >
             {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
           </button>
@@ -566,7 +585,8 @@ function MusicPanel({
           );
         })}
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 
