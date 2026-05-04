@@ -187,7 +187,9 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   }, []);
 
   const currentCat = library[Math.min(catIdx, library.length - 1)] ?? MUSIC_FALLBACK[0];
-  const currentTrack = currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)] ?? currentCat.tracks[0];
+  const currentTrack = (currentCat?.tracks?.length ?? 0) > 0
+    ? (currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)] ?? currentCat.tracks[0])
+    : ({ title: '', src: '', image_url: null, artist: null } as Track);
 
   // Load track when catIdx, trackIdx, or library changes
   useEffect(() => {
@@ -238,7 +240,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     } else {
       // Ensure src is set (in case library loaded after mount)
       if (!el.src || el.src === window.location.href) {
-        el.src = currentTrack.src;
+        if (currentTrack?.src) el.src = currentTrack.src;
       }
       el.play().catch(() => {});
       setPlaying(true);
@@ -464,16 +466,16 @@ function MusicPanel({
 
         {/* Vinyl disc */}
         <div className="flex justify-center mb-3">
-          <VinylDisc imageUrl={player.currentTrack.image_url} playing={player.playing} />
+          <VinylDisc imageUrl={player.currentTrack?.image_url} playing={player.playing} />
         </div>
 
         {/* Track info */}
         <div className="text-center mb-3">
-          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack.title}</p>
-          {player.currentTrack.artist ? (
+          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack?.title ?? '—'}</p>
+          {player.currentTrack?.artist ? (
             <p className="text-[11px] text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
           ) : null}
-          <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat.label}</p>
+          <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat?.label ?? ''}</p>
         </div>
 
         {/* Bar waveform visualizer */}

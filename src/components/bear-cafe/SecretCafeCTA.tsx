@@ -50,6 +50,27 @@ export function SecretCafeCTA() {
           <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
             ☕ 𓂃 กำลังเหงาอยู่ใช่มั้ย?
           </h2>
+          <ul className="space-y-1.5">
+            {[
+              // 1. เปลี่ยนจาก icon เป็น iconSrc และใส่ที่อยู่รูปภาพของเรา
+              { iconSrc: '/icons/SecretCafe-1.png', text: 'ตั้งโปรไฟล์ของตัวเองได้ — ชื่อสมมติ + รูปอวาตาร์' },
+              { iconSrc: '/icons/SecretCafe-2.png', text: 'สุ่มแชทแบบไม่เปิดเผยตัวตน ปลอดภัย 100%' },
+              { iconSrc: '/icons/SecretCafe-3.png', text: 'มีเพลง BGM เปิดคลอระหว่างคุย บรรยากาศคาเฟ่จริงๆ' },
+            ].map(({ iconSrc, text }) => (
+              <li key={text} className="flex items-start gap-2 text-sm text-orange-100">
+                
+                {/* 2. เปลี่ยนแท็ก span เดิม ให้กลายเป็นแท็ก img แทน */}
+                <img 
+                  src={iconSrc} 
+                  alt="icon" 
+                  className="w-5 h-5 shrink-0 mt-0.5" 
+                  style={{ imageRendering: 'pixelated' }} 
+                />
+                
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* ── Right: Button + Live status ── */}

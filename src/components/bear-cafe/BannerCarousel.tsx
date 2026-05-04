@@ -56,7 +56,7 @@ export function BannerCarousel() {
 
   if (isLoading) {
     return (
-      <div className="relative w-full aspect-[16/9] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden bg-gradient-to-br from-peach/30 to-blush/30 dark:from-coffee/30 dark:to-mocha/30 animate-pulse">
+      <div className="relative w-full aspect-[3/1] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden bg-gradient-to-br from-peach/30 to-blush/30 dark:from-coffee/30 dark:to-mocha/30 animate-pulse">
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-3xl sm:text-4xl">🐻</span>
         </div>
@@ -66,7 +66,7 @@ export function BannerCarousel() {
 
   if (banners.length === 0) {
     return (
-      <div className="relative w-full aspect-[16/9] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden bg-gradient-to-br from-peach/40 to-blush/40 dark:from-coffee/40 dark:to-mocha/40 border border-latte/30 dark:border-coffee/30">
+      <div className="relative w-full aspect-[3/1] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden bg-gradient-to-br from-peach/40 to-blush/40 dark:from-coffee/40 dark:to-mocha/40 border border-latte/30 dark:border-coffee/30">
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
           <span className="text-4xl sm:text-5xl">🐻☕</span>
           <p className="text-xs sm:text-sm text-muted-foreground">Bear Café</p>
@@ -76,7 +76,7 @@ export function BannerCarousel() {
   }
 
   return (
-    <div className="relative w-full aspect-[16/9] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden group isolate">
+    <div className="relative w-full aspect-[3/1] sm:aspect-[909/304] rounded-xl sm:rounded-2xl overflow-hidden group isolate">
       {/* Banner Images */}
       <div 
         className="flex transition-transform duration-500 ease-out h-full"

@@ -238,17 +238,6 @@ export default function Index() {
               <SecretCafeCTA />
             </motion.div>
 
-            {/* Secret Table Widget — Owner only */}
-            {user?.is_owner && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.08 }}
-              >
-                <SecretTableWidget />
-              </motion.div>
-            )}
-
             {/* Category Grid */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
