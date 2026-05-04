@@ -99,7 +99,7 @@ export function BannerCarousel() {
             )}
             
             {(banner.title || banner.description || banner.button_text) && (
-              <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 md:bottom-6 md:left-6 md:right-auto md:max-w-[60%]">
+              <div className="absolute bottom-7 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 md:bottom-6 md:left-6 md:right-auto md:max-w-[60%]">
                 {banner.title && (
                   <h3 className="text-white font-bold text-sm sm:text-lg md:text-xl drop-shadow-lg mb-0.5 sm:mb-1 line-clamp-1">
                     {banner.title}

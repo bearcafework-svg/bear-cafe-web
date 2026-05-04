@@ -4,15 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -39,13 +30,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Ban, Globe, Pencil } from 'lucide-react';
+import { Plus, Trash2, Ban, Globe, Pencil, X } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
-import { useBulkSelection } from '@/hooks/useBulkSelection';
-import { BulkDeleteToolbar } from '@/components/admin/BulkDeleteToolbar';
 
 interface BannedWord {
   id: string;
@@ -60,6 +49,13 @@ interface Category {
   icon: string;
 }
 
+interface WordGroup {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  words: BannedWord[];
+}
+
 export function BannedWordsManagement() {
   const [bannedWords, setBannedWords] = useState<BannedWord[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,25 +68,41 @@ export function BannedWordsManagement() {
   const [editingWord, setEditingWord] = useState<BannedWord | null>(null);
   const [editWordValue, setEditWordValue] = useState('');
   const [editCategoryId, setEditCategoryId] = useState<string>('global');
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<BannedWord | null>(null);
   const { toast } = useToast();
 
   const filteredWords = bannedWords.filter((w) =>
     w.word.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getWordId = useCallback((word: BannedWord) => word.id, []);
-  const {
-    selectedCount,
-    selectedItems,
-    isSelected,
-    isAllSelected,
-    isSomeSelected,
-    toggleItem,
-    toggleAll,
-    clearSelection,
-  } = useBulkSelection({ items: filteredWords, getItemId: getWordId });
+  // Group words by category
+  const wordGroups: WordGroup[] = React.useMemo(() => {
+    const globalWords = filteredWords.filter((w) => !w.category_id);
+    const groups: WordGroup[] = [];
+
+    if (globalWords.length > 0) {
+      groups.push({
+        key: 'global',
+        label: 'ทุกหมวดหมู่',
+        icon: <Globe className="w-3.5 h-3.5" />,
+        words: globalWords,
+      });
+    }
+
+    categories.forEach((cat) => {
+      const catWords = filteredWords.filter((w) => w.category_id === cat.id);
+      if (catWords.length > 0) {
+        groups.push({
+          key: cat.id,
+          label: cat.name,
+          icon: <IconDisplay icon={cat.icon} fallback="📁" size="sm" />,
+          words: catWords,
+        });
+      }
+    });
+
+    return groups;
+  }, [filteredWords, categories]);
 
   useEffect(() => {
     fetchData();
@@ -98,7 +110,6 @@ export function BannedWordsManagement() {
 
   async function fetchData() {
     try {
-      // Fetch banned words
       const { data: wordsData, error: wordsError } = await supabase
         .from('banned_words')
         .select('*')
@@ -107,7 +118,6 @@ export function BannedWordsManagement() {
       if (wordsError) throw wordsError;
       setBannedWords(wordsData || []);
 
-      // Fetch categories
       const { data: catData, error: catError } = await supabase
         .from('categories')
         .select('id, name, icon')
@@ -130,31 +140,20 @@ export function BannedWordsManagement() {
 
   async function handleAddWords() {
     if (!newWords.trim()) {
-      toast({
-        title: 'กรุณากรอกคำต้องห้าม',
-        variant: 'destructive',
-      });
+      toast({ title: 'กรุณากรอกคำต้องห้าม', variant: 'destructive' });
       return;
     }
 
     try {
-      // Split by comma and clean up each word, remove duplicates
       const words = [...new Set(
-        newWords
-          .split(',')
-          .map(w => w.trim().toLowerCase())
-          .filter(w => w.length > 0)
+        newWords.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0)
       )];
 
       if (words.length === 0) {
-        toast({
-          title: 'กรุณากรอกคำต้องห้าม',
-          variant: 'destructive',
-        });
+        toast({ title: 'กรุณากรอกคำต้องห้าม', variant: 'destructive' });
         return;
       }
 
-      // Insert words one by one to handle duplicates gracefully
       let addedCount = 0;
       let skippedCount = 0;
 
@@ -163,37 +162,17 @@ export function BannedWordsManagement() {
           word,
           category_id: selectedCategoryId === 'global' ? null : selectedCategoryId,
         });
-
-        if (error) {
-          // Check if it's a duplicate key error
-          if (error.code === '23505' || error.message.includes('duplicate')) {
-            skippedCount++;
-          } else {
-            console.error('Error adding word:', word, error);
-            skippedCount++;
-          }
-        } else {
-          addedCount++;
-        }
+        if (error) { skippedCount++; } else { addedCount++; }
       }
 
       if (addedCount === 0) {
-        toast({
-          title: 'คำเหล่านี้มีอยู่แล้ว',
-          description: 'ทุกคำที่กรอกมีอยู่ในระบบแล้ว',
-          variant: 'destructive',
-        });
+        toast({ title: 'คำเหล่านี้มีอยู่แล้ว', description: 'ทุกคำที่กรอกมีอยู่ในระบบแล้ว', variant: 'destructive' });
         return;
-      }
-
-      let description = `เพิ่ม ${addedCount} คำเรียบร้อยแล้ว`;
-      if (skippedCount > 0) {
-        description += ` (ข้าม ${skippedCount} คำที่ซ้ำ)`;
       }
 
       toast({
         title: 'เพิ่มคำต้องห้ามแล้ว',
-        description,
+        description: `เพิ่ม ${addedCount} คำ${skippedCount > 0 ? ` (ข้าม ${skippedCount} คำที่ซ้ำ)` : ''}`,
       });
 
       setNewWords('');
@@ -201,12 +180,7 @@ export function BannedWordsManagement() {
       setDialogOpen(false);
       fetchData();
     } catch (error) {
-      console.error('Error adding words:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถเพิ่มคำต้องห้ามได้',
-        variant: 'destructive',
-      });
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถเพิ่มคำต้องห้ามได้', variant: 'destructive' });
     }
   }
 
@@ -219,10 +193,7 @@ export function BannedWordsManagement() {
 
   async function handleEditWord() {
     if (!editingWord || !editWordValue.trim()) {
-      toast({
-        title: 'กรุณากรอกคำต้องห้าม',
-        variant: 'destructive',
-      });
+      toast({ title: 'กรุณากรอกคำต้องห้าม', variant: 'destructive' });
       return;
     }
 
@@ -237,47 +208,24 @@ export function BannedWordsManagement() {
 
       if (error) throw error;
 
-      toast({
-        title: 'แก้ไขคำต้องห้ามแล้ว',
-        description: `"${editWordValue}" ถูกแก้ไขเรียบร้อยแล้ว`,
-      });
-
-      setEditingWord(null);
-      setEditWordValue('');
-      setEditCategoryId('global');
+      toast({ title: 'แก้ไขคำต้องห้ามแล้ว', description: `"${editWordValue}" ถูกแก้ไขเรียบร้อยแล้ว` });
       setEditDialogOpen(false);
       fetchData();
     } catch (error) {
-      console.error('Error editing word:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถแก้ไขคำต้องห้ามได้',
-        variant: 'destructive',
-      });
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถแก้ไขคำต้องห้ามได้', variant: 'destructive' });
     }
   }
 
-  async function handleDeleteWord(wordId: string, word: string) {
+  async function handleDeleteWord() {
+    if (!deleteTarget) return;
     try {
-      const { error } = await supabase
-        .from('banned_words')
-        .delete()
-        .eq('id', wordId);
-
+      const { error } = await supabase.from('banned_words').delete().eq('id', deleteTarget.id);
       if (error) throw error;
-
-      setBannedWords(bannedWords.filter((w) => w.id !== wordId));
-
-      toast({
-        title: 'ลบคำต้องห้ามแล้ว',
-        description: `"${word}" ถูกลบเรียบร้อยแล้ว`,
-      });
+      setBannedWords(bannedWords.filter((w) => w.id !== deleteTarget.id));
+      toast({ title: 'ลบคำต้องห้ามแล้ว', description: `"${deleteTarget.word}" ถูกลบเรียบร้อยแล้ว` });
+      setDeleteTarget(null);
     } catch (error) {
-      console.error('Error deleting word:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        variant: 'destructive',
-      });
+      toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' });
     }
   }
 
@@ -286,147 +234,84 @@ export function BannedWordsManagement() {
     return categories.find((c) => c.id === categoryId);
   };
 
-  async function handleBulkDelete() {
-    if (selectedCount === 0) return;
-
-    setIsDeleting(true);
-    try {
-      const idsToDelete = selectedItems.map((item) => item.id);
-      const { error } = await supabase
-        .from('banned_words')
-        .delete()
-        .in('id', idsToDelete);
-
-      if (error) throw error;
-
-      setBannedWords(bannedWords.filter((w) => !idsToDelete.includes(w.id)));
-      clearSelection();
-      setBulkDeleteDialogOpen(false);
-
-      toast({
-        title: 'ลบคำต้องห้ามแล้ว',
-        description: `ลบ ${idsToDelete.length} คำเรียบร้อยแล้ว`,
-      });
-    } catch (error) {
-      console.error('Error bulk deleting words:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถลบคำต้องห้ามได้',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
   return (
     <Card className="admin-card">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Ban className="w-4 h-4" />
             จัดการคำต้องห้าม
+            {!loading && (
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                ({bannedWords.length} คำ)
+              </span>
+            )}
           </CardTitle>
-          <div className="flex items-center gap-3">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาคำ..." className="w-64" />
-            <Button onClick={() => setDialogOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              เพิ่มคำต้องห้าม
+          <div className="flex items-center gap-2">
+            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาคำ..." className="w-48 sm:w-56" />
+            <Button onClick={() => setDialogOpen(true)} size="sm" className="gap-1.5 shrink-0">
+              <Plus className="w-3.5 h-3.5" />
+              เพิ่มคำ
             </Button>
           </div>
         </div>
       </CardHeader>
+
       <CardContent>
-        <BulkDeleteToolbar
-          selectedCount={selectedCount}
-          onDelete={() => setBulkDeleteDialogOpen(true)}
-          onClear={clearSelection}
-          isDeleting={isDeleting}
-          itemLabel="คำ"
-        />
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">กำลังโหลด...</div>
+          <div className="text-center py-10 text-muted-foreground">กำลังโหลด...</div>
         ) : filteredWords.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-10 text-muted-foreground">
             {searchQuery ? 'ไม่พบคำที่ค้นหา' : 'ยังไม่มีคำต้องห้าม'}
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={toggleAll}
-                    aria-label="เลือกทั้งหมด"
-                    className={isSomeSelected ? 'data-[state=checked]:bg-primary/50' : ''}
-                    {...(isSomeSelected ? { 'data-state': 'checked' } : {})}
-                  />
-                </TableHead>
-                <TableHead>คำต้องห้าม</TableHead>
-                <TableHead>ขอบเขต</TableHead>
-                <TableHead>วันที่เพิ่ม</TableHead>
-                <TableHead className="text-right">จัดการ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredWords.map((word) => {
-                const category = getCategoryName(word.category_id);
-                return (
-                  <TableRow key={word.id} className={isSelected(word.id) ? 'bg-muted/50' : ''}>
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected(word.id)}
-                        onCheckedChange={() => toggleItem(word.id)}
-                        aria-label={`เลือก ${word.word}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="destructive" className="font-mono">
+          <div className="space-y-5">
+            {wordGroups.map((group) => (
+              <div key={group.key}>
+                {/* Group header */}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-muted-foreground">{group.icon}</span>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {group.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground/60 ml-0.5">
+                    ({group.words.length})
+                  </span>
+                </div>
+
+                {/* Word chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {group.words.map((word) => (
+                    <div
+                      key={word.id}
+                      className="group/chip inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-destructive/10 border border-destructive/20 hover:border-destructive/40 transition-colors"
+                    >
+                      <span className="text-xs font-mono text-destructive leading-none">
                         {word.word}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {category ? (
-                        <div className="flex items-center gap-2">
-                          <IconDisplay icon={category.icon} fallback="📁" size="sm" />
-                          <span>{category.name}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Globe className="w-4 h-4" />
-                          <span>ทุกหมวดหมู่</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(word.created_at).toLocaleDateString('th-TH')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-foreground"
+                      </span>
+                      {/* Actions — visible on hover */}
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/chip:opacity-100 transition-opacity ml-0.5">
+                        <button
                           onClick={() => openEditDialog(word)}
+                          className="w-4 h-4 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          title="แก้ไข"
                         >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDeleteWord(word.id, word.word)}
+                          <Pencil className="w-2.5 h-2.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(word)}
+                          className="w-4 h-4 flex items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          title="ลบ"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          <X className="w-2.5 h-2.5" />
+                        </button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
 
@@ -481,9 +366,7 @@ export function BannedWordsManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              ยกเลิก
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={handleAddWords}>เพิ่มคำต้องห้าม</Button>
           </DialogFooter>
         </DialogContent>
@@ -494,9 +377,7 @@ export function BannedWordsManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>แก้ไขคำต้องห้าม</DialogTitle>
-            <DialogDescription>
-              แก้ไขคำหรือเปลี่ยนขอบเขตการใช้งาน
-            </DialogDescription>
+            <DialogDescription>แก้ไขคำหรือเปลี่ยนขอบเขตการใช้งาน</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -533,32 +414,30 @@ export function BannedWordsManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              ยกเลิก
-            </Button>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={handleEditWord}>บันทึกการแก้ไข</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบหลายรายการ</AlertDialogTitle>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
             <AlertDialogDescription>
-              คุณต้องการลบคำต้องห้าม {selectedCount} คำหรือไม่?
-              การกระทำนี้ไม่สามารถย้อนกลับได้
+              ลบคำต้องห้าม{' '}
+              <span className="font-mono font-semibold text-destructive">"{deleteTarget?.word}"</span>{' '}
+              ออกจากระบบ? การกระทำนี้ไม่สามารถย้อนกลับได้
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleBulkDelete}
-              disabled={isDeleting}
+              onClick={handleDeleteWord}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {isDeleting ? 'กำลังลบ...' : `ลบ ${selectedCount} คำ`}
+              ลบ
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
