@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -60,13 +61,10 @@ async function loadSimilarMoodConfig(): Promise<SimilarMoodConfig> {
   return { enabled: false, similar_phase_delay_seconds: 15, map: {} };
 }
 
-// Bidirectional check: A→B or B→A
 function isSimilarMood(a: string, b: string, map: Record<string, string[]>): boolean {
   return (map[a]?.includes(b) ?? false) || (map[b]?.includes(a) ?? false);
 }
 
-// Role compatibility matrix
-// talk ↔ listen, both ↔ any, chill ↔ chill|both
 function isCompatibleRole(a: string, b: string): boolean {
   if (a === 'both' || b === 'both') return true;
   if (a === 'talk'   && b === 'listen') return true;
@@ -75,12 +73,11 @@ function isCompatibleRole(a: string, b: string): boolean {
   return false;
 }
 
-// Score a candidate: higher = better match
 function matchScore(myTopicId: string, myRole: string, candidate: any, moodConfig: SimilarMoodConfig): number {
   let score = 0;
   if (candidate.topic_id === myTopicId) score += 10;
   else if (moodConfig.enabled && isSimilarMood(myTopicId, candidate.topic_id, moodConfig.map)) score += 5;
-  else return -1; // not eligible
+  else return -1;
   if (isCompatibleRole(myRole ?? 'both', candidate.role ?? 'both')) score += 3;
   return score;
 }
@@ -168,17 +165,14 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   const [catIdx, setCatIdx] = useState(0);
   const [trackIdx, setTrackIdx] = useState(0);
   const [loopMode, setLoopMode] = useState<LoopMode>('all');
-  const [progress, setProgress] = useState(0);   // 0–100
-  const [duration, setDuration] = useState(0);   // seconds
-  const [volume, setVolumeState] = useState(0.8); // 0–1
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolumeState] = useState(0.8);
 
-  // Load library from DB on mount
   useEffect(() => {
     loadMusicLibrary().then(lib => {
       setLibrary(lib);
       setCatIdx(0);
       setTrackIdx(0);
-      // Set src immediately so first play works
       const el = audioRef.current;
       if (el && lib[0]?.tracks[0]) {
         el.src = lib[0].tracks[0].src;
@@ -191,7 +185,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     ? (currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)] ?? currentCat.tracks[0])
     : ({ title: '', src: '', image_url: null, artist: null } as Track);
 
-  // Load track when catIdx, trackIdx, or library changes
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !currentTrack?.src) return;
@@ -200,12 +193,10 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     if (playing) el.play().catch(() => {});
   }, [catIdx, trackIdx, library]);
 
-  // Sync loop attribute
   useEffect(() => {
     if (audioRef.current) audioRef.current.loop = loopMode === 'one';
   }, [loopMode]);
 
-  // Progress tracking — kept for auto-advance logic only (not displayed)
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
@@ -214,12 +205,11 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     return () => el.removeEventListener('loadedmetadata', onMeta);
   }, []);
 
-  // Auto-advance on track end
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
     const onEnded = () => {
-      if (loopMode === 'one') return; // handled by loop attr
+      if (loopMode === 'one') return;
       if (loopMode === 'all' || trackIdx < currentCat.tracks.length - 1) {
         const next = (trackIdx + 1) % currentCat.tracks.length;
         setTrackIdx(next);
@@ -238,7 +228,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
       el.pause();
       setPlaying(false);
     } else {
-      // Ensure src is set (in case library loaded after mount)
       if (!el.src || el.src === window.location.href) {
         if (currentTrack?.src) el.src = currentTrack.src;
       }
@@ -247,8 +236,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     }
   }, [playing, currentTrack]);
 
-  // Start playback from outside the hook (e.g. inside a click handler for autoplay unlock).
-  // Caller is responsible for calling el.play() directly; this just syncs the state.
   const syncPlayingState = useCallback((isPlaying: boolean) => {
     setPlaying(isPlaying);
   }, []);
@@ -277,7 +264,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     if (audioRef.current) audioRef.current.volume = clamped;
   }, []);
 
-  // Sync volume on mount / audio element change
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, []);
@@ -286,7 +272,6 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
 }
 
 // ─── Bar Waveform Visualizer ──────────────────────────────────────────────────
-// 18 vertical bars that animate randomly when playing, collapse when paused.
 const BAR_COUNT = 18;
 const BAR_SEEDS = Array.from({ length: BAR_COUNT }, (_, i) => ({
   duration: 0.5 + ((i * 137 + 31) % 7) * 0.1,
@@ -385,12 +370,10 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
   );
 }
 
-
 // ─── Vinyl Disc ───────────────────────────────────────────────────────────────
 function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) {
   return (
     <div className="relative flex items-center justify-center">
-      {/* Outer ring */}
       <motion.div
         animate={{ rotate: playing ? 360 : 0 }}
         transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
@@ -400,11 +383,9 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
           boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 0 12px rgba(0,0,0,0.4)',
         }}
       >
-        {/* Grooves */}
         {[38, 44, 50].map(r => (
           <div key={r} className="absolute rounded-full border border-white/5" style={{ width: r * 2, height: r * 2 }} />
         ))}
-        {/* Center image */}
         <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/40 shadow-inner z-10">
           {imageUrl ? (
             <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
@@ -414,7 +395,6 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
             </div>
           )}
         </div>
-        {/* Center hole */}
         <div className="absolute w-3 h-3 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
       </motion.div>
     </div>
@@ -422,7 +402,8 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
 }
 
 // ─── Music Player Panel ───────────────────────────────────────────────────────
-// Always renders as a centered modal with blurred backdrop on all platforms.
+// FIX: Renders via React Portal at document.body so it's never trapped inside
+// a Framer Motion parent with `transform`, which would break `position: fixed`.
 function MusicPanel({
   player, onClose,
 }: {
@@ -431,9 +412,9 @@ function MusicPanel({
 }) {
   const [activeCat, setActiveCat] = useState(player.catIdx);
 
-  return (
+  const panel = (
     <>
-      {/* Backdrop — blurs the chat behind the panel */}
+      {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -443,148 +424,147 @@ function MusicPanel({
         onClick={onClose}
       />
 
-      {/* Panel — centered on all screen sizes */}
+      {/* Panel — truly centered on all screen sizes */}
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 12 }}
         transition={{ duration: 0.2, type: 'spring', stiffness: 320, damping: 28 }}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-[22rem] sm:max-w-sm md:max-w-md max-h-[85dvh] flex flex-col bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]"
+        style={{ maxHeight: 'min(85dvh, 600px)' }}
         onClick={e => e.stopPropagation()}
       >
-      {/* Now playing header — fixed, does not scroll */}
-      <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06] shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5">
-            <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }} />
-            <span className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c]">เพลงที่กำลังเล่น</span>
+        {/* Now playing header */}
+        <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06] shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }} />
+              <span className="text-xs font-semibold text-[#7c5c3e] dark:text-[#c8956c]">เพลงที่กำลังเล่น</span>
+            </div>
+            <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors p-0.5">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button onClick={onClose} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors p-0.5">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Vinyl disc */}
-        <div className="flex justify-center mb-3">
-          <VinylDisc imageUrl={player.currentTrack?.image_url} playing={player.playing} />
-        </div>
+          <div className="flex justify-center mb-3">
+            <VinylDisc imageUrl={player.currentTrack?.image_url} playing={player.playing} />
+          </div>
 
-        {/* Track info */}
-        <div className="text-center mb-3">
-          <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack?.title ?? '—'}</p>
-          {player.currentTrack?.artist ? (
-            <p className="text-[11px] text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
-          ) : null}
-          <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat?.label ?? ''}</p>
-        </div>
+          <div className="text-center mb-3">
+            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm truncate">{player.currentTrack?.title ?? '—'}</p>
+            {player.currentTrack?.artist ? (
+              <p className="text-[11px] text-[#c8956c] mt-0.5 truncate">{player.currentTrack.artist}</p>
+            ) : null}
+            <p className="text-[11px] text-[#9c7c5e] mt-0.5">{player.currentCat?.label ?? ''}</p>
+          </div>
 
-        {/* Bar waveform visualizer */}
-        <BarWaveform playing={player.playing} />
+          <BarWaveform playing={player.playing} />
 
-        {/* Controls row */}
-        <div className="flex items-center justify-center gap-4 mt-3">
-          <button
-            onClick={player.cycleLoop}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
-            }`}
-            title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
-          >
-            {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-          </button>
-
-          <button
-            onClick={player.toggle}
-            className="w-12 h-12 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-lg"
-          >
-            {player.playing ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
-
-          <button
-            onClick={player.skipNext}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
-            title="เพลงถัดไป"
-          >
-            <SkipForward className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Volume slider */}
-        <div className="mt-3">
-          <VolumeSlider volume={player.volume} onChange={player.setVolume} />
-        </div>
-      </div>
-
-      {/* Category tabs — fixed */}
-      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto bg-white dark:bg-[#1a0e06] shrink-0">
-        {player.library.map((cat, ci) => (
-          <button
-            key={ci}
-            onClick={() => setActiveCat(ci)}
-            className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors ${
-              activeCat === ci
-                ? 'text-[#c8956c] border-b-2 border-[#c8956c]'
-                : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Track list — scrollable, fills remaining height */}
-      <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-[#1a0e06]">
-        {player.library[activeCat]?.tracks.map((track, ti) => {
-          const isActive = activeCat === player.catIdx && ti === player.trackIdx;
-          return (
+          <div className="flex items-center justify-center gap-4 mt-3">
             <button
-              key={ti}
-              onClick={() => player.selectTrack(activeCat, ti)}
-              className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
-                isActive ? 'bg-[#f5ede4] dark:bg-[#2a1a0e]' : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
+              onClick={player.cycleLoop}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                player.loopMode !== 'none' ? 'text-[#c8956c]' : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
+              }`}
+              title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
+            >
+              {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+            </button>
+
+            <button
+              onClick={player.toggle}
+              className="w-12 h-12 rounded-full bg-[#c8956c] hover:bg-[#b07d58] text-white flex items-center justify-center transition-colors shadow-lg"
+            >
+              {player.playing ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            <button
+              onClick={player.skipNext}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
+              title="เพลงถัดไป"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-3">
+            <VolumeSlider volume={player.volume} onChange={player.setVolume} />
+          </div>
+        </div>
+
+        {/* Category tabs */}
+        <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto bg-white dark:bg-[#1a0e06] shrink-0">
+          {player.library.map((cat, ci) => (
+            <button
+              key={ci}
+              onClick={() => setActiveCat(ci)}
+              className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors ${
+                activeCat === ci
+                  ? 'text-[#c8956c] border-b-2 border-[#c8956c]'
+                  : 'text-[#9c7c5e] hover:text-[#7c5c3e]'
               }`}
             >
-              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-[#f0e6d8] dark:bg-[#3a2a1e]">
-                {track.image_url ? (
-                  <img src={track.image_url} alt="" className="w-full h-full object-cover" />
-                ) : isActive && player.playing ? (
-                  <motion.div className="flex gap-0.5 items-end h-4">
-                    {[0, 0.1, 0.2].map((d, i) => (
-                      <motion.div key={i} className="w-0.5 bg-[#c8956c] rounded-full"
-                        animate={{ height: ['4px', '12px', '4px'] }}
-                        transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
-                    ))}
-                  </motion.div>
-                ) : (
-                  <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-[#c8956c]' : 'text-[#9c7c5e]'}`} fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className={`text-xs truncate block ${isActive ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#7c5c3e] dark:text-[#9c7c5e]'}`}>
-                  {track.title}
-                </span>
-                {track.artist && (
-                  <span className="text-[10px] text-[#c8956c] truncate block">{track.artist}</span>
-                )}
-              </div>
+              {cat.label}
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+
+        {/* Track list */}
+        <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-[#1a0e06]">
+          {player.library[activeCat]?.tracks.map((track, ti) => {
+            const isActive = activeCat === player.catIdx && ti === player.trackIdx;
+            return (
+              <button
+                key={ti}
+                onClick={() => player.selectTrack(activeCat, ti)}
+                className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
+                  isActive ? 'bg-[#f5ede4] dark:bg-[#2a1a0e]' : 'hover:bg-[#faf6f1] dark:hover:bg-[#221810]'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-[#f0e6d8] dark:bg-[#3a2a1e]">
+                  {track.image_url ? (
+                    <img src={track.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : isActive && player.playing ? (
+                    <motion.div className="flex gap-0.5 items-end h-4">
+                      {[0, 0.1, 0.2].map((d, i) => (
+                        <motion.div key={i} className="w-0.5 bg-[#c8956c] rounded-full"
+                          animate={{ height: ['4px', '12px', '4px'] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-[#c8956c]' : 'text-[#9c7c5e]'}`} fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs truncate block ${isActive ? 'font-semibold text-[#4a3728] dark:text-[#e8d9c8]' : 'text-[#7c5c3e] dark:text-[#9c7c5e]'}`}>
+                    {track.title}
+                  </span>
+                  {track.artist && (
+                    <span className="text-[10px] text-[#c8956c] truncate block">{track.artist}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </motion.div>
     </>
   );
+
+  // ── Portal: render at document.body to escape any transform stacking context ──
+  return createPortal(panel, document.body);
 }
 
 
@@ -599,12 +579,9 @@ function findBannedWord(text: string, banned: string[]): string | null {
 }
 
 // ─── Synchronized Countdown ───────────────────────────────────────────────────
-// Computes remaining time from server-authoritative started_at timestamp so
-// both clients stay in sync even after page reload or tab switch.
 function playUrgentSound() {
   try {
     const ctx = new AudioContext();
-    // Three short descending beeps
     [880, 660, 440].forEach((freq, i) => {
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -625,12 +602,12 @@ function playUrgentSound() {
 function useCountdown(
   totalSeconds: number,
   active: boolean,
-  startedAt: string | null,   // server timestamp — used for sync
+  startedAt: string | null,
   onExpire: () => void,
 ) {
   const [remaining, setRemaining] = useState(totalSeconds);
   const expiredRef   = useRef(false);
-  const urgentRef    = useRef(false); // prevent repeated sound
+  const urgentRef    = useRef(false);
 
   useEffect(() => {
     if (!active) return;
@@ -640,11 +617,9 @@ function useCountdown(
     const tick = () => {
       let secs: number;
       if (startedAt) {
-        // Server-authoritative: compute from DB timestamp
         const elapsed = (Date.now() - new Date(startedAt).getTime()) / 1000;
         secs = Math.max(0, Math.round(totalSeconds - elapsed));
       } else {
-        // Fallback: decrement locally (first join, started_at not yet written)
         setRemaining(prev => {
           secs = prev - 1;
           return Math.max(0, secs);
@@ -654,7 +629,6 @@ function useCountdown(
 
       setRemaining(secs);
 
-      // Play urgent sound once when crossing 60-second mark
       if (secs <= 60 && secs > 0 && !urgentRef.current) {
         urgentRef.current = true;
         playUrgentSound();
@@ -666,7 +640,7 @@ function useCountdown(
       }
     };
 
-    tick(); // immediate first tick
+    tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [active, totalSeconds, startedAt]);
@@ -725,8 +699,8 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
 }
 
 // ─── Tutorial ─────────────────────────────────────────────────────────────────
-// Steps 0-2: shown while waiting for match
-// Steps 3-4: shown after match
+// Steps 0-1: shown while waiting for match (2 steps)
+// Steps 2-5: shown after match (4 steps — timer, input, partner info, send)
 interface TutorialStep {
   refKey: string;
   title: string;
@@ -734,15 +708,24 @@ interface TutorialStep {
   tooltipSide: 'below' | 'above';
 }
 
+// ── FIX: 6 steps total — 2 pre-match + 4 post-match ──────────────────────────
+// Pre-match (steps 0–1): rain, music
+// Post-match (steps 2–5): leave, timer, input, partner
 const TUTORIAL_STEPS: TutorialStep[] = [
-  { refKey: 'rain',  title: 'เสียงฝน',     desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                    tooltipSide: 'below' },
-  { refKey: 'music', title: 'เพลง BGM',    desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ progress bar',               tooltipSide: 'below' },
-  { refKey: 'leave', title: 'ออกจากโต๊ะ',  desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                               tooltipSide: 'below' },
-  { refKey: 'timer', title: 'นับถอยหลัง',  desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',                    tooltipSide: 'below' },
-  { refKey: 'input', title: 'ช่องพิมพ์',   desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',              tooltipSide: 'above' },
+  // ── Pre-match (shown while waiting) ──────────────────────────────────────
+  { refKey: 'rain',    title: 'เสียงฝน',          desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                  tooltipSide: 'below' },
+  { refKey: 'music',   title: 'เพลง BGM',          desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ waveform visualizer',      tooltipSide: 'below' },
+  // ── Post-match (shown after joining the table) ────────────────────────────
+  { refKey: 'leave',   title: 'ออกจากโต๊ะ',        desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                             tooltipSide: 'below' },
+  { refKey: 'timer',   title: 'นับถอยหลัง',        desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',                  tooltipSide: 'below' },
+  { refKey: 'input',   title: 'ช่องพิมพ์',         desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',            tooltipSide: 'above' },
+  { refKey: 'partner', title: 'ข้อมูลคู่สนทนา',    desc: 'แสดงชื่อ บทบาท และสถานะออนไลน์ของคู่สนทนา กดที่ชื่อเพื่อดูหัวข้อที่คุยกัน',    tooltipSide: 'below' },
 ];
 
-// Ref map passed down from main component
+// PRE_MATCH_STEPS: number of steps shown while waiting (before match)
+// POST-match steps start at this index
+const PRE_MATCH_STEP_COUNT = 2;
+
 type TutorialRefs = Record<string, React.RefObject<HTMLElement>>;
 
 function TutorialOverlay({
@@ -757,45 +740,33 @@ function TutorialOverlay({
   const s = TUTORIAL_STEPS[step];
   const [ringRect, setRingRect] = useState<DOMRect | null>(null);
 
-  // Poll for the target element until it exists AND has a non-zero painted size.
-  // This handles Framer Motion entrance animations that start at opacity:0 / scale:0,
-  // which cause getBoundingClientRect() to return {width:0, height:0} on the first frame.
   useEffect(() => {
-    // Safety: if the step definition is missing, bail out immediately.
     if (!s?.refKey) { setRingRect(null); return; }
 
-    setRingRect(null); // reset while we wait for the new target
+    setRingRect(null);
 
     let intervalId: ReturnType<typeof setInterval>;
 
     const measure = () => {
       const el = refs[s.refKey]?.current;
 
-      // Safety fallback: ref is completely missing — skip gracefully.
       if (!el) {
-        console.warn(
-          `[Tutorial Debug] Step ${step} target "${s.refKey}" is null or size is 0. Waiting for Framer Motion to finish...`
-        );
-        return; // keep polling
+        console.warn(`[Tutorial Debug] Step ${step} target "${s.refKey}" not found yet, waiting...`);
+        return;
       }
 
       const rect = el.getBoundingClientRect();
 
       if (rect.width > 0 && rect.height > 0) {
-        // Element is fully painted — lock in the rect and stop polling.
         setRingRect(rect);
         clearInterval(intervalId);
       } else {
-        console.warn(
-          `[Tutorial Debug] Step ${step} target "${s.refKey}" is null or size is 0. Waiting for Framer Motion to finish...`
-        );
+        console.warn(`[Tutorial Debug] Step ${step} target "${s.refKey}" has zero size, waiting for paint...`);
       }
     };
 
-    // Start polling at 60 fps cadence (16 ms).
     intervalId = setInterval(measure, 16);
 
-    // Also update on resize / scroll so the ring tracks the element.
     const onResize = () => {
       const el = refs[s.refKey]?.current;
       if (el) {
@@ -813,18 +784,15 @@ function TutorialOverlay({
     };
   }, [step, s?.refKey]);
 
-  // Safety: unknown step — render nothing rather than crashing.
   if (!s) return null;
   const isLast = step === total - 1;
 
-  const PAD = 6; // padding around the highlight ring
+  const PAD = 6;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none">
-      {/* Dark overlay */}
       <div className="absolute inset-0 bg-black/55 pointer-events-auto" onClick={onSkip} />
 
-      {/* Highlight ring — positioned from measured rect */}
       {ringRect && (
         <motion.div
           key={s.refKey}
@@ -845,7 +813,6 @@ function TutorialOverlay({
         />
       )}
 
-      {/* Tooltip — positioned relative to ring */}
       {ringRect && (
         <motion.div
           key={`tip-${step}`}
@@ -855,14 +822,12 @@ function TutorialOverlay({
           className="absolute w-72 bg-white dark:bg-[#221810] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 pointer-events-auto"
           style={{
             zIndex: 62,
-            // Place below or above the ring, clamp to viewport
             top: s.tooltipSide === 'below'
               ? Math.min(ringRect.bottom + PAD + 8, window.innerHeight - 200)
               : undefined,
             bottom: s.tooltipSide === 'above'
               ? Math.min(window.innerHeight - ringRect.top + PAD + 8, window.innerHeight - 200)
               : undefined,
-            // Align right edge with ring, but keep inside viewport
             right: Math.max(8, window.innerWidth - ringRect.right - PAD),
           }}
         >
@@ -898,12 +863,10 @@ function TutorialOverlay({
   );
 }
 
-// ─── Match notification sound (Web Audio API — no file needed) ───────────────
 function playMatchSound() {
   try {
     const ctx = new AudioContext();
-    // Two-tone "ding ding" chime
-    const notes = [880, 1108]; // A5, C#6
+    const notes = [880, 1108];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -917,7 +880,6 @@ function playMatchSound() {
       osc.start(ctx.currentTime + i * 0.18);
       osc.stop(ctx.currentTime + i * 0.18 + 0.55);
     });
-    // Auto-close context after sound finishes
     setTimeout(() => ctx.close(), 1500);
   } catch {}
 }
@@ -946,11 +908,10 @@ export default function SecretChatRoom() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [bannedWarning, setBannedWarning] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ChatProfile[]>([]);
-  // Similar mood config + phase tracking
   const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
   const matchStartRef = useRef<number>(Date.now());
 
-  // Tutorial state — show once per session, stored in localStorage
+  // Tutorial state
   const TUTORIAL_KEY = 'cafe_room_tutorial_done';
   const [tutorialStep, setTutorialStep] = useState<number>(() =>
     localStorage.getItem(TUTORIAL_KEY) ? -1 : 0
@@ -961,52 +922,43 @@ export default function SecretChatRoom() {
     if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
   };
 
-  // Refs for tutorial highlight — typed correctly so React attaches them
-  const rainRef  = useRef<HTMLButtonElement>(null);
-  const musicRef = useRef<HTMLButtonElement>(null);
-  const leaveRef = useRef<HTMLButtonElement>(null);
-  const timerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLDivElement>(null);
-  // "Join Table" overlay — shown when a match is found, dismissed by user click.
-  // The click IS a user gesture, so audio play is allowed by the browser.
+  // Refs for tutorial highlight
+  const rainRef    = useRef<HTMLButtonElement>(null);
+  const musicRef   = useRef<HTMLButtonElement>(null);
+  const leaveRef   = useRef<HTMLButtonElement>(null);
+  const timerRef   = useRef<HTMLDivElement>(null);
+  const inputRef   = useRef<HTMLDivElement>(null);
+  const partnerRef = useRef<HTMLDivElement>(null); // ← NEW ref for the 6th step
+
   const [showJoinOverlay, setShowJoinOverlay] = useState(false);
-  // isRoomReady: true only after the user has dismissed the join overlay,
-  // guaranteeing all room UI elements (timer, input) are fully mounted.
   const [isRoomReady, setIsRoomReady] = useState(false);
 
-  // Stable object — only recreated if refs themselves change (they don't)
   const tutorialRefs = useMemo<TutorialRefs>(() => ({
-    rain:  rainRef  as React.RefObject<HTMLElement>,
-    music: musicRef as React.RefObject<HTMLElement>,
-    leave: leaveRef as React.RefObject<HTMLElement>,
-    timer: timerRef as React.RefObject<HTMLElement>,
-    input: inputRef as React.RefObject<HTMLElement>,
+    rain:    rainRef    as React.RefObject<HTMLElement>,
+    music:   musicRef   as React.RefObject<HTMLElement>,
+    leave:   leaveRef   as React.RefObject<HTMLElement>,
+    timer:   timerRef   as React.RefObject<HTMLElement>,
+    input:   inputRef   as React.RefObject<HTMLElement>,
+    partner: partnerRef as React.RefObject<HTMLElement>, // ← NEW
   }), []);
 
-  // Advance tutorial to post-match steps ONLY after isRoomReady is true.
-  // This guarantees the timer and input elements are fully mounted and painted
-  // before TutorialOverlay tries to measure their DOMRects.
+  // ── FIX: Jump to first post-match step (step 2) after room is ready ──────────
+  // Previously jumped to step 3 — now correctly jumps to step PRE_MATCH_STEP_COUNT (2)
   useEffect(() => {
-    if (isRoomReady && tutorialStep >= 0 && tutorialStep < 3) {
-      // Give one extra frame for the room UI to finish painting
-      const raf = requestAnimationFrame(() => setTutorialStep(3));
+    if (isRoomReady && tutorialStep >= 0 && tutorialStep < PRE_MATCH_STEP_COUNT) {
+      const raf = requestAnimationFrame(() => setTutorialStep(PRE_MATCH_STEP_COUNT));
       return () => cancelAnimationFrame(raf);
     }
   }, [isRoomReady, tutorialStep]);
 
-  // Show the join overlay as soon as a match is found
   useEffect(() => {
     if (matchStatus === 'matched' && !isRoomReady) {
       setShowJoinOverlay(true);
     }
   }, [matchStatus, isRoomReady]);
 
-  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed.
-  // CRITICAL: el.play() MUST be the very first synchronous call so the browser's
-  // transient activation token is still valid. Any await or setState before it
-  // will cause a NotAllowedError.
   const handleJoinTable = useCallback(() => {
-    // ── 1. Trigger audio FIRST — synchronous, before any state updates ──────
+    // 1. Trigger audio FIRST — synchronous
     const el = bgmRef.current;
     if (el) {
       if (!el.src || el.src === window.location.href) {
@@ -1021,20 +973,18 @@ export default function SecretChatRoom() {
             .catch((err: unknown) => {
               const error = err as DOMException;
               console.error('[Audio Debug] Playback failed:', error);
-              window.alert(`Audio Error: ${error.name} - ${error.message}`);
             });
         }
       } catch (err: unknown) {
         const error = err as DOMException;
         console.error('[Audio Debug] Playback failed (sync):', error);
-        window.alert(`Audio Error: ${error.name} - ${error.message}`);
       }
     }
-    // ── 2. Update state AFTER play() has been called ─────────────────────────
+    // 2. Update state AFTER play()
     setShowJoinOverlay(false);
     setIsRoomReady(true);
 
-    // ── 3. Write started_at to DB so both clients can sync the countdown ─────
+    // 3. Write started_at to DB
     if (session?.id && !session.started_at) {
       (supabase as any)
         .from('chat_sessions')
@@ -1045,8 +995,7 @@ export default function SecretChatRoom() {
         });
     }
 
-    // ── 4. Insert bot safety welcome message for both users ──────────────────
-    // sender_id = null → system message (no FK violation)
+    // 4. Insert bot safety welcome message
     if (session?.id) {
       const welcomeText = [
         '⚠️ **คำเตือนก่อนเริ่มแชท**',
@@ -1060,7 +1009,7 @@ export default function SecretChatRoom() {
 
       (supabase as any).from('chat_messages').insert({
         session_id: session.id,
-        sender_id:  null,          // null = system/bot, no FK violation
+        sender_id:  null,
         content:    welcomeText,
         is_system:  true,
       }).then(({ error }: any) => {
@@ -1093,17 +1042,13 @@ export default function SecretChatRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-navigate when session ends and user returns from background (mobile/tablet)
-  // Handles the case where the timer expired while the app was backgrounded
   useEffect(() => {
     if (matchStatus !== 'ended') return;
-    // If rating dialog is not showing (already dismissed or skipped), go home
     if (!showRating) {
       navigate('/');
     }
   }, [matchStatus, showRating, navigate]);
 
-  // When user returns from background, check if session has already ended
   useEffect(() => {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
@@ -1124,20 +1069,17 @@ export default function SecretChatRoom() {
 
   const handleExpire = useCallback(async () => {
     if (!session) return;
-    // Only PATCH if session is still active — avoids 400 on already-ended sessions
     if (session.status === 'active') {
       await (supabase as any)
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', session.id)
-        .eq('status', 'active'); // guard: only update if still active
+        .eq('status', 'active');
     }
     setMatchStatus('ended');
     setShowRating(true);
   }, [session]);
 
-  // Countdown only starts after the user has joined (isRoomReady), so the timer
-  // doesn't tick away while the join overlay is displayed.
   const { remaining, display: countdownDisplay } = useCountdown(
     SESSION_DURATION,
     isRoomReady && matchStatus === 'matched',
@@ -1149,22 +1091,17 @@ export default function SecretChatRoom() {
   useEffect(() => {
     if (!user || !topicId || matchStatus !== 'waiting') return;
 
-    // Record when we started waiting (for similar-phase delay)
     matchStartRef.current = Date.now();
 
-    // ── Cleanup helper ────────────────────────────────────────────────────────
     const cleanupQueue = () => {
       (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
     };
 
-    // Stale cleanup — call the DB function instead of a client-side cutoff
     (supabase as any).rpc('cleanup_stale_queue').then(() => {});
 
     const onBeforeUnload = () => cleanupQueue();
     window.addEventListener('beforeunload', onBeforeUnload);
 
-    // Track whether this client has already triggered a match to prevent
-    // double-firing when both Realtime and polling detect the same event.
     let matchedRef = false;
 
     const handleMatch = (sess: ChatSession) => {
@@ -1175,7 +1112,6 @@ export default function SecretChatRoom() {
       setMatchStatus('matched');
     };
 
-    // ── tryMatch: uses atomic DB function to eliminate race conditions ────────
     const tryMatch = async () => {
       if (matchedRef) return;
 
@@ -1196,7 +1132,6 @@ export default function SecretChatRoom() {
       const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
 
-      // Score candidates and pick the best
       let best: any = null;
       let bestScore = -1;
       for (const candidate of queue) {
@@ -1205,8 +1140,6 @@ export default function SecretChatRoom() {
       }
       if (!best || bestScore < 0) return;
 
-      // ── Atomic match via DB function (advisory lock + transaction) ────────
-      // This prevents two clients from simultaneously matching the same partner.
       const { data: sessions, error } = await (supabase as any).rpc('try_match_users', {
         p_user_a_id:     user.id,
         p_user_b_id:     best.user_id,
@@ -1220,28 +1153,21 @@ export default function SecretChatRoom() {
         p_duration_secs: SESSION_DURATION,
       });
 
-      // rpc returns an array; empty = partner was already taken (race lost)
       if (error || !sessions || sessions.length === 0) return;
 
       handleMatch(sessions[0] as ChatSession);
     };
 
-    // ── Polling with per-client jitter to avoid thundering herd ──────────────
-    // Base interval 3s + random 0–2s offset so 100 clients don't all fire
-    // at the same millisecond. Effective rate: ~1 query per 3–5s per client.
     const POLL_BASE_MS  = 3000;
     const POLL_JITTER_MS = 2000;
     const jitter = Math.random() * POLL_JITTER_MS;
 
-    // Initial delayed start (spread out first wave)
     const initialDelay = setTimeout(() => {
       tryMatch();
       const interval = setInterval(tryMatch, POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
-      // Store interval id so cleanup can clear it
       (intervalRef as any).current = interval;
     }, jitter);
 
-    // ── Realtime: primary notification path (faster than polling) ────────────
     const queueChannel = supabase
       .channel(`queue-watch-${user.id}`)
       .on('postgres_changes', {
@@ -1250,8 +1176,6 @@ export default function SecretChatRoom() {
         table: 'chat_sessions',
         filter: `user_b_id=eq.${user.id}`,
       }, (payload) => {
-        // user_b receives the session via Realtime — no need to delete queue
-        // (the atomic function already deleted it server-side)
         handleMatch(payload.new as ChatSession);
       })
       .subscribe();
@@ -1316,28 +1240,17 @@ export default function SecretChatRoom() {
 
     const content = input.trim();
 
-    // ── Local moderation (zero latency, no network) ───────────────────────────
-    // Normalize: collapse bypass attempts like ค-ว-ย / ค.ว.ย / ค@ว#ย → ควย
-    // Thai vowel marks (U+0E30–U+0E4E) are combining chars — keep them.
     const normalize = (s: string) =>
       s
         .toLowerCase()
-        // Remove zero-width / invisible chars
         .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '')
-        // Keep: Thai consonants (0E01-0E2E), Thai vowels/tone marks (0E30-0E4E),
-        //       Thai digits (0E50-0E59), ASCII letters, ASCII digits.
-        // Strip everything else (spaces, dashes, dots, @, #, _, etc.)
         .replace(/[^\u0e01-\u0e4e\u0e50-\u0e59a-z0-9]/g, '');
 
     const normalized = normalize(content);
 
-    // Blacklist — exact substrings checked against normalized text.
-    // Add more entries here as needed; normalization handles bypass attempts.
     const BLACKLIST: string[] = [
-      // Thai
       'ควย', 'หี', 'เย็ด', 'สัตว์', 'เหี้ย', 'สัด', 'อีดอก', 'ไอ้ดอก',
       'มึง', 'กู', 'ควาย', 'ฆ่า', 'ตาย', 'ระเบิด',
-      // English
       'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'nigger', 'kill',
       'murder', 'rape', 'porn', 'sex',
     ];
@@ -1345,11 +1258,9 @@ export default function SecretChatRoom() {
     const hitWord = BLACKLIST.find(w => normalized.includes(normalize(w)));
 
     if (hitWord) {
-      // ── Flagged: log violation + insert system warning ──────────────────────
       const warningText = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
 
       await Promise.all([
-        // Log for admin observation tab (Realtime → admin sees it instantly)
         (supabase as any).from('chat_violations').insert({
           session_id:    session.id,
           user_id:       user.id,
@@ -1357,22 +1268,19 @@ export default function SecretChatRoom() {
           message:       content,
           ai_categories: null,
         }),
-        // System warning visible to both users in the chat
         (supabase as any).from('chat_messages').insert({
           session_id: session.id,
-          sender_id:  null,        // null = system/bot
+          sender_id:  null,
           content:    warningText,
           is_system:  true,
         }),
       ]);
 
-      // Also show local toast so the sender gets immediate feedback
       setBannedWarning('__local__');
       setTimeout(() => setBannedWarning(null), 4000);
       return;
     }
 
-    // ── Also check DB banned-word list (admin-managed) ────────────────────────
     const foundWord = findBannedWord(content, bannedWords);
     if (foundWord) {
       await (supabase as any).from('chat_violations').insert({
@@ -1386,7 +1294,6 @@ export default function SecretChatRoom() {
       return;
     }
 
-    // ── Clean — insert message ────────────────────────────────────────────────
     setSending(true);
     setInput('');
     await (supabase as any).from('chat_messages').insert({
@@ -1410,10 +1317,8 @@ export default function SecretChatRoom() {
 
   const leaveTable = useCallback(async () => {
     if (session) {
-      // Has matched — ask for confirmation first
       setShowLeaveConfirm(true);
     } else {
-      // Still waiting — just remove from queue, no confirm needed
       await (supabase as any).from('chat_queue').delete().eq('user_id', user?.id);
       navigate('/');
     }
@@ -1458,7 +1363,6 @@ export default function SecretChatRoom() {
     ? (session.user_a_id === user?.id ? session.user_b_role : session.user_a_role)
     : null;
 
-  // Thai role labels — friendly display names
   const ROLE_TH: Record<string, string> = {
     talk: '💬 พิมพ์ไม่หยุด', listen: '👂 ผู้รับฟังที่ดี', both: '🤝 ได้ทั้งสอง', chill: '☕ ชิล ๆ',
   };
@@ -1472,7 +1376,7 @@ export default function SecretChatRoom() {
     <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden secret-room-zoom">
       <audio ref={bgmRef} />
 
-      {/* Join Table overlay — shown on match, dismissed by user click to unlock AudioContext */}
+      {/* Join Table overlay */}
       <AnimatePresence>
         {showJoinOverlay && (
           <motion.div
@@ -1500,7 +1404,6 @@ export default function SecretChatRoom() {
                 <p className="text-sm text-[#9c7c5e] leading-relaxed">
                   พบคู่สนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
                 </p>
-                {/* Partner role badge */}
                 {partnerRole && (
                   <div className="flex items-center justify-center gap-1.5 pt-1">
                     <span className="text-xs text-[#9c7c5e]">บทบาทฝ่ายตรงข้าม:</span>
@@ -1559,7 +1462,6 @@ export default function SecretChatRoom() {
         )}
       </AnimatePresence>
 
-      {/* Urgent time warning banner — appears at 60s remaining */}
       <AnimatePresence>
         {isUrgent && isRoomReady && (
           <motion.div
@@ -1579,7 +1481,8 @@ export default function SecretChatRoom() {
         <div className="px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {matchStatus === 'matched' && session ? (
-              <>
+              // ── FIX: attach partnerRef here for the 6th tutorial step ────────
+              <div ref={partnerRef} className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
                   {partnerImg
                     ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
@@ -1600,7 +1503,7 @@ export default function SecretChatRoom() {
                     </p>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center shrink-0 overflow-hidden">
@@ -1634,25 +1537,24 @@ export default function SecretChatRoom() {
               <CloudRain className="w-4 h-4" />
             </button>
 
-            {/* Music player button + panel */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMusicPanel(v => !v)}
-                ref={musicRef}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
-                  player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
-                }`}
-                title="เพลง"
-              >
-                {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
+            {/* Music button — no longer wraps the panel in a relative container */}
+            <button
+              onClick={() => setShowMusicPanel(v => !v)}
+              ref={musicRef}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
+                player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
+              }`}
+              title="เพลง"
+            >
+              {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
 
-              <AnimatePresence>
-                {showMusicPanel && (
-                  <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
-                )}
-              </AnimatePresence>
-            </div>
+            {/* MusicPanel is now rendered via Portal — no relative wrapper needed */}
+            <AnimatePresence>
+              {showMusicPanel && (
+                <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
+              )}
+            </AnimatePresence>
 
             {/* Theme toggle */}
             <button
@@ -1666,7 +1568,6 @@ export default function SecretChatRoom() {
               }
             </button>
 
-            {/* Leave — solid red */}
             <button onClick={leaveTable}
               ref={leaveRef}
               className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm"
@@ -1721,9 +1622,7 @@ export default function SecretChatRoom() {
 
         <AnimatePresence initial={false}>
           {messages.map(msg => {
-            // ── System message (Bear Guard / น้องฮันนี่) ─────────────────────
             if (msg.is_system) {
-              // Render **bold** markdown inline
               const renderBold = (text: string) =>
                 text.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
                   part.startsWith('**') && part.endsWith('**')
@@ -1740,7 +1639,6 @@ export default function SecretChatRoom() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex gap-3 flex-row"
                 >
-                  {/* Bear mascot avatar */}
                   <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 self-start mt-1 shadow-sm border-2 border-[#c8956c]/30">
                     <img src={bearMascotIcon} alt="น้องฮันนี่" className="w-full h-full object-cover" />
                   </div>
@@ -1765,7 +1663,6 @@ export default function SecretChatRoom() {
               );
             }
 
-            // ── Normal message ────────────────────────────────────────────────
             return (
               <motion.div
                 key={msg.id}
@@ -1846,7 +1743,6 @@ export default function SecretChatRoom() {
 
       {showRating && <RatingDialog onRate={submitRating} />}
 
-      {/* Leave confirmation dialog */}
       <AnimatePresence>
         {showLeaveConfirm && (
           <motion.div
