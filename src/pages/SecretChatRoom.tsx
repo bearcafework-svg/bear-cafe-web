@@ -449,11 +449,11 @@ function MusicPanel({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 12 }}
         transition={{ duration: 0.2, type: 'spring', stiffness: 320, damping: 28 }}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm max-h-[88vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-[22rem] sm:max-w-sm md:max-w-md max-h-[85dvh] flex flex-col bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]"
         onClick={e => e.stopPropagation()}
       >
-      {/* Now playing header */}
-      <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06]">
+      {/* Now playing header — fixed, does not scroll */}
+      <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-[#f5ede4] to-[#faf6f1] dark:from-[#2a1a0e] dark:to-[#1a0e06] shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
             <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }} />
@@ -524,8 +524,8 @@ function MusicPanel({
         </div>
       </div>
 
-      {/* Category tabs */}
-      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto bg-white dark:bg-[#1a0e06]">
+      {/* Category tabs — fixed */}
+      <div className="flex border-b border-[#e8d9c8] dark:border-[#3a2a1e] overflow-x-auto bg-white dark:bg-[#1a0e06] shrink-0">
         {player.library.map((cat, ci) => (
           <button
             key={ci}
@@ -541,8 +541,8 @@ function MusicPanel({
         ))}
       </div>
 
-      {/* Track list */}
-      <div className="max-h-40 overflow-y-auto bg-white dark:bg-[#1a0e06]">
+      {/* Track list — scrollable, fills remaining height */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-[#1a0e06]">
         {player.library[activeCat]?.tracks.map((track, ti) => {
           const isActive = activeCat === player.catIdx && ti === player.trackIdx;
           return (

@@ -1129,6 +1129,7 @@ function RolesTab() {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export function SecretTableManagement() {
+  const [activeTab, setActiveTab] = useState('topics');
   return (
     <Card>
       <CardHeader>
@@ -1138,7 +1139,7 @@ export function SecretTableManagement() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="topics">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 flex-wrap h-auto gap-1">
             <TabsTrigger value="topics" className="gap-2">
               <Tag className="w-4 h-4" /> หมวดหมู่
@@ -1166,18 +1167,19 @@ export function SecretTableManagement() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="topics"><TopicsTab /></TabsContent>
-          <TabsContent value="profiles"><ProfilesTab /></TabsContent>
-          <TabsContent value="prefixes">
+          {/* Use hidden instead of unmount so form state persists when switching tabs */}
+          <div hidden={activeTab !== 'topics'}><TopicsTab /></div>
+          <div hidden={activeTab !== 'profiles'}><ProfilesTab /></div>
+          <div hidden={activeTab !== 'prefixes'}>
             <WordListTab table="chat_name_prefixes" label="คำนำหน้า" placeholder="เช่น นุ่มนิ่ม" />
-          </TabsContent>
-          <TabsContent value="menus">
+          </div>
+          <div hidden={activeTab !== 'menus'}>
             <WordListTab table="chat_name_menus" label="ชื่อเมนู" placeholder="เช่น ลาเต้" />
-          </TabsContent>
-          <TabsContent value="monitor"><MonitorTab /></TabsContent>
-          <TabsContent value="similar-mood"><SimilarMoodTab /></TabsContent>
-          <TabsContent value="roles"><RolesTab /></TabsContent>
-          <TabsContent value="music"><ChatMusicManagement /></TabsContent>
+          </div>
+          <div hidden={activeTab !== 'monitor'}><MonitorTab /></div>
+          <div hidden={activeTab !== 'similar-mood'}><SimilarMoodTab /></div>
+          <div hidden={activeTab !== 'roles'}><RolesTab /></div>
+          <div hidden={activeTab !== 'music'}><ChatMusicManagement /></div>
         </Tabs>
       </CardContent>
     </Card>

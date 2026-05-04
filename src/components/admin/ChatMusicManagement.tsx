@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Trash2, Edit, Music2, Folder, ChevronDown, ChevronRight,
-  Upload, FileAudio, X, Check, Play, Square, Loader2,
+  Upload, FileAudio, X, Check, Play, Square, Loader2, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -824,7 +824,6 @@ function LibraryTab({
 
   async function deleteCategory(cat: MusicCategory) {
     if (!confirm(`ลบหมวด "${cat.label}" และเพลงทั้งหมด?`)) return;
-    // Delete storage files
     const catTracks = tracks.filter(t => t.category_id === cat.id);
     for (const t of catTracks) {
       const path = t.src.split('/chat-music/').pop();
@@ -837,7 +836,6 @@ function LibraryTab({
 
   async function deleteTrack(track: MusicTrack) {
     if (!confirm(`ลบเพลง "${track.title}"?`)) return;
-    // Delete storage file
     const path = track.src.split('/chat-music/').pop();
     if (path) await supabase.storage.from('chat-music').remove([path]);
     await (supabase as any).from('chat_music_tracks').delete().eq('id', track.id);
@@ -847,6 +845,31 @@ function LibraryTab({
 
   function toggleExpand(id: string) {
     setExpandedCats(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function moveCategory(cat: MusicCategory, dir: 'up' | 'down') {
+    const idx = categories.findIndex(c => c.id === cat.id);
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= categories.length) return;
+    const other = categories[swapIdx];
+    await Promise.all([
+      (supabase as any).from('chat_music_categories').update({ sort_order: other.sort_order }).eq('id', cat.id),
+      (supabase as any).from('chat_music_categories').update({ sort_order: cat.sort_order }).eq('id', other.id),
+    ]);
+    onRefresh();
+  }
+
+  async function moveTrack(track: MusicTrack, dir: 'up' | 'down') {
+    const catTracks = tracks.filter(t => t.category_id === track.category_id);
+    const idx = catTracks.findIndex(t => t.id === track.id);
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= catTracks.length) return;
+    const other = catTracks[swapIdx];
+    await Promise.all([
+      (supabase as any).from('chat_music_tracks').update({ sort_order: other.sort_order }).eq('id', track.id),
+      (supabase as any).from('chat_music_tracks').update({ sort_order: track.sort_order }).eq('id', other.id),
+    ]);
+    onRefresh();
   }
 
   return (
@@ -878,7 +901,10 @@ function LibraryTab({
                   <span className="font-semibold text-sm truncate">{cat.label}</span>
                   <Badge variant="outline" className="text-[10px] shrink-0">{catTracks.length} เพลง</Badge>
                 </button>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-6 w-6" disabled={categories.indexOf(cat) === 0} onClick={() => moveCategory(cat, 'up')}><ArrowUp className="w-3 h-3" /></Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" disabled={categories.indexOf(cat) === categories.length - 1} onClick={() => moveCategory(cat, 'down')}><ArrowDown className="w-3 h-3" /></Button>
+                  <div className="w-px h-4 bg-border mx-0.5" />
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCatDialog({ open: true, editing: cat })}><Edit className="w-3.5 h-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteCategory(cat)}><Trash2 className="w-3.5 h-3.5" /></Button>
                 </div>
@@ -891,7 +917,19 @@ function LibraryTab({
                   ) : (
                     catTracks.map((track, i) => (
                       <div key={track.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 group">
-                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{i + 1}</div>
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          <button
+                            disabled={i === 0}
+                            onClick={() => moveTrack(track, 'up')}
+                            className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                          ><ArrowUp className="w-3 h-3" /></button>
+                          <button
+                            disabled={i === catTracks.length - 1}
+                            onClick={() => moveTrack(track, 'down')}
+                            className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                          ><ArrowDown className="w-3 h-3" /></button>
+                        </div>
+                        <div className="w-5 text-center text-xs font-mono text-muted-foreground shrink-0">{i + 1}</div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{track.title}</p>
                           {track.artist && (
