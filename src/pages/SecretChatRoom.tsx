@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
@@ -439,9 +439,6 @@ function MusicPanel({
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const dragX = useMotionValue(0);
-  const drawerOpacity = useTransform(dragX, [0, 200], [1, 0]);
-
   const allTracks = useMemo(() => {
     const result: Array<{ track: Track; catIdx: number; trackIdx: number; catLabel: string }> = [];
     player.library.forEach((cat, ci) => {
@@ -476,10 +473,10 @@ function MusicPanel({
         transition={{ type: 'spring', stiffness: 340, damping: 34 }}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={{ left: 0, right: 0.3 }}
-        style={{ x: dragX, opacity: drawerOpacity }}
+        dragElastic={{ left: 0, right: 0.35 }}
+        dragMomentum={false}
         onDragEnd={(_, info) => { if (info.offset.x > 80) onClose(); }}
-        className="fixed top-0 left-0 h-full w-[min(85vw,22rem)] md:w-[min(30vw,26rem)] flex flex-col bg-[#faf6f1] dark:bg-[#140c04] shadow-2xl z-[56] select-none"
+        className="fixed top-0 left-0 h-full w-[min(85vw,22rem)] md:w-[min(30vw,26rem)] flex flex-col bg-[#faf6f1] dark:bg-[#140c04] shadow-2xl z-[56] select-none overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <AnimatePresence mode="wait" initial={false}>
