@@ -1286,15 +1286,17 @@ export default function SecretChatRoom() {
     const content = input.trim();
 
     // ── Local moderation (zero latency, no network) ───────────────────────────
-    // Normalize: strip spaces, punctuation, special chars so bypass attempts
-    // like ค.ว.ย  อ-ี_ด อ ก  ค@ว#ย  all collapse to the same string.
+    // Normalize: collapse bypass attempts like ค-ว-ย / ค.ว.ย / ค@ว#ย → ควย
+    // Thai vowel marks (U+0E30–U+0E4E) are combining chars — keep them.
     const normalize = (s: string) =>
       s
         .toLowerCase()
-        // Remove zero-width chars, combining marks, and common bypass chars
+        // Remove zero-width / invisible chars
         .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '')
-        // Strip anything that isn't a Thai letter, English letter, or digit
-        .replace(/[^ก-๙a-z0-9]/g, '');
+        // Keep: Thai consonants (0E01-0E2E), Thai vowels/tone marks (0E30-0E4E),
+        //       Thai digits (0E50-0E59), ASCII letters, ASCII digits.
+        // Strip everything else (spaces, dashes, dots, @, #, _, etc.)
+        .replace(/[^\u0e01-\u0e4e\u0e50-\u0e59a-z0-9]/g, '');
 
     const normalized = normalize(content);
 
