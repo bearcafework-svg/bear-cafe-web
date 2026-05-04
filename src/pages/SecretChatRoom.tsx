@@ -1285,83 +1285,84 @@ export default function SecretChatRoom() {
 
     const content = input.trim();
 
-    // ── 1. Thai keyword fallback (fast, no network) ───────────────────────────
-    // OpenAI moderation is sometimes weak on Thai slang — catch the worst locally.
-    const THAI_BLOCKED = [
-      /ไอ้เหี้ย/i, /อีสัตว์/i, /มึง/i, /กู/i, /เย็ด/i, /สัตว์/i,
-      /ควาย/i, /หน้าหี/i, /หน้าสัด/i, /ไอ้สัด/i, /อีดอก/i,
+    // ── Local moderation (zero latency, no network) ───────────────────────────
+    // Normalize: strip spaces, punctuation, special chars so bypass attempts
+    // like ค.ว.ย  อ-ี_ด อ ก  ค@ว#ย  all collapse to the same string.
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        // Remove zero-width chars, combining marks, and common bypass chars
+        .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '')
+        // Strip anything that isn't a Thai letter, English letter, or digit
+        .replace(/[^ก-๙a-z0-9]/g, '');
+
+    const normalized = normalize(content);
+
+    // Blacklist — exact substrings checked against normalized text.
+    // Add more entries here as needed; normalization handles bypass attempts.
+    const BLACKLIST: string[] = [
+      // Thai
+      'ควย', 'หี', 'เย็ด', 'สัตว์', 'เหี้ย', 'สัด', 'อีดอก', 'ไอ้ดอก',
+      'มึง', 'กู', 'ควาย', 'ฆ่า', 'ตาย', 'ระเบิด',
+      // English
+      'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'nigger', 'kill',
+      'murder', 'rape', 'porn', 'sex',
     ];
-    const thaiMatch = THAI_BLOCKED.find(re => re.test(content));
-    if (thaiMatch) {
-      // Log violation locally (same as banned-word path)
-      await (supabase as any).from('chat_violations').insert({
-        session_id: session.id,
-        user_id: user.id,
-        word: '__thai_keyword__',
-        message: content,
-      });
-      setBannedWarning('__thai__');
+
+    const hitWord = BLACKLIST.find(w => normalized.includes(normalize(w)));
+
+    if (hitWord) {
+      // ── Flagged: log violation + insert system warning ──────────────────────
+      const SYSTEM_SENDER = '00000000-0000-0000-0000-000000000000';
+      const warningText   = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
+
+      await Promise.all([
+        // Log for admin observation tab (Realtime → admin sees it instantly)
+        (supabase as any).from('chat_violations').insert({
+          session_id:    session.id,
+          user_id:       user.id,
+          word:          hitWord,
+          message:       content,
+          ai_categories: null,
+        }),
+        // System warning visible to both users in the chat
+        (supabase as any).from('chat_messages').insert({
+          session_id: session.id,
+          sender_id:  SYSTEM_SENDER,
+          content:    warningText,
+          is_system:  true,
+        }),
+      ]);
+
+      // Also show local toast so the sender gets immediate feedback
+      setBannedWarning('__local__');
       setTimeout(() => setBannedWarning(null), 4000);
       return;
     }
 
-    // ── 2. DB banned-word check ───────────────────────────────────────────────
+    // ── Also check DB banned-word list (admin-managed) ────────────────────────
     const foundWord = findBannedWord(content, bannedWords);
     if (foundWord) {
       await (supabase as any).from('chat_violations').insert({
         session_id: session.id,
-        user_id: user.id,
-        word: foundWord,
-        message: content,
+        user_id:    user.id,
+        word:       foundWord,
+        message:    content,
       });
       setBannedWarning(foundWord);
       setTimeout(() => setBannedWarning(null), 4000);
       return;
     }
 
-    // ── 3. Lock send button — AI moderation runs ONLY on submit ──────────────
+    // ── Clean — insert message ────────────────────────────────────────────────
     setSending(true);
-    setInput(''); // clear input immediately for snappy UX
-
-    try {
-      const { data: modResult, error: modError } = await supabase.functions.invoke(
-        'moderate-chat',
-        { body: { text: content, session_id: session.id, user_id: user.id } }
-      );
-
-      if (modError) {
-        // Edge Function returned an error — log it but fail open (allow message)
-        // 503 = Edge Function not deployed yet, don't punish users for infra issues
-        console.error('[sendMessage] moderation error:', modError);
-        // Fall through to insert the message
-      } else if (modResult?.isFlagged === true) {
-        // Edge Function already:
-        //   • inserted violation into chat_violations (Realtime → admin)
-        //   • inserted system warning into chat_messages (both users see it)
-        // Do NOT insert the original message.
-        setSending(false);
-        return;
-      }
-
-      // ── 4. Not flagged — insert message normally ──────────────────────────
-      await (supabase as any).from('chat_messages').insert({
-        session_id: session.id,
-        sender_id: user.id,
-        content,
-      });
-      setSending(false);
-
-    } catch (err) {
-      // Network/timeout error — fail open, allow message through
-      // Don't block users due to infra issues
-      console.error('[sendMessage] unexpected error:', err);
-      await (supabase as any).from('chat_messages').insert({
-        session_id: session.id,
-        sender_id: user.id,
-        content,
-      });
-      setSending(false);
-    }
+    setInput('');
+    await (supabase as any).from('chat_messages').insert({
+      session_id: session.id,
+      sender_id:  user.id,
+      content,
+    });
+    setSending(false);
   }, [input, session, user, sending, bannedWords]);
 
   const handleInputChange = useCallback((val: string) => {
@@ -1500,6 +1501,8 @@ export default function SecretChatRoom() {
               ? 'ข้อความนี้อาจขัดต่อกฎของคาเฟ่ ลองปรับคำพูดดูน้า 🐻'
               : bannedWarning === '__thai__'
               ? 'ข้อความถูกบล็อก — พบคำต้องห้าม'
+              : bannedWarning === '__local__'
+              ? 'ข้อความถูกบล็อก — พบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า 🐻'
               : bannedWarning === '__error__'
               ? 'ไม่สามารถส่งข้อความได้ในขณะนี้ ลองใหม่อีกครั้งน้า'
               : 'ข้อความถูกบล็อก — พบคำต้องห้าม'
