@@ -459,12 +459,14 @@ function MusicTriggerButton({ playing, onClick }: { playing: boolean; onClick: (
       initial={{ x: -8, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -8, opacity: 0 }}
-      whileHover={{ scale: 1.04, x: 3 }}
-      whileTap={{ scale: 0.96 }}
+      whileHover={{ x: 3 }}
+      whileTap={{ scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 1 }}
-      className="fixed left-0 top-1/2 -translate-y-1/2 z-[54] hidden md:flex flex-col items-center justify-center gap-2 py-6 px-2.5 rounded-r-3xl select-none"
+      className="fixed left-0 flex flex-col items-center justify-center gap-2 py-5 px-2.5 rounded-r-3xl select-none"
       style={{
-        background: 'rgba(248,243,237,0.88)',
+        top: 'calc(80px + env(safe-area-inset-top, 0px))',
+        zIndex: 50,
+        background: 'rgba(248,243,237,0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         boxShadow: '6px 0 32px rgba(0,0,0,0.14), inset -1px 0 0 rgba(200,149,108,0.25)',
@@ -477,22 +479,22 @@ function MusicTriggerButton({ playing, onClick }: { playing: boolean; onClick: (
       <motion.div
         animate={playing ? { rotate: 360 } : { rotate: 0 }}
         transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-9 h-9 rounded-full flex items-center justify-center relative"
+        className="w-8 h-8 rounded-full flex items-center justify-center relative"
         style={{
           background: 'conic-gradient(from 0deg, #1a0e06, #3a2410, #1a0e06, #2a1a0e, #3a2410, #1a0e06)',
           boxShadow: playing
-            ? '0 0 0 2px rgba(200,149,108,0.2), 0 0 16px rgba(200,149,108,0.55)'
+            ? '0 0 0 2px rgba(200,149,108,0.2), 0 0 14px rgba(200,149,108,0.5)'
             : '0 2px 8px rgba(0,0,0,0.35)',
         }}
       >
         <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 50%)' }} />
-        <div className="w-4 h-4 rounded-full overflow-hidden border border-[#c8956c]/40 z-10">
+        <div className="w-3.5 h-3.5 rounded-full overflow-hidden border border-[#c8956c]/40 z-10">
           <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06]" />
         </div>
         <div className="absolute w-2 h-2 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
       </motion.div>
 
-      {/* Playing indicator dots */}
+      {/* Playing bars */}
       {playing && (
         <div className="flex flex-col gap-[3px] items-center">
           {[0, 0.15, 0.3].map((d, i) => (
@@ -507,7 +509,7 @@ function MusicTriggerButton({ playing, onClick }: { playing: boolean; onClick: (
       )}
 
       <span
-        className="text-[9px] font-bold text-[#7c5c3e] tracking-widest"
+        className="text-[9px] font-bold text-[#7c5c3e]"
         style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}
       >
         MUSIC
@@ -544,39 +546,35 @@ function MusicPanel({
 
   return (
     <>
-      {/* Grain texture overlay */}
+      {/* Grain texture overlay — pointer-events-none, purely decorative */}
       <div
-        className="fixed inset-0 z-[55] pointer-events-none"
+        className="fixed inset-0 pointer-events-none"
         style={{
+          zIndex: 997,
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E")`,
           opacity: 0.6,
         }}
       />
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]"
-        onClick={onClose}
-      />
 
+      {/* Drawer panel */}
       <motion.div
+        key="music-panel"
         initial={{ x: '-100%' }}
         animate={{ x: 0 }}
         exit={{ x: '-100%' }}
-        transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.8 }}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={{ left: 0, right: 0.35 }}
+        dragElastic={{ left: 0, right: 0.25 }}
         dragMomentum={false}
         onDragEnd={(_, info) => { if (info.offset.x > 72) onClose(); }}
-        className="fixed top-0 left-0 h-full w-[85vw] md:w-[25vw] min-w-0 md:min-w-[320px] md:max-w-[390px] flex flex-col z-[56] select-none overflow-hidden"
+        className="fixed top-0 left-0 h-full w-[85vw] md:w-[25vw] md:min-w-[320px] md:max-w-[390px] flex flex-col select-none"
         style={{
-          background: 'rgba(250,246,242,0.86)',
+          zIndex: 999,
+          background: 'rgba(250,246,242,0.92)',
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
-          boxShadow: '12px 0 56px rgba(0,0,0,0.24), 4px 0 16px rgba(0,0,0,0.1), inset -1px 0 0 rgba(200,149,108,0.18)',
+          boxShadow: '12px 0 56px rgba(0,0,0,0.28), 4px 0 16px rgba(0,0,0,0.12), inset -1px 0 0 rgba(200,149,108,0.18)',
           borderRight: '1px solid rgba(200,149,108,0.22)',
         }}
         onClick={e => e.stopPropagation()}
@@ -729,7 +727,7 @@ function MusicPanel({
               </div>
 
               {/* Current category track list */}
-              <div className="flex-1 overflow-y-auto min-h-0 mt-4 border-t shrink-0" style={{ borderColor: 'rgba(200,149,108,0.15)' }}>
+              <div className="flex-1 overflow-y-auto min-h-0 mt-4 border-t" style={{ borderColor: 'rgba(200,149,108,0.15)' }}>
                 <div className="px-5 pt-3 pb-2 flex items-center gap-2">
                   <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65">
@@ -1498,20 +1496,21 @@ export default function SecretChatRoom() {
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       const x = e.touches[0].clientX;
-      if (x < 22) swipeTouchStartX.current = x;
-      else swipeTouchStartX.current = null;
+      swipeTouchStartX.current = x < 24 ? x : null;
     };
-    const onTouchEnd = (e: TouchEvent) => {
+    const onTouchMove = (e: TouchEvent) => {
       if (swipeTouchStartX.current === null) return;
-      const dx = e.changedTouches[0].clientX - swipeTouchStartX.current;
-      if (dx > 48) setShowMusicPanel(true);
-      swipeTouchStartX.current = null;
+      const dx = e.touches[0].clientX - swipeTouchStartX.current;
+      if (dx > 60) {
+        setShowMusicPanel(true);
+        swipeTouchStartX.current = null; // prevent re-firing
+      }
     };
     document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
     return () => {
       document.removeEventListener('touchstart', onTouchStart);
-      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchmove', onTouchMove);
     };
   }, []);
 
@@ -2051,14 +2050,42 @@ export default function SecretChatRoom() {
   const isMyMessage = (msg: Message) => msg.sender_id === user?.id;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] overflow-hidden secret-room-zoom">
+    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] secret-room-zoom" style={{ isolation: 'isolate' }}>
       <audio ref={bgmRef} />
 
-      {/* Mobile swipe-from-left-edge zone (visual hint) */}
+      {/* Music panel + backdrop — at root level, above everything */}
+      <AnimatePresence>
+        {showMusicPanel && (
+          <>
+            {/* Backdrop — z-[998], below panel */}
+            <motion.div
+              key="music-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+              style={{ zIndex: 998 }}
+              onClick={() => setShowMusicPanel(false)}
+            />
+            {/* Panel — z-[999] */}
+            <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop floating trigger — visible on md+ when panel is closed */}
+      <AnimatePresence>
+        {!showMusicPanel && (
+          <MusicTriggerButton playing={player.playing} onClick={() => setShowMusicPanel(true)} />
+        )}
+      </AnimatePresence>
+
+      {/* Mobile swipe-from-left-edge visual hint */}
       {!showMusicPanel && (
         <div
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-[53] md:hidden flex items-center justify-center"
-          style={{ width: 6, height: 64, background: 'rgba(200,149,108,0.35)', borderRadius: '0 6px 6px 0' }}
+          className="fixed left-0 top-1/2 -translate-y-1/2 md:hidden"
+          style={{ width: 5, height: 56, background: 'rgba(200,149,108,0.4)', borderRadius: '0 6px 6px 0', zIndex: 53 }}
           aria-hidden="true"
         />
       )}
@@ -2225,32 +2252,17 @@ export default function SecretChatRoom() {
               <CloudRain className="w-4 h-4" />
             </button>
 
-            {/* Music player button + panel */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMusicPanel(v => !v)}
-                ref={musicRef}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
-                  player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
-                }`}
-                title="เพลง"
-              >
-                {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
-
-              <AnimatePresence>
-                {showMusicPanel && (
-                  <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Desktop floating trigger — always visible */}
-            <AnimatePresence>
-              {!showMusicPanel && (
-                <MusicTriggerButton playing={player.playing} onClick={() => setShowMusicPanel(true)} />
-              )}
-            </AnimatePresence>
+            {/* Music player button */}
+            <button
+              onClick={() => setShowMusicPanel(v => !v)}
+              ref={musicRef}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
+                player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
+              }`}
+              title="เพลง"
+            >
+              {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
 
             {/* Theme toggle */}
             <button
