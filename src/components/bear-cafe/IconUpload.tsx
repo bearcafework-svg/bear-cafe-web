@@ -46,12 +46,15 @@ export function IconUpload({
     setUploading(true);
     try {
       // Auto-compress if needed (max 2MB, 512x512 for icons)
+      // Preserve PNG transparency by keeping outputType as 'image/png'
       let processed = file;
       if (file.size > 2 * 1024 * 1024 || file.type === 'image/png' || file.type === 'image/bmp') {
+        const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
         processed = await compressImage(file, {
           maxWidth: 512,
           maxHeight: 512,
           maxSizeBytes: 2 * 1024 * 1024,
+          outputType,
         });
       }
 
@@ -112,7 +115,7 @@ export function IconUpload({
             <img
               src={value}
               alt="Icon preview"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-transparent"
             />
           ) : (
             <span className="text-3xl">{value || placeholder}</span>

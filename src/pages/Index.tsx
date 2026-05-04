@@ -11,6 +11,7 @@ import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopu
 import { CategoryGuidance } from '@/components/bear-cafe/CategoryGuidance';
 import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
 import { SecretTableWidget } from '@/components/bear-cafe/SecretTableWidget';
+import { SecretCafeCTA } from '@/components/bear-cafe/SecretCafeCTA';
 import { useCooldown } from '@/hooks/useCooldown';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
@@ -228,6 +229,15 @@ export default function Index() {
               <CategoryGuidance />
             </motion.div>
 
+            {/* Secret Cafe CTA Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.07 }}
+            >
+              <SecretCafeCTA />
+            </motion.div>
+
             {/* Secret Table Widget — Owner only */}
             {user?.is_owner && (
               <motion.div
@@ -240,6 +250,13 @@ export default function Index() {
             )}
 
             {/* Category Grid */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <p className="text-sm font-semibold text-muted-foreground mb-3">สำหรับหาเพื่อนลงห้อง</p>
+            </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -274,7 +291,7 @@ export default function Index() {
                 >
                   <MoreCategoriesCard
                     remainingCount={remainingCount}
-                    onClick={() => setShowAllCategories(true)}
+                    onClick={() => navigate('/create-session')}
                     isLocked={isOnCooldown}
                     formattedTime={formattedTime}
                   />

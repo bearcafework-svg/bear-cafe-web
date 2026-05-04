@@ -110,13 +110,18 @@ export default function CreateSessionPage() {
   const [milestoneData, setMilestoneData] = useState<MilestoneData | null>(null);
   const [showMilestone, setShowMilestone] = useState(false);
 
-  // Pre-select category from URL params
+  // Pre-select category from URL params and optionally jump to step 2
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
+    const stepFromUrl     = searchParams.get('step');
     if (categoryFromUrl) {
       setSelectedCategory(categoryFromUrl);
+      // If ?step=2 is present, skip straight to step 2 once data is loaded
+      if (stepFromUrl === '2' && !loadingData) {
+        setCurrentStep(2);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, loadingData]);
 
   // Fetch categories, roles, and banned words from database
   useEffect(() => {

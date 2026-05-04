@@ -54,6 +54,7 @@ import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
 import { SecretTableManagement } from '@/components/admin/SecretTableManagement';
+import { ProfileFramesManagement } from '@/components/admin/ProfileFramesManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -276,6 +277,7 @@ export default function AdminPage() {
         case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'secret-table': return isOwner ? <SecretTableManagement /> : null;
+        case 'profile-frames': return isOwner ? <ProfileFramesManagement /> : null;
         default: return null;
       }
     } catch (error) {

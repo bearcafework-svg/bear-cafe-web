@@ -947,6 +947,7 @@ export default function SecretChatRoom() {
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [bannedWords, setBannedWords] = useState<string[]>([]);
   const [showRating, setShowRating] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [bannedWarning, setBannedWarning] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ChatProfile[]>([]);
   // Similar mood config + phase tracking
@@ -1049,8 +1050,8 @@ export default function SecretChatRoom() {
     }
 
     // ── 4. Insert bot safety welcome message for both users ──────────────────
+    // sender_id = null → system message (no FK violation)
     if (session?.id) {
-      const SYSTEM_SENDER = '00000000-0000-0000-0000-000000000000';
       const welcomeText = [
         '⚠️ **คำเตือนก่อนเริ่มแชท**',
         '',
@@ -1063,10 +1064,12 @@ export default function SecretChatRoom() {
 
       (supabase as any).from('chat_messages').insert({
         session_id: session.id,
-        sender_id:  SYSTEM_SENDER,
+        sender_id:  null,          // null = system/bot, no FK violation
         content:    welcomeText,
         is_system:  true,
-      }).then(() => {});
+      }).then(({ error }: any) => {
+        if (error) console.warn('[handleJoinTable] bot message failed:', error.message);
+      });
     }
   }, [player.currentTrack?.src, player.syncPlayingState, session]);
 
@@ -1335,8 +1338,7 @@ export default function SecretChatRoom() {
 
     if (hitWord) {
       // ── Flagged: log violation + insert system warning ──────────────────────
-      const SYSTEM_SENDER = '00000000-0000-0000-0000-000000000000';
-      const warningText   = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
+      const warningText = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
 
       await Promise.all([
         // Log for admin observation tab (Realtime → admin sees it instantly)
@@ -1350,7 +1352,7 @@ export default function SecretChatRoom() {
         // System warning visible to both users in the chat
         (supabase as any).from('chat_messages').insert({
           session_id: session.id,
-          sender_id:  SYSTEM_SENDER,
+          sender_id:  null,        // null = system/bot
           content:    warningText,
           is_system:  true,
         }),
@@ -1400,19 +1402,26 @@ export default function SecretChatRoom() {
 
   const leaveTable = useCallback(async () => {
     if (session) {
-      // Has matched — end session and show rating
+      // Has matched — ask for confirmation first
+      setShowLeaveConfirm(true);
+    } else {
+      // Still waiting — just remove from queue, no confirm needed
+      await (supabase as any).from('chat_queue').delete().eq('user_id', user?.id);
+      navigate('/');
+    }
+  }, [session, user?.id, navigate]);
+
+  const confirmLeave = useCallback(async () => {
+    setShowLeaveConfirm(false);
+    if (session) {
       await (supabase as any)
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', session.id);
       setMatchStatus('ended');
       setShowRating(true);
-    } else {
-      // Still waiting — just remove from queue, no rating
-      await (supabase as any).from('chat_queue').delete().eq('user_id', user?.id);
-      navigate('/');
     }
-  }, [session, user?.id, navigate]);
+  }, [session]);
 
   const submitRating = useCallback(async (stars: number) => {
     setShowRating(false);
@@ -1828,6 +1837,50 @@ export default function SecretChatRoom() {
       )}
 
       {showRating && <RatingDialog onRate={submitRating} />}
+
+      {/* Leave confirmation dialog */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="bg-white dark:bg-[#221810] rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-center space-y-4"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center mx-auto">
+                <LogOut className="w-7 h-7 text-red-500" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">ออกจากโต๊ะ?</p>
+                <p className="text-sm text-[#9c7c5e] leading-relaxed">
+                  การสนทนาจะสิ้นสุดทันที และไม่สามารถกลับมาได้
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 h-11 rounded-xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] font-semibold text-sm hover:bg-[#f0e6d8] dark:hover:bg-[#2a1a0e] transition-colors"
+                >
+                  อยู่ต่อ
+                </button>
+                <button
+                  onClick={confirmLeave}
+                  className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors shadow-sm"
+                >
+                  ออกเลย
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

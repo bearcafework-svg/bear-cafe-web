@@ -61,6 +61,15 @@ export async function compressImage(
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d')!;
+
+    // For JPEG output: fill white background first (JPEG has no alpha channel,
+    // transparent pixels would otherwise render as black).
+    // For PNG/WebP: leave transparent — clearRect is the default (alpha = 0).
+    if (outputType === 'image/jpeg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
+
     ctx.drawImage(img, 0, 0, width, height);
 
     // Try progressively lower quality until under maxSizeBytes

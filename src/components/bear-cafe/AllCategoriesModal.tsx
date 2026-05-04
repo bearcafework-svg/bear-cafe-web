@@ -40,7 +40,7 @@ export function AllCategoriesModal({
   const handleSelect = (id: string) => {
     if (isLocked) return;
     onOpenChange(false);
-    navigate(`/create-session?category=${id}`);
+    navigate(`/create-session?category=${id}&step=2`);
   };
 
   return (

@@ -150,12 +150,12 @@ export default function SecretChatMenu() {
   return (
     <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 secret-menu-zoom ${theme.bg}`}>
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/60 dark:bg-black/30 backdrop-blur-xl border-b border-white/30 dark:border-white/10">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-orange-200/60 dark:border-white/10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost" size="icon"
             onClick={() => step === 'role' ? setStep('category') : navigate('/')}
-            className="rounded-xl w-8 h-8 text-[#7c5c3e] hover:bg-white/50 dark:hover:bg-white/10 shrink-0"
+            className="rounded-xl w-8 h-8 text-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-white/10 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -165,8 +165,8 @@ export default function SecretChatMenu() {
               <Coffee className="w-4.5 h-4.5" style={{ color: theme.accent }} />
             </div>
             <div>
-              <h1 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base leading-tight">คาเฟ่ลับ</h1>
-              <p className="text-[11px] text-[#9c7c5e]">
+              <h1 className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base leading-tight">คาเฟ่ลับ</h1>
+              <p className="text-[11px] text-orange-700/70 dark:text-[#9c7c5e]">
                 {step === 'category' ? 'เลือกหมวดสนทนา' : `${selectedCategory?.name} · เลือกบทบาท`}
               </p>
             </div>
@@ -185,7 +185,7 @@ export default function SecretChatMenu() {
           {/* Theme toggle */}
           <button
             onClick={() => setColorTheme(colorTheme === 'dark' ? 'light' : 'dark')}
-            className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-[#7c5c3e] hover:bg-white/50 dark:hover:bg-white/10 transition-colors"
+            className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-white/10 transition-colors"
             title={colorTheme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
           >
             {colorTheme === 'dark'
@@ -243,7 +243,7 @@ export default function SecretChatMenu() {
                           whileHover={{ y: -3, scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => { setSelectedCategory(cat); setStep('role'); }}
-                          className="group w-full text-left rounded-2xl border border-white/60 dark:border-white/10 p-5 transition-all bg-white/70 dark:bg-black/20 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-black/30 shadow-sm hover:shadow-lg"
+                          className="group w-full text-left rounded-2xl border border-orange-200/80 dark:border-white/10 p-5 transition-all bg-white/90 dark:bg-black/20 backdrop-blur-sm hover:bg-white dark:hover:bg-black/30 shadow-sm hover:shadow-lg"
                         >
                           <div className="flex items-start gap-4">
                             {cat.image_url ? (
@@ -254,9 +254,9 @@ export default function SecretChatMenu() {
                               </div>
                             )}
                             <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">{cat.name}</p>
+                              <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-lg">{cat.name}</p>
                               {cat.description && (
-                                <p className="text-sm text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
+                                <p className="text-sm text-orange-700/70 dark:text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
                               )}
                             </div>
                             <ChevronRight className="w-4 h-4 text-[#c8b09a] dark:text-[#5a4030] shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
@@ -321,8 +321,8 @@ export default function SecretChatMenu() {
                             <span className="text-2xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
                           )}
                           <div>
-                            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">{r.label}</p>
-                            <p className="text-xs text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
+                            <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base">{r.label}</p>
+                            <p className="text-xs text-orange-700/70 dark:text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
                           </div>
                         </div>
                         {active && (
@@ -349,7 +349,7 @@ export default function SecretChatMenu() {
                     {rollingAlias ? (
                       <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e] mx-auto" />
                     ) : (
-                      <span className="font-bold text-[#4a3728] dark:text-[#e8d9c8] flex-1 text-lg">{alias}</span>
+                      <span className="font-bold text-orange-900 dark:text-[#e8d9c8] flex-1 text-lg">{alias}</span>
                     )}
                     <button
                       onClick={rollAlias}
@@ -430,7 +430,7 @@ export default function SecretChatMenu() {
                 >
                   <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-12 h-12 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base truncate">{alias || '...'}</p>
+                    <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base truncate">{alias || '...'}</p>
                     <p className="text-xs text-[#9c7c5e] mt-0.5">
                       {roles.find(r => r.key === selectedRole)?.label} · {selectedCategory.name}
                     </p>

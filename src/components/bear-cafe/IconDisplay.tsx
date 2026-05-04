@@ -31,7 +31,7 @@ export function IconDisplay({
         src={displayValue}
         alt="Icon"
         className={cn(
-          'object-cover rounded',
+          'object-contain rounded bg-transparent',
           sizeClasses[size],
           className
         )}

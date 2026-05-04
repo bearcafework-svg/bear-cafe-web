@@ -35,7 +35,7 @@ export function HomeCategoryCard({
       navigate('/login');
       return;
     }
-    navigate(`/create-session?category=${id}`);
+    navigate(`/create-session?category=${id}&step=2`);
   };
 
   return (
@@ -87,7 +87,7 @@ export function HomeCategoryCard({
           <img 
             src={icon} 
             alt={name} 
-            className="w-full h-full object-contain rounded-lg sm:rounded-xl"
+            className="w-full h-full object-contain rounded-lg sm:rounded-xl bg-transparent"
           />
         ) : (
           <span className={cn(
