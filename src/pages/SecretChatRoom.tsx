@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, Repeat, Repeat1, X, Sun, Moon } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 import pixelCoffeeIcon from '@/assets/pixel-coffee.gif';
+import bearMascotIcon from '@/assets/bear-mascot.png';
 
 interface Message {
   id: string;
@@ -391,7 +392,7 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
       <motion.div
         animate={{ rotate: playing ? 360 : 0 }}
         transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-28 h-28 rounded-full flex items-center justify-center"
+        className="w-20 h-20 sm:w-28 sm:h-28 rounded-full flex items-center justify-center"
         style={{
           background: 'conic-gradient(from 0deg, #2a1a0e, #4a2e1a, #2a1a0e, #3a2410, #2a1a0e)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 0 12px rgba(0,0,0,0.4)',
@@ -402,7 +403,7 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
           <div key={r} className="absolute rounded-full border border-white/5" style={{ width: r * 2, height: r * 2 }} />
         ))}
         {/* Center image */}
-        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/40 shadow-inner z-10">
+        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/40 shadow-inner z-10">
           {imageUrl ? (
             <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
           ) : (
@@ -450,7 +451,7 @@ function MusicPanel({
         transition={{ duration: 0.2, type: 'spring', stiffness: 320, damping: 28 }}
         className={
           isMobile
-            ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm max-h-[85vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]'
+            ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-[320px] max-h-[80vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]'
             : 'absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50'
         }
         onClick={e => e.stopPropagation()}
@@ -1037,8 +1038,6 @@ export default function SecretChatRoom() {
     setIsRoomReady(true);
 
     // ── 3. Write started_at to DB so both clients can sync the countdown ─────
-    // Wrapped in try/catch — if the column doesn't exist yet (migration pending),
-    // this silently fails instead of causing a 400 that breaks the join flow.
     if (session?.id && !session.started_at) {
       (supabase as any)
         .from('chat_sessions')
@@ -1047,6 +1046,27 @@ export default function SecretChatRoom() {
         .then(({ error }: any) => {
           if (error) console.warn('[handleJoinTable] started_at update skipped:', error.message);
         });
+    }
+
+    // ── 4. Insert bot safety welcome message for both users ──────────────────
+    if (session?.id) {
+      const SYSTEM_SENDER = '00000000-0000-0000-0000-000000000000';
+      const welcomeText = [
+        '⚠️ **คำเตือนก่อนเริ่มแชท**',
+        '',
+        'หากคุณพบว่าเพื่อนสนทนาของคุณมีการใช้ถ้อยคำไม่สุภาพ คุกคาม หรือทำให้คุณรู้สึกไม่ปลอดภัย สามารถแจ้งปัญหาได้ที่ **#🚨︰พื้นที่แจ้งปัญหา** ผ่านทางเซิร์ฟเวอร์ Discord ของเรา',
+        '',
+        'กรุณา **แคปหน้าจอแชททุกครั้งโดยห้ามครอปภาพ** เพื่อให้ทีมงานสามารถตรวจสอบบริบทของบทสนทนาได้อย่างครบถ้วน เนื่องจากระบบ **ไม่มีการบันทึกประวัติแชทของผู้ใช้งาน**',
+        '',
+        '⏰ เมื่อเกิดปัญหา กรุณาแจ้งภายใน **24 ชั่วโมง** เพื่อให้สามารถดำเนินการได้อย่างรวดเร็ว',
+      ].join('\n');
+
+      (supabase as any).from('chat_messages').insert({
+        session_id: session.id,
+        sender_id:  SYSTEM_SENDER,
+        content:    welcomeText,
+        is_system:  true,
+      }).then(() => {});
     }
   }, [player.currentTrack?.src, player.syncPlayingState, session]);
 
@@ -1421,9 +1441,9 @@ export default function SecretChatRoom() {
     ? (session.user_a_id === user?.id ? session.user_b_role : session.user_a_role)
     : null;
 
-  // Thai role labels
+  // Thai role labels — friendly display names
   const ROLE_TH: Record<string, string> = {
-    talk: '💬 Talk', listen: '👂 Listen', both: '🤝 Both', chill: '☕ Chill',
+    talk: '💬 พิมพ์ไม่หยุด', listen: '👂 ผู้รับฟังที่ดี', both: '🤝 ได้ทั้งสอง', chill: '☕ ชิล ๆ',
   };
 
   const getAvatarImg = (key: string) => profiles.find(p => p.id === key)?.image_url ?? null;
@@ -1463,6 +1483,15 @@ export default function SecretChatRoom() {
                 <p className="text-sm text-[#9c7c5e] leading-relaxed">
                   พบคู่สนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
                 </p>
+                {/* Partner role badge */}
+                {partnerRole && (
+                  <div className="flex items-center justify-center gap-1.5 pt-1">
+                    <span className="text-xs text-[#9c7c5e]">บทบาทฝ่ายตรงข้าม:</span>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c]">
+                      {ROLE_TH[partnerRole] ?? partnerRole}
+                    </span>
+                  </div>
+                )}
               </div>
               <motion.button
                 whileHover={{ scale: 1.03 }}
@@ -1496,7 +1525,7 @@ export default function SecretChatRoom() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg"
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg whitespace-nowrap"
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {bannedWarning === '__ai__'
@@ -1675,20 +1704,45 @@ export default function SecretChatRoom() {
 
         <AnimatePresence initial={false}>
           {messages.map(msg => {
-            // ── System message (Bear Guard warning) ──────────────────────────
+            // ── System message (Bear Guard / น้องฮันนี่) ─────────────────────
             if (msg.is_system) {
+              // Render **bold** markdown inline
+              const renderBold = (text: string) =>
+                text.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
+                  part.startsWith('**') && part.endsWith('**')
+                    ? <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>
+                    : <span key={i}>{part}</span>
+                );
+
+              const isWarning = msg.content.includes('รปภ.') || msg.content.includes('ติ๊ดๆ');
+
               return (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 8, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-center"
+                  className="flex gap-3 flex-row"
                 >
-                  <div className="flex items-start gap-2 max-w-[90%] bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-2xl px-4 py-2.5 shadow-sm">
-                    <span className="text-base shrink-0 mt-0.5">🐻</span>
-                    <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
-                      {msg.content}
-                    </p>
+                  {/* Bear mascot avatar */}
+                  <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 self-start mt-1 shadow-sm border-2 border-[#c8956c]/30">
+                    <img src={bearMascotIcon} alt="น้องฮันนี่" className="w-full h-full object-cover" />
+                  </div>
+
+                  <div className="max-w-[80%] space-y-1">
+                    <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
+                      น้องฮันนี่ · ฝ่ายความปลอดภัย
+                    </span>
+                    <div className={`px-4 py-3 rounded-2xl rounded-bl-sm text-xs leading-relaxed shadow-sm ${
+                      isWarning
+                        ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300'
+                        : 'bg-[#f0e6d8] dark:bg-[#2a1a0e] border border-[#e8d9c8] dark:border-[#3a2a1e] text-[#4a3728] dark:text-[#e8d9c8]'
+                    }`}>
+                      {msg.content.split('\n').map((line, i) => (
+                        <p key={i} className={line === '' ? 'h-2' : ''}>
+                          {renderBold(line)}
+                        </p>
+                      ))}
+                    </div>
                   </div>
                 </motion.div>
               );

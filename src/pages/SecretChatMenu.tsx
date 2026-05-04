@@ -196,7 +196,7 @@ export default function SecretChatMenu() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-8 py-6 pb-12">
+      <main className="max-w-xl mx-auto px-4 sm:px-8 py-6 pb-12">
         <AnimatePresence mode="wait">
 
           {/* ── Step 1: Category ── */}
