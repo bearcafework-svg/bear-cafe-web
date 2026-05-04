@@ -420,8 +420,7 @@ function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: b
 }
 
 // ─── Music Player Panel ───────────────────────────────────────────────────────
-// Desktop: dropdown from the music button (absolute)
-// Mobile (<640px): centered modal with backdrop + X button
+// Always renders as a centered modal with blurred backdrop on all platforms.
 function MusicPanel({
   player, onClose,
 }: {
@@ -429,31 +428,26 @@ function MusicPanel({
   onClose: () => void;
 }) {
   const [activeCat, setActiveCat] = useState(player.catIdx);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
   return (
     <>
-      {/* Mobile-only backdrop */}
-      {isMobile && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]"
-          onClick={onClose}
-        />
-      )}
-
+      {/* Backdrop — blurs the chat behind the panel */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.92 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]"
+        onClick={onClose}
+      />
+
+      {/* Panel — centered on all screen sizes */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92, y: 12 }}
         transition={{ duration: 0.2, type: 'spring', stiffness: 320, damping: 28 }}
-        className={
-          isMobile
-            ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-[320px] max-h-[80vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]'
-            : 'absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] overflow-hidden z-50'
-        }
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm max-h-[88vh] overflow-y-auto bg-white dark:bg-[#1a0e06] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] z-[56]"
         onClick={e => e.stopPropagation()}
       >
       {/* Now playing header */}
@@ -1076,6 +1070,7 @@ export default function SecretChatRoom() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!topicId || !alias) navigate('/secret-chat');
@@ -1155,27 +1150,33 @@ export default function SecretChatRoom() {
     // Record when we started waiting (for similar-phase delay)
     matchStartRef.current = Date.now();
 
-    // ── Cleanup helper — removes THIS user's queue entry ──────────────────────
-    // Called both on unmount and on beforeunload so stale entries don't linger.
+    // ── Cleanup helper ────────────────────────────────────────────────────────
     const cleanupQueue = () => {
       (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
     };
 
-    // Also clean up stale entries older than 5 minutes (left by crashed sessions)
-    const cleanupStale = async () => {
-      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      await (supabase as any)
-        .from('chat_queue')
-        .delete()
-        .lt('joined_at', cutoff);
-    };
-    cleanupStale();
+    // Stale cleanup — call the DB function instead of a client-side cutoff
+    (supabase as any).rpc('cleanup_stale_queue').then(() => {});
 
-    // beforeunload: fires when user closes tab / navigates away
     const onBeforeUnload = () => cleanupQueue();
     window.addEventListener('beforeunload', onBeforeUnload);
 
+    // Track whether this client has already triggered a match to prevent
+    // double-firing when both Realtime and polling detect the same event.
+    let matchedRef = false;
+
+    const handleMatch = (sess: ChatSession) => {
+      if (matchedRef) return;
+      matchedRef = true;
+      playMatchSound();
+      setSession(sess);
+      setMatchStatus('matched');
+    };
+
+    // ── tryMatch: uses atomic DB function to eliminate race conditions ────────
     const tryMatch = async () => {
+      if (matchedRef) return;
+
       const elapsedSeconds = (Date.now() - matchStartRef.current) / 1000;
       const inSimilarPhase = moodConfig.enabled && elapsedSeconds >= moodConfig.similar_phase_delay_seconds;
 
@@ -1193,47 +1194,52 @@ export default function SecretChatRoom() {
       const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
 
-      // Find best candidate using score
+      // Score candidates and pick the best
       let best: any = null;
       let bestScore = -1;
       for (const candidate of queue) {
         const score = matchScore(topicId, role ?? 'both', candidate, moodConfig);
         if (score > bestScore) { bestScore = score; best = candidate; }
       }
-
       if (!best || bestScore < 0) return;
-      const partner = best;
 
-      const { data: sess, error } = await (supabase as any)
-        .from('chat_sessions')
-        .insert({
-          topic_id: topicId,
-          user_a_id: user.id,
-          user_b_id: partner.user_id,
-          user_a_alias: alias,
-          user_b_alias: partner.alias,
-          user_a_avatar: avatar,
-          user_b_avatar: partner.avatar,
-          user_a_role: role ?? 'both',
-          user_b_role: partner.role ?? 'both',
-          duration_seconds: SESSION_DURATION,
-        })
-        .select()
-        .single();
+      // ── Atomic match via DB function (advisory lock + transaction) ────────
+      // This prevents two clients from simultaneously matching the same partner.
+      const { data: sessions, error } = await (supabase as any).rpc('try_match_users', {
+        p_user_a_id:     user.id,
+        p_user_b_id:     best.user_id,
+        p_topic_id:      topicId,
+        p_user_a_alias:  alias,
+        p_user_b_alias:  best.alias,
+        p_user_a_avatar: avatar,
+        p_user_b_avatar: best.avatar,
+        p_user_a_role:   role ?? 'both',
+        p_user_b_role:   best.role ?? 'both',
+        p_duration_secs: SESSION_DURATION,
+      });
 
-      if (error || !sess) return;
+      // rpc returns an array; empty = partner was already taken (race lost)
+      if (error || !sessions || sessions.length === 0) return;
 
-      await Promise.all([
-        (supabase as any).from('chat_queue').delete().eq('user_id', user.id),
-        (supabase as any).from('chat_queue').delete().eq('user_id', partner.user_id),
-      ]);
-      playMatchSound();
-      setSession(sess);
-      setMatchStatus('matched');
+      handleMatch(sessions[0] as ChatSession);
     };
 
-    const interval = setInterval(tryMatch, 2000);
+    // ── Polling with per-client jitter to avoid thundering herd ──────────────
+    // Base interval 3s + random 0–2s offset so 100 clients don't all fire
+    // at the same millisecond. Effective rate: ~1 query per 3–5s per client.
+    const POLL_BASE_MS  = 3000;
+    const POLL_JITTER_MS = 2000;
+    const jitter = Math.random() * POLL_JITTER_MS;
 
+    // Initial delayed start (spread out first wave)
+    const initialDelay = setTimeout(() => {
+      tryMatch();
+      const interval = setInterval(tryMatch, POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
+      // Store interval id so cleanup can clear it
+      (intervalRef as any).current = interval;
+    }, jitter);
+
+    // ── Realtime: primary notification path (faster than polling) ────────────
     const queueChannel = supabase
       .channel(`queue-watch-${user.id}`)
       .on('postgres_changes', {
@@ -1241,16 +1247,16 @@ export default function SecretChatRoom() {
         schema: 'public',
         table: 'chat_sessions',
         filter: `user_b_id=eq.${user.id}`,
-      }, async (payload) => {
-        await (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
-        playMatchSound();
-        setSession(payload.new as ChatSession);
-        setMatchStatus('matched');
+      }, (payload) => {
+        // user_b receives the session via Realtime — no need to delete queue
+        // (the atomic function already deleted it server-side)
+        handleMatch(payload.new as ChatSession);
       })
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(initialDelay);
+      if ((intervalRef as any).current) clearInterval((intervalRef as any).current);
       supabase.removeChannel(queueChannel);
       window.removeEventListener('beforeunload', onBeforeUnload);
       cleanupQueue();
@@ -1561,7 +1567,7 @@ export default function SecretChatRoom() {
             className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-500 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-lg"
           >
             <Clock className="w-4 h-4 shrink-0 animate-pulse" />
-            เหลือเวลาอีก {countdownDisplay} นาที รีบคุยด้วยน้า! ⏰
+            เหลือเวลาอีก {countdownDisplay} รีบคุยด้วยน้า! ⏰
           </motion.div>
         )}
       </AnimatePresence>
