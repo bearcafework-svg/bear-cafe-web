@@ -1037,12 +1037,16 @@ export default function SecretChatRoom() {
     setIsRoomReady(true);
 
     // ── 3. Write started_at to DB so both clients can sync the countdown ─────
+    // Wrapped in try/catch — if the column doesn't exist yet (migration pending),
+    // this silently fails instead of causing a 400 that breaks the join flow.
     if (session?.id && !session.started_at) {
       (supabase as any)
         .from('chat_sessions')
         .update({ started_at: new Date().toISOString() })
         .eq('id', session.id)
-        .then(() => {});
+        .then(({ error }: any) => {
+          if (error) console.warn('[handleJoinTable] started_at update skipped:', error.message);
+        });
     }
   }, [player.currentTrack?.src, player.syncPlayingState, session]);
 
