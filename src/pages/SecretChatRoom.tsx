@@ -766,8 +766,7 @@ const MusicPanel = memo(function MusicPanel({
                 >
                   <button
                     onClick={() => {
-                      const pct = Math.round(player.volume * 100);
-                      if (pct > 0) player.setVolume(0); else player.setVolume(0.8);
+                      if (player.volume > 0) player.setVolume(0); else player.setVolume(0.8);
                     }}
                     className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors"
                     style={{ color: textMuted }}
@@ -784,21 +783,32 @@ const MusicPanel = memo(function MusicPanel({
                     )}
                   </button>
                   <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
+                    {/* Track fill — no transition, follows value instantly */}
                     <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
                       <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.15)' }}>
-                        <div className="h-full rounded-full transition-[width] duration-75"
-                          style={{ width: `${Math.round(player.volume * 100)}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }} />
+                        <div className="h-full rounded-full"
+                          style={{ width: `${player.volume * 100}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }} />
                       </div>
                     </div>
-                    <input type="range" min={0} max={100} step={1} value={Math.round(player.volume * 100)}
+                    {/* Range input — opacity:0.001 so iPad/iOS touch events work correctly */}
+                    <input
+                      type="range" min={0} max={100} step={0.5}
+                      value={player.volume * 100}
                       onChange={e => player.setVolume(Number(e.target.value) / 100)}
-                      className="vol-slider w-full relative z-10"
-                      style={{ '--fill': `${Math.round(player.volume * 100)}%`, opacity: 0, cursor: 'pointer', height: 32 } as React.CSSProperties}
+                      className="w-full absolute inset-0"
+                      style={{ opacity: 0.001, cursor: 'pointer', height: '100%', margin: 0, padding: 0, touchAction: 'none' }}
                     />
+                    {/* HoneyJar thumb — position matches value exactly, no rounding */}
                     <img src={honeyJarIcon} alt="" draggable={false}
-                      style={{ position: 'absolute', left: `calc(${Math.round(player.volume * 100)}% - 12px)`, top: '50%',
-                        transform: 'translateY(-50%)', width: 24, height: 24, pointerEvents: 'none', userSelect: 'none', zIndex: 20,
-                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
+                      style={{
+                        position: 'absolute',
+                        left: `calc(${player.volume * 100}% - 12px)`,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 24, height: 24,
+                        pointerEvents: 'none', userSelect: 'none', zIndex: 20,
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                      }} />
                   </div>
                   <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: textMuted }}>
                     {player.volume === 0 ? '—' : Math.round(player.volume * 100)}
@@ -1287,12 +1297,21 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
 }
 
 // ─── Tooltip (desktop hover) ─────────────────────────────────────────────────
-function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+// align: 'center' | 'right' — ใช้ 'right' สำหรับปุ่มที่อยู่ขอบขวาของหน้าจอ
+function Tooltip({ text, children, align = 'center' }: { text: string; children: React.ReactNode; align?: 'center' | 'right' }) {
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = () => { timerRef.current = setTimeout(() => setVisible(true), 500); };
   const hide = () => { if (timerRef.current) clearTimeout(timerRef.current); setVisible(false); };
+
+  const posClass = align === 'right'
+    ? 'right-0'
+    : 'left-1/2 -translate-x-1/2';
+
+  const arrowClass = align === 'right'
+    ? 'right-3'
+    : 'left-1/2 -translate-x-1/2';
 
   return (
     <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
@@ -1304,17 +1323,11 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none"
-            style={{
-              zIndex: 9999,
-              background: 'rgba(42,26,14,0.92)',
-              color: '#f3e9dc',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-            }}
+            className={`absolute top-full ${posClass} mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none`}
+            style={{ zIndex: 9999, background: 'rgba(42,26,14,0.92)', color: '#f3e9dc', boxShadow: '0 4px 12px rgba(0,0,0,0.25)' }}
           >
             {text}
-            {/* Arrow pointing up */}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
+            <div className={`absolute bottom-full ${arrowClass} w-0 h-0`}
               style={{ borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '5px solid rgba(42,26,14,0.92)' }} />
           </motion.div>
         )}
@@ -1535,6 +1548,16 @@ export default function SecretChatRoom() {
   const [musicPerfMode, setMusicPerfMode] = useState<boolean>(() => {
     try { return localStorage.getItem('music_perf_mode') === '1'; } catch { return false; }
   });
+  // Perf prompt — แสดงครั้งแรกที่เข้า room ถ้ายังไม่เคยตัดสินใจ
+  const [showPerfPrompt, setShowPerfPrompt] = useState<boolean>(() => {
+    try { return localStorage.getItem('music_perf_mode') === null; } catch { return false; }
+  });
+  const dismissPerfPrompt = (enable: boolean) => {
+    const next = enable;
+    setMusicPerfMode(next);
+    try { localStorage.setItem('music_perf_mode', next ? '1' : '0'); } catch {}
+    setShowPerfPrompt(false);
+  };
 
   // Mobile swipe-from-left-edge to open music panel
   const swipeTouchStartX = useRef<number | null>(null);
@@ -2152,6 +2175,63 @@ export default function SecretChatRoom() {
         />
       )}
 
+      {/* Perf prompt — แสดงครั้งแรกที่เข้า room */}
+      <AnimatePresence>
+        {showPerfPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 20, opacity: 0, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="w-full max-w-sm rounded-3xl p-6 shadow-2xl border"
+              style={{
+                background: 'rgba(250,246,242,0.97)',
+                borderColor: 'rgba(200,149,108,0.25)',
+              }}
+            >
+              {/* Icon */}
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'rgba(200,149,108,0.12)' }}>
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#c8956c" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+              </div>
+              {/* Text */}
+              <p className="text-center font-bold text-[#2a1a0e] text-base mb-1">เว็บกระตุกอยู่ไหม?</p>
+              <p className="text-center text-sm text-[#7c5c3e] leading-relaxed mb-5">
+                เปิดโหมดประหยัดพลังงานช่วยได้นะคะ<br />
+                <span className="text-[11px] text-[#9c7c5e]">ปิด blur effect เพื่อให้ animation ลื่นขึ้น</span>
+              </p>
+              {/* Buttons */}
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => dismissPerfPrompt(true)}
+                  className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(145deg, #e0b080, #c8956c)', boxShadow: '0 4px 16px rgba(200,149,108,0.4)' }}
+                >
+                  ⚡ เปิดโหมดประหยัดพลังงาน
+                </button>
+                <button
+                  onClick={() => dismissPerfPrompt(false)}
+                  className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98]"
+                  style={{ background: 'rgba(239,68,68,0.9)', boxShadow: '0 4px 12px rgba(239,68,68,0.25)' }}
+                >
+                  ไม่ต้องการ
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Join Table overlay — shown on match, dismissed by user click to unlock AudioContext */}
       <AnimatePresence>
         {showJoinOverlay && (
@@ -2331,7 +2411,7 @@ export default function SecretChatRoom() {
             </Tooltip>
 
             {/* Leave — solid red */}
-            <Tooltip text="ออกจากโต๊ะ">
+            <Tooltip text="ออกจากโต๊ะ" align="right">
               <button onClick={leaveTable}
                 ref={leaveRef}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm">
