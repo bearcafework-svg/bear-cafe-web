@@ -1662,6 +1662,27 @@ export default function SecretChatRoom() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [matchStatus, setMatchStatus] = useState<'waiting' | 'matched' | 'ended'>('waiting');
+  const [queueCount, setQueueCount] = useState(0);
+
+  // ── Queue count realtime — แสดงจำนวนคนรอขณะ waiting ──────────────────────
+  useEffect(() => {
+    if (matchStatus !== 'waiting') return;
+    const STALE_MS = 10 * 60 * 1000;
+    const fetchCount = async () => {
+      const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+      const { count } = await (supabase as any)
+        .from('chat_queue')
+        .select('*', { count: 'exact', head: true })
+        .gte('joined_at', cutoff);
+      setQueueCount(count ?? 0);
+    };
+    fetchCount();
+    const ch = supabase
+      .channel('room-queue-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCount)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [matchStatus]);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [bannedWords, setBannedWords] = useState<string[]>([]);
   const [showRating, setShowRating] = useState(false);
@@ -2491,6 +2512,17 @@ export default function SecretChatRoom() {
                 รอสักครู่ กำลังจับคู่ในหัวข้อ{' '}
                 <span className="font-semibold text-[#7c5c3e] dark:text-[#c8956c]">{topicName}</span>
               </p>
+              {/* Queue counter */}
+              <div className="flex justify-center pt-1">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ background: 'rgba(200,149,108,0.12)', color: '#c8956c', border: '1px solid rgba(200,149,108,0.25)' }}>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#c8956c' }} />
+                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#c8956c' }} />
+                  </span>
+                  {queueCount > 0 ? `${queueCount} คนกำลังรออยู่` : 'กำลังโหลด...'}
+                </span>
+              </div>
               {moodConfig.enabled && (
                 <p className="text-xs text-[#c8b09a]">
                   หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง
