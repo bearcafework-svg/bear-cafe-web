@@ -1,6 +1,6 @@
-﻿import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+﻿import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
@@ -195,9 +195,13 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !currentTrack?.src) return;
+    el.preload = 'auto';
     el.src = currentTrack.src;
     el.loop = loopMode === 'one';
-    if (playing) el.play().catch(() => {});
+    if (playing) {
+      const p = el.play();
+      if (p !== undefined) p.catch(() => {});
+    }
   }, [catIdx, trackIdx, library]);
 
   // Sync loop attribute
@@ -238,11 +242,11 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
       el.pause();
       setPlaying(false);
     } else {
-      // Ensure src is set (in case library loaded after mount)
       if (!el.src || el.src === window.location.href) {
         if (currentTrack?.src) el.src = currentTrack.src;
       }
-      el.play().catch(() => {});
+      const p = el.play();
+      if (p !== undefined) p.catch(() => {});
       setPlaying(true);
     }
   }, [playing, currentTrack]);
@@ -270,7 +274,11 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     setTrackIdx(ti);
     setPlaying(true);
     const el = audioRef.current;
-    if (el) { el.src = library[ci].tracks[ti].src; el.play().catch(() => {}); }
+    if (el) {
+      el.src = library[ci].tracks[ti].src;
+      const p = el.play();
+      if (p !== undefined) p.catch(() => {});
+    }
   }, [library]);
 
   const cycleLoop = useCallback(() => {
@@ -292,42 +300,40 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
 }
 
 // ─── Bar Waveform Visualizer ──────────────────────────────────────────────────
-const BAR_COUNT = 28;
+const BAR_COUNT = 18; // reduced from 28 — fewer bars = less GPU work on mobile
 const BAR_SEEDS = Array.from({ length: BAR_COUNT }, (_, i) => ({
-  duration: 0.7 + ((i * 137 + 31) % 9) * 0.11,
-  delay:    ((i * 53  + 17) % 11) * 0.055,
-  maxH:     18 + ((i * 79  + 11) % 24),
+  duration: 0.8 + ((i * 137 + 31) % 9) * 0.1,
+  delay:    ((i * 53  + 17) % 11) * 0.06,
+  maxH:     16 + ((i * 79  + 11) % 20),
   minH:     3  + ((i * 43  +  7) % 5),
 }));
 
-function BarWaveform({ playing }: { playing: boolean }) {
-  return (
-    <div className="flex items-end justify-center gap-[2px] px-2" style={{ height: 48 }}>
-      {BAR_SEEDS.map((s, i) => (
-        <motion.div
-          key={i}
-          className="rounded-full"
-          style={{
-            width: 2.5,
-            background: playing
-              ? `linear-gradient(to top, rgba(200,149,108,0.9), rgba(240,200,160,0.95), rgba(255,230,190,0.7))`
-              : 'rgba(200,149,108,0.2)',
-            originY: 1,
-            boxShadow: playing ? '0 0 4px rgba(200,149,108,0.4)' : 'none',
-          }}
-          animate={playing
-            ? { height: [s.minH, s.maxH, s.minH * 1.4, s.maxH * 0.75, s.minH], opacity: [0.6, 1, 0.75, 1, 0.6] }
-            : { height: 2.5, opacity: 0.2 }
-          }
-          transition={playing
-            ? { duration: s.duration, repeat: Infinity, ease: 'easeInOut', delay: s.delay, repeatType: 'mirror' }
-            : { duration: 0.8, ease: 'easeOut' }
-          }
-        />
-      ))}
-    </div>
-  );
-}
+const BarWaveform = memo(({ playing }: { playing: boolean }) => (
+  <div className="flex items-end justify-center gap-[3px] px-2" style={{ height: 44 }}>
+    {BAR_SEEDS.map((s, i) => (
+      <motion.div
+        key={i}
+        className="rounded-full"
+        initial={{ height: s.maxH, scaleY: 0.15, originY: 1 }}
+        animate={playing
+          ? { scaleY: [s.minH / s.maxH, 1, (s.minH / s.maxH) * 1.3, 0.7, s.minH / s.maxH] }
+          : { scaleY: 0.15 }
+        }
+        transition={playing
+          ? { duration: s.duration, repeat: Infinity, ease: 'easeInOut', delay: s.delay, repeatType: 'mirror' }
+          : { duration: 0.5, ease: 'easeOut' }
+        }
+        style={{
+          height: s.maxH,
+          width: 3,
+          originY: 1,
+          willChange: 'transform',
+          background: playing ? 'linear-gradient(to top, #c8956c, #e8b48a)' : 'rgba(200,149,108,0.2)',
+        }}
+      />
+    ))}
+  </div>
+));
 
 // ─── Volume Slider ────────────────────────────────────────────────────────────
 function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
@@ -342,17 +348,12 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
 
   return (
     <div
-      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl"
-      style={{
-        background: 'rgba(200,149,108,0.07)',
-        border: '1px solid rgba(200,149,108,0.15)',
-      }}
+      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl dark:bg-black/20"
+      style={{ background: 'rgba(200,149,108,0.07)', border: '1px solid rgba(200,149,108,0.15)' }}
     >
-      <motion.button
-        whileHover={{ scale: 1.12 }}
-        whileTap={{ scale: 0.9 }}
+      <button
         onClick={toggleMute}
-        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#c8956c] transition-all"
+        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#c8956c] dark:hover:text-[#e0b48a] transition-colors"
         title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
       >
         {isMuted ? (
@@ -365,51 +366,36 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3.5-3.5M12 18l3.5-3.5M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
           </svg>
         )}
-      </motion.button>
+      </button>
 
       <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
         <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
           <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(200,149,108,0.15)' }}>
-            <motion.div
-              className="h-full rounded-full"
-              style={{
-                width: `${pct}%`,
-                background: 'linear-gradient(to right, #c8956c, #e8b48a, #f5d0a0)',
-                boxShadow: '0 0 8px rgba(200,149,108,0.5)',
-              }}
-              animate={{ width: `${pct}%` }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            {/* Use CSS width directly — no spring animation on layout property */}
+            <div
+              className="h-full rounded-full transition-[width] duration-75"
+              style={{ width: `${pct}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }}
             />
           </div>
         </div>
         <input
-          type="range"
-          min={0} max={100} step={1}
-          value={pct}
+          type="range" min={0} max={100} step={1} value={pct}
           onChange={e => onChange(Number(e.target.value) / 100)}
           className="vol-slider w-full relative z-10"
           style={{ '--fill': `${pct}%`, opacity: 0, cursor: 'pointer', height: 32 } as React.CSSProperties}
         />
         <img
-          src={honeyJarIcon}
-          alt=""
-          draggable={false}
+          src={honeyJarIcon} alt="" draggable={false}
           style={{
-            position: 'absolute',
-            left: `calc(${pct}% - 12px)`,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 24,
-            height: 24,
-            pointerEvents: 'none',
-            filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35)) drop-shadow(0 0 8px rgba(200,149,108,0.4))',
-            userSelect: 'none',
-            zIndex: 20,
+            position: 'absolute', left: `calc(${pct}% - 12px)`, top: '50%',
+            transform: 'translateY(-50%)', width: 24, height: 24,
+            pointerEvents: 'none', userSelect: 'none', zIndex: 20,
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
           }}
         />
       </div>
 
-      <span className="shrink-0 text-[10px] font-mono text-[#9c7c5e]/60 tabular-nums w-6 text-right">
+      <span className="shrink-0 text-[10px] font-mono text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 tabular-nums w-6 text-right">
         {isMuted ? '—' : `${pct}`}
       </span>
     </div>
@@ -418,108 +404,98 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
 
 
 // ─── Vinyl Disc (small, header) ───────────────────────────────────────────────
-function VinylDisc({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) {
-  return (
-    <div className="relative flex items-center justify-center">
-      <motion.div
-        animate={{ rotate: playing ? 360 : 0 }}
-        transition={{ duration: 5, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-20 h-20 sm:w-28 sm:h-28 rounded-full flex items-center justify-center"
-        style={{
-          background: 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008, #2a1a0e, #4a2e1a, #1e1008)',
-          boxShadow: playing
-            ? '0 0 0 3px rgba(200,149,108,0.15), 0 0 28px rgba(200,149,108,0.45), 0 6px 24px rgba(0,0,0,0.55)'
-            : '0 4px 20px rgba(0,0,0,0.45)',
-        }}
-      >
-        {[36, 42, 48].map(r => (
-          <div key={r} className="absolute rounded-full border border-white/[0.05]" style={{ width: r * 2, height: r * 2 }} />
-        ))}
-        <div className="absolute inset-0 rounded-full pointer-events-none" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)' }} />
-        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/35 shadow-inner z-10">
-          {imageUrl ? (
-            <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06] flex items-center justify-center">
-              <Music2 className="w-6 h-6 text-[#c8956c]/55" />
-            </div>
-          )}
-        </div>
-        <div className="absolute w-3.5 h-3.5 rounded-full bg-[#1a0e06] border-2 border-[#c8956c]/35 z-20" style={{ boxShadow: '0 0 6px rgba(200,149,108,0.3)' }} />
-      </motion.div>
-    </div>
-  );
-}
+const VinylDisc = memo(({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) => (
+  <div className="relative flex items-center justify-center">
+    <motion.div
+      animate={{ rotate: playing ? 360 : 0 }}
+      transition={{ duration: 5, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+      className="w-20 h-20 sm:w-28 sm:h-28 rounded-full flex items-center justify-center"
+      style={{
+        willChange: 'transform',
+        background: 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008, #2a1a0e, #4a2e1a, #1e1008)',
+        boxShadow: playing
+          ? '0 0 0 3px rgba(200,149,108,0.15), 0 0 28px rgba(200,149,108,0.45), 0 6px 24px rgba(0,0,0,0.55)'
+          : '0 4px 20px rgba(0,0,0,0.45)',
+      }}
+    >
+      {[36, 42, 48].map(r => (
+        <div key={r} className="absolute rounded-full border border-white/[0.05]" style={{ width: r * 2, height: r * 2 }} />
+      ))}
+      <div className="absolute inset-0 rounded-full pointer-events-none" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)' }} />
+      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/35 shadow-inner z-10">
+        {imageUrl ? (
+          <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06] flex items-center justify-center">
+            <Music2 className="w-6 h-6 text-[#c8956c]/55" />
+          </div>
+        )}
+      </div>
+      <div className="absolute w-3.5 h-3.5 rounded-full bg-[#1a0e06] border-2 border-[#c8956c]/35 z-20" />
+    </motion.div>
+  </div>
+));
 
 // ─── Desktop Trigger Button ───────────────────────────────────────────────────
-function MusicTriggerButton({ playing, onClick }: { playing: boolean; onClick: () => void }) {
-  return (
-    <motion.button
-      onClick={onClick}
-      initial={{ x: -8, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: -8, opacity: 0 }}
-      whileHover={{ x: 3 }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 1 }}
-      className="fixed left-0 flex flex-col items-center justify-center gap-2 py-5 px-2.5 rounded-r-3xl select-none"
+const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onClick: () => void }) => (
+  <motion.button
+    onClick={onClick}
+    initial={{ x: -8, opacity: 0 }}
+    animate={{ x: 0, opacity: 1 }}
+    exit={{ x: -8, opacity: 0 }}
+    whileHover={{ x: 3 }}
+    whileTap={{ scale: 0.95 }}
+    transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.7 }}
+    className="fixed left-0 flex flex-col items-center justify-center gap-2 py-5 px-2.5 rounded-r-3xl select-none"
+    style={{
+      top: 'calc(80px + env(safe-area-inset-top, 0px))',
+      zIndex: 50,
+      willChange: 'transform',
+      background: 'rgba(248,243,237,0.92)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      boxShadow: '4px 0 20px rgba(0,0,0,0.12)',
+      border: '1px solid rgba(200,149,108,0.25)',
+      borderLeft: 'none',
+    }}
+    title="เปิด Music Player"
+  >
+    <motion.div
+      animate={playing ? { rotate: 360 } : { rotate: 0 }}
+      transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+      className="w-8 h-8 rounded-full flex items-center justify-center relative"
       style={{
-        top: 'calc(80px + env(safe-area-inset-top, 0px))',
-        zIndex: 50,
-        background: 'rgba(248,243,237,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: '6px 0 32px rgba(0,0,0,0.14), inset -1px 0 0 rgba(200,149,108,0.25)',
-        border: '1px solid rgba(200,149,108,0.28)',
-        borderLeft: 'none',
+        willChange: 'transform',
+        background: 'conic-gradient(from 0deg, #1a0e06, #3a2410, #1a0e06, #2a1a0e, #3a2410, #1a0e06)',
+        boxShadow: playing ? '0 0 12px rgba(200,149,108,0.5)' : '0 2px 6px rgba(0,0,0,0.3)',
       }}
-      title="เปิด Music Player"
     >
-      {/* Mini vinyl */}
-      <motion.div
-        animate={playing ? { rotate: 360 } : { rotate: 0 }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-8 h-8 rounded-full flex items-center justify-center relative"
-        style={{
-          background: 'conic-gradient(from 0deg, #1a0e06, #3a2410, #1a0e06, #2a1a0e, #3a2410, #1a0e06)',
-          boxShadow: playing
-            ? '0 0 0 2px rgba(200,149,108,0.2), 0 0 14px rgba(200,149,108,0.5)'
-            : '0 2px 8px rgba(0,0,0,0.35)',
-        }}
-      >
-        <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 50%)' }} />
-        <div className="w-3.5 h-3.5 rounded-full overflow-hidden border border-[#c8956c]/40 z-10">
-          <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06]" />
-        </div>
-        <div className="absolute w-2 h-2 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
-      </motion.div>
-
-      {/* Playing bars */}
-      {playing && (
-        <div className="flex flex-col gap-[3px] items-center">
-          {[0, 0.15, 0.3].map((d, i) => (
-            <motion.div
-              key={i}
-              className="w-1 rounded-full bg-[#c8956c]"
-              animate={{ height: ['3px', '8px', '3px'] }}
-              transition={{ duration: 0.55, repeat: Infinity, delay: d, ease: 'easeInOut' }}
-            />
-          ))}
-        </div>
-      )}
-
-      <span
-        className="text-[9px] font-bold text-[#7c5c3e]"
-        style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}
-      >
-        MUSIC
-      </span>
-    </motion.button>
-  );
-}
+      <div className="w-3.5 h-3.5 rounded-full border border-[#c8956c]/40 z-10 bg-gradient-to-br from-[#3a2410] to-[#1a0e06]" />
+      <div className="absolute w-2 h-2 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
+    </motion.div>
+    {playing && (
+      <div className="flex flex-col gap-[3px] items-center">
+        {[0, 0.15, 0.3].map((d, i) => (
+          <motion.div
+            key={i}
+            className="w-1 rounded-full bg-[#c8956c] dark:bg-[#e0b48a]"
+            initial={{ height: 8, scaleY: 0.375, originY: 0.5 }}
+            animate={{ scaleY: [0.375, 1, 0.375] }}
+            transition={{ duration: 0.55, repeat: Infinity, delay: d, ease: 'easeInOut' }}
+            style={{ height: 8, originY: 0.5, willChange: 'transform' }}
+          />
+        ))}
+      </div>
+    )}
+    <span className="text-[9px] font-bold text-[#7c5c3e] dark:text-[#cbb3a0]"
+      style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}>
+      MUSIC
+    </span>
+  </motion.button>
+));
 
 // ─── Music Drawer (Left Slide-in) ────────────────────────────────────────────
-function MusicPanel({
+const MusicPanel = memo(function MusicPanel({
   player, onClose,
 }: {
   player: ReturnType<typeof useMusicPlayer>;
@@ -527,6 +503,12 @@ function MusicPanel({
 }) {
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // useMotionValue for drag — position updates bypass React reconciler entirely
+  const x = useMotionValue(0);
+  // Reduce blur to 4px while dragging — derived from x, no setState needed
+  const blurAmount = useTransform(x, [0, 60], [16, 4]);
+  const backdropBlur = useTransform(blurAmount, v => `blur(${Math.round(v)}px)`);
 
   const allTracks = useMemo(() => {
     const result: Array<{ track: Track; catIdx: number; trackIdx: number; catLabel: string }> = [];
@@ -546,74 +528,93 @@ function MusicPanel({
 
   return (
     <>
-      {/* Grain texture overlay — pointer-events-none, purely decorative */}
+      {/* Grain overlay — desktop only, hidden on mobile to save GPU */}
       <div
-        className="fixed inset-0 pointer-events-none"
+        className="fixed inset-0 pointer-events-none hidden md:block"
         style={{
           zIndex: 997,
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E")`,
-          opacity: 0.6,
+          opacity: 0.5,
         }}
       />
 
-      {/* Drawer panel */}
+      {/* Drawer — useMotionValue drag bypasses React reconciler, transform-only, contained */}
       <motion.div
         key="music-panel"
         initial={{ x: '-100%' }}
         animate={{ x: 0 }}
         exit={{ x: '-100%' }}
-        transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.8 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.7 }}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={{ left: 0, right: 0.25 }}
+        dragElastic={{ left: 0, right: 0.08 }}
         dragMomentum={false}
-        onDragEnd={(_, info) => { if (info.offset.x > 72) onClose(); }}
-        className="fixed top-0 left-0 h-full w-[85vw] md:w-[25vw] md:min-w-[320px] md:max-w-[390px] flex flex-col select-none"
         style={{
+          x,
           zIndex: 999,
-          background: 'rgba(250,246,242,0.92)',
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          boxShadow: '12px 0 56px rgba(0,0,0,0.28), 4px 0 16px rgba(0,0,0,0.12), inset -1px 0 0 rgba(200,149,108,0.18)',
-          borderRight: '1px solid rgba(200,149,108,0.22)',
+          willChange: 'transform',
+          touchAction: 'pan-y',
+          // contain scopes repaints to this element only — prevents full-page invalidation
+          contain: 'layout paint size',
+          backdropFilter: backdropBlur,
+          WebkitBackdropFilter: backdropBlur,
+          background: 'rgba(250,246,242,0.94)',
+          boxShadow: '8px 0 32px rgba(0,0,0,0.2)',
+          borderRight: '1px solid rgba(200,149,108,0.2)',
         }}
+        onDragStart={() => { /* blur handled by useTransform(x) */ }}
+        onDrag={(_, info) => {
+          // Snap to integer pixels — eliminates subpixel rendering jitter
+          const snapped = Math.round(info.offset.x);
+          if (snapped !== Math.round(x.get())) x.set(snapped);
+        }}
+        onDragEnd={(_, info) => {
+          if (info.offset.x > 80 || info.velocity.x > 500) {
+            // Animate out before calling onClose so exit animation plays
+            animate(x, window.innerWidth, {
+              type: 'spring', stiffness: 320, damping: 32, mass: 0.7,
+              onComplete: onClose,
+            });
+          } else {
+            // Snap back to 0
+            animate(x, 0, { type: 'spring', stiffness: 320, damping: 32, mass: 0.7 });
+          }
+        }}
+        className="fixed top-0 left-0 h-full w-[85vw] md:w-[25vw] md:min-w-[320px] md:max-w-[390px] flex flex-col select-none"
         onClick={e => e.stopPropagation()}
       >
-        {/* Layered depth backgrounds */}
-        <div className="absolute inset-0 pointer-events-none z-0" style={{ background: 'radial-gradient(ellipse at 25% 15%, rgba(200,149,108,0.14) 0%, transparent 55%), radial-gradient(ellipse at 85% 85%, rgba(248,220,180,0.12) 0%, transparent 50%), radial-gradient(ellipse at 60% 50%, rgba(255,240,220,0.06) 0%, transparent 60%)' }} />
-        {/* Subtle top border glow */}
-        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none z-0" style={{ background: 'linear-gradient(to right, transparent, rgba(200,149,108,0.4), transparent)' }} />
+        {/* Ambient top glow */}
+        <div className="absolute inset-x-0 top-0 h-32 pointer-events-none z-0 opacity-30"
+          style={{ background: 'radial-gradient(ellipse at 50% 0%, #fff3e0, transparent 70%)' }} />
         <AnimatePresence mode="wait" initial={false}>
           {view === 'player' ? (
             <motion.div
               key="player"
-              initial={{ x: -24, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -24, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 1 }}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -16 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.7 }}
               className="flex flex-col h-full relative z-10"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2">
-                  <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain drop-shadow" />
-                  <span className="text-sm font-bold text-[#7c5c3e]">เพลงคาเฟ่</span>
+                  <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain" />
+                  <span className="text-sm font-bold text-[#7c5c3e] dark:text-[#cbb3a0]">เพลงคาเฟ่</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <motion.button
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={() => setView('library')}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#c8956c] hover:bg-[#c8956c]/10 transition-all"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#c8956c] dark:hover:text-[#e0b48a] hover:bg-[#c8956c]/10 transition-colors"
                     title="คลังเพลง"
                   >
                     <Library className="w-4 h-4" />
                   </motion.button>
                   <motion.button
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:text-[#7c5c3e] hover:bg-[#c8956c]/10 transition-all"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#7c5c3e] dark:hover:text-[#f3e9dc] hover:bg-[#c8956c]/10 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </motion.button>
@@ -631,25 +632,19 @@ function MusicPanel({
                   key={player.currentTrack?.title}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 220, damping: 28 }}
-                  className="font-bold text-[#2a1a0e] text-lg leading-tight truncate"
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+                  transition={{ duration: 0.2 }}
+                  className="font-bold text-[#2a1a0e] dark:text-[#f3e9dc] text-lg leading-tight truncate"
                 >
                   {player.currentTrack?.title ?? '—'}
                 </motion.p>
                 {player.currentTrack?.artist && (
-                  <motion.p
-                    key={player.currentTrack.artist}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-sm text-[#c8956c] truncate font-medium"
-                  >
+                  <p className="text-sm text-[#c8956c] dark:text-[#e0b48a] truncate font-medium">
                     {player.currentTrack.artist}
-                  </motion.p>
+                  </p>
                 )}
                 <div className="flex items-center justify-center gap-2 pt-0.5">
                   <div className="h-px flex-1 max-w-[40px]" style={{ background: 'linear-gradient(to right, transparent, rgba(200,149,108,0.3))' }} />
-                  <p className="text-[10px] text-[#9c7c5e]/60 uppercase tracking-[0.2em] font-medium">{player.currentCat?.label ?? ''}</p>
+                  <p className="text-[10px] text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 uppercase tracking-[0.2em] font-medium">{player.currentCat?.label ?? ''}</p>
                   <div className="h-px flex-1 max-w-[40px]" style={{ background: 'linear-gradient(to left, transparent, rgba(200,149,108,0.3))' }} />
                 </div>
               </div>
@@ -662,39 +657,37 @@ function MusicPanel({
               {/* Controls */}
               <div className="flex items-center justify-center gap-3 mt-4 px-4 shrink-0">
                 <motion.button
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.88 }}
                   onClick={player.cycleLoop}
-                  className={`w-9 h-9 flex items-center justify-center rounded-full transition-all ${
+                  className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
                     player.loopMode !== 'none'
-                      ? 'text-[#c8956c] shadow-sm'
-                      : 'text-[#9c7c5e]/60 hover:text-[#7c5c3e]'
+                      ? 'text-[#c8956c] dark:text-[#e0b48a]'
+                      : 'text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 hover:text-[#7c5c3e] dark:hover:text-[#cbb3a0]'
                   }`}
-                  style={player.loopMode !== 'none' ? { background: 'rgba(200,149,108,0.15)', boxShadow: '0 0 12px rgba(200,149,108,0.25)' } : {}}
+                  style={player.loopMode !== 'none' ? { background: 'rgba(200,149,108,0.15)' } : {}}
                   title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
                 >
                   {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.88 }}
                   onClick={player.skipPrev}
-                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] hover:bg-[#c8956c]/10 transition-all"
+                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
                 >
                   <SkipBack className="w-5 h-5" />
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.07 }}
-                  whileTap={{ scale: 0.93 }}
+                  whileTap={{ scale: 0.92 }}
                   onClick={player.toggle}
-                  className="w-[68px] h-[68px] rounded-full text-white flex items-center justify-center transition-all"
+                  className="w-[68px] h-[68px] rounded-full text-white flex items-center justify-center"
                   style={{
+                    willChange: 'transform',
                     background: 'linear-gradient(145deg, #e0b080, #c8956c, #b07d58)',
                     boxShadow: player.playing
-                      ? '0 6px 24px rgba(200,149,108,0.55), 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.2)'
-                      : '0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.15)',
+                      ? '0 4px 20px rgba(200,149,108,0.5), 0 2px 6px rgba(0,0,0,0.15)'
+                      : '0 4px 14px rgba(0,0,0,0.2)',
                   }}
                 >
                   {player.playing ? (
@@ -710,10 +703,9 @@ function MusicPanel({
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.88 }}
                   onClick={player.skipNext}
-                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] hover:bg-[#c8956c]/10 transition-all"
+                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
                 >
                   <SkipForward className="w-5 h-5" />
                 </motion.button>
@@ -730,37 +722,35 @@ function MusicPanel({
               <div className="flex-1 overflow-y-auto min-h-0 mt-4 border-t" style={{ borderColor: 'rgba(200,149,108,0.15)' }}>
                 <div className="px-5 pt-3 pb-2 flex items-center gap-2">
                   <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
                     {player.currentCat?.label}
                   </p>
                 </div>
                 {player.currentCat?.tracks.map((track, ti) => {
                   const isActive = ti === player.trackIdx;
                   return (
-                    <motion.button
+                    <button
                       key={ti}
-                      whileHover={{ x: 4 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       onClick={() => player.selectTrack(player.catIdx, ti)}
-                      className={`w-full text-left px-5 py-2.5 flex items-center gap-3 transition-colors ${
-                        isActive
-                          ? 'bg-gradient-to-r from-[#c8956c]/18 to-transparent'
-                          : 'hover:bg-[#c8956c]/6'
+                      className={`w-full text-left px-5 py-2.5 flex items-center gap-3 transition-colors active:bg-[#c8956c]/10 ${
+                        isActive ? 'bg-[#c8956c]/10 dark:bg-[#c8956c]/8' : 'hover:bg-[#c8956c]/6'
                       }`}
                     >
                       <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center transition-all ${
-                        isActive ? 'ring-2 ring-[#c8956c]/55 shadow-sm' : 'bg-[#e8d9c8]/50'
+                        isActive ? 'ring-2 ring-[#c8956c]/55' : 'bg-[#e8d9c8]/50 dark:bg-white/10'
                       }`}>
                         {track.image_url ? (
                           <img src={track.image_url} alt="" className="w-full h-full object-cover" />
                         ) : isActive && player.playing ? (
-                          <motion.div className="flex gap-[2px] items-end h-4 bg-[#c8956c]/15 w-full justify-center">
+                          <div className="flex gap-[2px] items-end h-4 w-full justify-center">
                             {[0, 0.1, 0.2].map((d, i) => (
-                              <motion.div key={i} className="w-[3px] bg-[#c8956c] rounded-full"
-                                animate={{ height: ['3px', '10px', '3px'] }}
+                              <motion.div key={i} className="w-[3px] bg-[#c8956c] dark:bg-[#e0b48a] rounded-full"
+                                animate={{ scaleY: [0.3, 1, 0.3] }}
+                                initial={{ height: 10, scaleY: 0.3, originY: 1 }}
+                                style={{ height: 10, originY: 1, willChange: 'transform' }}
                                 transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
                             ))}
-                          </motion.div>
+                          </div>
                         ) : (
                           <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-[#c8956c]' : 'text-[#9c7c5e]/50'}`} fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z" />
@@ -768,21 +758,17 @@ function MusicPanel({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs truncate ${isActive ? 'font-semibold text-[#2a1a0e]' : 'text-[#7c5c3e]'}`}>
+                        <p className={`text-xs truncate ${isActive ? 'font-semibold text-[#2a1a0e] dark:text-[#f3e9dc]' : 'text-[#7c5c3e] dark:text-[#cbb3a0]'}`}>
                           {track.title}
                         </p>
                         {track.artist && (
-                          <p className="text-[10px] text-[#c8956c]/65 truncate">{track.artist}</p>
+                          <p className="text-[10px] text-[#c8956c]/65 dark:text-[#e0b48a]/55 truncate">{track.artist}</p>
                         )}
                       </div>
                       {isActive && (
-                        <motion.div
-                          layoutId="activeTrackDot"
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: 'linear-gradient(135deg, #c8956c, #e8b48a)', boxShadow: '0 0 6px rgba(200,149,108,0.5)' }}
-                        />
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#c8956c] dark:bg-[#e0b48a]" />
                       )}
-                    </motion.button>
+                    </button>
                   );
                 })}
               </div>
@@ -794,55 +780,47 @@ function MusicPanel({
           ) : (
             <motion.div
               key="library"
-              initial={{ x: 28, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 28, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 1 }}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 16 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.7 }}
               className="flex flex-col h-full relative z-10"
             >
               {/* Library header */}
               <div className="flex items-center gap-2 px-5 pt-5 pb-3 shrink-0">
                 <motion.button
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.94 }}
+                  whileTap={{ scale: 0.92 }}
                   onClick={() => { setView('player'); setSearchQuery(''); }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:bg-[#c8956c]/10 transition-all"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </motion.button>
                 <div className="flex items-center gap-2 flex-1">
-                  <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain drop-shadow" />
-                  <span className="text-sm font-bold text-[#7c5c3e]">คลังเพลง</span>
+                  <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" />
+                  <span className="text-sm font-bold text-[#7c5c3e] dark:text-[#cbb3a0]">คลังเพลง</span>
                 </div>
                 <motion.button
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.94 }}
+                  whileTap={{ scale: 0.92 }}
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] hover:bg-[#c8956c]/10 transition-all"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </motion.button>
               </div>
 
-              {/* Search bar — pill style */}
+              {/* Search bar */}
               <div className="px-5 pb-3 shrink-0">
-                <div
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full"
-                  style={{
-                    background: 'rgba(200,149,108,0.1)',
-                    border: '1px solid rgba(200,149,108,0.25)',
-                    backdropFilter: 'blur(8px)',
-                  }}
-                >
-                  <Search className="w-3.5 h-3.5 text-[#9c7c5e] shrink-0" />
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-full"
+                  style={{ background: 'rgba(200,149,108,0.1)', border: '1px solid rgba(200,149,108,0.22)' }}>
+                  <Search className="w-3.5 h-3.5 text-[#9c7c5e] dark:text-[#cbb3a0] shrink-0" />
                   <input
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="ค้นหาเพลง, ศิลปิน..."
-                    className="flex-1 bg-transparent text-xs text-[#3a2410] placeholder:text-[#9c7c5e]/60 outline-none"
+                    className="flex-1 bg-transparent text-xs text-[#3a2410] dark:text-[#f3e9dc] placeholder:text-[#9c7c5e]/60 dark:placeholder:text-[#cbb3a0]/50 outline-none"
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
+                    <button onClick={() => setSearchQuery('')} className="text-[#9c7c5e] dark:text-[#cbb3a0] transition-colors">
                       <X className="w-3 h-3" />
                     </button>
                   )}
@@ -852,38 +830,35 @@ function MusicPanel({
               <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-24 space-y-6">
                 {searchQuery ? (
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50 mb-3">
                       ผลการค้นหา ({filteredAll.length})
                     </p>
                     {filteredAll.length === 0 ? (
-                      <p className="text-xs text-[#9c7c5e] text-center py-8">ไม่พบเพลง</p>
+                      <p className="text-xs text-[#9c7c5e] dark:text-[#cbb3a0] text-center py-8">ไม่พบเพลง</p>
                     ) : (
                       <div className="space-y-1">
                         {filteredAll.map(({ track, catIdx, trackIdx: ti, catLabel }) => {
                           const isActive = catIdx === player.catIdx && ti === player.trackIdx;
                           return (
-                            <motion.button
+                            <button
                               key={`${catIdx}-${ti}`}
-                              whileHover={{ x: 3 }}
                               onClick={() => { player.selectTrack(catIdx, ti); setView('player'); setSearchQuery(''); }}
-                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-all ${
-                                isActive
-                                  ? 'bg-gradient-to-r from-[#c8956c]/20 to-[#c8956c]/5'
-                                  : 'hover:bg-[#c8956c]/8'
+                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:bg-[#c8956c]/15 ${
+                                isActive ? 'bg-[#c8956c]/15 dark:bg-[#c8956c]/10' : 'hover:bg-[#c8956c]/8'
                               }`}
                             >
                               <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${
-                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60'
+                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60 dark:bg-white/10'
                               }`}>
                                 {track.image_url
                                   ? <img src={track.image_url} alt="" className="w-full h-full object-cover" />
                                   : <Music2 className="w-4 h-4 text-[#c8956c]/60" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c]' : 'text-[#3a2410]'}`}>{track.title}</p>
-                                <p className="text-[10px] text-[#9c7c5e]/70 truncate">{track.artist ?? catLabel}</p>
+                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c] dark:text-[#e0b48a]' : 'text-[#3a2410] dark:text-[#f3e9dc]'}`}>{track.title}</p>
+                                <p className="text-[10px] text-[#9c7c5e]/70 dark:text-[#cbb3a0]/55 truncate">{track.artist ?? catLabel}</p>
                               </div>
-                            </motion.button>
+                            </button>
                           );
                         })}
                       </div>
@@ -895,7 +870,7 @@ function MusicPanel({
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
                           เพลงทั้งหมด ({allTracks.length})
                         </p>
                       </div>
@@ -903,37 +878,36 @@ function MusicPanel({
                         {allTracks.map(({ track, catIdx, trackIdx: ti, catLabel }) => {
                           const isActive = catIdx === player.catIdx && ti === player.trackIdx;
                           return (
-                            <motion.button
+                            <button
                               key={`${catIdx}-${ti}`}
-                              whileHover={{ x: 3 }}
                               onClick={() => { player.selectTrack(catIdx, ti); setView('player'); }}
-                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-all ${
-                                isActive
-                                  ? 'bg-gradient-to-r from-[#c8956c]/20 to-[#c8956c]/5'
-                                  : 'hover:bg-[#c8956c]/8'
+                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:bg-[#c8956c]/15 ${
+                                isActive ? 'bg-[#c8956c]/12 dark:bg-[#c8956c]/8' : 'hover:bg-[#c8956c]/8'
                               }`}
                             >
                               <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${
-                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60'
+                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60 dark:bg-white/10'
                               }`}>
                                 {track.image_url ? <img src={track.image_url} alt="" className="w-full h-full object-cover" /> : (
                                   isActive && player.playing ? (
-                                    <motion.div className="flex gap-[2px] items-end h-4 w-full justify-center">
+                                    <div className="flex gap-[2px] items-end h-4 w-full justify-center">
                                       {[0, 0.1, 0.2].map((d, i) => (
-                                        <motion.div key={i} className="w-[3px] bg-[#c8956c] rounded-full"
-                                          animate={{ height: ['3px', '12px', '3px'] }}
+                                        <motion.div key={i} className="w-[3px] bg-[#c8956c] dark:bg-[#e0b48a] rounded-full"
+                                          animate={{ scaleY: [0.25, 1, 0.25] }}
+                                          initial={{ height: 12, scaleY: 0.25, originY: 1 }}
+                                          style={{ height: 12, originY: 1, willChange: 'transform' }}
                                           transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
                                       ))}
-                                    </motion.div>
+                                    </div>
                                   ) : <Music2 className="w-4 h-4 text-[#c8956c]/60" />
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c]' : 'text-[#3a2410]'}`}>{track.title}</p>
-                                <p className="text-[10px] text-[#9c7c5e]/70 truncate">{track.artist ?? catLabel}</p>
+                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c] dark:text-[#e0b48a]' : 'text-[#3a2410] dark:text-[#f3e9dc]'}`}>{track.title}</p>
+                                <p className="text-[10px] text-[#9c7c5e]/70 dark:text-[#cbb3a0]/55 truncate">{track.artist ?? catLabel}</p>
                               </div>
-                              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[#c8956c] shrink-0" />}
-                            </motion.button>
+                              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[#c8956c] dark:bg-[#e0b48a] shrink-0" />}
+                            </button>
                           );
                         })}
                       </div>
@@ -943,7 +917,7 @@ function MusicPanel({
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
                           หมวดหมู่
                         </p>
                       </div>
@@ -1026,40 +1000,34 @@ function MusicPanel({
               <div
                 className="absolute bottom-0 left-0 right-0 px-4 py-3 z-20"
                 style={{
-                  background: 'rgba(250,246,242,0.92)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  borderTop: '1px solid rgba(200,149,108,0.18)',
+                  background: 'rgba(250,246,242,0.95)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  borderTop: '1px solid rgba(200,149,108,0.15)',
                 }}
               >
-                <motion.button
-                  whileHover={{ scale: 1.015 }}
-                  whileTap={{ scale: 0.985 }}
+                <button
                   onClick={() => setView('player')}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl"
-                  style={{
-                    background: 'rgba(200,149,108,0.1)',
-                    border: '1px solid rgba(200,149,108,0.22)',
-                    boxShadow: '0 2px 12px rgba(200,149,108,0.12)',
-                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl active:bg-[#c8956c]/15 transition-colors"
+                  style={{ background: 'rgba(200,149,108,0.1)', border: '1px solid rgba(200,149,108,0.2)' }}
                 >
-                  <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center" style={{ background: 'rgba(232,217,200,0.5)' }}>
+                  <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-[#e8d9c8]/50 dark:bg-white/10">
                     {player.currentTrack?.image_url
                       ? <img src={player.currentTrack.image_url} alt="" className="w-full h-full object-cover" />
                       : <Music2 className="w-4 h-4 text-[#c8956c]/55" />}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-semibold text-[#2a1a0e] truncate">{player.currentTrack?.title ?? '—'}</p>
-                    <p className="text-[10px] text-[#9c7c5e]/65 truncate">{player.currentTrack?.artist ?? player.currentCat?.label ?? ''}</p>
+                    <p className="text-xs font-semibold text-[#2a1a0e] dark:text-[#f3e9dc] truncate">{player.currentTrack?.title ?? '—'}</p>
+                    <p className="text-[10px] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/55 truncate">{player.currentTrack?.artist ?? player.currentCat?.label ?? ''}</p>
                   </div>
                   <motion.button
-                    whileHover={{ scale: 1.12 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={e => { e.stopPropagation(); player.toggle(); }}
-                    className="w-9 h-9 rounded-full text-white flex items-center justify-center shrink-0 transition-all"
+                    className="w-9 h-9 rounded-full text-white flex items-center justify-center shrink-0"
                     style={{
+                      willChange: 'transform',
                       background: 'linear-gradient(145deg, #e0b080, #c8956c)',
-                      boxShadow: '0 2px 10px rgba(200,149,108,0.45)',
+                      boxShadow: '0 2px 8px rgba(200,149,108,0.4)',
                     }}
                   >
                     {player.playing ? (
@@ -1073,7 +1041,7 @@ function MusicPanel({
                       </svg>
                     )}
                   </motion.button>
-                </motion.button>
+                </button>
               </div>
             </motion.div>
           )}
@@ -1081,70 +1049,43 @@ function MusicPanel({
       </motion.div>
     </>
   );
-}
+});
 
 // ─── Large Vinyl Disc (hero, drawer player view) ─────────────────────────────
-function VinylDiscLarge({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) {
-  return (
-    <div className="relative flex items-center justify-center">
-      {/* Outer glow ring — pulses when playing */}
-      {playing && (
-        <motion.div
-          className="absolute rounded-full pointer-events-none"
-          style={{ width: 240, height: 240, background: 'radial-gradient(circle, rgba(200,149,108,0.18) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.12, 1], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      )}
-      <motion.div
-        animate={{ rotate: playing ? 360 : 0 }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-52 h-52 sm:w-60 sm:h-60 rounded-full flex items-center justify-center relative"
-        style={{
-          background: 'conic-gradient(from 0deg, #120a04, #2a1a0e, #120a04, #1e1208, #3a2410, #1e1208, #120a04)',
-          boxShadow: playing
-            ? '0 0 0 4px rgba(200,149,108,0.1), 0 0 0 8px rgba(200,149,108,0.06), 0 0 50px rgba(200,149,108,0.35), 0 16px 48px rgba(0,0,0,0.55)'
-            : '0 10px 40px rgba(0,0,0,0.5)',
-        }}
-      >
-        {/* Groove rings */}
-        {[48, 58, 68, 78, 88, 98].map(r => (
-          <div key={r} className="absolute rounded-full border border-white/[0.035]" style={{ width: r * 2, height: r * 2 }} />
-        ))}
-        {/* Sheen highlight */}
-        <div
-          className="absolute inset-0 rounded-full pointer-events-none"
-          style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 30%, transparent 55%)' }}
-        />
-        {/* Bottom reflection */}
-        <div
-          className="absolute inset-0 rounded-full pointer-events-none"
-          style={{ background: 'linear-gradient(315deg, rgba(200,149,108,0.06) 0%, transparent 40%)' }}
-        />
-        {/* Album art center */}
-        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[#c8956c]/25 z-10"
-          style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,149,108,0.1)' }}>
-          {imageUrl ? (
-            <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#120a04] flex items-center justify-center">
-              <Music2 className="w-10 h-10 text-[#c8956c]/45" />
-            </div>
-          )}
-        </div>
-        {/* Center spindle */}
-        <div
-          className="absolute w-5 h-5 rounded-full z-20"
-          style={{
-            background: 'radial-gradient(circle at 35% 35%, #3a2410, #120a04)',
-            border: '2px solid rgba(200,149,108,0.35)',
-            boxShadow: '0 0 8px rgba(200,149,108,0.25)',
-          }}
-        />
-      </motion.div>
-    </div>
-  );
-}
+const VinylDiscLarge = memo(({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) => (
+  <div className="relative flex items-center justify-center">
+    <motion.div
+      animate={{ rotate: playing ? 360 : 0 }}
+      transition={{ duration: 7, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+      className="w-52 h-52 sm:w-60 sm:h-60 rounded-full flex items-center justify-center relative"
+      style={{
+        willChange: 'transform',
+        background: 'conic-gradient(from 0deg, #120a04, #2a1a0e, #120a04, #1e1208, #3a2410, #1e1208, #120a04)',
+        boxShadow: playing
+          ? '0 0 0 4px rgba(200,149,108,0.1), 0 0 40px rgba(200,149,108,0.3), 0 16px 48px rgba(0,0,0,0.55)'
+          : '0 10px 40px rgba(0,0,0,0.5)',
+      }}
+    >
+      {[48, 58, 68, 78, 88, 98].map(r => (
+        <div key={r} className="absolute rounded-full border border-white/[0.035]" style={{ width: r * 2, height: r * 2 }} />
+      ))}
+      <div className="absolute inset-0 rounded-full pointer-events-none"
+        style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 30%, transparent 55%)' }} />
+      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[#c8956c]/25 z-10"
+        style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)' }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#120a04] flex items-center justify-center">
+            <Music2 className="w-10 h-10 text-[#c8956c]/45" />
+          </div>
+        )}
+      </div>
+      <div className="absolute w-5 h-5 rounded-full z-20"
+        style={{ background: 'radial-gradient(circle at 35% 35%, #3a2410, #120a04)', border: '2px solid rgba(200,149,108,0.35)' }} />
+    </motion.div>
+  </div>
+));
 
 async function loadBannedWords(): Promise<string[]> {
   const { data } = await supabase.from('banned_words').select('word');
@@ -1513,6 +1454,21 @@ export default function SecretChatRoom() {
       document.removeEventListener('touchmove', onTouchMove);
     };
   }, []);
+
+  // Lock body scroll when panel is open (prevents scroll bleed on iOS)
+  useEffect(() => {
+    if (showMusicPanel) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [showMusicPanel]);
 
   const { topicId, topicName, alias, avatar, role } = (location.state as any) ?? {};
 
