@@ -6,28 +6,39 @@ import { motion } from 'framer-motion';
 export function SecretCafeCTA() {
   const navigate = useNavigate();
   const [activeCount, setActiveCount] = useState<number | null>(null);
+  const [queueCount, setQueueCount] = useState<number>(0);
 
-  // Fetch live count of active chat sessions (each session = 2 users chatting)
   useEffect(() => {
     let mounted = true;
+    const STALE_MS = 10 * 60 * 1000;
 
-    const fetchCount = async () => {
-      const { count } = await (supabase as any)
-        .from('chat_sessions')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active');
-      if (mounted) setActiveCount((count ?? 0) * 2);
+    const fetchCounts = async () => {
+      const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+      const [sessRes, queueRes] = await Promise.all([
+        (supabase as any)
+          .from('chat_sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'active'),
+        (supabase as any)
+          .from('chat_queue')
+          .select('*', { count: 'exact', head: true })
+          .gte('joined_at', cutoff),
+      ]);
+      if (mounted) {
+        setActiveCount((sessRes.count ?? 0) * 2);
+        setQueueCount(queueRes.count ?? 0);
+      }
     };
 
-    fetchCount();
+    fetchCounts();
 
-    // Realtime: refresh when sessions change
     const ch = supabase
       .channel('secret-cafe-cta')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, fetchCount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, fetchCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCounts)
       .subscribe();
 
-    const interval = setInterval(fetchCount, 30_000);
+    const interval = setInterval(fetchCounts, 30_000);
 
     return () => {
       mounted = false;
@@ -85,19 +96,32 @@ export function SecretCafeCTA() {
           </motion.button>
 
           {/* Live status */}
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            <span className="text-sm text-orange-100/80">
-              {activeCount === null
-                ? 'กำลังโหลด...'
-                : activeCount === 0
-                ? 'ยังไม่มีคนแชทอยู่ — เป็นคนแรกเลย!'
-                : `คนกำลังแชทอยู่ ${activeCount} คน`
-              }
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-sm text-orange-100/80">
+                {activeCount === null
+                  ? 'กำลังโหลด...'
+                  : activeCount === 0
+                  ? 'ยังไม่มีคนแชทอยู่ — เป็นคนแรกเลย!'
+                  : `กำลังแชทอยู่ ${activeCount} คน`
+                }
+              </span>
+            </div>
+            {queueCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-400" />
+                </span>
+                <span className="text-sm text-orange-100/80">
+                  {queueCount} คนกำลังรอสนทนา
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
