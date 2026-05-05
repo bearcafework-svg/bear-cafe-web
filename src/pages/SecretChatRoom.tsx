@@ -86,44 +86,40 @@ function matchScore(myTopicId: string, myRole: string, candidate: any, moodConfi
 }
 
 function useRainAmbient() {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const srcRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [on, setOn] = useState(false);
+  const [volume, setVolumeState] = useState(0.5);
 
-  const start = useCallback(() => {
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
-    if (srcRef.current) return;
-    const ctx = ctxRef.current;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    const f = ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.value = 1200;
-    f.Q.value = 0.3;
-    const g = ctx.createGain();
-    g.gain.value = 0.06;
-    src.connect(f);
-    f.connect(g);
-    g.connect(ctx.destination);
-    src.start();
-    srcRef.current = src;
-  }, []);
-
-  const stop = useCallback(() => {
-    try { srcRef.current?.stop(); } catch {}
-    srcRef.current = null;
+  // สร้าง audio element ครั้งเดียว
+  useEffect(() => {
+    const el = new Audio('/RainSounds.mp3');
+    el.loop = true;
+    el.volume = 0.5;
+    el.preload = 'auto';
+    audioRef.current = el;
+    return () => { el.pause(); el.src = ''; };
   }, []);
 
   const toggle = useCallback(() => {
-    if (on) { stop(); setOn(false); } else { start(); setOn(true); }
-  }, [on, start, stop]);
+    const el = audioRef.current;
+    if (!el) return;
+    if (on) {
+      el.pause();
+      setOn(false);
+    } else {
+      const p = el.play();
+      if (p !== undefined) p.catch(() => {});
+      setOn(true);
+    }
+  }, [on]);
 
-  useEffect(() => () => stop(), [stop]);
-  return { on, toggle };
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolumeState(clamped);
+    if (audioRef.current) audioRef.current.volume = clamped;
+  }, []);
+
+  return { on, toggle, volume, setVolume };
 }
 
 // ─── Music Player ─────────────────────────────────────────────────────────────
@@ -502,12 +498,16 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
 
 // ─── Music Drawer (Left Slide-in) ────────────────────────────────────────────
 const MusicPanel = memo(function MusicPanel({
-  player, onClose, perfMode, onTogglePerfMode,
+  player, onClose, perfMode, onTogglePerfMode, rainOn, onToggleRain, rainVolume, onRainVolume,
 }: {
   player: ReturnType<typeof useMusicPlayer>;
   onClose: () => void;
   perfMode: boolean;
   onTogglePerfMode: () => void;
+  rainOn: boolean;
+  onToggleRain: () => void;
+  rainVolume: number;
+  onRainVolume: (v: number) => void;
 }) {
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
@@ -755,8 +755,66 @@ const MusicPanel = memo(function MusicPanel({
                   <SkipForward className="w-5 h-5" />
                 </motion.button>
 
-                <div className="w-9 h-9" />
+                {/* Rain toggle button — แทนที่ spacer */}
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  onClick={onToggleRain}
+                  className="w-9 h-9 flex items-center justify-center rounded-full transition-colors text-lg"
+                  style={{
+                    background: rainOn ? 'rgba(96,165,250,0.18)' : 'transparent',
+                    color: rainOn ? '#60a5fa' : textMuted,
+                    outline: rainOn ? '1.5px solid rgba(96,165,250,0.4)' : 'none',
+                  }}
+                  title={rainOn ? 'ปิดเสียงฝน' : 'เปิดเสียงฝน'}
+                >
+                  🌧
+                </motion.button>
               </div>
+
+              {/* Rain volume slider — โผล่เมื่อเปิดเสียงฝน */}
+              <AnimatePresence>
+                {rainOn && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="px-4 mt-2 shrink-0 overflow-hidden"
+                  >
+                    <div
+                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl"
+                      style={{ background: dark ? 'rgba(96,165,250,0.08)' : 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)' }}
+                    >
+                      <span className="text-base shrink-0">🌧</span>
+                      <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
+                        <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
+                          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(96,165,250,0.15)' }}>
+                            <div className="h-full rounded-full"
+                              style={{ width: `${rainVolume * 100}%`, background: 'linear-gradient(to right, #60a5fa, #93c5fd)' }} />
+                          </div>
+                        </div>
+                        <input
+                          type="range" min={0} max={100} step={0.5}
+                          value={rainVolume * 100}
+                          onChange={e => onRainVolume(Number(e.target.value) / 100)}
+                          className="w-full absolute inset-0"
+                          style={{ opacity: 0.001, cursor: 'pointer', height: '100%', margin: 0, padding: 0, touchAction: 'none' }}
+                        />
+                        {/* Emoji thumb */}
+                        <span
+                          className="absolute text-base pointer-events-none select-none"
+                          style={{ left: `calc(${rainVolume * 100}% - 10px)`, top: '50%', transform: 'translateY(-50%)', zIndex: 20, lineHeight: 1 }}
+                        >
+                          🌧
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: dark ? 'rgba(147,197,253,0.7)' : 'rgba(96,165,250,0.8)' }}>
+                        {Math.round(rainVolume * 100)}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Volume */}
               <div className="px-4 mt-3 shrink-0">
@@ -1539,7 +1597,7 @@ export default function SecretChatRoom() {
   const location = useLocation();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { on: rainOn, toggle: toggleRain } = useRainAmbient();
+  const { on: rainOn, toggle: toggleRain, volume: rainVolume, setVolume: setRainVolume } = useRainAmbient();
 
   const bgmRef = useRef<HTMLAudioElement>(null);
   const player = useMusicPlayer(bgmRef);
@@ -2154,7 +2212,7 @@ export default function SecretChatRoom() {
               onClick={() => setShowMusicPanel(false)}
             />
             {/* Panel — z-[999] */}
-            <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} perfMode={musicPerfMode} onTogglePerfMode={() => setMusicPerfMode(v => { const next = !v; try { localStorage.setItem('music_perf_mode', next ? '1' : '0'); } catch {} return next; })} />
+            <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} perfMode={musicPerfMode} onTogglePerfMode={() => setMusicPerfMode(v => { const next = !v; try { localStorage.setItem('music_perf_mode', next ? '1' : '0'); } catch {} return next; })} rainOn={rainOn} onToggleRain={toggleRain} rainVolume={rainVolume} onRainVolume={setRainVolume} />
           </>
         )}
       </AnimatePresence>
@@ -2387,14 +2445,6 @@ export default function SecretChatRoom() {
                 {countdownDisplay}
               </div>
             )}
-
-            <Tooltip text="เสียงฝน">
-              <button onClick={toggleRain}
-                ref={rainRef}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
-                <CloudRain className="w-4 h-4" />
-              </button>
-            </Tooltip>
 
             {/* Theme toggle */}
             <Tooltip text={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
