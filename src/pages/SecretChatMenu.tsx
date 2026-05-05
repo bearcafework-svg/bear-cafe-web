@@ -85,6 +85,7 @@ export default function SecretChatMenu() {
   const [profiles, setProfiles] = useState<ChatProfile[]>([]);
   const [dbRoles, setDbRoles] = useState<DBRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [queueCount, setQueueCount] = useState(0); // จำนวนคนรอแบบ realtime
 
   const [step, setStep] = useState<'category' | 'role'>('category');
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory | null>(null);
@@ -110,6 +111,30 @@ export default function SecretChatMenu() {
       setDbRoles(rolesRes.data ?? []);
       setLoading(false);
     });
+  }, []);
+
+  // ── Queue count realtime ──────────────────────────────────────────────────
+  useEffect(() => {
+    const STALE_MS = 10 * 60 * 1000; // 10 นาที
+
+    const fetchCount = async () => {
+      const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+      const { count } = await (supabase as any)
+        .from('chat_queue')
+        .select('*', { count: 'exact', head: true })
+        .gte('joined_at', cutoff);
+      setQueueCount(count ?? 0);
+    };
+
+    fetchCount();
+
+    // Subscribe realtime — อัปเดตทุกครั้งที่มีคนเข้า/ออก queue
+    const ch = supabase
+      .channel('queue-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCount)
+      .subscribe();
+
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   useEffect(() => {
@@ -220,6 +245,19 @@ export default function SecretChatMenu() {
                   <p className="text-sm text-[#9c7c5e] mt-1.5 leading-relaxed max-w-sm mx-auto">
                     พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน คุยได้อย่างสบายใจในแบบของคุณ
                   </p>
+                  {/* Queue counter */}
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                      style={{ background: 'rgba(200,149,108,0.12)', color: '#c8956c', border: '1px solid rgba(200,149,108,0.25)' }}>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#c8956c' }} />
+                        <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#c8956c' }} />
+                      </span>
+                      {queueCount > 0
+                        ? `${queueCount} คนกำลังรอสนทนา`
+                        : 'ยังไม่มีคนรออยู่'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

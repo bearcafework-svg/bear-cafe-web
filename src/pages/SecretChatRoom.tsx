@@ -1910,6 +1910,7 @@ export default function SecretChatRoom() {
         .from('chat_queue')
         .select('*')
         .neq('user_id', user.id)
+        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // ป้องกันผี: ข้ามคนที่รอนานเกิน 10 นาที
         .order('joined_at', { ascending: true })
         .limit(20);
 
