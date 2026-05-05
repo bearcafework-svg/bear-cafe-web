@@ -1300,21 +1300,22 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
       <AnimatePresence>
         {visible && (
           <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            initial={{ opacity: 0, y: -4, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            exit={{ opacity: 0, y: -4, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none z-[80]"
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none"
             style={{
+              zIndex: 9999,
               background: 'rgba(42,26,14,0.92)',
               color: '#f3e9dc',
               boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
             }}
           >
             {text}
-            {/* Arrow */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-              style={{ borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(42,26,14,0.92)' }} />
+            {/* Arrow pointing up */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
+              style={{ borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '5px solid rgba(42,26,14,0.92)' }} />
           </motion.div>
         )}
       </AnimatePresence>

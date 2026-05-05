@@ -56,8 +56,8 @@ export function useNotifications(options: NotificationOptions = {}): Notificatio
 
     try {
       const notification = new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
+        icon: '/logo.png',
+        badge: '/logo.png',
         ...options,
       });
 
