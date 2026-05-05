@@ -1769,9 +1769,9 @@ export default function SecretChatRoom() {
         });
     }
 
-    // ── 4. Insert bot safety welcome message for both users ──────────────────
+    // ── 4. Insert bot safety welcome message — user_a only (ป้องกันส่ง 2 ครั้ง) ──
     // sender_id = null → system message (no FK violation)
-    if (session?.id) {
+    if (session?.id && session.user_a_id === user?.id) {
       const welcomeText = [
         '⚠️ **คำเตือนก่อนเริ่มแชท**',
         '',
@@ -1784,7 +1784,7 @@ export default function SecretChatRoom() {
 
       (supabase as any).from('chat_messages').insert({
         session_id: session.id,
-        sender_id:  null,          // null = system/bot, no FK violation
+        sender_id:  null,
         content:    welcomeText,
         is_system:  true,
       }).then(({ error }: any) => {
