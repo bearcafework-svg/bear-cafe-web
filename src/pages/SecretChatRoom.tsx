@@ -437,7 +437,10 @@ const VinylDisc = memo(({ imageUrl, playing }: { imageUrl?: string | null; playi
 ));
 
 // ─── Desktop Trigger Button ───────────────────────────────────────────────────
-const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onClick: () => void }) => (
+const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onClick: () => void }) => {
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+  return (
   <motion.button
     onClick={onClick}
     initial={{ x: -8, opacity: 0 }}
@@ -451,10 +454,10 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
       top: 'calc(80px + env(safe-area-inset-top, 0px))',
       zIndex: 50,
       willChange: 'transform',
-      background: 'rgba(248,243,237,0.92)',
+      background: dark ? 'rgba(26,18,13,0.92)' : 'rgba(248,243,237,0.92)',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
-      boxShadow: '4px 0 20px rgba(0,0,0,0.12)',
+      boxShadow: dark ? '4px 0 20px rgba(0,0,0,0.4)' : '4px 0 20px rgba(0,0,0,0.12)',
       border: '1px solid rgba(200,149,108,0.25)',
       borderLeft: 'none',
     }}
@@ -478,31 +481,53 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
         {[0, 0.15, 0.3].map((d, i) => (
           <motion.div
             key={i}
-            className="w-1 rounded-full bg-[#c8956c] dark:bg-[#e0b48a]"
+            className="w-1 rounded-full"
+            style={{ background: dark ? '#e0b48a' : '#c8956c', height: 8, originY: 0.5, willChange: 'transform' }}
             initial={{ height: 8, scaleY: 0.375, originY: 0.5 }}
             animate={{ scaleY: [0.375, 1, 0.375] }}
             transition={{ duration: 0.55, repeat: Infinity, delay: d, ease: 'easeInOut' }}
-            style={{ height: 8, originY: 0.5, willChange: 'transform' }}
           />
         ))}
       </div>
     )}
-    <span className="text-[9px] font-bold text-[#7c5c3e] dark:text-[#cbb3a0]"
-      style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}>
+    <span
+      className="text-[9px] font-bold"
+      style={{ color: dark ? '#cbb3a0' : '#7c5c3e', writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}
+    >
       MUSIC
     </span>
   </motion.button>
-));
+  );
+});
 
 // ─── Music Drawer (Left Slide-in) ────────────────────────────────────────────
 const MusicPanel = memo(function MusicPanel({
-  player, onClose,
+  player, onClose, perfMode, onTogglePerfMode,
 }: {
   player: ReturnType<typeof useMusicPlayer>;
   onClose: () => void;
+  perfMode: boolean;
+  onTogglePerfMode: () => void;
 }) {
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+
+  // ── theme-aware color tokens ──────────────────────────────────────────────
+  const panelBg      = dark ? 'rgba(22,14,9,0.96)'    : 'rgba(250,246,242,0.94)';
+  const miniBarBg    = dark ? 'rgba(22,14,9,0.97)'    : 'rgba(250,246,242,0.95)';
+  const miniBarBorder= dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
+  const searchBg     = dark ? 'rgba(200,149,108,0.08)' : 'rgba(200,149,108,0.1)';
+  const trackActiveBg= dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.1)';
+  const trackHoverBg = dark ? 'rgba(200,149,108,0.07)' : 'rgba(200,149,108,0.06)';
+  const thumbBg      = dark ? 'rgba(255,255,255,0.06)' : 'rgba(232,217,200,0.5)';
+  const volBg        = dark ? 'rgba(200,149,108,0.06)' : 'rgba(200,149,108,0.07)';
+  const textPrimary  = dark ? '#f3e9dc' : '#2a1a0e';
+  const textSecondary= dark ? '#cbb3a0' : '#7c5c3e';
+  const textAccent   = dark ? '#e0b48a' : '#c8956c';
+  const textMuted    = dark ? 'rgba(203,179,160,0.5)' : 'rgba(156,124,94,0.6)';
+  const borderAccent = dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
 
   // useMotionValue for drag — position updates bypass React reconciler entirely
   const x = useMotionValue(0);
@@ -554,13 +579,14 @@ const MusicPanel = memo(function MusicPanel({
           zIndex: 999,
           willChange: 'transform',
           touchAction: 'pan-y',
-          // contain scopes repaints to this element only — prevents full-page invalidation
           contain: 'layout paint size',
-          backdropFilter: backdropBlur,
-          WebkitBackdropFilter: backdropBlur,
-          background: 'rgba(250,246,242,0.94)',
-          boxShadow: '8px 0 32px rgba(0,0,0,0.2)',
-          borderRight: '1px solid rgba(200,149,108,0.2)',
+          backdropFilter: perfMode ? 'none' : backdropBlur,
+          WebkitBackdropFilter: perfMode ? 'none' : backdropBlur,
+          background: perfMode
+            ? (dark ? 'rgba(22,14,9,0.99)' : 'rgba(250,246,242,0.99)')
+            : panelBg,
+          boxShadow: dark ? '8px 0 32px rgba(0,0,0,0.5)' : '8px 0 32px rgba(0,0,0,0.2)',
+          borderRight: `1px solid ${borderAccent}`,
         }}
         onDragStart={() => { /* blur handled by useTransform(x) */ }}
         onDrag={(_, info) => {
@@ -600,13 +626,29 @@ const MusicPanel = memo(function MusicPanel({
               <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain" />
-                  <span className="text-sm font-bold text-[#7c5c3e] dark:text-[#cbb3a0]">เพลงคาเฟ่</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>เพลงคาเฟ่</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  {/* โหมดประหยัด toggle */}
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    onClick={onTogglePerfMode}
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                    style={{
+                      color: perfMode ? textAccent : textMuted,
+                      background: perfMode ? `${textAccent}20` : 'transparent',
+                    }}
+                    title={perfMode ? 'โหมดประหยัด: เปิดอยู่ (กดเพื่อปิด)' : 'โหมดประหยัด: ปิดอยู่ (กดเพื่อเปิด — ลดกระตุก)'}
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.92 }}
                     onClick={() => setView('library')}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#c8956c] dark:hover:text-[#e0b48a] hover:bg-[#c8956c]/10 transition-colors"
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                    style={{ color: textMuted }}
                     title="คลังเพลง"
                   >
                     <Library className="w-4 h-4" />
@@ -614,7 +656,8 @@ const MusicPanel = memo(function MusicPanel({
                   <motion.button
                     whileTap={{ scale: 0.92 }}
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#7c5c3e] dark:hover:text-[#f3e9dc] hover:bg-[#c8956c]/10 transition-colors"
+                    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                    style={{ color: textMuted }}
                   >
                     <X className="w-4 h-4" />
                   </motion.button>
@@ -633,19 +676,20 @@ const MusicPanel = memo(function MusicPanel({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="font-bold text-[#2a1a0e] dark:text-[#f3e9dc] text-lg leading-tight truncate"
+                  className="font-bold text-lg leading-tight truncate"
+                  style={{ color: textPrimary }}
                 >
                   {player.currentTrack?.title ?? '—'}
                 </motion.p>
                 {player.currentTrack?.artist && (
-                  <p className="text-sm text-[#c8956c] dark:text-[#e0b48a] truncate font-medium">
+                  <p className="text-sm truncate font-medium" style={{ color: textAccent }}>
                     {player.currentTrack.artist}
                   </p>
                 )}
                 <div className="flex items-center justify-center gap-2 pt-0.5">
-                  <div className="h-px flex-1 max-w-[40px]" style={{ background: 'linear-gradient(to right, transparent, rgba(200,149,108,0.3))' }} />
-                  <p className="text-[10px] text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 uppercase tracking-[0.2em] font-medium">{player.currentCat?.label ?? ''}</p>
-                  <div className="h-px flex-1 max-w-[40px]" style={{ background: 'linear-gradient(to left, transparent, rgba(200,149,108,0.3))' }} />
+                  <div className="h-px flex-1 max-w-[40px]" style={{ background: `linear-gradient(to right, transparent, ${textAccent}44)` }} />
+                  <p className="text-[10px] uppercase tracking-[0.2em] font-medium" style={{ color: textMuted }}>{player.currentCat?.label ?? ''}</p>
+                  <div className="h-px flex-1 max-w-[40px]" style={{ background: `linear-gradient(to left, transparent, ${textAccent}44)` }} />
                 </div>
               </div>
 
@@ -659,12 +703,11 @@ const MusicPanel = memo(function MusicPanel({
                 <motion.button
                   whileTap={{ scale: 0.88 }}
                   onClick={player.cycleLoop}
-                  className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-                    player.loopMode !== 'none'
-                      ? 'text-[#c8956c] dark:text-[#e0b48a]'
-                      : 'text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 hover:text-[#7c5c3e] dark:hover:text-[#cbb3a0]'
-                  }`}
-                  style={player.loopMode !== 'none' ? { background: 'rgba(200,149,108,0.15)' } : {}}
+                  className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                  style={{
+                    color: player.loopMode !== 'none' ? textAccent : textMuted,
+                    background: player.loopMode !== 'none' ? (dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)') : 'transparent',
+                  }}
                   title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
                 >
                   {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
@@ -673,7 +716,8 @@ const MusicPanel = memo(function MusicPanel({
                 <motion.button
                   whileTap={{ scale: 0.88 }}
                   onClick={player.skipPrev}
-                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
+                  className="w-11 h-11 flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: textSecondary }}
                 >
                   <SkipBack className="w-5 h-5" />
                 </motion.button>
@@ -705,7 +749,8 @@ const MusicPanel = memo(function MusicPanel({
                 <motion.button
                   whileTap={{ scale: 0.88 }}
                   onClick={player.skipNext}
-                  className="w-11 h-11 flex items-center justify-center rounded-full text-[#7c5c3e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
+                  className="w-11 h-11 flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: textSecondary }}
                 >
                   <SkipForward className="w-5 h-5" />
                 </motion.button>
@@ -715,14 +760,57 @@ const MusicPanel = memo(function MusicPanel({
 
               {/* Volume */}
               <div className="px-4 mt-3 shrink-0">
-                <VolumeSlider volume={player.volume} onChange={player.setVolume} />
+                <div
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl"
+                  style={{ background: volBg, border: `1px solid ${borderAccent}` }}
+                >
+                  <button
+                    onClick={() => {
+                      const pct = Math.round(player.volume * 100);
+                      if (pct > 0) player.setVolume(0); else player.setVolume(0.8);
+                    }}
+                    className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                    style={{ color: textMuted }}
+                  >
+                    {player.volume === 0 ? (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3.5-3.5M12 18l3.5-3.5M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
+                    <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
+                      <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.15)' }}>
+                        <div className="h-full rounded-full transition-[width] duration-75"
+                          style={{ width: `${Math.round(player.volume * 100)}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }} />
+                      </div>
+                    </div>
+                    <input type="range" min={0} max={100} step={1} value={Math.round(player.volume * 100)}
+                      onChange={e => player.setVolume(Number(e.target.value) / 100)}
+                      className="vol-slider w-full relative z-10"
+                      style={{ '--fill': `${Math.round(player.volume * 100)}%`, opacity: 0, cursor: 'pointer', height: 32 } as React.CSSProperties}
+                    />
+                    <img src={honeyJarIcon} alt="" draggable={false}
+                      style={{ position: 'absolute', left: `calc(${Math.round(player.volume * 100)}% - 12px)`, top: '50%',
+                        transform: 'translateY(-50%)', width: 24, height: 24, pointerEvents: 'none', userSelect: 'none', zIndex: 20,
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
+                  </div>
+                  <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: textMuted }}>
+                    {player.volume === 0 ? '—' : Math.round(player.volume * 100)}
+                  </span>
+                </div>
               </div>
 
               {/* Current category track list */}
-              <div className="flex-1 overflow-y-auto min-h-0 mt-4 border-t" style={{ borderColor: 'rgba(200,149,108,0.15)' }}>
+              <div className="flex-1 overflow-y-auto min-h-0 mt-4 border-t" style={{ borderColor: borderAccent }}>
                 <div className="px-5 pt-3 pb-2 flex items-center gap-2">
                   <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                     {player.currentCat?.label}
                   </p>
                 </div>
@@ -732,49 +820,45 @@ const MusicPanel = memo(function MusicPanel({
                     <button
                       key={ti}
                       onClick={() => player.selectTrack(player.catIdx, ti)}
-                      className={`w-full text-left px-5 py-2.5 flex items-center gap-3 transition-colors active:bg-[#c8956c]/10 ${
-                        isActive ? 'bg-[#c8956c]/10 dark:bg-[#c8956c]/8' : 'hover:bg-[#c8956c]/6'
-                      }`}
+                      className="w-full text-left px-5 py-2.5 flex items-center gap-3 transition-colors active:opacity-70"
+                      style={{ background: isActive ? trackActiveBg : 'transparent' }}
                     >
-                      <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center transition-all ${
-                        isActive ? 'ring-2 ring-[#c8956c]/55' : 'bg-[#e8d9c8]/50 dark:bg-white/10'
-                      }`}>
+                      <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center transition-all"
+                        style={{ background: isActive ? 'transparent' : thumbBg, outline: isActive ? `2px solid ${textAccent}55` : 'none' }}>
                         {track.image_url ? (
                           <img src={track.image_url} alt="" className="w-full h-full object-cover" />
                         ) : isActive && player.playing ? (
                           <div className="flex gap-[2px] items-end h-4 w-full justify-center">
                             {[0, 0.1, 0.2].map((d, i) => (
-                              <motion.div key={i} className="w-[3px] bg-[#c8956c] dark:bg-[#e0b48a] rounded-full"
+                              <motion.div key={i} className="w-[3px] rounded-full"
+                                style={{ background: textAccent, height: 10, originY: 1, willChange: 'transform' }}
                                 animate={{ scaleY: [0.3, 1, 0.3] }}
                                 initial={{ height: 10, scaleY: 0.3, originY: 1 }}
-                                style={{ height: 10, originY: 1, willChange: 'transform' }}
                                 transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
                             ))}
                           </div>
                         ) : (
-                          <svg className={`w-3 h-3 ml-0.5 ${isActive ? 'text-[#c8956c]' : 'text-[#9c7c5e]/50'}`} fill="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24" style={{ color: isActive ? textAccent : textMuted }}>
                             <path d="M8 5v14l11-7z" />
                           </svg>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs truncate ${isActive ? 'font-semibold text-[#2a1a0e] dark:text-[#f3e9dc]' : 'text-[#7c5c3e] dark:text-[#cbb3a0]'}`}>
+                        <p className="text-xs truncate" style={{ color: isActive ? textPrimary : textSecondary, fontWeight: isActive ? 600 : 400 }}>
                           {track.title}
                         </p>
                         {track.artist && (
-                          <p className="text-[10px] text-[#c8956c]/65 dark:text-[#e0b48a]/55 truncate">{track.artist}</p>
+                          <p className="text-[10px] truncate" style={{ color: `${textAccent}99` }}>{track.artist}</p>
                         )}
                       </div>
-                      {isActive && (
-                        <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#c8956c] dark:bg-[#e0b48a]" />
-                      )}
+                      {isActive && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: textAccent }} />}
                     </button>
                   );
                 })}
               </div>
 
               <div className="shrink-0 py-3 flex justify-center">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(200,149,108,0.18)' }} />
+                <div className="w-10 h-1 rounded-full" style={{ background: `${textAccent}30` }} />
               </div>
             </motion.div>
           ) : (
@@ -791,18 +875,20 @@ const MusicPanel = memo(function MusicPanel({
                 <motion.button
                   whileTap={{ scale: 0.92 }}
                   onClick={() => { setView('player'); setSearchQuery(''); }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ color: textMuted }}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </motion.button>
                 <div className="flex items-center gap-2 flex-1">
                   <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" />
-                  <span className="text-sm font-bold text-[#7c5c3e] dark:text-[#cbb3a0]">คลังเพลง</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>คลังเพลง</span>
                 </div>
                 <motion.button
                   whileTap={{ scale: 0.92 }}
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:bg-[#c8956c]/10 transition-colors"
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ color: textMuted }}
                 >
                   <X className="w-4 h-4" />
                 </motion.button>
@@ -811,16 +897,17 @@ const MusicPanel = memo(function MusicPanel({
               {/* Search bar */}
               <div className="px-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-full"
-                  style={{ background: 'rgba(200,149,108,0.1)', border: '1px solid rgba(200,149,108,0.22)' }}>
-                  <Search className="w-3.5 h-3.5 text-[#9c7c5e] dark:text-[#cbb3a0] shrink-0" />
+                  style={{ background: searchBg, border: `1px solid ${borderAccent}` }}>
+                  <Search className="w-3.5 h-3.5 shrink-0" style={{ color: textMuted }} />
                   <input
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="ค้นหาเพลง, ศิลปิน..."
-                    className="flex-1 bg-transparent text-xs text-[#3a2410] dark:text-[#f3e9dc] placeholder:text-[#9c7c5e]/60 dark:placeholder:text-[#cbb3a0]/50 outline-none"
+                    className="flex-1 bg-transparent text-xs outline-none"
+                    style={{ color: textPrimary }}
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="text-[#9c7c5e] dark:text-[#cbb3a0] transition-colors">
+                    <button onClick={() => setSearchQuery('')} style={{ color: textMuted }}>
                       <X className="w-3 h-3" />
                     </button>
                   )}
@@ -830,11 +917,11 @@ const MusicPanel = memo(function MusicPanel({
               <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-24 space-y-6">
                 {searchQuery ? (
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50 mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-3" style={{ color: textMuted }}>
                       ผลการค้นหา ({filteredAll.length})
                     </p>
                     {filteredAll.length === 0 ? (
-                      <p className="text-xs text-[#9c7c5e] dark:text-[#cbb3a0] text-center py-8">ไม่พบเพลง</p>
+                      <p className="text-xs text-center py-8" style={{ color: textMuted }}>ไม่พบเพลง</p>
                     ) : (
                       <div className="space-y-1">
                         {filteredAll.map(({ track, catIdx, trackIdx: ti, catLabel }) => {
@@ -843,20 +930,18 @@ const MusicPanel = memo(function MusicPanel({
                             <button
                               key={`${catIdx}-${ti}`}
                               onClick={() => { player.selectTrack(catIdx, ti); setView('player'); setSearchQuery(''); }}
-                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:bg-[#c8956c]/15 ${
-                                isActive ? 'bg-[#c8956c]/15 dark:bg-[#c8956c]/10' : 'hover:bg-[#c8956c]/8'
-                              }`}
+                              className="w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:opacity-70"
+                              style={{ background: isActive ? trackActiveBg : 'transparent' }}
                             >
-                              <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${
-                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60 dark:bg-white/10'
-                              }`}>
+                              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+                                style={{ background: isActive ? 'transparent' : thumbBg, outline: isActive ? `2px solid ${textAccent}55` : 'none' }}>
                                 {track.image_url
                                   ? <img src={track.image_url} alt="" className="w-full h-full object-cover" />
-                                  : <Music2 className="w-4 h-4 text-[#c8956c]/60" />}
+                                  : <Music2 className="w-4 h-4" style={{ color: `${textAccent}99` }} />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c] dark:text-[#e0b48a]' : 'text-[#3a2410] dark:text-[#f3e9dc]'}`}>{track.title}</p>
-                                <p className="text-[10px] text-[#9c7c5e]/70 dark:text-[#cbb3a0]/55 truncate">{track.artist ?? catLabel}</p>
+                                <p className="text-xs font-medium truncate" style={{ color: isActive ? textAccent : textPrimary }}>{track.title}</p>
+                                <p className="text-[10px] truncate" style={{ color: textMuted }}>{track.artist ?? catLabel}</p>
                               </div>
                             </button>
                           );
@@ -870,7 +955,7 @@ const MusicPanel = memo(function MusicPanel({
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           เพลงทั้งหมด ({allTracks.length})
                         </p>
                       </div>
@@ -881,32 +966,30 @@ const MusicPanel = memo(function MusicPanel({
                             <button
                               key={`${catIdx}-${ti}`}
                               onClick={() => { player.selectTrack(catIdx, ti); setView('player'); }}
-                              className={`w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:bg-[#c8956c]/15 ${
-                                isActive ? 'bg-[#c8956c]/12 dark:bg-[#c8956c]/8' : 'hover:bg-[#c8956c]/8'
-                              }`}
+                              className="w-full text-left flex items-center gap-3 py-2.5 px-3 rounded-2xl transition-colors active:opacity-70"
+                              style={{ background: isActive ? trackActiveBg : 'transparent' }}
                             >
-                              <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${
-                                isActive ? 'ring-2 ring-[#c8956c]/50' : 'bg-[#e8d9c8]/60 dark:bg-white/10'
-                              }`}>
+                              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+                                style={{ background: isActive ? 'transparent' : thumbBg, outline: isActive ? `2px solid ${textAccent}55` : 'none' }}>
                                 {track.image_url ? <img src={track.image_url} alt="" className="w-full h-full object-cover" /> : (
                                   isActive && player.playing ? (
                                     <div className="flex gap-[2px] items-end h-4 w-full justify-center">
                                       {[0, 0.1, 0.2].map((d, i) => (
-                                        <motion.div key={i} className="w-[3px] bg-[#c8956c] dark:bg-[#e0b48a] rounded-full"
+                                        <motion.div key={i} className="w-[3px] rounded-full"
+                                          style={{ background: textAccent, height: 12, originY: 1, willChange: 'transform' }}
                                           animate={{ scaleY: [0.25, 1, 0.25] }}
                                           initial={{ height: 12, scaleY: 0.25, originY: 1 }}
-                                          style={{ height: 12, originY: 1, willChange: 'transform' }}
                                           transition={{ duration: 0.6, repeat: Infinity, delay: d }} />
                                       ))}
                                     </div>
-                                  ) : <Music2 className="w-4 h-4 text-[#c8956c]/60" />
+                                  ) : <Music2 className="w-4 h-4" style={{ color: `${textAccent}99` }} />
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs font-medium truncate ${isActive ? 'text-[#c8956c] dark:text-[#e0b48a]' : 'text-[#3a2410] dark:text-[#f3e9dc]'}`}>{track.title}</p>
-                                <p className="text-[10px] text-[#9c7c5e]/70 dark:text-[#cbb3a0]/55 truncate">{track.artist ?? catLabel}</p>
+                                <p className="text-xs font-medium truncate" style={{ color: isActive ? textAccent : textPrimary }}>{track.title}</p>
+                                <p className="text-[10px] truncate" style={{ color: textMuted }}>{track.artist ?? catLabel}</p>
                               </div>
-                              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[#c8956c] dark:bg-[#e0b48a] shrink-0" />}
+                              {isActive && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: textAccent }} />}
                             </button>
                           );
                         })}
@@ -917,7 +1000,7 @@ const MusicPanel = memo(function MusicPanel({
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/50">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
                           หมวดหมู่
                         </p>
                       </div>
@@ -1000,35 +1083,31 @@ const MusicPanel = memo(function MusicPanel({
               <div
                 className="absolute bottom-0 left-0 right-0 px-4 py-3 z-20"
                 style={{
-                  background: 'rgba(250,246,242,0.95)',
+                  background: miniBarBg,
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
-                  borderTop: '1px solid rgba(200,149,108,0.15)',
+                  borderTop: `1px solid ${miniBarBorder}`,
                 }}
               >
                 <button
                   onClick={() => setView('player')}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl active:bg-[#c8956c]/15 transition-colors"
-                  style={{ background: 'rgba(200,149,108,0.1)', border: '1px solid rgba(200,149,108,0.2)' }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl active:opacity-70 transition-colors"
+                  style={{ background: trackActiveBg, border: `1px solid ${borderAccent}` }}
                 >
-                  <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-[#e8d9c8]/50 dark:bg-white/10">
+                  <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center" style={{ background: thumbBg }}>
                     {player.currentTrack?.image_url
                       ? <img src={player.currentTrack.image_url} alt="" className="w-full h-full object-cover" />
-                      : <Music2 className="w-4 h-4 text-[#c8956c]/55" />}
+                      : <Music2 className="w-4 h-4" style={{ color: `${textAccent}88` }} />}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-semibold text-[#2a1a0e] dark:text-[#f3e9dc] truncate">{player.currentTrack?.title ?? '—'}</p>
-                    <p className="text-[10px] text-[#9c7c5e]/65 dark:text-[#cbb3a0]/55 truncate">{player.currentTrack?.artist ?? player.currentCat?.label ?? ''}</p>
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{player.currentTrack?.title ?? '—'}</p>
+                    <p className="text-[10px] truncate" style={{ color: textMuted }}>{player.currentTrack?.artist ?? player.currentCat?.label ?? ''}</p>
                   </div>
                   <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={e => { e.stopPropagation(); player.toggle(); }}
                     className="w-9 h-9 rounded-full text-white flex items-center justify-center shrink-0"
-                    style={{
-                      willChange: 'transform',
-                      background: 'linear-gradient(145deg, #e0b080, #c8956c)',
-                      boxShadow: '0 2px 8px rgba(200,149,108,0.4)',
-                    }}
+                    style={{ willChange: 'transform', background: 'linear-gradient(145deg, #e0b080, #c8956c)', boxShadow: '0 2px 8px rgba(200,149,108,0.4)' }}
                   >
                     {player.playing ? (
                       <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -1431,6 +1510,10 @@ export default function SecretChatRoom() {
   const bgmRef = useRef<HTMLAudioElement>(null);
   const player = useMusicPlayer(bgmRef);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
+  // โหมดประหยัด — ปิด backdrop-blur บน panel เพื่อลดการกระตุกบนอุปกรณ์ที่ไม่แรง
+  const [musicPerfMode, setMusicPerfMode] = useState<boolean>(() => {
+    try { return localStorage.getItem('music_perf_mode') === '1'; } catch { return false; }
+  });
 
   // Mobile swipe-from-left-edge to open music panel
   const swipeTouchStartX = useRef<number | null>(null);
@@ -2025,7 +2108,7 @@ export default function SecretChatRoom() {
               onClick={() => setShowMusicPanel(false)}
             />
             {/* Panel — z-[999] */}
-            <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} />
+            <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} perfMode={musicPerfMode} onTogglePerfMode={() => setMusicPerfMode(v => { const next = !v; try { localStorage.setItem('music_perf_mode', next ? '1' : '0'); } catch {} return next; })} />
           </>
         )}
       </AnimatePresence>
@@ -2206,18 +2289,6 @@ export default function SecretChatRoom() {
               ref={rainRef}
               className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
               <CloudRain className="w-4 h-4" />
-            </button>
-
-            {/* Music player button */}
-            <button
-              onClick={() => setShowMusicPanel(v => !v)}
-              ref={musicRef}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
-                player.playing ? 'bg-violet-100 text-violet-600 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'
-              }`}
-              title="เพลง"
-            >
-              {player.playing ? <Music2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
 
             {/* Theme toggle */}
