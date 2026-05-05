@@ -951,6 +951,70 @@ const MusicPanel = memo(function MusicPanel({
                   </div>
                 ) : (
                   <>
+                    {/* Categories — Pinterest card grid (ขึ้นก่อน) */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
+                          หมวดหมู่
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {player.library.map((cat, ci) => {
+                          const firstTrack = cat.tracks[0];
+                          const isCurrentCat = ci === player.catIdx;
+                          return (
+                            <motion.button
+                              key={ci}
+                              whileHover={{ scale: 1.04, y: -3 }}
+                              whileTap={{ scale: 0.96 }}
+                              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+                              onClick={() => { player.selectTrack(ci, 0); setView('player'); }}
+                              className="relative rounded-3xl overflow-hidden flex flex-col items-start justify-end"
+                              style={{
+                                aspectRatio: '3/4',
+                                boxShadow: isCurrentCat
+                                  ? '0 0 0 2.5px #c8956c, 0 10px 28px rgba(0,0,0,0.25), 0 0 20px rgba(200,149,108,0.2)'
+                                  : '0 6px 20px rgba(0,0,0,0.18)',
+                              }}
+                            >
+                              <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #2a1a0e, #120a04)' }}>
+                                {firstTrack?.image_url && (
+                                  <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" style={{ opacity: 0.8 }} />
+                                )}
+                              </div>
+                              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,5,2,0.88) 0%, rgba(10,5,2,0.4) 40%, rgba(10,5,2,0.1) 65%, transparent 100%)' }} />
+                              <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(200,149,108,0.08) 0%, transparent 50%)' }} />
+                              <div className="absolute inset-x-0 top-0 h-2/5" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)' }} />
+                              <div className="absolute top-3 right-3 z-10">
+                                <div className="w-9 h-9 rounded-full border border-white/15 flex items-center justify-center"
+                                  style={{ background: 'conic-gradient(from 0deg, #120a04, #2a1a0e, #120a04, #1e1208, #2a1a0e, #120a04)', boxShadow: isCurrentCat ? '0 0 10px rgba(200,149,108,0.5)' : '0 2px 8px rgba(0,0,0,0.4)' }}>
+                                  <div className="w-3 h-3 rounded-full overflow-hidden border border-[#c8956c]/30">
+                                    {firstTrack?.image_url ? <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-[#2a1a0e]" />}
+                                  </div>
+                                </div>
+                              </div>
+                              {isCurrentCat && (
+                                <div className="absolute top-3 left-3 z-10">
+                                  <motion.div className="flex gap-[2px] items-end" style={{ height: 12 }}>
+                                    {[0, 0.12, 0.24].map((d, i) => (
+                                      <motion.div key={i} className="w-[2.5px] rounded-full bg-[#c8956c]"
+                                        animate={{ height: ['3px', '10px', '3px'] }}
+                                        transition={{ duration: 0.5, repeat: Infinity, delay: d }} />
+                                    ))}
+                                  </motion.div>
+                                </div>
+                              )}
+                              <div className="relative z-10 p-3 w-full">
+                                <p className="text-white text-xs font-bold truncate leading-tight" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{cat.label}</p>
+                                <p className="text-white/50 text-[10px] mt-0.5">{cat.tracks.length} เพลง</p>
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* All songs */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
@@ -991,86 +1055,6 @@ const MusicPanel = memo(function MusicPanel({
                               </div>
                               {isActive && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: textAccent }} />}
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Categories — Pinterest card grid */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          หมวดหมู่
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {player.library.map((cat, ci) => {
-                          const firstTrack = cat.tracks[0];
-                          const isCurrentCat = ci === player.catIdx;
-                          return (
-                            <motion.button
-                              key={ci}
-                              whileHover={{ scale: 1.04, y: -3 }}
-                              whileTap={{ scale: 0.96 }}
-                              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-                              onClick={() => { player.selectTrack(ci, 0); setView('player'); }}
-                              className="relative rounded-3xl overflow-hidden flex flex-col items-start justify-end"
-                              style={{
-                                aspectRatio: '3/4',
-                                boxShadow: isCurrentCat
-                                  ? '0 0 0 2.5px #c8956c, 0 10px 28px rgba(0,0,0,0.25), 0 0 20px rgba(200,149,108,0.2)'
-                                  : '0 6px 20px rgba(0,0,0,0.18)',
-                              }}
-                            >
-                              {/* Background image / gradient */}
-                              <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #2a1a0e, #120a04)' }}>
-                                {firstTrack?.image_url && (
-                                  <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" style={{ opacity: 0.8 }} />
-                                )}
-                              </div>
-                              {/* Multi-layer gradient overlays for depth */}
-                              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,5,2,0.88) 0%, rgba(10,5,2,0.4) 40%, rgba(10,5,2,0.1) 65%, transparent 100%)' }} />
-                              <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(200,149,108,0.08) 0%, transparent 50%)' }} />
-                              {/* Top sheen — CD case plastic feel */}
-                              <div className="absolute inset-x-0 top-0 h-2/5" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)' }} />
-                              {/* Mini CD in top-right */}
-                              <div className="absolute top-3 right-3 z-10">
-                                <div
-                                  className="w-9 h-9 rounded-full border border-white/15 flex items-center justify-center"
-                                  style={{
-                                    background: 'conic-gradient(from 0deg, #120a04, #2a1a0e, #120a04, #1e1208, #2a1a0e, #120a04)',
-                                    boxShadow: isCurrentCat ? '0 0 10px rgba(200,149,108,0.5)' : '0 2px 8px rgba(0,0,0,0.4)',
-                                  }}
-                                >
-                                  <div className="w-3 h-3 rounded-full overflow-hidden border border-[#c8956c]/30">
-                                    {firstTrack?.image_url
-                                      ? <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" />
-                                      : <div className="w-full h-full bg-[#2a1a0e]" />}
-                                  </div>
-                                </div>
-                              </div>
-                              {/* Active indicator */}
-                              {isCurrentCat && (
-                                <div className="absolute top-3 left-3 z-10">
-                                  <motion.div
-                                    className="flex gap-[2px] items-end"
-                                    style={{ height: 12 }}
-                                  >
-                                    {[0, 0.12, 0.24].map((d, i) => (
-                                      <motion.div key={i} className="w-[2.5px] rounded-full bg-[#c8956c]"
-                                        animate={{ height: ['3px', '10px', '3px'] }}
-                                        transition={{ duration: 0.5, repeat: Infinity, delay: d }} />
-                                    ))}
-                                  </motion.div>
-                                </div>
-                              )}
-                              {/* Text info */}
-                              <div className="relative z-10 p-3 w-full">
-                                <p className="text-white text-xs font-bold truncate leading-tight" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{cat.label}</p>
-                                <p className="text-white/50 text-[10px] mt-0.5">{cat.tracks.length} เพลง</p>
-                              </div>
-                            </motion.button>
                           );
                         })}
                       </div>
@@ -1302,6 +1286,42 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
   );
 }
 
+// ─── Tooltip (desktop hover) ─────────────────────────────────────────────────
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = () => { timerRef.current = setTimeout(() => setVisible(true), 500); };
+  const hide = () => { if (timerRef.current) clearTimeout(timerRef.current); setVisible(false); };
+
+  return (
+    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
+      {children}
+      <AnimatePresence>
+        {visible && (
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none z-[80]"
+            style={{
+              background: 'rgba(42,26,14,0.92)',
+              color: '#f3e9dc',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            }}
+          >
+            {text}
+            {/* Arrow */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+              style={{ borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(42,26,14,0.92)' }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── Tutorial ─────────────────────────────────────────────────────────────────
 // Steps 0-2: shown while waiting for match
 // Steps 3-4: shown after match
@@ -1313,11 +1333,11 @@ interface TutorialStep {
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
-  { refKey: 'rain',  title: 'เสียงฝน',     desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                    tooltipSide: 'below' },
-  { refKey: 'music', title: 'เพลง BGM',    desc: 'เปิด Music Player เลือกเพลงพื้นหลัง มีแผ่นเสียงหมุนและ progress bar',               tooltipSide: 'below' },
-  { refKey: 'leave', title: 'ออกจากโต๊ะ',  desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                               tooltipSide: 'below' },
-  { refKey: 'timer', title: 'นับถอยหลัง',  desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',                    tooltipSide: 'below' },
-  { refKey: 'input', title: 'ช่องพิมพ์',   desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',              tooltipSide: 'above' },
+  { refKey: 'rain',  title: 'เสียงฝน',        desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                tooltipSide: 'below' },
+  { refKey: 'theme', title: 'เปลี่ยนธีมสี',   desc: 'สลับระหว่างโหมดสว่างและโหมดมืด ตามความชอบของคุณ',                             tooltipSide: 'below' },
+  { refKey: 'leave', title: 'ออกจากโต๊ะ',     desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                          tooltipSide: 'below' },
+  { refKey: 'timer', title: 'นับถอยหลัง',     desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',               tooltipSide: 'below' },
+  { refKey: 'input', title: 'ช่องพิมพ์',      desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',         tooltipSide: 'above' },
 ];
 
 // Ref map passed down from main component
@@ -1586,6 +1606,7 @@ export default function SecretChatRoom() {
   const musicRef = useRef<HTMLButtonElement>(null);
   const leaveRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<HTMLDivElement>(null);
+  const themeRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   // "Join Table" overlay — shown when a match is found, dismissed by user click.
   // The click IS a user gesture, so audio play is allowed by the browser.
@@ -1600,6 +1621,7 @@ export default function SecretChatRoom() {
     music: musicRef as React.RefObject<HTMLElement>,
     leave: leaveRef as React.RefObject<HTMLElement>,
     timer: timerRef as React.RefObject<HTMLElement>,
+    theme: themeRef as React.RefObject<HTMLElement>,
     input: inputRef as React.RefObject<HTMLElement>,
   }), []);
 
@@ -2285,31 +2307,36 @@ export default function SecretChatRoom() {
               </div>
             )}
 
-            <button onClick={toggleRain}
-              ref={rainRef}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
-              <CloudRain className="w-4 h-4" />
-            </button>
+            <Tooltip text="เสียงฝน">
+              <button onClick={toggleRain}
+                ref={rainRef}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border ${rainOn ? 'bg-sky-100 text-sky-500 border-sky-200' : 'bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]'}`}>
+                <CloudRain className="w-4 h-4" />
+              </button>
+            </Tooltip>
 
             {/* Theme toggle */}
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all border bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]"
-              title={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
-            >
-              {theme === 'dark'
-                ? <Sun className="w-4 h-4" />
-                : <Moon className="w-4 h-4" />
-              }
-            </button>
+            <Tooltip text={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
+              <button
+                ref={themeRef}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all border bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]"
+              >
+                {theme === 'dark'
+                  ? <Sun className="w-4 h-4" />
+                  : <Moon className="w-4 h-4" />
+                }
+              </button>
+            </Tooltip>
 
             {/* Leave — solid red */}
-            <button onClick={leaveTable}
-              ref={leaveRef}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm"
-              title="ออกจากโต๊ะ">
-              <LogOut className="w-4 h-4" />
-            </button>
+            <Tooltip text="ออกจากโต๊ะ">
+              <button onClick={leaveTable}
+                ref={leaveRef}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </header>

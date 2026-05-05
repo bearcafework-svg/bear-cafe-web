@@ -550,3 +550,66 @@
     zoom: 1.25;
   }
 }
+
+/* ─── Custom Scrollbar — Global (Option C) ───────────────────────────────────
+   Mobile  : ซ่อน scrollbar ทั้งหมด (เลื่อนด้วยนิ้วได้ปกติ)
+   Desktop : แถบบางๆ สี honey ตามธีม light/dark
+   ครอบทุก element ในเว็บโดยไม่ต้องแตะแต่ละไฟล์
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Mobile: ซ่อนทั้งหมด ─────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  * {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE / Edge legacy */
+  }
+  *::-webkit-scrollbar {
+    display: none;                /* Chrome / Safari / WebKit */
+  }
+}
+
+/* ── Desktop: custom บางๆ สี honey ──────────────────────────────────────── */
+@media (min-width: 768px) {
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200, 149, 108, 0.35) transparent;
+  }
+
+  /* Chrome / Safari / WebKit */
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(200, 149, 108, 0.35);
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(200, 149, 108, 0.65);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Dark mode — สว่างขึ้นนิดนึงให้เห็นบนพื้นเข้ม */
+  .dark *::-webkit-scrollbar-thumb {
+    background: rgba(224, 180, 138, 0.3);
+  }
+
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: rgba(224, 180, 138, 0.6);
+  }
+
+  .dark * {
+    scrollbar-color: rgba(224, 180, 138, 0.3) transparent;
+  }
+}
