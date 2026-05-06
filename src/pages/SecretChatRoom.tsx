@@ -2644,7 +2644,10 @@ export default function SecretChatRoom() {
       {/* Input */}
       {matchStatus === 'matched' && (
         <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-3 sm:px-5 py-3">
-          <div className="flex gap-2 items-end max-w-4xl mx-auto">
+          <form
+            className="flex gap-2 items-end max-w-4xl mx-auto"
+            onSubmit={e => { e.preventDefault(); sendMessage(); }}
+          >
             <div
               ref={inputRef}
               className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-xl px-3.5 py-2.5 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
@@ -2660,15 +2663,19 @@ export default function SecretChatRoom() {
               />
             </div>
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={sendMessage}
+              type="submit"
+              whileTap={{ scale: 0.92 }}
+              onPointerDown={e => {
+                // ป้องกัน blur บน textarea ก่อน sendMessage จะ fire
+                e.preventDefault();
+                sendMessage();
+              }}
               disabled={!input.trim() || sending}
               className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
             >
               {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </motion.button>
-          </div>
+          </form>
         </div>
       )}
 
