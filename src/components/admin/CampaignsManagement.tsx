@@ -37,9 +37,13 @@ import {
   Loader2,
   ExternalLink,
   AlertCircle,
+  FlaskConical,
+  Clock,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { compressImage } from '@/lib/image-compress';
-import type { Tables } from '@/integrations/supabase/types';
 
 // Type for campaign_messages table (will be auto-generated after migration)
 type CampaignMessage = {
@@ -58,6 +62,14 @@ type CampaignMessage = {
   last_sent_at: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+type ScheduleConfig = {
+  id: string;
+  cron_expression: string;
+  label: string;
+  is_enabled: boolean;
   updated_at: string;
 };
 
@@ -101,13 +113,20 @@ const INITIAL_FORM: FormData = {
 export function CampaignsManagement() {
   const [campaigns, setCampaigns] = useState<CampaignMessage[]>([]);
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<CampaignMessage | null>(null);
+  const [testSendCampaign, setTestSendCampaign] = useState<CampaignMessage | null>(null);
+  const [testSendChannel, setTestSendChannel] = useState<string>('');
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [uploading, setUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -115,13 +134,14 @@ export function CampaignsManagement() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('campaign_messages')
-        .select('*')
-        .order('sort_order', { ascending: true });
+      const [campaignsRes, scheduleRes] = await Promise.all([
+        supabase.from('campaign_messages').select('*').order('sort_order', { ascending: true }),
+        supabase.from('campaign_schedule_config').select('*').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle(),
+      ]);
 
-      if (error) throw error;
-      setCampaigns(data || []);
+      if (campaignsRes.error) throw campaignsRes.error;
+      setCampaigns(campaignsRes.data || []);
+      if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
@@ -357,6 +377,75 @@ export function CampaignsManagement() {
     }));
   };
 
+  // ─── Test send ───────────────────────────────────────────────────────────
+  const handleOpenTestSend = (campaign: CampaignMessage) => {
+    setTestSendCampaign(campaign);
+    setTestSendChannel('');
+    setTestSendDialogOpen(true);
+  };
+
+  const handleTestSend = async () => {
+    if (!testSendCampaign || !testSendChannel) {
+      toast({ title: 'กรุณาเลือกช่อง', variant: 'destructive' });
+      return;
+    }
+    try {
+      setIsSendingTest(true);
+      const { data, error } = await supabase.functions.invoke('test-send-campaign', {
+        body: { campaign_id: testSendCampaign.id, channel_id: testSendChannel },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast({
+          title: 'ส่งสำเร็จ',
+          description: `ส่งไปยังช่องเรียบร้อยแล้ว (ID: ${data.message_id})`,
+        });
+        setTestSendDialogOpen(false);
+      } else {
+        throw new Error(data?.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('Test send error:', error);
+      toast({
+        title: 'ส่งไม่สำเร็จ',
+        description: error.message || 'ไม่สามารถส่งข้อความได้',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  // ─── Update schedule ─────────────────────────────────────────────────────
+  const handleUpdateSchedule = async (newConfig: Partial<ScheduleConfig>) => {
+    try {
+      setIsUpdatingSchedule(true);
+      const { data, error } = await supabase.functions.invoke('update-cron-schedule', {
+        body: {
+          cron_expression: newConfig.cron_expression ?? scheduleConfig?.cron_expression,
+          label: newConfig.label ?? scheduleConfig?.label,
+          is_enabled: newConfig.is_enabled ?? scheduleConfig?.is_enabled,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: 'บันทึกตารางเวลาแล้ว',
+        description: data?.note || 'อัปเดตเรียบร้อย',
+      });
+      setScheduleDialogOpen(false);
+      fetchCampaigns();
+    } catch (error: any) {
+      console.error('Schedule update error:', error);
+      toast({
+        title: 'เกิดข้อผิดพลาด',
+        description: 'ไม่สามารถอัปเดตตารางเวลาได้',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingSchedule(false);
+    }
+  };
+
   // ─── Initial load ────────────────────────────────────────────────────────
   useEffect(() => {
     fetchCampaigns();
@@ -372,10 +461,29 @@ export function CampaignsManagement() {
               <Send className="w-5 h-5" />
               จัดการแคมเปญโฆษณา
             </CardTitle>
-            <Button onClick={handleCreate} size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              สร้างแคมเปญ
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setScheduleDialogOpen(true)}
+                className="gap-2"
+              >
+                <Clock className="w-4 h-4" />
+                ตั้งเวลาส่ง
+                {scheduleConfig && (
+                  <Badge
+                    variant={scheduleConfig.is_enabled ? 'default' : 'secondary'}
+                    className="ml-1 text-xs"
+                  >
+                    {scheduleConfig.is_enabled ? scheduleConfig.label : 'ปิดอยู่'}
+                  </Badge>
+                )}
+              </Button>
+              <Button onClick={handleCreate} size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                สร้างแคมเปญ
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -421,15 +529,28 @@ export function CampaignsManagement() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {campaign.last_sent_at
-                        ? new Date(campaign.last_sent_at).toLocaleDateString('th-TH')
+                        ? new Date(campaign.last_sent_at).toLocaleDateString('th-TH', {
+                            day: 'numeric', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })
                         : 'ยังไม่เคยส่ง'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenTestSend(campaign)}
+                          title="ทดลองส่ง"
+                          className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                        >
+                          <FlaskConical className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEdit(campaign)}
+                          title="แก้ไข"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -438,6 +559,8 @@ export function CampaignsManagement() {
                           size="sm"
                           onClick={() => handleDelete(campaign.id)}
                           disabled={isDeleting}
+                          title="ลบ"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -450,6 +573,115 @@ export function CampaignsManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Test Send Dialog ─── */}
+      <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-blue-500" />
+              ทดลองส่ง
+            </DialogTitle>
+            <DialogDescription>
+              ส่งแคมเปญ{' '}
+              <span className="font-medium text-foreground">
+                "{testSendCampaign?.internal_name}"
+              </span>{' '}
+              ไปยังช่องที่เลือกทันที (ไม่เช็คกิจกรรมล่าสุด)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>เลือกช่องที่จะส่ง *</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={syncChannels}
+                  disabled={loadingChannels}
+                  className="gap-1 text-xs h-7"
+                >
+                  {loadingChannels ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3" />
+                  )}
+                  ซิงค์ช่อง
+                </Button>
+              </div>
+
+              {channels.length === 0 ? (
+                <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
+                  คลิก "ซิงค์ช่อง" เพื่อดึงรายการช่อง Discord
+                </div>
+              ) : (
+                <div className="border rounded-lg max-h-52 overflow-y-auto">
+                  {channels.map((ch) => (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => setTestSendChannel(ch.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-muted/50 ${
+                        testSendChannel === ch.id
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : ''
+                      }`}
+                    >
+                      {testSendChannel === ch.id ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <span className="w-3.5 h-3.5 shrink-0 text-muted-foreground text-center">#</span>
+                      )}
+                      {ch.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {testSendChannel && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                <span>
+                  จะส่งไปยัง{' '}
+                  <span className="font-medium text-foreground">
+                    #{channels.find((c) => c.id === testSendChannel)?.name ?? testSendChannel}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestSendDialogOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={handleTestSend}
+              disabled={!testSendChannel || isSendingTest}
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSendingTest ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FlaskConical className="w-4 h-4" />
+              )}
+              ส่งทดลอง
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Schedule Config Dialog ─── */}
+      <ScheduleDialog
+        open={scheduleDialogOpen}
+        onOpenChange={setScheduleDialogOpen}
+        config={scheduleConfig}
+        isSaving={isUpdatingSchedule}
+        onSave={handleUpdateSchedule}
+      />
 
       {/* ─── Create/Edit Dialog ─── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -739,5 +971,184 @@ export function CampaignsManagement() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ─── Schedule Dialog (sub-component) ─────────────────────────────────────────
+
+const PRESET_SCHEDULES = [
+  { label: 'ทุกวัน 08:00 น. (ไทย)', cron: '0 1 * * *' },
+  { label: 'ทุกวัน 10:00 น. (ไทย)', cron: '0 3 * * *' },
+  { label: 'ทุกวัน 12:00 น. (ไทย)', cron: '0 5 * * *' },
+  { label: 'ทุกวัน 18:00 น. (ไทย)', cron: '0 11 * * *' },
+  { label: 'ทุกวัน 20:00 น. (ไทย)', cron: '0 13 * * *' },
+  { label: 'ทุกวันจันทร์ 10:00 น. (ไทย)', cron: '0 3 * * 1' },
+  { label: 'ทุกวันศุกร์ 18:00 น. (ไทย)', cron: '0 11 * * 5' },
+  { label: 'กำหนดเอง', cron: 'custom' },
+];
+
+interface ScheduleDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  config: ScheduleConfig | null;
+  isSaving: boolean;
+  onSave: (config: Partial<ScheduleConfig>) => void;
+}
+
+function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: ScheduleDialogProps) {
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [customCron, setCustomCron] = useState('');
+  const [customLabel, setCustomLabel] = useState('');
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [cronError, setCronError] = useState('');
+
+  useEffect(() => {
+    if (open && config) {
+      setIsEnabled(config.is_enabled);
+      const preset = PRESET_SCHEDULES.find((p) => p.cron === config.cron_expression);
+      if (preset && preset.cron !== 'custom') {
+        setSelectedPreset(preset.cron);
+        setCustomCron('');
+        setCustomLabel('');
+      } else {
+        setSelectedPreset('custom');
+        setCustomCron(config.cron_expression);
+        setCustomLabel(config.label);
+      }
+    }
+  }, [open, config]);
+
+  const validateCron = (expr: string): boolean => {
+    const parts = expr.trim().split(/\s+/);
+    if (parts.length !== 5) return false;
+    const field = /^(\*|(\d+(-\d+)?)(\,(\d+(-\d+)?))*|(\*\/\d+))$/;
+    return parts.every((p) => field.test(p));
+  };
+
+  const handleSave = () => {
+    const isCustom = selectedPreset === 'custom';
+    const cronExpr = isCustom ? customCron.trim() : selectedPreset;
+    if (!cronExpr) { setCronError('กรุณาเลือกหรือกรอก cron expression'); return; }
+    if (!validateCron(cronExpr)) { setCronError('รูปแบบ cron ไม่ถูกต้อง (ต้องมี 5 ช่อง เช่น "0 3 * * *")'); return; }
+    setCronError('');
+    const label = isCustom
+      ? (customLabel.trim() || cronExpr)
+      : (PRESET_SCHEDULES.find((p) => p.cron === cronExpr)?.label ?? cronExpr);
+    onSave({ cron_expression: cronExpr, label, is_enabled: isEnabled });
+  };
+
+  const activeCron = selectedPreset === 'custom' ? customCron : selectedPreset;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            ตั้งเวลาส่งอัตโนมัติ
+          </DialogTitle>
+          <DialogDescription>
+            กำหนดตารางเวลาที่ระบบจะส่งแคมเปญที่เปิดใช้งานอยู่ไปยัง Discord โดยอัตโนมัติ
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">เปิดใช้งานการส่งอัตโนมัติ</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                ปิดเพื่อหยุดการส่งชั่วคราวโดยไม่ต้องลบตาราง
+              </p>
+            </div>
+            <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
+          </div>
+
+          {/* Preset selector */}
+          <div className="space-y-2">
+            <Label>เลือกตารางเวลา</Label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {PRESET_SCHEDULES.map((preset) => (
+                <button
+                  key={preset.cron}
+                  type="button"
+                  onClick={() => { setSelectedPreset(preset.cron); setCronError(''); }}
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
+                    selectedPreset === preset.cron
+                      ? 'border-primary bg-primary/5 text-primary font-medium'
+                      : 'border-border hover:bg-muted/50'
+                  }`}
+                >
+                  <span>{preset.label}</span>
+                  {preset.cron !== 'custom' && (
+                    <code className="text-xs text-muted-foreground font-mono">{preset.cron}</code>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom cron input */}
+          {selectedPreset === 'custom' && (
+            <div className="space-y-3 pl-3 border-l-2 border-primary/20">
+              <div>
+                <Label htmlFor="custom_cron">Cron Expression (UTC)</Label>
+                <Input
+                  id="custom_cron"
+                  value={customCron}
+                  onChange={(e) => { setCustomCron(e.target.value); setCronError(''); }}
+                  placeholder="0 3 * * *"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  รูปแบบ: นาที ชั่วโมง วันที่ เดือน วันในสัปดาห์ (UTC, ไทย = UTC+7)
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="custom_label">ชื่อที่แสดง</Label>
+                <Input
+                  id="custom_label"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  placeholder="เช่น: ทุกวันอาทิตย์ 09:00 น."
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {cronError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {cronError}
+            </div>
+          )}
+
+          {/* Summary */}
+          {activeCron && activeCron !== 'custom' && validateCron(activeCron) && (
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm space-y-1">
+              <p className="font-medium">สรุป</p>
+              <p className="text-muted-foreground">
+                Expression: <code className="font-mono text-foreground">{activeCron}</code>
+              </p>
+              <p className="text-muted-foreground">
+                สถานะ:{' '}
+                <span className={isEnabled ? 'text-green-600 font-medium' : ''}>
+                  {isEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            บันทึกตาราง
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
