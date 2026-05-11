@@ -42,7 +42,6 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { compressImage } from '@/lib/image-compress';
 
 // Type for campaign_messages table (will be auto-generated after migration)
@@ -70,6 +69,7 @@ type ScheduleConfig = {
   cron_expression: string;
   label: string;
   is_enabled: boolean;
+  interval_hours: number;
   updated_at: string;
 };
 
@@ -422,8 +422,7 @@ export function CampaignsManagement() {
       setIsUpdatingSchedule(true);
       const { data, error } = await supabase.functions.invoke('update-cron-schedule', {
         body: {
-          cron_expression: newConfig.cron_expression ?? scheduleConfig?.cron_expression,
-          label: newConfig.label ?? scheduleConfig?.label,
+          interval_hours: newConfig.interval_hours ?? scheduleConfig?.interval_hours ?? 24,
           is_enabled: newConfig.is_enabled ?? scheduleConfig?.is_enabled,
         },
       });
@@ -475,7 +474,9 @@ export function CampaignsManagement() {
                     variant={scheduleConfig.is_enabled ? 'default' : 'secondary'}
                     className="ml-1 text-xs"
                   >
-                    {scheduleConfig.is_enabled ? scheduleConfig.label : 'ปิดอยู่'}
+                    {scheduleConfig.is_enabled
+                      ? `ทุก ${scheduleConfig.interval_hours} ชม.`
+                      : 'ปิดอยู่'}
                   </Badge>
                 )}
               </Button>
@@ -976,15 +977,17 @@ export function CampaignsManagement() {
 
 // ─── Schedule Dialog (sub-component) ─────────────────────────────────────────
 
-const PRESET_SCHEDULES = [
-  { label: 'ทุกวัน 08:00 น. (ไทย)', cron: '0 1 * * *' },
-  { label: 'ทุกวัน 10:00 น. (ไทย)', cron: '0 3 * * *' },
-  { label: 'ทุกวัน 12:00 น. (ไทย)', cron: '0 5 * * *' },
-  { label: 'ทุกวัน 18:00 น. (ไทย)', cron: '0 11 * * *' },
-  { label: 'ทุกวัน 20:00 น. (ไทย)', cron: '0 13 * * *' },
-  { label: 'ทุกวันจันทร์ 10:00 น. (ไทย)', cron: '0 3 * * 1' },
-  { label: 'ทุกวันศุกร์ 18:00 น. (ไทย)', cron: '0 11 * * 5' },
-  { label: 'กำหนดเอง', cron: 'custom' },
+const INTERVAL_PRESETS = [
+  { label: '1 ชั่วโมง', hours: 1 },
+  { label: '2 ชั่วโมง', hours: 2 },
+  { label: '4 ชั่วโมง', hours: 4 },
+  { label: '6 ชั่วโมง', hours: 6 },
+  { label: '8 ชั่วโมง', hours: 8 },
+  { label: '12 ชั่วโมง', hours: 12 },
+  { label: '24 ชั่วโมง (1 วัน)', hours: 24 },
+  { label: '48 ชั่วโมง (2 วัน)', hours: 48 },
+  { label: '72 ชั่วโมง (3 วัน)', hours: 72 },
+  { label: '168 ชั่วโมง (1 สัปดาห์)', hours: 168 },
 ];
 
 interface ScheduleDialogProps {
@@ -996,144 +999,150 @@ interface ScheduleDialogProps {
 }
 
 function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: ScheduleDialogProps) {
-  const [selectedPreset, setSelectedPreset] = useState<string>('');
-  const [customCron, setCustomCron] = useState('');
-  const [customLabel, setCustomLabel] = useState('');
+  const [intervalHours, setIntervalHours] = useState(24);
   const [isEnabled, setIsEnabled] = useState(false);
-  const [cronError, setCronError] = useState('');
+  const [customHours, setCustomHours] = useState('');
+  const [useCustom, setUseCustom] = useState(false);
 
   useEffect(() => {
     if (open && config) {
       setIsEnabled(config.is_enabled);
-      const preset = PRESET_SCHEDULES.find((p) => p.cron === config.cron_expression);
-      if (preset && preset.cron !== 'custom') {
-        setSelectedPreset(preset.cron);
-        setCustomCron('');
-        setCustomLabel('');
+      const hours = config.interval_hours ?? 24;
+      const isPreset = INTERVAL_PRESETS.some((p) => p.hours === hours);
+      if (isPreset) {
+        setIntervalHours(hours);
+        setUseCustom(false);
+        setCustomHours('');
       } else {
-        setSelectedPreset('custom');
-        setCustomCron(config.cron_expression);
-        setCustomLabel(config.label);
+        setUseCustom(true);
+        setCustomHours(String(hours));
+        setIntervalHours(hours);
       }
     }
   }, [open, config]);
 
-  const validateCron = (expr: string): boolean => {
-    const parts = expr.trim().split(/\s+/);
-    if (parts.length !== 5) return false;
-    const field = /^(\*|(\d+(-\d+)?)(\,(\d+(-\d+)?))*|(\*\/\d+))$/;
-    return parts.every((p) => field.test(p));
-  };
+  const effectiveHours = useCustom ? (parseInt(customHours) || 0) : intervalHours;
+  const isValid = effectiveHours >= 1 && effectiveHours <= 168;
 
   const handleSave = () => {
-    const isCustom = selectedPreset === 'custom';
-    const cronExpr = isCustom ? customCron.trim() : selectedPreset;
-    if (!cronExpr) { setCronError('กรุณาเลือกหรือกรอก cron expression'); return; }
-    if (!validateCron(cronExpr)) { setCronError('รูปแบบ cron ไม่ถูกต้อง (ต้องมี 5 ช่อง เช่น "0 3 * * *")'); return; }
-    setCronError('');
-    const label = isCustom
-      ? (customLabel.trim() || cronExpr)
-      : (PRESET_SCHEDULES.find((p) => p.cron === cronExpr)?.label ?? cronExpr);
-    onSave({ cron_expression: cronExpr, label, is_enabled: isEnabled });
+    if (!isValid) return;
+    onSave({ interval_hours: effectiveHours, is_enabled: isEnabled });
   };
 
-  const activeCron = selectedPreset === 'custom' ? customCron : selectedPreset;
+  // Describe what the setting means in plain Thai
+  const describeInterval = (h: number) => {
+    if (h < 24) return `ส่งซ้ำได้ทุก ${h} ชั่วโมง`;
+    if (h === 24) return 'ส่งซ้ำได้วันละ 1 ครั้ง';
+    if (h === 48) return 'ส่งซ้ำได้ทุก 2 วัน';
+    if (h === 72) return 'ส่งซ้ำได้ทุก 3 วัน';
+    if (h === 168) return 'ส่งซ้ำได้สัปดาห์ละ 1 ครั้ง';
+    return `ส่งซ้ำได้ทุก ${h} ชั่วโมง`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            ตั้งเวลาส่งอัตโนมัติ
+            ตั้งความถี่การส่ง
           </DialogTitle>
           <DialogDescription>
-            กำหนดตารางเวลาที่ระบบจะส่งแคมเปญที่เปิดใช้งานอยู่ไปยัง Discord โดยอัตโนมัติ
+            กำหนดว่าระบบจะส่งแคมเปญซ้ำได้บ่อยแค่ไหน
+            เพื่อป้องกันข้อความสแปมในช่อง Discord
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* Enable toggle */}
+
+          {/* ── Enable toggle ── */}
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium">เปิดใช้งานการส่งอัตโนมัติ</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                ปิดเพื่อหยุดการส่งชั่วคราวโดยไม่ต้องลบตาราง
+                ปิดเพื่อหยุดชั่วคราวโดยไม่ต้องลบการตั้งค่า
               </p>
             </div>
             <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
           </div>
 
-          {/* Preset selector */}
+          {/* ── Interval presets ── */}
           <div className="space-y-2">
-            <Label>เลือกตารางเวลา</Label>
-            <div className="grid grid-cols-1 gap-1.5">
-              {PRESET_SCHEDULES.map((preset) => (
+            <Label>ส่งซ้ำทุก...</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {INTERVAL_PRESETS.map((preset) => (
                 <button
-                  key={preset.cron}
+                  key={preset.hours}
                   type="button"
-                  onClick={() => { setSelectedPreset(preset.cron); setCronError(''); }}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
-                    selectedPreset === preset.cron
+                  onClick={() => { setIntervalHours(preset.hours); setUseCustom(false); }}
+                  className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
+                    !useCustom && intervalHours === preset.hours
                       ? 'border-primary bg-primary/5 text-primary font-medium'
                       : 'border-border hover:bg-muted/50'
                   }`}
                 >
-                  <span>{preset.label}</span>
-                  {preset.cron !== 'custom' && (
-                    <code className="text-xs text-muted-foreground font-mono">{preset.cron}</code>
-                  )}
+                  {preset.label}
                 </button>
               ))}
+              {/* Custom option */}
+              <button
+                type="button"
+                onClick={() => setUseCustom(true)}
+                className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors col-span-2 ${
+                  useCustom
+                    ? 'border-primary bg-primary/5 text-primary font-medium'
+                    : 'border-border hover:bg-muted/50'
+                }`}
+              >
+                กำหนดเอง...
+              </button>
             </div>
           </div>
 
-          {/* Custom cron input */}
-          {selectedPreset === 'custom' && (
-            <div className="space-y-3 pl-3 border-l-2 border-primary/20">
-              <div>
-                <Label htmlFor="custom_cron">Cron Expression (UTC)</Label>
+          {/* ── Custom hours input ── */}
+          {useCustom && (
+            <div className="pl-3 border-l-2 border-primary/20 space-y-1">
+              <Label htmlFor="custom_hours">จำนวนชั่วโมง (1–168)</Label>
+              <div className="flex items-center gap-2">
                 <Input
-                  id="custom_cron"
-                  value={customCron}
-                  onChange={(e) => { setCustomCron(e.target.value); setCronError(''); }}
-                  placeholder="0 3 * * *"
-                  className="font-mono"
+                  id="custom_hours"
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={customHours}
+                  onChange={(e) => setCustomHours(e.target.value)}
+                  placeholder="เช่น 3"
+                  className="w-28"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  รูปแบบ: นาที ชั่วโมง วันที่ เดือน วันในสัปดาห์ (UTC, ไทย = UTC+7)
-                </p>
+                <span className="text-sm text-muted-foreground">ชั่วโมง</span>
               </div>
-              <div>
-                <Label htmlFor="custom_label">ชื่อที่แสดง</Label>
-                <Input
-                  id="custom_label"
-                  value={customLabel}
-                  onChange={(e) => setCustomLabel(e.target.value)}
-                  placeholder="เช่น: ทุกวันอาทิตย์ 09:00 น."
-                />
-              </div>
+              {customHours && !isValid && (
+                <p className="text-xs text-destructive">ต้องอยู่ระหว่าง 1–168 ชั่วโมง</p>
+              )}
             </div>
           )}
 
-          {/* Error */}
-          {cronError && (
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {cronError}
-            </div>
-          )}
-
-          {/* Summary */}
-          {activeCron && activeCron !== 'custom' && validateCron(activeCron) && (
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm space-y-1">
-              <p className="font-medium">สรุป</p>
+          {/* ── Summary box ── */}
+          {isValid && (
+            <div className="rounded-lg bg-muted/40 px-4 py-3 space-y-2 text-sm">
+              <div className="flex items-center gap-2 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                สรุปการตั้งค่า
+              </div>
               <p className="text-muted-foreground">
-                Expression: <code className="font-mono text-foreground">{activeCron}</code>
+                {describeInterval(effectiveHours)}
               </p>
               <p className="text-muted-foreground">
+                ระบบจะตรวจสอบทุกชั่วโมง แต่จะส่งจริงเมื่อผ่านไปครบ{' '}
+                <span className="font-medium text-foreground">{effectiveHours} ชั่วโมง</span>{' '}
+                นับจากครั้งล่าสุด
+              </p>
+              <p className="text-muted-foreground">
+                ช่องที่ไม่มีกิจกรรมใน 7 วัน จะถูกข้ามโดยอัตโนมัติ
+              </p>
+              <p>
                 สถานะ:{' '}
-                <span className={isEnabled ? 'text-green-600 font-medium' : ''}>
+                <span className={isEnabled ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
                   {isEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
                 </span>
               </p>
@@ -1143,9 +1152,9 @@ function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: Schedu
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          <Button onClick={handleSave} disabled={isSaving || !isValid} className="gap-2">
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            บันทึกตาราง
+            บันทึก
           </Button>
         </DialogFooter>
       </DialogContent>
