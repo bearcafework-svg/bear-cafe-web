@@ -230,7 +230,9 @@ export function TradingHistoryManagement() {
         .eq('key', 'trading_webhook_enabled')
         .single();
       if (data) {
-        setWebhookEnabled(Boolean(data.value));
+        // data.value is JSONB — could be boolean true/false or string "true"/"false"
+        const val = data.value;
+        setWebhookEnabled(val === true || val === 'true');
       }
     };
     loadSettings();
