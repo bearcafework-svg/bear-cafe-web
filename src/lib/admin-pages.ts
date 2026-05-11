@@ -38,6 +38,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'secret-table', label: 'Secret Table', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'profile-frames', label: 'กรอบโปรไฟล์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
+  { id: 'campaigns', label: 'แคมเปญโฆษณา', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */
