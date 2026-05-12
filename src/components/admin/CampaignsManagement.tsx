@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
-  Image as ImageIcon,
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from '@hello-pangea/dnd';
+import {
+  GripVertical,
   Plus,
   Trash2,
   Edit,
@@ -41,6 +47,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  BarChart2,
+  MessageSquare,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
@@ -74,6 +82,14 @@ type ScheduleConfig = {
   updated_at: string;
 };
 
+type ActivityStats = {
+  channel_id: string;
+  count_24h: number;
+  count_7d: number;
+  count_30d: number;
+  updated_at: string;
+};
+
 interface DiscordChannel {
   id: string;
   name: string;
@@ -93,7 +109,6 @@ interface FormData {
   button_emoji_id: string;
   button_emoji_name: string;
   target_channels: string[];
-  sort_order: number;
   is_active: boolean;
 }
 
@@ -107,7 +122,6 @@ const INITIAL_FORM: FormData = {
   button_emoji_id: '',
   button_emoji_name: '',
   target_channels: [],
-  sort_order: 0,
   is_active: true,
 };
 
@@ -115,6 +129,7 @@ export function CampaignsManagement() {
   const [campaigns, setCampaigns] = useState<CampaignMessage[]>([]);
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
+  const [activityStats, setActivityStats] = useState<ActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -135,14 +150,16 @@ export function CampaignsManagement() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const [campaignsRes, scheduleRes] = await Promise.all([
+      const [campaignsRes, scheduleRes, activityRes] = await Promise.all([
         supabase.from('campaign_messages').select('*').order('sort_order', { ascending: true }),
         supabase.from('campaign_schedule_config').select('*').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle(),
+        supabase.from('channel_activity_stats').select('*').eq('channel_id', '1144585665883938927').maybeSingle(),
       ]);
 
       if (campaignsRes.error) throw campaignsRes.error;
       setCampaigns(campaignsRes.data || []);
       if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
+      if (activityRes.data) setActivityStats(activityRes.data as ActivityStats);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
@@ -154,6 +171,35 @@ export function CampaignsManagement() {
       setLoading(false);
     }
   };
+
+  // ─── Drag-and-drop reorder ───────────────────────────────────────────────
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+
+    // Reorder local state immediately for snappy UI
+    const reordered = Array.from(campaigns);
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+
+    // Assign new sort_order values (0, 1, 2, …)
+    const updated = reordered.map((c, i) => ({ ...c, sort_order: i }));
+    setCampaigns(updated);
+
+    // Persist to DB — batch update
+    try {
+      const updates = updated.map((c) =>
+        supabase
+          .from('campaign_messages')
+          .update({ sort_order: c.sort_order })
+          .eq('id', c.id)
+      );
+      await Promise.all(updates);
+    } catch (err) {
+      console.error('Failed to save order:', err);
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถบันทึกลำดับได้', variant: 'destructive' });
+      fetchCampaigns(); // revert
+    }
+  }, [campaigns]);
 
   // ─── Sync Discord channels ───────────────────────────────────────────────
   const syncChannels = async () => {
@@ -290,13 +336,12 @@ export function CampaignsManagement() {
           .from('campaign_messages')
           .update(payload)
           .eq('id', editingCampaign.id);
-
         if (error) throw error;
         toast({ title: 'สำเร็จ', description: 'แก้ไขแคมเปญเรียบร้อยแล้ว' });
       } else {
         const { error } = await supabase
           .from('campaign_messages')
-          .insert([payload]);
+          .insert([{ ...payload, sort_order: campaigns.length }]);
 
         if (error) throw error;
         toast({ title: 'สำเร็จ', description: 'สร้างแคมเปญเรียบร้อยแล้ว' });
@@ -355,7 +400,6 @@ export function CampaignsManagement() {
       button_emoji_id: campaign.button_emoji_id || '',
       button_emoji_name: campaign.button_emoji_name || '',
       target_channels: campaign.target_channels || [],
-      sort_order: campaign.sort_order,
       is_active: campaign.is_active,
     });
     setDialogOpen(true);
@@ -439,9 +483,23 @@ export function CampaignsManagement() {
     }
   };
 
-  // ─── Initial load ────────────────────────────────────────────────────────
+  // ─── Initial load + realtime subscription ───────────────────────────────
   useEffect(() => {
     fetchCampaigns();
+
+    // Subscribe to live updates from channel_activity_stats
+    const sub = supabase
+      .channel('channel_activity_stats_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'channel_activity_stats' },
+        (payload) => {
+          if (payload.new) setActivityStats(payload.new as ActivityStats);
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(sub); };
   }, []);
 
   return (
@@ -486,9 +544,77 @@ export function CampaignsManagement() {
         </CardHeader>
       </Card>
 
+      {/* ─── Channel Activity Stats ─── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+            <BarChart2 className="w-4 h-4" />
+            กิจกรรมช่อง #1144585665883938927
+            {activityStats && (
+              <span className="ml-auto text-xs font-normal">
+                อัปเดตล่าสุด{' '}
+                {new Date(activityStats.updated_at).toLocaleTimeString('th-TH', {
+                  hour: '2-digit', minute: '2-digit', second: '2-digit',
+                })}
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {!activityStats ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              รอข้อมูลจาก cron (อัปเดตทุกนาที)...
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {/* 24h */}
+              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs text-muted-foreground">24 ชั่วโมง</span>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {activityStats.count_24h.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+              </div>
+              {/* 7d */}
+              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-violet-500" />
+                  <span className="text-xs text-muted-foreground">7 วัน</span>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {activityStats.count_7d.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+              </div>
+              {/* 30d */}
+              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-orange-500" />
+                  <span className="text-xs text-muted-foreground">30 วัน</span>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {activityStats.count_30d.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ─── Campaigns table ─── */}
       <Card>
         <CardContent className="p-6">
+          {campaigns.length > 1 && !loading && (
+            <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+              <GripVertical className="w-3.5 h-3.5" />
+              ลากแถวเพื่อเรียงลำดับการส่ง
+            </p>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -499,75 +625,102 @@ export function CampaignsManagement() {
               <p>ยังไม่มีแคมเปญ</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ชื่อภายใน</TableHead>
-                  <TableHead>ข้อความ</TableHead>
-                  <TableHead>ช่องเป้าหมาย</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>ส่งล่าสุด</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((campaign) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">{campaign.internal_name}</TableCell>
-                    <TableCell className="max-w-xs truncate">{campaign.content_text}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{campaign.target_channels?.length || 0} ช่อง</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {campaign.is_active ? (
-                        <Badge className="bg-green-500">เปิดใช้งาน</Badge>
-                      ) : (
-                        <Badge variant="secondary">ปิดใช้งาน</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {campaign.last_sent_at
-                        ? new Date(campaign.last_sent_at).toLocaleDateString('th-TH', {
-                            day: 'numeric', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit',
-                          })
-                        : 'ยังไม่เคยส่ง'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenTestSend(campaign)}
-                          title="ทดลองส่ง"
-                          className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
-                        >
-                          <FlaskConical className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(campaign)}
-                          title="แก้ไข"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(campaign.id)}
-                          disabled={isDeleting}
-                          title="ลบ"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>ชื่อภายใน</TableHead>
+                    <TableHead>ข้อความ</TableHead>
+                    <TableHead>ช่องเป้าหมาย</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead>ส่งล่าสุด</TableHead>
+                    <TableHead className="text-right">จัดการ</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <Droppable droppableId="campaigns">
+                  {(provided) => (
+                    <TableBody ref={provided.innerRef} {...provided.droppableProps}>
+                      {campaigns.map((campaign, index) => (
+                        <Draggable key={campaign.id} draggableId={campaign.id} index={index}>
+                          {(drag, snapshot) => (
+                            <TableRow
+                              ref={drag.innerRef}
+                              {...drag.draggableProps}
+                              className={snapshot.isDragging ? 'opacity-80 bg-muted shadow-lg' : ''}
+                            >
+                              {/* Drag handle */}
+                              <TableCell className="w-8 pr-0">
+                                <span
+                                  {...drag.dragHandleProps}
+                                  className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                                >
+                                  <GripVertical className="w-4 h-4" />
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-medium">{campaign.internal_name}</TableCell>
+                              <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
+                                {campaign.content_text}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{campaign.target_channels?.length || 0} ช่อง</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {campaign.is_active ? (
+                                  <Badge className="bg-green-500">เปิดใช้งาน</Badge>
+                                ) : (
+                                  <Badge variant="secondary">ปิดใช้งาน</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {campaign.last_sent_at
+                                  ? new Date(campaign.last_sent_at).toLocaleDateString('th-TH', {
+                                      day: 'numeric', month: 'short', year: 'numeric',
+                                      hour: '2-digit', minute: '2-digit',
+                                    })
+                                  : 'ยังไม่เคยส่ง'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenTestSend(campaign)}
+                                    title="ทดลองส่ง"
+                                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                  >
+                                    <FlaskConical className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(campaign)}
+                                    title="แก้ไข"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDelete(campaign.id)}
+                                    disabled={isDeleting}
+                                    title="ลบ"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </TableBody>
+                  )}
+                </Droppable>
+              </Table>
+            </DragDropContext>
           )}
         </CardContent>
       </Card>
@@ -873,17 +1026,6 @@ export function CampaignsManagement() {
                 <p className="text-xs text-muted-foreground mt-1">
                   เลือกแล้ว {formData.target_channels.length} ช่อง
                 </p>
-              </div>
-
-              {/* Sort order */}
-              <div>
-                <Label htmlFor="sort_order">ลำดับการแสดง</Label>
-                <Input
-                  id="sort_order"
-                  type="number"
-                  value={formData.sort_order}
-                  onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                />
               </div>
 
               {/* Active toggle */}

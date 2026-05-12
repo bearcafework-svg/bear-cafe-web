@@ -1,34 +1,39 @@
 /**
  * cron-smart-announcements
- * Runs every hour via pg_cron ('0 * * * *').
- * The actual send frequency is controlled by `interval_hours` in campaign_schedule_config.
+ * Runs every minute via pg_cron ('* * * * *').
  *
- * Anti-spam logic (per campaign):
- *   - If last_sent_at is NULL → send (first time)
- *   - If now - last_sent_at < interval_hours → skip (cooldown active)
- *   - If now - last_sent_at >= interval_hours → send
+ * Round-robin logic — sends ONE campaign per invocation:
+ *   1. Filter active campaigns whose cooldown has expired
+ *   2. Pick the one with the oldest last_sent_at (NULL = never sent = highest priority)
+ *   3. Send it to all target channels (skip inactive ones)
+ *   4. Update last_sent_at
  *
- * Channel activity check:
- *   - Fetches the last message in the channel
- *   - Skips if no message in the last 7 days (dead channel)
+ * This guarantees campaigns rotate in order and never all fire at once.
+ *
+ * Anti-spam:
+ *   - Cooldown per campaign: interval_minutes from campaign_schedule_config
+ *   - Channel activity check: skip channels with no message in last 7 days
+ *   - 1000ms delay between Discord API calls
  *
  * pg_cron setup (run once in Supabase SQL Editor):
  *
  *   SELECT cron.schedule(
  *     'smart-announcements',
- *     '0 * * * *',   -- every hour; interval_hours controls actual frequency
+ *     '* * * * *',
  *     $$
  *     SELECT net.http_post(
  *       url     := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/cron-smart-announcements',
- *       headers := '{"Authorization":"Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+ *       headers := jsonb_build_object(
+ *         'Content-Type',  'application/json',
+ *         'Authorization', 'Bearer ' || (
+ *           SELECT decrypted_secret FROM vault.decrypted_secrets
+ *           WHERE name = 'service_role_key' LIMIT 1
+ *         )
+ *       ),
+ *       body := '{}'::jsonb
  *     );
  *     $$
  *   );
- *
- * Required env vars:
- *   DISCORD_BOT_TOKEN
- *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -101,11 +106,32 @@ function buildCampaignPayload(campaign: CampaignMessage): Record<string, unknown
   };
 }
 
-// ─── Check if campaign is past its cooldown ───────────────────────────────────
-function isCooldownExpired(lastSentAt: string | null, intervalMinutes: number): boolean {
-  if (!lastSentAt) return true;
-  const elapsed = Date.now() - new Date(lastSentAt).getTime();
-  return elapsed >= intervalMinutes * 60 * 1000;
+// ─── Pick the next campaign to send (round-robin by oldest last_sent_at) ─────
+// Returns null if no campaign is ready (all on cooldown)
+function pickNextCampaign(
+  campaigns: CampaignMessage[],
+  intervalMinutes: number,
+): CampaignMessage | null {
+  const nowMs = Date.now();
+  const intervalMs = intervalMinutes * 60 * 1000;
+
+  // Filter to only campaigns whose cooldown has expired
+  const ready = campaigns.filter((c) => {
+    if (!c.last_sent_at) return true; // never sent → always ready
+    return nowMs - new Date(c.last_sent_at).getTime() >= intervalMs;
+  });
+
+  if (ready.length === 0) return null;
+
+  // Sort: null last_sent_at first (never sent), then oldest last_sent_at
+  ready.sort((a, b) => {
+    if (!a.last_sent_at && !b.last_sent_at) return a.sort_order - b.sort_order;
+    if (!a.last_sent_at) return -1;
+    if (!b.last_sent_at) return 1;
+    return new Date(a.last_sent_at).getTime() - new Date(b.last_sent_at).getTime();
+  });
+
+  return ready[0];
 }
 
 // ─── Human-readable time until next send ─────────────────────────────────────
@@ -117,25 +143,76 @@ function timeUntilNext(lastSentAt: string, intervalMinutes: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// ─── Check if channel has recent activity (last 7 days) ──────────────────────
-async function hasRecentActivity(channelId: string, botToken: string): Promise<boolean> {
-  try {
-    const res = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages?limit=1`,
-      { headers: { Authorization: `Bot ${botToken}` } },
+// ─── Check if the activity channel has recent messages (last 7 days) ─────────
+// Uses a fixed reference channel instead of checking each target channel individually.
+const ACTIVITY_REFERENCE_CHANNEL = "1144585665883938927";
+
+interface ActivityStats {
+  count_24h: number;
+  count_7d: number;
+  count_30d: number;
+  oldest_sampled: string | null;
+  is_active: boolean; // true if any message in last 7 days
+}
+
+/**
+ * Fetch up to 500 recent messages from the reference channel (5 pages × 100),
+ * count how many fall within 24h / 7d / 30d windows,
+ * and return whether the channel is considered "active" (message in last 7 days).
+ */
+async function fetchActivityStats(botToken: string): Promise<ActivityStats> {
+  const now = Date.now();
+  const cut24h  = now - 1  * 24 * 60 * 60 * 1000;
+  const cut7d   = now - 7  * 24 * 60 * 60 * 1000;
+  const cut30d  = now - 30 * 24 * 60 * 60 * 1000;
+
+  let count24h = 0;
+  let count7d  = 0;
+  let count30d = 0;
+  let oldestSampled: string | null = null;
+  let beforeId: string | undefined;
+  let reachedOlderThan30d = false;
+
+  // Paginate up to 5 pages (500 messages) — enough for most active channels
+  for (let page = 0; page < 5 && !reachedOlderThan30d; page++) {
+    const url = new URL(
+      `https://discord.com/api/v10/channels/${ACTIVITY_REFERENCE_CHANNEL}/messages`,
     );
+    url.searchParams.set("limit", "100");
+    if (beforeId) url.searchParams.set("before", beforeId);
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bot ${botToken}` },
+    });
+
     if (!res.ok) {
-      console.warn(`[activity] Channel ${channelId} returned ${res.status} — skipping`);
-      return false;
+      console.warn(`[activity-stats] Page ${page} returned ${res.status}`);
+      break;
     }
+
     const messages: DiscordMessage[] = await res.json();
-    if (messages.length === 0) return false;
-    const lastMs = new Date(messages[0].timestamp).getTime();
-    return Date.now() - lastMs < 7 * 24 * 60 * 60 * 1000;
-  } catch (err) {
-    console.error(`[activity] Error checking channel ${channelId}:`, err);
-    return false;
+    if (messages.length === 0) break;
+
+    for (const msg of messages) {
+      const ts = new Date(msg.timestamp).getTime();
+      oldestSampled = msg.timestamp; // messages are newest-first
+      if (ts >= cut24h)  count24h++;
+      if (ts >= cut7d)   count7d++;
+      if (ts >= cut30d)  count30d++;
+      else { reachedOlderThan30d = true; break; }
+    }
+
+    beforeId = messages[messages.length - 1].id;
+    if (messages.length < 100) break; // no more pages
   }
+
+  return {
+    count_24h: count24h,
+    count_7d:  count7d,
+    count_30d: count30d,
+    oldest_sampled: oldestSampled,
+    is_active: count7d > 0,
+  };
 }
 
 // ─── Send to a single Discord channel ────────────────────────────────────────
@@ -208,7 +285,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const config = configRow as ScheduleConfig | null;
 
-    // If schedule is disabled, exit early
     if (!config?.is_enabled) {
       console.log("[cron] Schedule is disabled — exiting");
       return new Response(
@@ -218,9 +294,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const intervalMinutes = config.interval_minutes ?? 1440;
-    console.log(`[cron] Running with interval_minutes=${intervalMinutes}`);
 
-    // ─── 2. Fetch active campaigns ────────────────────────────────────────────
+    // ─── 2. Fetch all active campaigns ────────────────────────────────────────
     const { data: campaigns, error: fetchError } = await supabase
       .from("campaign_messages")
       .select("*")
@@ -242,101 +317,141 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const results: Record<string, unknown>[] = [];
-    let totalSent = 0;
-    let totalCooldown = 0;
-    let totalSkipped = 0;
-    let totalFailed = 0;
+    // ─── 3. Round-robin: pick ONE campaign to send this invocation ────────────
+    const campaign = pickNextCampaign(campaigns as CampaignMessage[], intervalMinutes);
 
-    // ─── 3. Process each campaign ─────────────────────────────────────────────
-    for (const campaign of campaigns as CampaignMessage[]) {
+    if (!campaign) {
+      // All campaigns are on cooldown — report when each will be ready
+      const nextTimes = (campaigns as CampaignMessage[])
+        .filter((c) => c.last_sent_at)
+        .map((c) => ({
+          name: c.internal_name,
+          next_in: timeUntilNext(c.last_sent_at!, intervalMinutes),
+        }));
 
-      // ── Anti-spam: check cooldown ──────────────────────────────────────────
-      if (!isCooldownExpired(campaign.last_sent_at, intervalMinutes)) {
-        const remaining = timeUntilNext(campaign.last_sent_at!, intervalMinutes);
-        console.log(
-          `[cron] "${campaign.internal_name}" cooldown active — next in ${remaining}`,
-        );
-        results.push({
-          campaign_id: campaign.id,
-          campaign_name: campaign.internal_name,
-          status: "cooldown",
-          next_send_in: remaining,
-        });
-        totalCooldown++;
-        continue;
-      }
-
-      const payload = buildCampaignPayload(campaign);
-      const channelResults: Record<string, unknown>[] = [];
-      let anySent = false;
-
-      console.log(
-        `[cron] "${campaign.internal_name}" — targeting ${campaign.target_channels.length} channels`,
+      console.log(`[cron] All ${campaigns.length} campaigns on cooldown`);
+      return new Response(
+        JSON.stringify({
+          message: "All campaigns on cooldown",
+          interval_minutes: intervalMinutes,
+          campaigns_on_cooldown: campaigns.length,
+          next_sends: nextTimes,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
-
-      // ── Send to each target channel ────────────────────────────────────────
-      for (const channelId of campaign.target_channels) {
-
-        // Activity check — skip dead channels
-        const active = await hasRecentActivity(channelId, botToken);
-        if (!active) {
-          console.log(`[cron] Channel ${channelId} inactive — skipping`);
-          channelResults.push({ channel_id: channelId, status: "skipped", reason: "inactive_7d" });
-          totalSkipped++;
-          continue;
-        }
-
-        // Send
-        const result = await sendToChannel(channelId, payload, botToken);
-        if (result.success) {
-          console.log(`[cron] Sent to ${channelId}, messageId=${result.messageId}`);
-          channelResults.push({ channel_id: channelId, status: "sent", message_id: result.messageId });
-          totalSent++;
-          anySent = true;
-        } else {
-          console.error(`[cron] Failed ${channelId}: ${result.error}`);
-          channelResults.push({ channel_id: channelId, status: "failed", error: result.error });
-          totalFailed++;
-        }
-
-        // 1 second between Discord API calls
-        await delay(1000);
-      }
-
-      // ── Update last_sent_at only if at least one channel was sent ──────────
-      if (anySent) {
-        const { error: updateError } = await supabase
-          .from("campaign_messages")
-          .update({ last_sent_at: new Date().toISOString() })
-          .eq("id", campaign.id);
-
-        if (updateError) {
-          console.error(`[cron] Failed to update last_sent_at for "${campaign.internal_name}":`, updateError);
-        }
-      }
-
-      results.push({
-        campaign_id: campaign.id,
-        campaign_name: campaign.internal_name,
-        channels: channelResults,
-      });
     }
 
     console.log(
-      `[cron] Done — sent=${totalSent} cooldown=${totalCooldown} skipped=${totalSkipped} failed=${totalFailed}`,
+      `[cron] Round-robin selected: "${campaign.internal_name}" ` +
+      `(last_sent_at=${campaign.last_sent_at ?? "never"}, ` +
+      `interval=${intervalMinutes}min, ` +
+      `channels=${campaign.target_channels.length})`,
+    );
+
+    // ─── 4. Fetch activity stats + check if server is active ─────────────────
+    let activityStats: ActivityStats;
+    try {
+      activityStats = await fetchActivityStats(botToken);
+    } catch (err) {
+      console.error("[cron] Failed to fetch activity stats:", err);
+      // Fail open — don't block sends if stats fetch errors
+      activityStats = { count_24h: 0, count_7d: 0, count_30d: 0, oldest_sampled: null, is_active: true };
+    }
+
+    // Persist stats to DB (upsert — non-blocking, don't await failure)
+    supabase.from("channel_activity_stats").upsert({
+      channel_id:     ACTIVITY_REFERENCE_CHANNEL,
+      count_24h:      activityStats.count_24h,
+      count_7d:       activityStats.count_7d,
+      count_30d:      activityStats.count_30d,
+      oldest_sampled: activityStats.oldest_sampled,
+      updated_at:     new Date().toISOString(),
+    }, { onConflict: "channel_id" }).then(({ error }) => {
+      if (error) console.error("[cron] Failed to save activity stats:", error);
+    });
+
+    console.log(
+      `[activity] 24h=${activityStats.count_24h} 7d=${activityStats.count_7d} 30d=${activityStats.count_30d} active=${activityStats.is_active}`,
+    );
+
+    if (!activityStats.is_active) {
+      console.log(`[cron] Reference channel inactive (7d) — skipping all sends`);
+      return new Response(
+        JSON.stringify({
+          message: "Reference channel inactive — no sends",
+          reference_channel: ACTIVITY_REFERENCE_CHANNEL,
+          activity: activityStats,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ─── 5. Send to each target channel ──────────────────────────────────────
+    const payload = buildCampaignPayload(campaign);
+    const channelResults: Record<string, unknown>[] = [];
+    let totalSent = 0;
+    let totalSkipped = 0;
+    let totalFailed = 0;
+    let anySent = false;
+
+    for (const channelId of campaign.target_channels) {
+      const result = await sendToChannel(channelId, payload, botToken);
+      if (result.success) {
+        console.log(`[cron] Sent to ${channelId}, messageId=${result.messageId}`);
+        channelResults.push({ channel_id: channelId, status: "sent", message_id: result.messageId });
+        totalSent++;
+        anySent = true;
+      } else {
+        console.error(`[cron] Failed ${channelId}: ${result.error}`);
+        channelResults.push({ channel_id: channelId, status: "failed", error: result.error });
+        totalFailed++;
+      }
+
+      // 1 second between Discord API calls to avoid rate limits
+      await delay(1000);
+    }
+
+    // ─── 5. Update last_sent_at (only if at least one channel succeeded) ─────
+    if (anySent) {
+      const { error: updateError } = await supabase
+        .from("campaign_messages")
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq("id", campaign.id);
+
+      if (updateError) {
+        console.error(`[cron] Failed to update last_sent_at:`, updateError);
+      }
+    }
+
+    // ─── 6. Report cooldown status of remaining campaigns ────────────────────
+    const remaining = (campaigns as CampaignMessage[])
+      .filter((c) => c.id !== campaign.id && c.last_sent_at)
+      .map((c) => ({
+        name: c.internal_name,
+        next_in: timeUntilNext(c.last_sent_at!, intervalMinutes),
+      }));
+
+    console.log(
+      `[cron] Done — sent=${totalSent} skipped=${totalSkipped} failed=${totalFailed}`,
     );
 
     return new Response(
       JSON.stringify({
         success: true,
+        mode: "round_robin",
         interval_minutes: intervalMinutes,
-        campaigns_processed: campaigns.length,
+        activity_reference_channel: ACTIVITY_REFERENCE_CHANNEL,
+        activity: {
+          count_24h: activityStats.count_24h,
+          count_7d:  activityStats.count_7d,
+          count_30d: activityStats.count_30d,
+        },
+        selected_campaign: campaign.internal_name,
         total_sent: totalSent,
-        total_cooldown: totalCooldown,
         total_skipped: totalSkipped,
         total_failed: totalFailed,
-        results,
+        channels: channelResults,
+        other_campaigns_cooldown: remaining,
         executed_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
