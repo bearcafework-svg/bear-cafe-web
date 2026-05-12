@@ -334,9 +334,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // ─── 6. Update this campaign's next_send_at ───────────────────────────────
-    // Set to now + interval so it won't fire again until the full interval passes
+    // next_send_at = now + (total_campaigns × interval)
+    // This ensures this campaign won't fire again until all others have had a turn
     const nowIso = new Date().toISOString();
-    const nextSendAt = new Date(Date.now() + intervalMs).toISOString();
+    const totalCampaigns = campaigns.length;
+    const nextSendAt = new Date(Date.now() + totalCampaigns * intervalMs).toISOString();
 
     if (anySent) {
       await supabase
@@ -344,7 +346,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .update({ last_sent_at: nowIso, next_send_at: nextSendAt })
         .eq("id", campaign.id);
 
-      console.log(`[cron] "${campaign.internal_name}" next_send_at set to ${nextSendAt}`);
+      console.log(
+        `[cron] "${campaign.internal_name}" next_send_at = ${nextSendAt} ` +
+        `(${totalCampaigns} campaigns × ${intervalMinutes}min)`,
+      );
     }
 
     // ─── 7. Queue status of all campaigns ────────────────────────────────────

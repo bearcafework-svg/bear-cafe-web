@@ -48,6 +48,7 @@ import {
   CheckCircle2,
   XCircle,
   BarChart2,
+  RotateCcw,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
@@ -144,6 +145,7 @@ export function CampaignsManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+  const [isResettingQueue, setIsResettingQueue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -195,6 +197,8 @@ export function CampaignsManagement() {
           .eq('id', c.id)
       );
       await Promise.all(updates);
+      // Recalculate queue after reorder
+      await handleResetQueue(true);
     } catch (err) {
       console.error('Failed to save order:', err);
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถบันทึกลำดับได้', variant: 'destructive' });
@@ -462,6 +466,29 @@ export function CampaignsManagement() {
     }
   };
 
+  // ─── Reset queue ─────────────────────────────────────────────────────────
+  const handleResetQueue = async (silent = false) => {
+    try {
+      setIsResettingQueue(true);
+      const { data, error } = await supabase.functions.invoke('reset-campaign-queue');
+      if (error) throw error;
+      if (!silent) {
+        toast({
+          title: 'รีเซ็ตคิวสำเร็จ',
+          description: `จัดคิว ${data?.updated ?? 0} แคมเปญใหม่ (interval ${data?.interval_minutes} นาที)`,
+        });
+      }
+      fetchCampaigns();
+    } catch (error: any) {
+      console.error('Reset queue error:', error);
+      if (!silent) {
+        toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถรีเซ็ตคิวได้', variant: 'destructive' });
+      }
+    } finally {
+      setIsResettingQueue(false);
+    }
+  };
+
   // ─── Update schedule ─────────────────────────────────────────────────────
   const handleUpdateSchedule = async (newConfig: Partial<ScheduleConfig>) => {
     try {
@@ -475,7 +502,8 @@ export function CampaignsManagement() {
       if (error) throw error;
       toast({ title: 'บันทึกตารางเวลาแล้ว', description: data?.label || 'อัปเดตเรียบร้อย' });
       setScheduleDialogOpen(false);
-      fetchCampaigns();
+      // Auto-reset queue so all next_send_at values reflect the new interval
+      await handleResetQueue(true);
     } catch (error: any) {
       console.error('Schedule update error:', error);
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปเดตตารางเวลาได้', variant: 'destructive' });
@@ -543,6 +571,21 @@ export function CampaignsManagement() {
               จัดการแคมเปญโฆษณา
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleResetQueue()}
+                disabled={isResettingQueue || campaigns.length === 0}
+                className="gap-2"
+                title="รีเซ็ตคิวใหม่ตาม sort_order และ interval ปัจจุบัน"
+              >
+                {isResettingQueue ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                รีเซ็ตคิว
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
