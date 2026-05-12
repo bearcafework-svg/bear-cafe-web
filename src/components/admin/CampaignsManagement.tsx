@@ -130,6 +130,7 @@ export function CampaignsManagement() {
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
   const [activityStats, setActivityStats] = useState<ActivityStats | null>(null);
+  const [tick, setTick] = useState(0); // increments every second to drive countdown
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -341,7 +342,7 @@ export function CampaignsManagement() {
       } else {
         const { error } = await supabase
           .from('campaign_messages')
-          .insert([{ ...payload, sort_order: campaigns.length }]);
+          .insert([{ ...payload, sort_order: campaigns.length, next_send_at: computeNewNextSendAt() }]);
 
         if (error) throw error;
         toast({ title: 'สำเร็จ', description: 'สร้างแคมเปญเรียบร้อยแล้ว' });
@@ -483,7 +484,30 @@ export function CampaignsManagement() {
     }
   };
 
-  // ─── Initial load + realtime subscription ───────────────────────────────
+  // ─── Format countdown from a future ISO timestamp ───────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const formatCountdown = (nextSendAt: string | null): React.ReactNode => {
+    void tick; // depend on tick so this re-evaluates every second
+    if (!nextSendAt) return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950 text-xs">พร้อมส่ง</Badge>;
+    const ms = new Date(nextSendAt).getTime() - Date.now();
+    if (ms <= 0) return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950 text-xs">พร้อมส่ง</Badge>;
+    const h = Math.floor(ms / 3_600_000);
+    const m = Math.floor((ms % 3_600_000) / 60_000);
+    const s = Math.floor((ms % 60_000) / 1_000);
+    const label = h > 0 ? `${h}ชม. ${m}น. ${s}ว.` : m > 0 ? `${m}น. ${s}ว.` : `${s}ว.`;
+    return <span className="text-xs tabular-nums text-muted-foreground">อีก {label}</span>;
+  };
+
+  // ─── Compute next_send_at for a new campaign (appended to queue end) ─────
+  const computeNewNextSendAt = (): string | null => {
+    const intervalMs = (scheduleConfig?.interval_minutes ?? 1440) * 60 * 1000;
+    // Find the latest next_send_at among active campaigns
+    const latestMs = campaigns
+      .filter((c) => c.is_active && c.next_send_at)
+      .reduce((max, c) => Math.max(max, new Date(c.next_send_at!).getTime()), 0);
+    if (latestMs === 0) return null; // no campaigns in queue yet → send immediately
+    return new Date(latestMs + intervalMs).toISOString();
+  };
   useEffect(() => {
     fetchCampaigns();
 
@@ -499,7 +523,13 @@ export function CampaignsManagement() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(sub); };
+    // Tick every second to drive countdown display without page refresh
+    const ticker = setInterval(() => setTick((t) => t + 1), 1000);
+
+    return () => {
+      supabase.removeChannel(sub);
+      clearInterval(ticker);
+    };
   }, []);
 
   return (
@@ -691,20 +721,7 @@ export function CampaignsManagement() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {(() => {
-                                  if (!campaign.next_send_at) {
-                                    return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950">พร้อมส่ง</Badge>;
-                                  }
-                                  const ms = new Date(campaign.next_send_at).getTime() - Date.now();
-                                  if (ms <= 0) {
-                                    return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950">พร้อมส่ง</Badge>;
-                                  }
-                                  const h = Math.floor(ms / 3_600_000);
-                                  const m = Math.floor((ms % 3_600_000) / 60_000);
-                                  const s = Math.floor((ms % 60_000) / 1_000);
-                                  const label = h > 0 ? `${h}ชม. ${m}น.` : m > 0 ? `${m}น. ${s}ว.` : `${s}ว.`;
-                                  return <span className="text-xs">อีก {label}</span>;
-                                })()}
+                                {formatCountdown(campaign.next_send_at)}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
