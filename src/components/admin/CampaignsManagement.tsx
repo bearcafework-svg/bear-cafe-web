@@ -48,7 +48,6 @@ import {
   CheckCircle2,
   XCircle,
   BarChart2,
-  MessageSquare,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
@@ -67,6 +66,7 @@ type CampaignMessage = {
   sort_order: number;
   is_active: boolean;
   last_sent_at: string | null;
+  next_send_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -545,61 +545,79 @@ export function CampaignsManagement() {
       </Card>
 
       {/* ─── Channel Activity Stats ─── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-            <BarChart2 className="w-4 h-4" />
-            กิจกรรมช่อง #1144585665883938927
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-2 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-primary" />
+              กิจกรรมช่อง Discord
+            </CardTitle>
             {activityStats && (
-              <span className="ml-auto text-xs font-normal">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 อัปเดตล่าสุด{' '}
                 {new Date(activityStats.updated_at).toLocaleTimeString('th-TH', {
                   hour: '2-digit', minute: '2-digit', second: '2-digit',
                 })}
               </span>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="p-0">
           {!activityStats ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              รอข้อมูลจาก cron (อัปเดตทุกนาที)...
+            <div className="flex items-center gap-3 px-6 py-5 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              <span>รอข้อมูลจาก cron (อัปเดตทุกนาที)...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 divide-x divide-border/50">
               {/* 24h */}
-              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-xs text-muted-foreground">24 ชั่วโมง</span>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">24 ชั่วโมง</span>
                 </div>
-                <p className="text-2xl font-bold tabular-nums">
+                <p className="text-3xl font-bold tabular-nums text-foreground">
                   {activityStats.count_24h.toLocaleString()}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${Math.min(100, (activityStats.count_24h / Math.max(activityStats.count_7d, 1)) * 100 * 7)}%` }}
+                  />
+                </div>
               </div>
               {/* 7d */}
-              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-violet-500" />
-                  <span className="text-xs text-muted-foreground">7 วัน</span>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-violet-500" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">7 วัน</span>
                 </div>
-                <p className="text-2xl font-bold tabular-nums">
+                <p className="text-3xl font-bold tabular-nums text-foreground">
                   {activityStats.count_7d.toLocaleString()}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-violet-500 transition-all"
+                    style={{ width: `${Math.min(100, (activityStats.count_7d / Math.max(activityStats.count_30d, 1)) * 100 * 4.3)}%` }}
+                  />
+                </div>
               </div>
               {/* 30d */}
-              <div className="rounded-lg bg-muted/40 px-4 py-3 text-center">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-orange-500" />
-                  <span className="text-xs text-muted-foreground">30 วัน</span>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">30 วัน</span>
                 </div>
-                <p className="text-2xl font-bold tabular-nums">
+                <p className="text-3xl font-bold tabular-nums text-foreground">
                   {activityStats.count_30d.toLocaleString()}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">ข้อความ</p>
+                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-orange-500 w-full" />
+                </div>
               </div>
             </div>
           )}
@@ -634,7 +652,7 @@ export function CampaignsManagement() {
                     <TableHead>ข้อความ</TableHead>
                     <TableHead>ช่องเป้าหมาย</TableHead>
                     <TableHead>สถานะ</TableHead>
-                    <TableHead>ส่งล่าสุด</TableHead>
+                    <TableHead>คิวถัดไป</TableHead>
                     <TableHead className="text-right">จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -673,12 +691,20 @@ export function CampaignsManagement() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {campaign.last_sent_at
-                                  ? new Date(campaign.last_sent_at).toLocaleDateString('th-TH', {
-                                      day: 'numeric', month: 'short', year: 'numeric',
-                                      hour: '2-digit', minute: '2-digit',
-                                    })
-                                  : 'ยังไม่เคยส่ง'}
+                                {(() => {
+                                  if (!campaign.next_send_at) {
+                                    return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950">พร้อมส่ง</Badge>;
+                                  }
+                                  const ms = new Date(campaign.next_send_at).getTime() - Date.now();
+                                  if (ms <= 0) {
+                                    return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950">พร้อมส่ง</Badge>;
+                                  }
+                                  const h = Math.floor(ms / 3_600_000);
+                                  const m = Math.floor((ms % 3_600_000) / 60_000);
+                                  const s = Math.floor((ms % 60_000) / 1_000);
+                                  const label = h > 0 ? `${h}ชม. ${m}น.` : m > 0 ? `${m}น. ${s}ว.` : `${s}ว.`;
+                                  return <span className="text-xs">อีก {label}</span>;
+                                })()}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
