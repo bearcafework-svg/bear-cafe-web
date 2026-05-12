@@ -39,7 +39,7 @@ const corsHeaders = {
 };
 
 interface ScheduleConfig {
-  interval_hours: number;
+  interval_minutes: number;
   is_enabled: boolean;
 }
 
@@ -102,22 +102,18 @@ function buildCampaignPayload(campaign: CampaignMessage): Record<string, unknown
 }
 
 // ─── Check if campaign is past its cooldown ───────────────────────────────────
-function isCooldownExpired(lastSentAt: string | null, intervalHours: number): boolean {
-  if (!lastSentAt) return true; // Never sent → always send
-  const lastSentMs = new Date(lastSentAt).getTime();
-  const intervalMs = intervalHours * 60 * 60 * 1000;
-  const elapsed = Date.now() - lastSentMs;
-  return elapsed >= intervalMs;
+function isCooldownExpired(lastSentAt: string | null, intervalMinutes: number): boolean {
+  if (!lastSentAt) return true;
+  const elapsed = Date.now() - new Date(lastSentAt).getTime();
+  return elapsed >= intervalMinutes * 60 * 1000;
 }
 
 // ─── Human-readable time until next send ─────────────────────────────────────
-function timeUntilNext(lastSentAt: string, intervalHours: number): string {
-  const lastSentMs = new Date(lastSentAt).getTime();
-  const intervalMs = intervalHours * 60 * 60 * 1000;
-  const remainingMs = intervalMs - (Date.now() - lastSentMs);
-  if (remainingMs <= 0) return "now";
-  const h = Math.floor(remainingMs / 3_600_000);
-  const m = Math.floor((remainingMs % 3_600_000) / 60_000);
+function timeUntilNext(lastSentAt: string, intervalMinutes: number): string {
+  const remaining = intervalMinutes * 60 * 1000 - (Date.now() - new Date(lastSentAt).getTime());
+  if (remaining <= 0) return "now";
+  const h = Math.floor(remaining / 3_600_000);
+  const m = Math.floor((remaining % 3_600_000) / 60_000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
@@ -198,7 +194,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ─── 1. Read schedule config ──────────────────────────────────────────────
     const { data: configRow, error: configError } = await supabase
       .from("campaign_schedule_config")
-      .select("interval_hours, is_enabled")
+      .select("interval_minutes, is_enabled")
       .eq("id", "00000000-0000-0000-0000-000000000001")
       .maybeSingle();
 
@@ -221,8 +217,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const intervalHours = config.interval_hours ?? 24;
-    console.log(`[cron] Running with interval_hours=${intervalHours}`);
+    const intervalMinutes = config.interval_minutes ?? 1440;
+    console.log(`[cron] Running with interval_minutes=${intervalMinutes}`);
 
     // ─── 2. Fetch active campaigns ────────────────────────────────────────────
     const { data: campaigns, error: fetchError } = await supabase
@@ -256,8 +252,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     for (const campaign of campaigns as CampaignMessage[]) {
 
       // ── Anti-spam: check cooldown ──────────────────────────────────────────
-      if (!isCooldownExpired(campaign.last_sent_at, intervalHours)) {
-        const remaining = timeUntilNext(campaign.last_sent_at!, intervalHours);
+      if (!isCooldownExpired(campaign.last_sent_at, intervalMinutes)) {
+        const remaining = timeUntilNext(campaign.last_sent_at!, intervalMinutes);
         console.log(
           `[cron] "${campaign.internal_name}" cooldown active — next in ${remaining}`,
         );
@@ -334,7 +330,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({
         success: true,
-        interval_hours: intervalHours,
+        interval_minutes: intervalMinutes,
         campaigns_processed: campaigns.length,
         total_sent: totalSent,
         total_cooldown: totalCooldown,

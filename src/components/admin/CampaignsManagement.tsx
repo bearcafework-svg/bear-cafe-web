@@ -70,6 +70,7 @@ type ScheduleConfig = {
   label: string;
   is_enabled: boolean;
   interval_hours: number;
+  interval_minutes: number;
   updated_at: string;
 };
 
@@ -422,24 +423,17 @@ export function CampaignsManagement() {
       setIsUpdatingSchedule(true);
       const { data, error } = await supabase.functions.invoke('update-cron-schedule', {
         body: {
-          interval_hours: newConfig.interval_hours ?? scheduleConfig?.interval_hours ?? 24,
+          interval_minutes: newConfig.interval_minutes ?? scheduleConfig?.interval_minutes ?? 1440,
           is_enabled: newConfig.is_enabled ?? scheduleConfig?.is_enabled,
         },
       });
       if (error) throw error;
-      toast({
-        title: 'บันทึกตารางเวลาแล้ว',
-        description: data?.note || 'อัปเดตเรียบร้อย',
-      });
+      toast({ title: 'บันทึกตารางเวลาแล้ว', description: data?.label || 'อัปเดตเรียบร้อย' });
       setScheduleDialogOpen(false);
       fetchCampaigns();
     } catch (error: any) {
       console.error('Schedule update error:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถอัปเดตตารางเวลาได้',
-        variant: 'destructive',
-      });
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปเดตตารางเวลาได้', variant: 'destructive' });
     } finally {
       setIsUpdatingSchedule(false);
     }
@@ -475,7 +469,10 @@ export function CampaignsManagement() {
                     className="ml-1 text-xs"
                   >
                     {scheduleConfig.is_enabled
-                      ? `ทุก ${scheduleConfig.interval_hours} ชม.`
+                      ? (() => {
+                          const m = scheduleConfig.interval_minutes ?? scheduleConfig.interval_hours * 60;
+                          return m < 60 ? `ทุก ${m} นาที` : `ทุก ${Math.round(m / 60)} ชม.`;
+                        })()
                       : 'ปิดอยู่'}
                   </Badge>
                 )}
@@ -977,18 +974,256 @@ export function CampaignsManagement() {
 
 // ─── Schedule Dialog (sub-component) ─────────────────────────────────────────
 
-const INTERVAL_PRESETS = [
-  { label: '1 ชั่วโมง', hours: 1 },
-  { label: '2 ชั่วโมง', hours: 2 },
-  { label: '4 ชั่วโมง', hours: 4 },
-  { label: '6 ชั่วโมง', hours: 6 },
-  { label: '8 ชั่วโมง', hours: 8 },
-  { label: '12 ชั่วโมง', hours: 12 },
-  { label: '24 ชั่วโมง (1 วัน)', hours: 24 },
-  { label: '48 ชั่วโมง (2 วัน)', hours: 48 },
-  { label: '72 ชั่วโมง (3 วัน)', hours: 72 },
-  { label: '168 ชั่วโมง (1 สัปดาห์)', hours: 168 },
+// Presets in minutes
+const MINUTE_PRESETS = [
+  { label: '5 นาที',   minutes: 5 },
+  { label: '10 นาที',  minutes: 10 },
+  { label: '15 นาที',  minutes: 15 },
+  { label: '30 นาที',  minutes: 30 },
+  { label: '45 นาที',  minutes: 45 },
 ];
+
+const HOUR_PRESETS = [
+  { label: '1 ชั่วโมง',              minutes: 60 },
+  { label: '2 ชั่วโมง',              minutes: 120 },
+  { label: '4 ชั่วโมง',              minutes: 240 },
+  { label: '6 ชั่วโมง',              minutes: 360 },
+  { label: '8 ชั่วโมง',              minutes: 480 },
+  { label: '12 ชั่วโมง',             minutes: 720 },
+  { label: '24 ชั่วโมง (1 วัน)',     minutes: 1440 },
+  { label: '48 ชั่วโมง (2 วัน)',     minutes: 2880 },
+  { label: '72 ชั่วโมง (3 วัน)',     minutes: 4320 },
+  { label: '168 ชั่วโมง (1 สัปดาห์)', minutes: 10080 },
+];
+
+interface ScheduleDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  config: ScheduleConfig | null;
+  isSaving: boolean;
+  onSave: (config: Partial<ScheduleConfig>) => void;
+}
+
+function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: ScheduleDialogProps) {
+  const [tab, setTab] = useState<'minute' | 'hour'>('hour');
+  const [selectedMinutes, setSelectedMinutes] = useState<number>(1440);
+  const [customValue, setCustomValue] = useState('');
+  const [useCustom, setUseCustom] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
+
+  // Sync from config when dialog opens
+  useEffect(() => {
+    if (!open || !config) return;
+    setIsEnabled(config.is_enabled);
+    const m = config.interval_minutes ?? (config.interval_hours ?? 24) * 60;
+    const allPresets = [...MINUTE_PRESETS, ...HOUR_PRESETS];
+    const match = allPresets.find((p) => p.minutes === m);
+    if (match) {
+      setSelectedMinutes(m);
+      setUseCustom(false);
+      setCustomValue('');
+      setTab(m < 60 ? 'minute' : 'hour');
+    } else {
+      setUseCustom(true);
+      setCustomValue(String(m));
+      setSelectedMinutes(m);
+      setTab(m < 60 ? 'minute' : 'hour');
+    }
+  }, [open, config]);
+
+  const effectiveMinutes = useCustom ? (parseInt(customValue) || 0) : selectedMinutes;
+  const isValid = effectiveMinutes >= 5 && effectiveMinutes <= 10080;
+
+  const handlePresetClick = (minutes: number) => {
+    setSelectedMinutes(minutes);
+    setUseCustom(false);
+    setCustomValue('');
+  };
+
+  const describeInterval = (m: number): string => {
+    if (m < 60) return `ส่งซ้ำได้ทุก ${m} นาที`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    if (rem === 0) {
+      if (h === 1) return 'ส่งซ้ำได้ทุก 1 ชั่วโมง';
+      if (h === 24) return 'ส่งซ้ำได้วันละ 1 ครั้ง';
+      if (h === 168) return 'ส่งซ้ำได้สัปดาห์ละ 1 ครั้ง';
+      return `ส่งซ้ำได้ทุก ${h} ชั่วโมง`;
+    }
+    return `ส่งซ้ำได้ทุก ${h} ชั่วโมง ${rem} นาที`;
+  };
+
+  const handleSave = () => {
+    if (!isValid) return;
+    onSave({ interval_minutes: effectiveMinutes, is_enabled: isEnabled });
+  };
+
+  const currentPresets = tab === 'minute' ? MINUTE_PRESETS : HOUR_PRESETS;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            ตั้งความถี่การส่ง
+          </DialogTitle>
+          <DialogDescription>
+            กำหนดว่าระบบจะส่งแคมเปญซ้ำได้บ่อยแค่ไหน
+            เพื่อป้องกันข้อความสแปมในช่อง Discord
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+
+          {/* ── Enable toggle ── */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">เปิดใช้งานการส่งอัตโนมัติ</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                ปิดเพื่อหยุดชั่วคราวโดยไม่ต้องลบการตั้งค่า
+              </p>
+            </div>
+            <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
+          </div>
+
+          {/* ── Unit tab ── */}
+          <div className="flex rounded-lg border overflow-hidden text-sm">
+            <button
+              type="button"
+              onClick={() => { setTab('minute'); setUseCustom(false); }}
+              className={`flex-1 py-2 font-medium transition-colors ${
+                tab === 'minute'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              นาที
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab('hour'); setUseCustom(false); }}
+              className={`flex-1 py-2 font-medium transition-colors ${
+                tab === 'hour'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              ชั่วโมง / วัน
+            </button>
+          </div>
+
+          {/* ── Presets ── */}
+          <div className="grid grid-cols-2 gap-1.5">
+            {currentPresets.map((preset) => (
+              <button
+                key={preset.minutes}
+                type="button"
+                onClick={() => handlePresetClick(preset.minutes)}
+                className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
+                  !useCustom && selectedMinutes === preset.minutes
+                    ? 'border-primary bg-primary/5 text-primary font-medium'
+                    : 'border-border hover:bg-muted/50'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setUseCustom(true)}
+              className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors col-span-2 ${
+                useCustom
+                  ? 'border-primary bg-primary/5 text-primary font-medium'
+                  : 'border-border hover:bg-muted/50'
+              }`}
+            >
+              กำหนดเอง...
+            </button>
+          </div>
+
+          {/* ── Custom input ── */}
+          {useCustom && (
+            <div className="pl-3 border-l-2 border-primary/20 space-y-1">
+              <Label htmlFor="custom_minutes">
+                จำนวน{tab === 'minute' ? 'นาที' : 'ชั่วโมง'} (
+                {tab === 'minute' ? '5–59' : '1–168'})
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="custom_minutes"
+                  type="number"
+                  min={tab === 'minute' ? 5 : 1}
+                  max={tab === 'minute' ? 59 : 168}
+                  value={customValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomValue(v);
+                    // auto-convert hours → minutes
+                    if (tab === 'hour') {
+                      const h = parseInt(v);
+                      if (!isNaN(h)) setSelectedMinutes(h * 60);
+                    } else {
+                      const m = parseInt(v);
+                      if (!isNaN(m)) setSelectedMinutes(m);
+                    }
+                  }}
+                  placeholder={tab === 'minute' ? 'เช่น 20' : 'เช่น 3'}
+                  className="w-28"
+                />
+                <span className="text-sm text-muted-foreground">
+                  {tab === 'minute' ? 'นาที' : 'ชั่วโมง'}
+                </span>
+              </div>
+              {customValue && !isValid && (
+                <p className="text-xs text-destructive">
+                  ต้องอยู่ระหว่าง 5 นาที – 168 ชั่วโมง
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Summary ── */}
+          {isValid && (
+            <div className="rounded-lg bg-muted/40 px-4 py-3 space-y-1.5 text-sm">
+              <div className="flex items-center gap-2 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                สรุปการตั้งค่า
+              </div>
+              <p className="text-muted-foreground">{describeInterval(effectiveMinutes)}</p>
+              <p className="text-muted-foreground">
+                ระบบตรวจสอบทุกนาที แต่ส่งจริงเมื่อผ่านครบ{' '}
+                <span className="font-medium text-foreground">
+                  {effectiveMinutes < 60
+                    ? `${effectiveMinutes} นาที`
+                    : `${Math.floor(effectiveMinutes / 60)} ชั่วโมง${effectiveMinutes % 60 > 0 ? ` ${effectiveMinutes % 60} นาที` : ''}`}
+                </span>{' '}
+                นับจากครั้งล่าสุด
+              </p>
+              <p className="text-muted-foreground">
+                ช่องที่ไม่มีกิจกรรมใน 7 วัน จะถูกข้ามโดยอัตโนมัติ
+              </p>
+              <p>
+                สถานะ:{' '}
+                <span className={isEnabled ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
+                  {isEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+          <Button onClick={handleSave} disabled={isSaving || !isValid} className="gap-2">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            บันทึก
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 interface ScheduleDialogProps {
   open: boolean;
