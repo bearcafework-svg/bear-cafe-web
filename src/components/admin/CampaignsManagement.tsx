@@ -162,7 +162,8 @@ export function CampaignsManagement() {
       if (campaignsRes.error) throw campaignsRes.error;
       setCampaigns(campaignsRes.data || []);
       if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
-      if (activityRes.data) setActivityStats(activityRes.data as ActivityStats);
+      // Ignore 404 — table may not exist yet if migration hasn't run
+      if (activityRes.data && !activityRes.error) setActivityStats(activityRes.data as ActivityStats);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
@@ -260,13 +261,16 @@ export function CampaignsManagement() {
     try {
       setUploading(true);
 
-      // Compress image
+      // Compress image — preserve PNG format to keep transparency
+      const isPng = file.type === 'image/png';
       const compressed = await compressImage(file, {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1920,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        maxSizeBytes: 1 * 1024 * 1024,
+        outputType: isPng ? 'image/png' : 'image/jpeg',
       });
 
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const ext = isPng ? 'png' : 'jpg';
       const fileName = `${Date.now()}-campaign.${ext}`;
       const { data, error } = await supabase.storage
         .from('campaign-images')
@@ -540,13 +544,13 @@ export function CampaignsManagement() {
   useEffect(() => {
     fetchCampaigns();
 
-    // Subscribe to live updates from channel_activity_stats
+    // Subscribe to live updates from channel_activity_stats (if table exists)
     const sub = supabase
       .channel('channel_activity_stats_realtime')
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         { event: '*', schema: 'public', table: 'channel_activity_stats' },
-        (payload) => {
+        (payload: any) => {
           if (payload.new) setActivityStats(payload.new as ActivityStats);
         },
       )
