@@ -266,7 +266,8 @@ export function CampaignsManagement() {
         maxWidthOrHeight: 1920,
       });
 
-      const fileName = `${Date.now()}-${file.name}`;
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}-campaign.${ext}`;
       const { data, error } = await supabase.storage
         .from('campaign-images')
         .upload(fileName, compressed);
