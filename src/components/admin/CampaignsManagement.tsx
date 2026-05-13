@@ -58,11 +58,16 @@ type CampaignMessage = {
   internal_name: string;
   content_text: string;
   image_url: string | null;
+  image_url_2: string | null;
   has_button: boolean;
   button_label: string | null;
   button_url: string | null;
   button_emoji_id: string | null;
   button_emoji_name: string | null;
+  button_2_label: string | null;
+  button_2_url: string | null;
+  button_2_emoji_id: string | null;
+  button_2_emoji_name: string | null;
   target_channels: string[];
   sort_order: number;
   is_active: boolean;
@@ -104,11 +109,16 @@ interface FormData {
   internal_name: string;
   content_text: string;
   image_url: string;
+  image_url_2: string;
   has_button: boolean;
   button_label: string;
   button_url: string;
   button_emoji_id: string;
   button_emoji_name: string;
+  button_2_label: string;
+  button_2_url: string;
+  button_2_emoji_id: string;
+  button_2_emoji_name: string;
   target_channels: string[];
   is_active: boolean;
 }
@@ -117,11 +127,16 @@ const INITIAL_FORM: FormData = {
   internal_name: '',
   content_text: '',
   image_url: '',
+  image_url_2: '',
   has_button: false,
   button_label: '',
   button_url: '',
   button_emoji_id: '',
   button_emoji_name: '',
+  button_2_label: '',
+  button_2_url: '',
+  button_2_emoji_id: '',
+  button_2_emoji_name: '',
   target_channels: [],
   is_active: true,
 };
@@ -142,11 +157,13 @@ export function CampaignsManagement() {
   const [testSendChannel, setTestSendChannel] = useState<string>('');
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [uploading, setUploading] = useState(false);
+  const [uploading2, setUploading2] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
   const [isResettingQueue, setIsResettingQueue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef2 = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // ─── Fetch campaigns ─────────────────────────────────────────────────────
@@ -233,71 +250,55 @@ export function CampaignsManagement() {
     }
   };
 
-  // ─── Image upload ────────────────────────────────────────────────────────
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
+  // ─── Image upload (shared logic) ─────────────────────────────────────────
+  const uploadImage = async (
+    file: File,
+    onSuccess: (url: string) => void,
+    setUploadingState: (v: boolean) => void,
+    inputRef: React.RefObject<HTMLInputElement>,
+  ) => {
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'ไฟล์ไม่ถูกต้อง',
-        description: 'กรุณาเลือกไฟล์รูปภาพเท่านั้น',
-        variant: 'destructive',
-      });
+      toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'กรุณาเลือกไฟล์รูปภาพเท่านั้น', variant: 'destructive' });
       return;
     }
-
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'ไฟล์ใหญ่เกินไป',
-        description: 'ขนาดไฟล์ต้องไม่เกิน 5MB',
-        variant: 'destructive',
-      });
+      toast({ title: 'ไฟล์ใหญ่เกินไป', description: 'ขนาดไฟล์ต้องไม่เกิน 5MB', variant: 'destructive' });
       return;
     }
-
     try {
-      setUploading(true);
-
-      // Compress image — preserve PNG format to keep transparency
+      setUploadingState(true);
       const isPng = file.type === 'image/png';
       const compressed = await compressImage(file, {
-        maxWidth: 1920,
-        maxHeight: 1920,
+        maxWidth: 1920, maxHeight: 1920,
         maxSizeBytes: 1 * 1024 * 1024,
         outputType: isPng ? 'image/png' : 'image/jpeg',
       });
-
       const ext = isPng ? 'png' : 'jpg';
       const fileName = `${Date.now()}-campaign.${ext}`;
-      const { data, error } = await supabase.storage
-        .from('campaign-images')
-        .upload(fileName, compressed);
-
+      const { data, error } = await supabase.storage.from('campaign-images').upload(fileName, compressed);
       if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('campaign-images')
-        .getPublicUrl(data.path);
-
-      setFormData((prev) => ({ ...prev, image_url: publicUrl }));
-      toast({
-        title: 'สำเร็จ',
-        description: 'อัปโหลดรูปภาพเรียบร้อยแล้ว',
-      });
+      const { data: { publicUrl } } = supabase.storage.from('campaign-images').getPublicUrl(data.path);
+      onSuccess(publicUrl);
+      toast({ title: 'สำเร็จ', description: 'อัปโหลดรูปภาพเรียบร้อยแล้ว' });
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถอัปโหลดรูปภาพได้',
-        variant: 'destructive',
-      });
+      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปโหลดรูปภาพได้', variant: 'destructive' });
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadingState(false);
+      if (inputRef.current) inputRef.current.value = '';
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadImage(file, (url) => setFormData((p) => ({ ...p, image_url: url })), setUploading, fileInputRef);
+  };
+
+  const handleImageUpload2 = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadImage(file, (url) => setFormData((p) => ({ ...p, image_url_2: url })), setUploading2, fileInputRef2);
   };
 
   // ─── Form validation ─────────────────────────────────────────────────────
@@ -335,10 +336,16 @@ export function CampaignsManagement() {
     try {
       const payload = {
         ...formData,
+        image_url: formData.image_url || null,
+        image_url_2: formData.image_url_2 || null,
         button_label: formData.has_button ? formData.button_label : null,
         button_url: formData.has_button ? formData.button_url : null,
         button_emoji_id: formData.has_button && formData.button_emoji_id ? formData.button_emoji_id : null,
         button_emoji_name: formData.has_button && formData.button_emoji_name ? formData.button_emoji_name : null,
+        button_2_label: formData.button_2_label || null,
+        button_2_url: formData.button_2_url || null,
+        button_2_emoji_id: formData.button_2_emoji_id || null,
+        button_2_emoji_name: formData.button_2_emoji_name || null,
       };
 
       if (editingCampaign) {
@@ -404,11 +411,16 @@ export function CampaignsManagement() {
       internal_name: campaign.internal_name,
       content_text: campaign.content_text,
       image_url: campaign.image_url || '',
+      image_url_2: campaign.image_url_2 || '',
       has_button: campaign.has_button,
       button_label: campaign.button_label || '',
       button_url: campaign.button_url || '',
       button_emoji_id: campaign.button_emoji_id || '',
       button_emoji_name: campaign.button_emoji_name || '',
+      button_2_label: campaign.button_2_label || '',
+      button_2_url: campaign.button_2_url || '',
+      button_2_emoji_id: campaign.button_2_emoji_id || '',
+      button_2_emoji_name: campaign.button_2_emoji_name || '',
       target_channels: campaign.target_channels || [],
       is_active: campaign.is_active,
     });
@@ -971,54 +983,49 @@ export function CampaignsManagement() {
                 </p>
               </div>
 
-              {/* Image upload */}
+              {/* Image 1 */}
               <div>
-                <Label>รูปภาพ</Label>
+                <Label>รูปภาพที่ 1</Label>
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleImageUpload}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="gap-2"
-                  >
-                    {uploading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Upload className="w-4 h-4" />
-                    )}
-                    อัปโหลดรูปภาพ
+                  <Input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="gap-2">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    อัปโหลด
                   </Button>
                   {formData.image_url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, image_url: '' })}
-                    >
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url: '' })}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
                 {formData.image_url && (
-                  <img
-                    src={formData.image_url}
-                    alt="Preview"
-                    className="mt-2 w-full h-32 object-cover rounded-lg"
-                  />
+                  <img src={formData.image_url} alt="Preview 1" className="mt-2 w-full h-28 object-cover rounded-lg" />
                 )}
               </div>
 
-              {/* Button toggle */}
+              {/* Image 2 */}
+              <div>
+                <Label>รูปภาพที่ 2 (ไม่บังคับ)</Label>
+                <div className="flex items-center gap-2">
+                  <Input type="file" ref={fileInputRef2} onChange={handleImageUpload2} accept="image/*" className="hidden" />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef2.current?.click()} disabled={uploading2} className="gap-2">
+                    {uploading2 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    อัปโหลด
+                  </Button>
+                  {formData.image_url_2 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url_2: '' })}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                {formData.image_url_2 && (
+                  <img src={formData.image_url_2} alt="Preview 2" className="mt-2 w-full h-28 object-cover rounded-lg" />
+                )}
+              </div>
+
+              {/* Button 1 toggle */}
               <div className="flex items-center justify-between">
-                <Label htmlFor="has_button">เพิ่มปุ่ม</Label>
+                <Label htmlFor="has_button">เพิ่มปุ่มที่ 1</Label>
                 <Switch
                   id="has_button"
                   checked={formData.has_button}
@@ -1026,7 +1033,7 @@ export function CampaignsManagement() {
                 />
               </div>
 
-              {/* Button fields */}
+              {/* Button 1 fields */}
               {formData.has_button && (
                 <div className="space-y-3 pl-4 border-l-2 border-primary/20">
                   <div>
@@ -1070,6 +1077,52 @@ export function CampaignsManagement() {
                   </div>
                 </div>
               )}
+
+              {/* Button 2 */}
+              <div>
+                <Label className="mb-2 block">ปุ่มที่ 2 (ไม่บังคับ)</Label>
+                <div className="space-y-3 pl-4 border-l-2 border-muted">
+                  <div>
+                    <Label htmlFor="button_2_label">ข้อความปุ่ม</Label>
+                    <Input
+                      id="button_2_label"
+                      value={formData.button_2_label}
+                      onChange={(e) => setFormData({ ...formData, button_2_label: e.target.value })}
+                      placeholder="เช่น: สมัครสมาชิก"
+                      maxLength={80}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="button_2_url">URL ปุ่ม</Label>
+                    <Input
+                      id="button_2_url"
+                      value={formData.button_2_url}
+                      onChange={(e) => setFormData({ ...formData, button_2_url: e.target.value })}
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="button_2_emoji_id">Emoji ID</Label>
+                      <Input
+                        id="button_2_emoji_id"
+                        value={formData.button_2_emoji_id}
+                        onChange={(e) => setFormData({ ...formData, button_2_emoji_id: e.target.value })}
+                        placeholder="1234567890"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="button_2_emoji_name">Emoji Name</Label>
+                      <Input
+                        id="button_2_emoji_name"
+                        value={formData.button_2_emoji_name}
+                        onChange={(e) => setFormData({ ...formData, button_2_emoji_name: e.target.value })}
+                        placeholder="emoji_name"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Target channels */}
               <div>
@@ -1135,13 +1188,14 @@ export function CampaignsManagement() {
               <Label className="mb-2 block">ตัวอย่างแบบเรียลไทม์</Label>
               <Card className="bg-[#313338] text-white p-4">
                 <div className="space-y-3">
-                  {/* Image preview */}
+                  {/* Image 1 preview */}
                   {formData.image_url && (
-                    <img
-                      src={formData.image_url}
-                      alt="Campaign preview"
-                      className="w-full rounded-lg"
-                    />
+                    <img src={formData.image_url} alt="Preview 1" className="w-full rounded-lg" />
+                  )}
+
+                  {/* Image 2 preview */}
+                  {formData.image_url_2 && (
+                    <img src={formData.image_url_2} alt="Preview 2" className="w-full rounded-lg" />
                   )}
 
                   {/* Text content */}
@@ -1156,23 +1210,28 @@ export function CampaignsManagement() {
                     <div className="border-t border-gray-600" />
                   )}
 
-                  {/* Button preview */}
-                  {formData.has_button && formData.button_label && (
-                    <Button
-                      variant="outline"
-                      className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white border-0 gap-2"
-                      disabled
-                    >
-                      {formData.button_emoji_name && (
-                        <span>{formData.button_emoji_name}</span>
+                  {/* Buttons preview */}
+                  {(formData.has_button && formData.button_label) || formData.button_2_label ? (
+                    <div className="flex gap-2 flex-wrap">
+                      {formData.has_button && formData.button_label && (
+                        <Button variant="outline" className="bg-[#5865F2] hover:bg-[#4752C4] text-white border-0 gap-1.5 text-sm" disabled>
+                          {formData.button_emoji_name && <span>{formData.button_emoji_name}</span>}
+                          {formData.button_label}
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
                       )}
-                      {formData.button_label}
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
-                  )}
+                      {formData.button_2_label && formData.button_2_url && (
+                        <Button variant="outline" className="bg-[#5865F2] hover:bg-[#4752C4] text-white border-0 gap-1.5 text-sm" disabled>
+                          {formData.button_2_emoji_name && <span>{formData.button_2_emoji_name}</span>}
+                          {formData.button_2_label}
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : null}
 
                   {/* Empty state */}
-                  {!formData.content_text && !formData.image_url && (
+                  {!formData.content_text && !formData.image_url && !formData.image_url_2 && (
                     <div className="text-center py-8 text-gray-400">
                       <Eye className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">กรอกข้อมูลเพื่อดูตัวอย่าง</p>
