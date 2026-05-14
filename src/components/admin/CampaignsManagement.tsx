@@ -179,7 +179,7 @@ export function CampaignsManagement() {
       if (campaignsRes.error) throw campaignsRes.error;
       setCampaigns(campaignsRes.data || []);
       if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
-      // Ignore 404 — table may not exist yet if migration hasn't run
+      // Ignore errors — table may not exist yet if migration hasn't run
       if (activityRes.data && !activityRes.error) setActivityStats(activityRes.data as ActivityStats);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
@@ -556,23 +556,35 @@ export function CampaignsManagement() {
   useEffect(() => {
     fetchCampaigns();
 
-    // Subscribe to live updates from channel_activity_stats (if table exists)
-    const sub = supabase
-      .channel('channel_activity_stats_realtime')
-      .on(
-        'postgres_changes' as any,
-        { event: '*', schema: 'public', table: 'channel_activity_stats' },
-        (payload: any) => {
-          if (payload.new) setActivityStats(payload.new as ActivityStats);
-        },
-      )
-      .subscribe();
+    // Subscribe to live updates from channel_activity_stats (only if table exists)
+    let sub: ReturnType<typeof supabase.channel> | null = null;
+    supabase
+      .from('channel_activity_stats')
+      .select('channel_id')
+      .limit(1)
+      .then(({ error }) => {
+        if (error) {
+          // Table doesn't exist yet — skip realtime subscription
+          console.info('[campaigns] channel_activity_stats not ready yet, skipping realtime');
+          return;
+        }
+        sub = supabase
+          .channel('channel_activity_stats_realtime')
+          .on(
+            'postgres_changes' as any,
+            { event: '*', schema: 'public', table: 'channel_activity_stats' },
+            (payload: any) => {
+              if (payload.new) setActivityStats(payload.new as ActivityStats);
+            },
+          )
+          .subscribe();
+      });
 
     // Tick every second to drive countdown display without page refresh
     const ticker = setInterval(() => setTick((t) => t + 1), 1000);
 
     return () => {
-      supabase.removeChannel(sub);
+      if (sub) supabase.removeChannel(sub);
       clearInterval(ticker);
     };
   }, []);

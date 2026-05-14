@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "FILE SAVED → UI Guardian",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "src/components/**",
+      "src/app/**",
+      "src/pages/**"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review this UI component for:\n\n- inconsistent spacing\n- inconsistent typography\n- bad responsive behavior\n- mobile/tablet layout issues\n- buttons or banners overflowing\n- inconsistent dropdown/date-picker/search input styling\n- visual imbalance\n- Tailwind class inconsistency\n\nImprove the design while preserving the original structure and aesthetic.\n\nUse modern cozy UI principles:\n- soft spacing\n- rounded corners\n- consistent font sizes\n- responsive layouts\n- visually balanced sections\n\nAvoid overengineering."
+  },
+  "workspaceFolderName": "bearcafe4commu-main",
+  "shortName": "file-saved"
+}

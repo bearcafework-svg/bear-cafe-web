@@ -98,13 +98,12 @@ interface ActivityStats {
 function buildCampaignPayload(campaign: CampaignMessage): Record<string, unknown> {
   const components: unknown[] = [];
 
-  // ── Image 1 ──
+  // ── Image 1 (no spacer after) ──
   if (campaign.image_url) {
     components.push({ type: 12, items: [{ media: { url: campaign.image_url } }] });
-    components.push({ type: 14, spacing: 2 });
   }
 
-  // ── Image 2 ──
+  // ── Image 2 (spacer after) ──
   if (campaign.image_url_2) {
     components.push({ type: 12, items: [{ media: { url: campaign.image_url_2 } }] });
     components.push({ type: 14, spacing: 2 });

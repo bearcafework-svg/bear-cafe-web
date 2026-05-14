@@ -24,49 +24,77 @@ interface CampaignMessage {
   internal_name: string;
   content_text: string;
   image_url: string | null;
+  image_url_2: string | null;
   has_button: boolean;
   button_label: string | null;
   button_url: string | null;
   button_emoji_id: string | null;
   button_emoji_name: string | null;
+  button_2_label: string | null;
+  button_2_url: string | null;
+  button_2_emoji_id: string | null;
+  button_2_emoji_name: string | null;
   target_channels: string[];
 }
 
 function buildCampaignPayload(campaign: CampaignMessage): Record<string, unknown> {
   const components: unknown[] = [];
 
+  // ── Image 1 (no spacer after) ──
   if (campaign.image_url) {
-    components.push({
-      type: 12,
-      items: [{ media: { url: campaign.image_url } }],
-    });
+    components.push({ type: 12, items: [{ media: { url: campaign.image_url } }] });
+  }
+
+  // ── Image 2 (spacer after) ──
+  if (campaign.image_url_2) {
+    components.push({ type: 12, items: [{ media: { url: campaign.image_url_2 } }] });
     components.push({ type: 14, spacing: 2 });
   }
 
+  // ── Text ──
   components.push({ type: 10, content: campaign.content_text });
   components.push({ type: 14, spacing: 2, divider: true });
 
+  // ── Buttons (up to 2 in one action row) ──
+  const buttons: Record<string, unknown>[] = [];
+
   if (campaign.has_button && campaign.button_label && campaign.button_url) {
-    const button: Record<string, unknown> = {
-      type: 2,
-      style: 5,
+    const btn: Record<string, unknown> = {
+      type: 2, style: 5,
       label: campaign.button_label,
       url: campaign.button_url,
     };
     if (campaign.button_emoji_id || campaign.button_emoji_name) {
-      button.emoji = {
+      btn.emoji = {
         id: campaign.button_emoji_id ?? undefined,
         name: campaign.button_emoji_name ?? undefined,
         animated: false,
       };
     }
-    components.push({ type: 1, components: [button] });
+    buttons.push(btn);
   }
 
-  return {
-    flags: 32768,
-    components: [{ type: 17, components }],
-  };
+  if (campaign.button_2_label && campaign.button_2_url) {
+    const btn2: Record<string, unknown> = {
+      type: 2, style: 5,
+      label: campaign.button_2_label,
+      url: campaign.button_2_url,
+    };
+    if (campaign.button_2_emoji_id || campaign.button_2_emoji_name) {
+      btn2.emoji = {
+        id: campaign.button_2_emoji_id ?? undefined,
+        name: campaign.button_2_emoji_name ?? undefined,
+        animated: false,
+      };
+    }
+    buttons.push(btn2);
+  }
+
+  if (buttons.length > 0) {
+    components.push({ type: 1, components: buttons });
+  }
+
+  return { flags: 32768, components: [{ type: 17, components }] };
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {

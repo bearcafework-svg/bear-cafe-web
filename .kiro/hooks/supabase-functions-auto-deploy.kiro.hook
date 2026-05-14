@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "SUPABASE FUNCTIONS AUTO DEPLOY",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "supabase/functions/**"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "npx supabase functions deploy",
+    "timeout": 120
+  },
+  "workspaceFolderName": "bearcafe4commu-main",
+  "shortName": "supabase-functions-auto-deploy"
+}
