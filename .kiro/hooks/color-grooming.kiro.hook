@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "Color Grooming",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/components/**",
+      "src/app/**"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review all UI colors and visual consistency.\n\nFollow the Bear Cafe design language:\n\nSTYLE:\n- cozy cafe\n- honey pastel\n- warm soft night tones\n- illustrated cozy UI\n- soft and calm atmosphere\n\nCOLOR RULES:\n- prefer warm dark backgrounds instead of pure black\n- use soft cream instead of pure white\n- use honey gold as the primary accent\n- use muted brown for secondary accents\n- use soft leaf green sparingly\n- avoid neon, cyberpunk, highly saturated, or cold colors\n\nVISUAL RULES:\n- maintain soft contrast\n- avoid harsh visual separation\n- preserve a warm cozy atmosphere\n- keep components visually unified\n\nDo not introduce random new colors unless necessary.\nPrefer reusing existing palette colors."
+  }
+}
