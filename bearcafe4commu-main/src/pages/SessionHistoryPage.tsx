@@ -119,8 +119,8 @@ export default function SessionHistoryPage() {
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </Button>
           <div className="min-w-0">
-            <h1 className="font-display font-bold text-lg sm:text-xl text-foreground truncate">📜 ประวัติแมตช์</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">รายการแมตช์ย้อนหลัง 7 วัน</p>
+            <h1 className="font-display font-bold text-lg sm:text-xl text-foreground truncate">📜 ประวัติหาเพื่อน</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">รายการหาเพื่อนย้อนหลัง 7 วัน</p>
           </div>
         </div>
       </header>
@@ -157,8 +157,8 @@ export default function SessionHistoryPage() {
                 >
                   <Coffee className="w-9 h-9 sm:w-12 sm:h-12 text-primary" />
                 </motion.div>
-                <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">ยังไม่มีประวัติแมตช์</h2>
-                <p className="text-sm sm:text-base text-muted-foreground mt-2 sm:mt-3">เริ่มแมตช์แรกของคุณเลย! 🐻</p>
+                <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">ยังไม่มีประวัติการหาเพื่อน</h2>
+                <p className="text-sm sm:text-base text-muted-foreground mt-2 sm:mt-3">เริ่มหาเพื่อนลงห้อง! 🐻</p>
                 <motion.div
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
@@ -168,7 +168,7 @@ export default function SessionHistoryPage() {
                     onClick={() => navigate('/')}
                   >
                     <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 mr-2.5" />
-                    เริ่มแมตช์
+                    เริ่มหาเพื่อน
                   </Button>
                 </motion.div>
               </CardContent>
