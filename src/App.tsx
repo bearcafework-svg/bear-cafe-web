@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "next-themes";
 import { LoadingPage } from "@/components/bear-cafe/LoadingBear";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { MusicProvider } from "@/lib/music-context";
+import { FloatingMiniPlayer } from "@/components/bear-cafe/FloatingMiniPlayer";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
@@ -118,11 +120,14 @@ function App() {
       >
         <BrowserRouter>
           <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <AppRoutes />
-            </TooltipProvider>
+            <MusicProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <AppRoutes />
+                <FloatingMiniPlayer />
+              </TooltipProvider>
+            </MusicProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

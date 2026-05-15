@@ -551,12 +551,10 @@
   }
 }
 
-/* ─── Homepage — Desktop 110% zoom ──────────────────────────────────────── */
-/* Matches the user's preferred 110% browser zoom proportion.
-   Only activates at lg (1024px+). Mobile/tablet unaffected. */
+/* ─── Homepage — Desktop zoom (100% = no zoom) ───────────────────────────── */
 @media (min-width: 1024px) {
   .homepage-zoom {
-    zoom: 1.10;
+    zoom: 1.0;
   }
 }
 

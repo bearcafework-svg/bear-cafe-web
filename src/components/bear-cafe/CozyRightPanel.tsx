@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Music2, SkipBack, SkipForward, Repeat, Repeat1, Library, ChevronLeft, Search, X, Gift, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 import strawberryIcon from '@/assets/strawberry-icon.png';
+import { useMusic } from '@/lib/music-context';
+import type { Track, MusicCategory } from '@/lib/music-context';
 
 // ─── Rain ambient hook ────────────────────────────────────────────────────────
 function useRainAmbient() {
@@ -37,126 +39,6 @@ function useRainAmbient() {
   }, []);
 
   return { on, toggle, volume, setVolume };
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Track { title: string; src: string; image_url?: string | null; artist?: string | null; }
-interface MusicCategory { label: string; tracks: Track[]; }
-
-// ─── Music library loader (same as SecretChatRoom) ────────────────────────────
-const MUSIC_FALLBACK: MusicCategory[] = [
-  { label: 'Lo-fi Chill', tracks: [{ title: 'Cozy Rain', src: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' }] },
-];
-
-async function loadMusicLibrary(): Promise<MusicCategory[]> {
-  try {
-    const [catRes, trackRes] = await Promise.all([
-      (supabase as any).from('chat_music_categories').select('id, label, sort_order').order('sort_order'),
-      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, image_url, artist, sort_order').order('sort_order'),
-    ]);
-    const cats: any[] = catRes.data ?? [];
-    const allTracks: any[] = trackRes.data ?? [];
-    const lib: MusicCategory[] = cats
-      .map(c => ({
-        label: c.label,
-        tracks: allTracks
-          .filter(t => t.category_id === c.id)
-          .map(t => ({ title: t.title, src: t.src, image_url: t.image_url ?? null, artist: t.artist ?? null })),
-      }))
-      .filter(c => c.tracks.length > 0);
-    return lib.length > 0 ? lib : MUSIC_FALLBACK;
-  } catch {
-    return MUSIC_FALLBACK;
-  }
-}
-
-type LoopMode = 'none' | 'all' | 'one';
-
-// ─── useMusicPlayer (identical logic to SecretChatRoom) ───────────────────────
-function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
-  const [library, setLibrary] = useState<MusicCategory[]>(MUSIC_FALLBACK);
-  const [playing, setPlaying] = useState(false);
-  const [catIdx, setCatIdx] = useState(0);
-  const [trackIdx, setTrackIdx] = useState(0);
-  const [loopMode, setLoopMode] = useState<LoopMode>('all');
-  const [volume, setVolumeState] = useState(0.8);
-
-  useEffect(() => {
-    loadMusicLibrary().then(lib => {
-      setLibrary(lib);
-      setCatIdx(0); setTrackIdx(0);
-      const el = audioRef.current;
-      if (el && lib[0]?.tracks[0]) el.src = lib[0].tracks[0].src;
-    });
-  }, []);
-
-  const currentCat = library[Math.min(catIdx, library.length - 1)] ?? MUSIC_FALLBACK[0];
-  const currentTrack = (currentCat?.tracks?.length ?? 0) > 0
-    ? currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)]
-    : ({ title: '', src: '', image_url: null, artist: null } as Track);
-
-  useEffect(() => {
-    const el = audioRef.current;
-    if (!el || !currentTrack?.src) return;
-    el.src = currentTrack.src;
-    el.loop = loopMode === 'one';
-    if (playing) { const p = el.play(); if (p) p.catch(() => {}); }
-  }, [catIdx, trackIdx, library]);
-
-  useEffect(() => { if (audioRef.current) audioRef.current.loop = loopMode === 'one'; }, [loopMode]);
-
-  useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return;
-    const onEnded = () => {
-      if (loopMode === 'one') return;
-      if (loopMode === 'all' || trackIdx < currentCat.tracks.length - 1) {
-        setTrackIdx((trackIdx + 1) % currentCat.tracks.length);
-      } else { setPlaying(false); }
-    };
-    el.addEventListener('ended', onEnded);
-    return () => el.removeEventListener('ended', onEnded);
-  }, [loopMode, trackIdx, catIdx, currentCat]);
-
-  const toggle = useCallback(() => {
-    const el = audioRef.current;
-    if (!el) return;
-    if (playing) { el.pause(); setPlaying(false); }
-    else {
-      if (!el.src || el.src === window.location.href) { if (currentTrack?.src) el.src = currentTrack.src; }
-      const p = el.play(); if (p) p.catch(() => {}); setPlaying(true);
-    }
-  }, [playing, currentTrack]);
-
-  const skipNext = useCallback(() => {
-    setTrackIdx((trackIdx + 1) % currentCat.tracks.length);
-    if (!playing) setPlaying(true);
-  }, [trackIdx, currentCat, playing]);
-
-  const skipPrev = useCallback(() => {
-    setTrackIdx((trackIdx - 1 + currentCat.tracks.length) % currentCat.tracks.length);
-    if (!playing) setPlaying(true);
-  }, [trackIdx, currentCat, playing]);
-
-  const selectTrack = useCallback((ci: number, ti: number) => {
-    setCatIdx(ci); setTrackIdx(ti); setPlaying(true);
-    const el = audioRef.current;
-    if (el) { el.src = library[ci].tracks[ti].src; const p = el.play(); if (p) p.catch(() => {}); }
-  }, [library]);
-
-  const cycleLoop = useCallback(() => {
-    setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
-  }, []);
-
-  const setVolume = useCallback((v: number) => {
-    const c = Math.max(0, Math.min(1, v));
-    setVolumeState(c);
-    if (audioRef.current) audioRef.current.volume = c;
-  }, []);
-
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, []);
-
-  return { playing, toggle, skipNext, skipPrev, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, volume, setVolume };
 }
 
 // ─── Bar Waveform (same as SecretChatRoom) ────────────────────────────────────
@@ -271,9 +153,6 @@ function ProfileCard() {
               {user.username}
             </p>
           )}
-          <p className="text-[10px] mt-0.5" style={{ color: dark ? 'rgba(203,179,160,0.5)' : 'rgba(124,92,62,0.6)' }}>
-            ติดต่อสอบถาม DM
-          </p>
         </div>
       </div>
     </div>
@@ -396,10 +275,7 @@ function PointsWidget() {
           />
         </div>
 
-        {/* Pct label */}
-        <p className="text-[10px]" style={{ color: textMuted }}>
-          {loading ? 'กำลังโหลด...' : `${pct.toFixed(0)}% ของเป้าหมาย`}
-        </p>
+        {/* Pct label removed */}
       </div>
 
       {/* Divider */}
@@ -463,8 +339,8 @@ function PointsWidget() {
 function MusicPlayerWidget() {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === 'dark';
-  const audioRef = useRef<HTMLAudioElement>(null!);
-  const player = useMusicPlayer(audioRef);
+  // Use global music context — audio persists across page navigation
+  const player = useMusic();
   const rain = useRainAmbient();
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
@@ -792,9 +668,6 @@ function MusicPlayerWidget() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Hidden audio element */}
-      <audio ref={audioRef} preload="auto" />
     </div>
   );
 }

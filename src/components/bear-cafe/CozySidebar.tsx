@@ -113,13 +113,11 @@ export function CozySidebar() {
           label="สลับโหมด"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         />
-        <NavItem
-          icon={historyIcon}
-          label="ประวัติการใช้งาน"
-          href={isAuthenticated ? '/history' : '/login'}
-        />
         {isAuthenticated && (
-          <NavItem icon={pointIcon} label="เช็คแต้มของคุณ" href="/points" />
+          <NavItem icon={historyIcon} label="ประวัติการใช้งาน" href="/history" />
+        )}
+        {!isAuthenticated && (
+          <NavItem icon={historyIcon} label="ประวัติการใช้งาน" href="/login" />
         )}
         {user?.is_owner && (
           <NavItem icon={lotteryIcon} label="ลอตเตอรี่" href="/lottery" />
