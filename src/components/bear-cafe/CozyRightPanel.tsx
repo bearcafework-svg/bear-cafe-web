@@ -1,39 +1,249 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Music2, SkipBack, SkipForward, Repeat, Repeat1, Library, ChevronLeft, Search, X } from 'lucide-react';
+import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 
-interface MusicTrack {
-  id: string;
-  title: string;
-  artist: string | null;
-  src: string;
-  image_url: string | null;
-  category_label?: string;
+// ─── Rain ambient hook ────────────────────────────────────────────────────────
+function useRainAmbient() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [on, setOn] = useState(false);
+  const [volume, setVolumeState] = useState(0.4);
+
+  useEffect(() => {
+    const el = new Audio('/RainSounds.mp3');
+    el.loop = true;
+    el.volume = 0.4;
+    el.preload = 'auto';
+    audioRef.current = el;
+    return () => { el.pause(); el.src = ''; };
+  }, []);
+
+  const toggle = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (on) { el.pause(); setOn(false); }
+    else { const p = el.play(); if (p) p.catch(() => {}); setOn(true); }
+  }, [on]);
+
+  const setVolume = useCallback((v: number) => {
+    const c = Math.max(0, Math.min(1, v));
+    setVolumeState(c);
+    if (audioRef.current) audioRef.current.volume = c;
+  }, []);
+
+  return { on, toggle, volume, setVolume };
 }
 
-// ── Profile Card ─────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface Track { title: string; src: string; image_url?: string | null; artist?: string | null; }
+interface MusicCategory { label: string; tracks: Track[]; }
+
+// ─── Music library loader (same as SecretChatRoom) ────────────────────────────
+const MUSIC_FALLBACK: MusicCategory[] = [
+  { label: 'Lo-fi Chill', tracks: [{ title: 'Cozy Rain', src: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' }] },
+];
+
+async function loadMusicLibrary(): Promise<MusicCategory[]> {
+  try {
+    const [catRes, trackRes] = await Promise.all([
+      (supabase as any).from('chat_music_categories').select('id, label, sort_order').order('sort_order'),
+      (supabase as any).from('chat_music_tracks').select('id, category_id, title, src, image_url, artist, sort_order').order('sort_order'),
+    ]);
+    const cats: any[] = catRes.data ?? [];
+    const allTracks: any[] = trackRes.data ?? [];
+    const lib: MusicCategory[] = cats
+      .map(c => ({
+        label: c.label,
+        tracks: allTracks
+          .filter(t => t.category_id === c.id)
+          .map(t => ({ title: t.title, src: t.src, image_url: t.image_url ?? null, artist: t.artist ?? null })),
+      }))
+      .filter(c => c.tracks.length > 0);
+    return lib.length > 0 ? lib : MUSIC_FALLBACK;
+  } catch {
+    return MUSIC_FALLBACK;
+  }
+}
+
+type LoopMode = 'none' | 'all' | 'one';
+
+// ─── useMusicPlayer (identical logic to SecretChatRoom) ───────────────────────
+function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
+  const [library, setLibrary] = useState<MusicCategory[]>(MUSIC_FALLBACK);
+  const [playing, setPlaying] = useState(false);
+  const [catIdx, setCatIdx] = useState(0);
+  const [trackIdx, setTrackIdx] = useState(0);
+  const [loopMode, setLoopMode] = useState<LoopMode>('all');
+  const [volume, setVolumeState] = useState(0.8);
+
+  useEffect(() => {
+    loadMusicLibrary().then(lib => {
+      setLibrary(lib);
+      setCatIdx(0); setTrackIdx(0);
+      const el = audioRef.current;
+      if (el && lib[0]?.tracks[0]) el.src = lib[0].tracks[0].src;
+    });
+  }, []);
+
+  const currentCat = library[Math.min(catIdx, library.length - 1)] ?? MUSIC_FALLBACK[0];
+  const currentTrack = (currentCat?.tracks?.length ?? 0) > 0
+    ? currentCat.tracks[Math.min(trackIdx, currentCat.tracks.length - 1)]
+    : ({ title: '', src: '', image_url: null, artist: null } as Track);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !currentTrack?.src) return;
+    el.src = currentTrack.src;
+    el.loop = loopMode === 'one';
+    if (playing) { const p = el.play(); if (p) p.catch(() => {}); }
+  }, [catIdx, trackIdx, library]);
+
+  useEffect(() => { if (audioRef.current) audioRef.current.loop = loopMode === 'one'; }, [loopMode]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onEnded = () => {
+      if (loopMode === 'one') return;
+      if (loopMode === 'all' || trackIdx < currentCat.tracks.length - 1) {
+        setTrackIdx((trackIdx + 1) % currentCat.tracks.length);
+      } else { setPlaying(false); }
+    };
+    el.addEventListener('ended', onEnded);
+    return () => el.removeEventListener('ended', onEnded);
+  }, [loopMode, trackIdx, catIdx, currentCat]);
+
+  const toggle = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) { el.pause(); setPlaying(false); }
+    else {
+      if (!el.src || el.src === window.location.href) { if (currentTrack?.src) el.src = currentTrack.src; }
+      const p = el.play(); if (p) p.catch(() => {}); setPlaying(true);
+    }
+  }, [playing, currentTrack]);
+
+  const skipNext = useCallback(() => {
+    setTrackIdx((trackIdx + 1) % currentCat.tracks.length);
+    if (!playing) setPlaying(true);
+  }, [trackIdx, currentCat, playing]);
+
+  const skipPrev = useCallback(() => {
+    setTrackIdx((trackIdx - 1 + currentCat.tracks.length) % currentCat.tracks.length);
+    if (!playing) setPlaying(true);
+  }, [trackIdx, currentCat, playing]);
+
+  const selectTrack = useCallback((ci: number, ti: number) => {
+    setCatIdx(ci); setTrackIdx(ti); setPlaying(true);
+    const el = audioRef.current;
+    if (el) { el.src = library[ci].tracks[ti].src; const p = el.play(); if (p) p.catch(() => {}); }
+  }, [library]);
+
+  const cycleLoop = useCallback(() => {
+    setLoopMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none');
+  }, []);
+
+  const setVolume = useCallback((v: number) => {
+    const c = Math.max(0, Math.min(1, v));
+    setVolumeState(c);
+    if (audioRef.current) audioRef.current.volume = c;
+  }, []);
+
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, []);
+
+  return { playing, toggle, skipNext, skipPrev, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, volume, setVolume };
+}
+
+// ─── Bar Waveform (same as SecretChatRoom) ────────────────────────────────────
+const BAR_COUNT = 16;
+const BAR_SEEDS = Array.from({ length: BAR_COUNT }, (_, i) => ({
+  duration: 0.8 + ((i * 137 + 31) % 9) * 0.1,
+  delay:    ((i * 53  + 17) % 11) * 0.06,
+  maxH:     14 + ((i * 79  + 11) % 18),
+  minH:     3  + ((i * 43  +  7) % 5),
+}));
+
+const BarWaveform = memo(({ playing }: { playing: boolean }) => (
+  <div className="flex items-end justify-center gap-[3px]" style={{ height: 36 }}>
+    {BAR_SEEDS.map((s, i) => (
+      <motion.div
+        key={i}
+        className="rounded-full"
+        initial={{ height: s.maxH, scaleY: 0.15, originY: 1 }}
+        animate={playing
+          ? { scaleY: [s.minH / s.maxH, 1, (s.minH / s.maxH) * 1.3, 0.7, s.minH / s.maxH] }
+          : { scaleY: 0.15 }}
+        transition={playing
+          ? { duration: s.duration, repeat: Infinity, ease: 'easeInOut', delay: s.delay, repeatType: 'mirror' }
+          : { duration: 0.5, ease: 'easeOut' }}
+        style={{
+          height: s.maxH, width: 3, originY: 1, willChange: 'transform',
+          background: playing ? 'linear-gradient(to top, #c8956c, #e8b48a)' : 'rgba(200,149,108,0.2)',
+        }}
+      />
+    ))}
+  </div>
+));
+
+// ─── Vinyl Disc (same visual as SecretChatRoom) ───────────────────────────────
+const VinylDisc = memo(({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) => (
+  <div className="relative flex items-center justify-center">
+    <motion.div
+      animate={{ rotate: playing ? 360 : 0 }}
+      transition={{ duration: 5, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
+      className="w-24 h-24 rounded-full flex items-center justify-center"
+      style={{
+        willChange: 'transform',
+        background: 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008, #2a1a0e, #4a2e1a, #1e1008)',
+        boxShadow: playing
+          ? '0 0 0 3px rgba(200,149,108,0.15), 0 0 24px rgba(200,149,108,0.4), 0 6px 20px rgba(0,0,0,0.5)'
+          : '0 4px 16px rgba(0,0,0,0.4)',
+      }}
+    >
+      {[28, 34, 40].map(r => (
+        <div key={r} className="absolute rounded-full border border-white/[0.05]" style={{ width: r * 2, height: r * 2 }} />
+      ))}
+      <div className="absolute inset-0 rounded-full pointer-events-none"
+        style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)' }} />
+      <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-[#c8956c]/35 shadow-inner z-10">
+        {imageUrl
+          ? <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
+          : <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06] flex items-center justify-center">
+              <Music2 className="w-5 h-5 text-[#c8956c]/55" />
+            </div>}
+      </div>
+      <div className="absolute w-3 h-3 rounded-full bg-[#1a0e06] border-2 border-[#c8956c]/35 z-20" />
+    </motion.div>
+  </div>
+));
+
+// ─── Profile Card ─────────────────────────────────────────────────────────────
 function ProfileCard() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+
+  const cardBg = dark
+    ? 'linear-gradient(135deg, rgba(58,36,16,0.6), rgba(26,18,13,0.8))'
+    : 'linear-gradient(135deg, rgba(255,235,210,0.8), rgba(248,243,237,0.9))';
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] p-4 text-center space-y-3">
-        <div className="w-14 h-14 rounded-full bg-[hsl(var(--peach)/0.4)] flex items-center justify-center mx-auto text-2xl">
-          🐻
-        </div>
+      <div className="rounded-2xl p-4 text-center space-y-3 border"
+        style={{ background: cardBg, borderColor: 'rgba(200,149,108,0.2)' }}>
+        <div className="w-12 h-12 rounded-full bg-[rgba(200,149,108,0.15)] flex items-center justify-center mx-auto text-2xl">🐻</div>
         <div>
-          <p className="text-sm font-semibold text-foreground">ยังไม่ได้เข้าสู่ระบบ</p>
-          <p className="text-xs text-muted-foreground mt-0.5">เข้าสู่ระบบเพื่อใช้งานเต็มรูปแบบ</p>
+          <p className="text-sm font-bold" style={{ color: dark ? '#f3e9dc' : '#2a1a0e' }}>ยังไม่ได้เข้าสู่ระบบ</p>
+          <p className="text-xs mt-0.5" style={{ color: dark ? '#cbb3a0' : '#7c5c3e' }}>เข้าสู่ระบบเพื่อใช้งานเต็มรูปแบบ</p>
         </div>
-        <button
-          onClick={() => navigate('/login')}
-          className="w-full py-2 rounded-xl bg-[hsl(var(--honey))] text-[hsl(var(--accent-foreground))] text-xs font-bold hover:opacity-90 transition-opacity shadow-sm"
-        >
+        <button onClick={() => navigate('/login')}
+          className="w-full py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-90"
+          style={{ background: 'linear-gradient(135deg, #e0b080, #c8956c)', color: '#fff' }}>
           เข้าสู่ระบบ ☕
         </button>
       </div>
@@ -41,360 +251,380 @@ function ProfileCard() {
   }
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-[hsl(var(--peach)/0.4)] via-[hsl(var(--cream))] to-[hsl(var(--blush)/0.3)] dark:from-[hsl(var(--coffee)/0.5)] dark:via-[hsl(var(--mocha))] dark:to-[hsl(var(--coffee)/0.3)] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] p-4">
+    <div className="rounded-2xl p-4 border" style={{ background: cardBg, borderColor: 'rgba(200,149,108,0.2)' }}>
       <div className="flex items-center gap-3">
-        {/* Avatar */}
-        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/60 dark:border-white/10 shadow-md shrink-0">
-          {user.avatar_url ? (
-            <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[hsl(var(--peach))] to-[hsl(var(--blush))] flex items-center justify-center text-xl">
-              🐻
-            </div>
-          )}
+        <div className="w-11 h-11 rounded-full overflow-hidden border-2 shadow-md shrink-0"
+          style={{ borderColor: 'rgba(200,149,108,0.4)' }}>
+          {user.avatar_url
+            ? <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+            : <div className="w-full h-full bg-gradient-to-br from-[#e8c49a] to-[#c8956c] flex items-center justify-center text-lg">🐻</div>}
         </div>
-
-        {/* Name */}
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm text-foreground truncate">
+          {/* Primary: discord display name (may include role prefix like 【👑】) */}
+          <p className="font-bold text-sm leading-tight truncate" style={{ color: dark ? '#f3e9dc' : '#2a1a0e' }}>
             {user.discord_username ?? user.username}
           </p>
-          {user.discord_username && (
-            <p className="text-[11px] text-muted-foreground truncate">{user.username}</p>
+          {/* Secondary: raw username only when it differs from discord_username */}
+          {user.discord_username && user.discord_username !== user.username && (
+            <p className="text-[11px] truncate mt-0.5" style={{ color: dark ? '#cbb3a0' : '#7c5c3e' }}>
+              {user.username}
+            </p>
           )}
-          <p className="text-[10px] text-muted-foreground mt-0.5">ชื่อ / ติดต่อสอบถาม DM</p>
+          <p className="text-[10px] mt-0.5" style={{ color: dark ? 'rgba(203,179,160,0.5)' : 'rgba(124,92,62,0.6)' }}>
+            ติดต่อสอบถาม DM
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Vinyl disc animation ──────────────────────────────────────────────────────
-function VinylDisc({ imageUrl, isPlaying }: { imageUrl: string | null; isPlaying: boolean }) {
-  return (
-    <div className="relative w-24 h-24 mx-auto">
-      {/* Outer ring */}
-      <motion.div
-        animate={{ rotate: isPlaying ? 360 : 0 }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
-        className="w-full h-full rounded-full bg-[#2a1f1a] dark:bg-[#1a1210] shadow-lg flex items-center justify-center"
-        style={{ willChange: 'transform' }}
-      >
-        {/* Grooves */}
-        <div className="absolute inset-2 rounded-full border border-white/5" />
-        <div className="absolute inset-4 rounded-full border border-white/5" />
-        <div className="absolute inset-6 rounded-full border border-white/5" />
+// ─── Music Player Widget ──────────────────────────────────────────────────────
+function MusicPlayerWidget() {
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+  const audioRef = useRef<HTMLAudioElement>(null!);
+  const player = useMusicPlayer(audioRef);
+  const rain = useRainAmbient();
+  const [view, setView] = useState<'player' | 'library'>('player');
+  const [searchQuery, setSearchQuery] = useState('');
 
-        {/* Center label */}
-        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 shadow-inner">
-          {imageUrl ? (
-            <img src={imageUrl} alt="album art" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[hsl(var(--honey)/0.6)] to-[hsl(var(--peach)/0.6)] flex items-center justify-center text-lg">
-              🎵
-            </div>
-          )}
-        </div>
-      </motion.div>
+  // colour tokens matching SecretChatRoom
+  const panelBg      = dark ? 'rgba(22,14,9,0.95)'     : 'rgba(250,246,242,0.95)';
+  const textPrimary  = dark ? '#f3e9dc' : '#2a1a0e';
+  const textSecondary= dark ? '#cbb3a0' : '#7c5c3e';
+  const textAccent   = dark ? '#e0b48a' : '#c8956c';
+  const textMuted    = dark ? 'rgba(203,179,160,0.5)' : 'rgba(156,124,94,0.6)';
+  const borderAccent = dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
+  const trackActiveBg= dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.1)';
+  const thumbBg      = dark ? 'rgba(255,255,255,0.06)' : 'rgba(232,217,200,0.5)';
 
-      {/* Needle */}
-      <div
-        className="absolute -right-1 top-2 w-0.5 h-8 bg-[hsl(var(--honey)/0.7)] rounded-full origin-top"
-        style={{ transform: isPlaying ? 'rotate(25deg)' : 'rotate(40deg)', transition: 'transform 0.5s ease' }}
-      />
-    </div>
-  );
-}
+  // Flat track list for library search
+  const allTracks = useMemo(() => {
+    const result: Array<{ track: Track; ci: number; ti: number; catLabel: string }> = [];
+    player.library.forEach((cat, ci) => {
+      cat.tracks.forEach((t, ti) => result.push({ track: t, ci, ti, catLabel: cat.label }));
+    });
+    return result;
+  }, [player.library]);
 
-// ── Music Player ─────────────────────────────────────────────────────────────
-function MusicPlayer() {
-  const [tracks, setTracks] = useState<MusicTrack[]>([]);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const filteredTracks = useMemo(() => {
+    if (!searchQuery.trim()) return allTracks;
+    const q = searchQuery.toLowerCase();
+    return allTracks.filter(({ track }) =>
+      track.title.toLowerCase().includes(q) || (track.artist ?? '').toLowerCase().includes(q)
+    );
+  }, [allTracks, searchQuery]);
 
-  useEffect(() => {
-    const fetchTracks = async () => {
-      const { data } = await (supabase as any)
-        .from('chat_music_tracks')
-        .select('id, title, artist, src, image_url, chat_music_categories(label)')
-        .order('sort_order', { ascending: true })
-        .limit(20);
-
-      if (data) {
-        const mapped: MusicTrack[] = data.map((t: any) => ({
-          id: t.id,
-          title: t.title,
-          artist: t.artist ?? null,
-          src: t.src,
-          image_url: t.image_url ?? null,
-          category_label: t.chat_music_categories?.label ?? null,
-        }));
-        setTracks(mapped);
-      }
-    };
-    fetchTracks();
-  }, []);
-
-  const currentTrack = tracks[currentIdx] ?? null;
-
-  // Sync audio element
-  useEffect(() => {
-    if (!currentTrack) return;
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.loop = true;
-    }
-    audioRef.current.src = currentTrack.src;
-    audioRef.current.muted = muted;
-    if (isPlaying) {
-      audioRef.current.play().catch(() => setIsPlaying(false));
-    }
-  }, [currentIdx, tracks]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = muted;
-  }, [muted]);
-
-  const startProgress = useCallback(() => {
-    if (progressInterval.current) clearInterval(progressInterval.current);
-    progressInterval.current = setInterval(() => {
-      const audio = audioRef.current;
-      if (!audio || !audio.duration) return;
-      setProgress((audio.currentTime / audio.duration) * 100);
-    }, 500);
-  }, []);
-
-  const stopProgress = useCallback(() => {
-    if (progressInterval.current) clearInterval(progressInterval.current);
-  }, []);
-
-  const togglePlay = async () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      stopProgress();
-      setIsPlaying(false);
-    } else {
-      try {
-        await audioRef.current.play();
-        startProgress();
-        setIsPlaying(true);
-      } catch {
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  const skipTo = (idx: number) => {
-    const next = (idx + tracks.length) % tracks.length;
-    setCurrentIdx(next);
-    setProgress(0);
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      // src change handled by useEffect above
-      setTimeout(() => {
-        audioRef.current?.play().catch(() => setIsPlaying(false));
-        startProgress();
-      }, 50);
-    }
-  };
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      stopProgress();
-      audioRef.current?.pause();
-    };
-  }, []);
-
-  if (tracks.length === 0) {
+  if (player.library.length === 0 || (player.library.length === 1 && player.library[0].tracks.length === 0)) {
     return (
-      <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] p-5 text-center">
-        <p className="text-xs text-muted-foreground">ยังไม่มีเพลงในระบบ</p>
+      <div className="rounded-2xl p-5 text-center border" style={{ background: panelBg, borderColor: borderAccent }}>
+        <p className="text-xs" style={{ color: textMuted }}>ยังไม่มีเพลงในระบบ</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] p-4 space-y-4">
-      {/* Section label */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">เพลงตอนนี้</p>
-        <span className="text-xs text-[hsl(var(--honey)/0.7)]">⚡</span>
-      </div>
+    <div className="rounded-2xl overflow-hidden border flex flex-col" style={{ background: panelBg, borderColor: borderAccent }}>
+      <AnimatePresence mode="wait" initial={false}>
 
-      {/* Vinyl */}
-      <VinylDisc imageUrl={currentTrack?.image_url ?? null} isPlaying={isPlaying} />
+        {/* ── PLAYER VIEW ── */}
+        {view === 'player' && (
+          <motion.div key="player"
+            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <div className="flex items-center gap-2">
+                <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" />
+                <span className="text-xs font-bold" style={{ color: textSecondary }}>เพลงตอนนี้</span>
+              </div>
+              <button onClick={() => setView('library')}
+                className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                style={{ color: textMuted }} title="คลังเพลง">
+                <Library className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-      {/* Track info */}
-      <div className="text-center space-y-0.5">
-        <p className="text-sm font-bold text-foreground truncate">{currentTrack?.title ?? '—'}</p>
-        <p className="text-[11px] text-muted-foreground truncate">
-          {currentTrack?.artist ?? currentTrack?.category_label ?? 'Bear Cafe'}
-        </p>
-        {isPlaying && (
-          <p className="text-[10px] text-[hsl(var(--matcha))] font-medium animate-pulse">
-            — กำลังเล่นอยู่ —
-          </p>
+            {/* Vinyl */}
+            <div className="flex justify-center py-3">
+              <VinylDisc imageUrl={player.currentTrack?.image_url} playing={player.playing} />
+            </div>
+
+            {/* Track info */}
+            <div className="px-4 text-center space-y-0.5 pb-1">
+              <motion.p key={player.currentTrack?.title}
+                initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                className="font-bold text-sm leading-tight truncate" style={{ color: textPrimary }}>
+                {player.currentTrack?.title ?? '—'}
+              </motion.p>
+              {player.currentTrack?.artist && (
+                <p className="text-[11px] truncate font-medium" style={{ color: textAccent }}>
+                  {player.currentTrack.artist}
+                </p>
+              )}
+              <div className="flex items-center justify-center gap-2 pt-0.5">
+                <div className="h-px flex-1 max-w-[32px]"
+                  style={{ background: `linear-gradient(to right, transparent, ${textAccent}44)` }} />
+                <p className="text-[9px] uppercase tracking-[0.18em] font-medium" style={{ color: textMuted }}>
+                  {player.currentCat?.label ?? ''}
+                </p>
+                <div className="h-px flex-1 max-w-[32px]"
+                  style={{ background: `linear-gradient(to left, transparent, ${textAccent}44)` }} />
+              </div>
+            </div>
+
+            {/* Waveform */}
+            <div className="px-4 py-1">
+              <BarWaveform playing={player.playing} />
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-2 px-4 pb-2">
+              {/* Loop */}
+              <button onClick={player.cycleLoop}
+                className="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+                style={{
+                  color: player.loopMode !== 'none' ? textAccent : textMuted,
+                  background: player.loopMode !== 'none' ? `${textAccent}22` : 'transparent',
+                }}>
+                {player.loopMode === 'one' ? <Repeat1 className="w-3.5 h-3.5" /> : <Repeat className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Prev */}
+              <button onClick={player.skipPrev}
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                style={{ color: textSecondary }}>
+                <SkipBack className="w-4 h-4" />
+              </button>
+
+              {/* Play/Pause */}
+              <motion.button whileTap={{ scale: 0.92 }} onClick={player.toggle}
+                className="w-14 h-14 rounded-full text-white flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(145deg, #e0b080, #c8956c, #b07d58)',
+                  boxShadow: player.playing
+                    ? '0 4px 18px rgba(200,149,108,0.5), 0 2px 6px rgba(0,0,0,0.15)'
+                    : '0 4px 12px rgba(0,0,0,0.2)',
+                }}>
+                {player.playing
+                  ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="4" width="4" height="16" rx="2" />
+                      <rect x="14" y="4" width="4" height="16" rx="2" />
+                    </svg>
+                  : <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>}
+              </motion.button>
+
+              {/* Next */}
+              <button onClick={player.skipNext}
+                className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                style={{ color: textSecondary }}>
+                <SkipForward className="w-4 h-4" />
+              </button>
+
+              {/* Rain toggle */}
+              <button onClick={rain.toggle}
+                className="w-8 h-8 flex items-center justify-center rounded-full transition-colors text-base"
+                style={{
+                  background: rain.on ? 'rgba(96,165,250,0.18)' : 'transparent',
+                  color: rain.on ? '#60a5fa' : textMuted,
+                  outline: rain.on ? '1.5px solid rgba(96,165,250,0.4)' : 'none',
+                }}
+                title={rain.on ? 'ปิดเสียงฝน' : 'เปิดเสียงฝน'}>
+                🌧
+              </button>
+            </div>
+
+            {/* Rain volume — visible only when rain is on */}
+            <AnimatePresence>
+              {rain.on && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="px-4 pb-2 overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                    <span className="text-sm shrink-0">🌧</span>
+                    <div className="relative flex-1 flex items-center" style={{ height: 26 }}>
+                      <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
+                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(96,165,250,0.15)' }}>
+                          <div className="h-full rounded-full"
+                            style={{ width: `${rain.volume * 100}%`, background: 'linear-gradient(to right, #60a5fa, #93c5fd)' }} />
+                        </div>
+                      </div>
+                      <input type="range" min={0} max={100} step={1} value={Math.round(rain.volume * 100)}
+                        onChange={e => rain.setVolume(Number(e.target.value) / 100)}
+                        className="w-full absolute inset-0"
+                        style={{ opacity: 0.001, cursor: 'pointer', height: '100%', margin: 0, padding: 0, touchAction: 'none' }} />
+                      <span className="absolute text-sm pointer-events-none select-none"
+                        style={{ left: `calc(${rain.volume * 100}% - 9px)`, top: '50%', transform: 'translateY(-50%)', zIndex: 20, lineHeight: 1 }}>
+                        🌧
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[9px] font-mono tabular-nums w-5 text-right"
+                      style={{ color: 'rgba(96,165,250,0.7)' }}>
+                      {Math.round(rain.volume * 100)}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Volume slider — honey jar thumb */}
+            <div className="px-4 pb-4">
+              <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl"
+                style={{ background: dark ? 'rgba(200,149,108,0.06)' : 'rgba(200,149,108,0.07)', border: `1px solid ${borderAccent}` }}>
+                <button onClick={() => player.setVolume(player.volume > 0 ? 0 : 0.8)}
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: textMuted }}>
+                  {player.volume === 0
+                    ? <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                      </svg>
+                    : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>}
+                </button>
+
+                <div className="relative flex-1 flex items-center" style={{ height: 28 }}>
+                  {/* Track fill */}
+                  <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
+                    <div className="w-full h-1.5 rounded-full overflow-hidden"
+                      style={{ background: dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.15)' }}>
+                      <div className="h-full rounded-full"
+                        style={{ width: `${player.volume * 100}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }} />
+                    </div>
+                  </div>
+                  {/* Range input */}
+                  <input type="range" min={0} max={100} step={1} value={Math.round(player.volume * 100)}
+                    onChange={e => player.setVolume(Number(e.target.value) / 100)}
+                    className="w-full absolute inset-0"
+                    style={{ opacity: 0.001, cursor: 'pointer', height: '100%', margin: 0, padding: 0, touchAction: 'none' }} />
+                  {/* Honey jar thumb */}
+                  <img src={honeyJarIcon} alt="" draggable={false}
+                    style={{
+                      position: 'absolute',
+                      left: `calc(${player.volume * 100}% - 10px)`,
+                      top: '50%', transform: 'translateY(-50%)',
+                      width: 20, height: 20,
+                      pointerEvents: 'none', userSelect: 'none', zIndex: 20,
+                      filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
+                    }} />
+                </div>
+
+                <span className="shrink-0 text-[9px] font-mono tabular-nums w-5 text-right" style={{ color: textMuted }}>
+                  {player.volume === 0 ? '—' : Math.round(player.volume * 100)}
+                </span>
+              </div>
+            </div>
+          </motion.div>
         )}
-      </div>
 
-      {/* Progress bar */}
-      <div className="relative h-1.5 rounded-full bg-[hsl(var(--latte)/0.6)] dark:bg-[hsl(var(--coffee)/0.4)] overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[hsl(var(--honey))] to-[hsl(var(--primary))] transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setMuted((m) => !m)}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={muted ? 'เปิดเสียง' : 'ปิดเสียง'}
-        >
-          {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => skipTo(currentIdx - 1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="เพลงก่อนหน้า"
+        {/* ── LIBRARY VIEW ── */}
+        {view === 'library' && (
+          <motion.div key="library"
+            initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="flex flex-col"
           >
-            <SkipBack className="w-4 h-4" />
-          </button>
+            {/* Header */}
+            <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+              <button onClick={() => { setView('player'); setSearchQuery(''); }}
+                className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                style={{ color: textMuted }}>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-bold flex-1" style={{ color: textSecondary }}>คลังเพลง</span>
+              <span className="text-[10px]" style={{ color: textMuted }}>{allTracks.length} เพลง</span>
+            </div>
 
-          <motion.button
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.94 }}
-            onClick={togglePlay}
-            className="w-11 h-11 rounded-full bg-[hsl(var(--honey))] text-[hsl(var(--accent-foreground))] flex items-center justify-center shadow-md shadow-[hsl(var(--honey)/0.3)]"
-            aria-label={isPlaying ? 'หยุด' : 'เล่น'}
-          >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-          </motion.button>
+            {/* Search */}
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                style={{ background: dark ? 'rgba(200,149,108,0.08)' : 'rgba(200,149,108,0.1)', border: `1px solid ${borderAccent}` }}>
+                <Search className="w-3 h-3 shrink-0" style={{ color: textMuted }} />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="ค้นหาเพลง..."
+                  className="flex-1 bg-transparent text-xs outline-none"
+                  style={{ color: textPrimary }}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} style={{ color: textMuted }}>
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-          <button
-            onClick={() => skipTo(currentIdx + 1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="เพลงถัดไป"
-          >
-            <SkipForward className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Floating music note doodle */}
-        <AnimatePresence>
-          {isPlaying && (
-            <motion.span
-              key="note"
-              initial={{ opacity: 0, y: 0 }}
-              animate={{ opacity: [0, 1, 0], y: -12 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-sm text-[hsl(var(--honey)/0.6)] select-none pointer-events-none"
-            >
-              ♪
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-// ── Playlist list ─────────────────────────────────────────────────────────────
-function PlaylistList() {
-  const [tracks, setTracks] = useState<MusicTrack[]>([]);
-
-  useEffect(() => {
-    const fetchTracks = async () => {
-      const { data } = await (supabase as any)
-        .from('chat_music_tracks')
-        .select('id, title, artist, src, image_url, chat_music_categories(label)')
-        .order('sort_order', { ascending: true })
-        .limit(6);
-
-      if (data) {
-        setTracks(
-          data.map((t: any) => ({
-            id: t.id,
-            title: t.title,
-            artist: t.artist ?? null,
-            src: t.src,
-            image_url: t.image_url ?? null,
-            category_label: t.chat_music_categories?.label ?? null,
-          }))
-        );
-      }
-    };
-    fetchTracks();
-  }, []);
-
-  if (tracks.length === 0) return null;
-
-  return (
-    <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[hsl(var(--latte)/0.4)] dark:border-[hsl(var(--coffee)/0.3)] flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ตอนนี้กำลังสนทนา</p>
-        <span className="text-xs">🎵</span>
-      </div>
-      <ul className="divide-y divide-[hsl(var(--latte)/0.3)] dark:divide-[hsl(var(--coffee)/0.25)]">
-        {tracks.map((track, i) => (
-          <li key={track.id} className={cn('flex items-center gap-3 px-4 py-2.5', i === 0 && 'bg-[hsl(var(--honey)/0.06)]')}>
-            {/* Tiny album art */}
-            <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 bg-[hsl(var(--latte)/0.4)] dark:bg-[hsl(var(--coffee)/0.3)] flex items-center justify-center">
-              {track.image_url ? (
-                <img src={track.image_url} alt={track.title} className="w-full h-full object-cover" />
+            {/* Track list */}
+            <div className="overflow-y-auto max-h-72 pb-3" style={{ borderTop: `1px solid ${borderAccent}` }}>
+              {filteredTracks.length === 0 ? (
+                <p className="text-center text-xs py-6" style={{ color: textMuted }}>ไม่พบเพลง</p>
               ) : (
-                <span className="text-xs">🎵</span>
+                filteredTracks.map(({ track, ci, ti, catLabel }) => {
+                  const isActive = ci === player.catIdx && ti === player.trackIdx;
+                  return (
+                    <button key={`${ci}-${ti}`}
+                      onClick={() => { player.selectTrack(ci, ti); setView('player'); }}
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors active:opacity-70"
+                      style={{ background: isActive ? trackActiveBg : 'transparent' }}>
+                      {/* Thumb */}
+                      <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
+                        style={{ background: isActive ? 'transparent' : thumbBg, outline: isActive ? `2px solid ${textAccent}55` : 'none' }}>
+                        {track.image_url
+                          ? <img src={track.image_url} alt="" className="w-full h-full object-cover" />
+                          : isActive && player.playing
+                            ? <div className="flex gap-[2px] items-end h-4 w-full justify-center">
+                                {[0, 0.1, 0.2].map((d, i) => (
+                                  <motion.div key={i} className="w-0.5 rounded-full"
+                                    style={{ background: textAccent, height: 8, originY: 0.5 }}
+                                    animate={{ scaleY: [0.4, 1, 0.4] }}
+                                    transition={{ duration: 0.55, repeat: Infinity, delay: d, ease: 'easeInOut' }} />
+                                ))}
+                              </div>
+                            : <Music2 className="w-3.5 h-3.5" style={{ color: textMuted }} />}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate"
+                          style={{ color: isActive ? textAccent : textPrimary }}>
+                          {track.title}
+                        </p>
+                        <p className="text-[10px] truncate" style={{ color: textMuted }}>
+                          {track.artist ?? catLabel}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <p className={cn('text-xs font-semibold truncate', i === 0 ? 'text-foreground' : 'text-muted-foreground')}>
-                {track.title}
-              </p>
-              <p className="text-[10px] text-muted-foreground/70 truncate">
-                {track.artist ?? track.category_label ?? 'Bear Cafe'}
-              </p>
-            </div>
-
-            {/* Playing indicator */}
-            {i === 0 && (
-              <div className="flex items-end gap-0.5 h-3 shrink-0">
-                {[1, 2, 3].map((b) => (
-                  <motion.div
-                    key={b}
-                    className="w-0.5 rounded-full bg-[hsl(var(--honey))]"
-                    animate={{ height: ['4px', '10px', '4px'] }}
-                    transition={{ duration: 0.8, repeat: Infinity, delay: b * 0.15 }}
-                  />
-                ))}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      {/* Hidden audio element */}
+      <audio ref={audioRef} preload="auto" />
     </div>
   );
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 export function CozyRightPanel() {
   return (
-    <aside className="w-[240px] shrink-0 flex flex-col gap-4 h-[100dvh] overflow-y-auto py-5 px-3">
+    <aside className="w-[264px] shrink-0 flex flex-col gap-4 h-[100dvh] overflow-y-auto py-5 px-3">
       <ProfileCard />
-      <MusicPlayer />
-      <PlaylistList />
+      <MusicPlayerWidget />
     </aside>
   );
 }

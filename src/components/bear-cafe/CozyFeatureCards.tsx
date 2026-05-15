@@ -12,7 +12,7 @@ const IMG_3 = '/icons/SecretCafe-3.png';
 
 const BEAR_CAFE_GUILD_ID = '1144251788493602848';
 const BEAR_CAFE_INVITE = 'https://discord.gg/bearcafe';
-const VOICE_STALE_MINUTES = 3;
+const VOICE_STALE_MINUTES = 20; // heartbeat runs every 15 min, 5 min buffer
 
 // Masking tape strip — purely decorative
 function MaskingTape({ color = 'honey', rotate = -1 }: { color?: 'honey' | 'mint' | 'blush'; rotate?: number }) {

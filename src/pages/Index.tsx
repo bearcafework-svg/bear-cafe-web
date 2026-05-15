@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth-context';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
 import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
 import { LoadingBear } from '@/components/bear-cafe/LoadingBear';
+import { Footer } from '@/components/bear-cafe/Footer';
 import { CozySidebar } from '@/components/bear-cafe/CozySidebar';
 import { CozyFeatureCards } from '@/components/bear-cafe/CozyFeatureCards';
 import { CommunityCarousel } from '@/components/bear-cafe/CommunityCarousel';
@@ -104,15 +105,16 @@ export default function Index() {
             {/* Main heading */}
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
               {isAuthenticated
-                ? `เฮ้ ${displayName}! 🐻`
-                : 'Bear Cafe ยินดีต้อนรับ 🐻'}
+                ? `ยินดีต้อนรับ ${displayName} 🐻`
+                : 'ยินดีต้อนรับสู่ Bear Cafe 🐻'}
             </h1>
 
             {/* Sub-heading */}
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg">
-              เหงาอยู่รึเปล่า? มาแฮงค์เอาท์กันที่นี่เลย
+              เหงาอยู่รึเปล่า? แวะมาใช้เวลาที่ Bear Cafe สิ!
               <br className="hidden sm:block" />
-              หาเพื่อนใหม่ สุ่มแชท หรือแค่มาเดินเล่นก็ได้ ไม่ตัดสิน 🍯
+              ทั้งหาเพื่อนใหม่ พูดคุยแบบสบายๆ มีสุ่มแชทให้ลองเล่น
+              และกิจกรรมสนุกๆ รอให้คุณเข้ามาจอยอีกเพียบ
             </p>
 
             {/* Tiny decorative stars */}
@@ -141,17 +143,10 @@ export default function Index() {
           >
             <CommunityCarousel />
           </motion.div>
-
-          {/* ── Footer note ── */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35 }}
-            className="text-[11px] text-center text-muted-foreground/50 pb-2"
-          >
-            © 2026 BEAR CAFE by Zeabiu · All rights reserved
-          </motion.p>
         </div>
+
+        {/* ── Footer ── */}
+        <Footer />
       </main>
 
       {/* ══════════════════════════════════════════════════════
@@ -178,7 +173,7 @@ export default function Index() {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setRightOpen(false)}
           />
-          <div className="absolute right-0 top-0 bottom-0 z-50 w-[260px] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))] border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] overflow-y-auto">
+          <div className="absolute right-0 top-0 bottom-0 z-50 w-[280px] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))] border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] overflow-y-auto">
             <CozyRightPanel />
           </div>
         </div>
