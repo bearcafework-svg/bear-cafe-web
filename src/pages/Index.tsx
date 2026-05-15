@@ -41,7 +41,7 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-screen flex bg-[hsl(var(--background))] overflow-hidden">
+    <div className="min-h-screen flex bg-[hsl(var(--background))] overflow-hidden homepage-zoom">
       {/* ── Popups ── */}
       <GreenTeaWarningPopup userId={user?.id} />
       <CooldownBox

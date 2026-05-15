@@ -4,8 +4,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Music2, SkipBack, SkipForward, Repeat, Repeat1, Library, ChevronLeft, Search, X } from 'lucide-react';
+import { Music2, SkipBack, SkipForward, Repeat, Repeat1, Library, ChevronLeft, Search, X, Gift, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
+import strawberryIcon from '@/assets/strawberry-icon.png';
 
 // ─── Rain ambient hook ────────────────────────────────────────────────────────
 function useRainAmbient() {
@@ -279,35 +280,182 @@ function ProfileCard() {
   );
 }
 
-// ─── Points quick-link ────────────────────────────────────────────────────────
-function PointsLink() {
+// ─── Points Widget ────────────────────────────────────────────────────────────
+function PointsWidget() {
   const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === 'dark';
 
+  const [points, setPoints] = useState(0);
+  const [maxCap, setMaxCap] = useState(500);
+  const [loading, setLoading] = useState(true);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemStatus, setRedeemStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [redeemMsg, setRedeemMsg] = useState('');
+
+  // colour tokens
+  const cardBg    = dark ? 'rgba(22,14,9,0.95)'     : 'rgba(250,246,242,0.95)';
+  const border    = dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
+  const textPri   = dark ? '#f3e9dc' : '#2a1a0e';
+  const textSec   = dark ? '#cbb3a0' : '#7c5c3e';
+  const textMuted = dark ? 'rgba(203,179,160,0.5)' : 'rgba(156,124,94,0.6)';
+  const accent    = dark ? '#e0b48a' : '#c8956c';
+
+  const fetchPoints = useCallback(async () => {
+    if (!user?.discord_id) { setLoading(false); return; }
+    try {
+      const { data } = await supabase
+        .from('user_points')
+        .select('points, max_cap')
+        .eq('discord_id', user.discord_id)
+        .maybeSingle();
+      if (data) {
+        setPoints(data.points ?? 0);
+        setMaxCap(data.max_cap ?? 500);
+      }
+    } catch {}
+    setLoading(false);
+  }, [user?.discord_id]);
+
+  useEffect(() => { fetchPoints(); }, [fetchPoints]);
+
+  // Poll every 30s (lighter than PointsPage's 10s — this is a sidebar widget)
+  useEffect(() => {
+    if (!user?.discord_id) return;
+    const id = setInterval(() => fetchPoints(), 30_000);
+    return () => clearInterval(id);
+  }, [fetchPoints, user?.discord_id]);
+
+  const handleRedeem = async () => {
+    const code = redeemCode.trim();
+    if (!code || !user?.discord_id) return;
+    setRedeemStatus('loading');
+    setRedeemMsg('');
+    try {
+      const { data, error } = await supabase.functions.invoke('redeem-code', {
+        body: { userId: user.discord_id, code },
+      });
+      if (error) throw error;
+      if (!data.ok) {
+        const msgs: Record<string, string> = {
+          code_used: 'โค้ดนี้ถูกใช้ไปแล้ว', invalid_code: 'ไม่พบโค้ดนี้',
+          expired: 'โค้ดหมดอายุแล้ว', already_redeemed: 'คุณเคยใช้โค้ดนี้แล้ว',
+          limit_reached: 'โค้ดถูกใช้ครบโควต้าแล้ว', disabled: 'โค้ดถูกปิดใช้งาน',
+        };
+        setRedeemStatus('error');
+        setRedeemMsg(msgs[data.error] ?? 'โค้ดไม่ถูกต้อง');
+        return;
+      }
+      const raw = data.pointsNow ?? (typeof data.points === 'number' ? data.points : Number(data.points));
+      if (Number.isFinite(raw)) setPoints(Math.min(raw, maxCap));
+      setRedeemStatus('success');
+      setRedeemMsg(data.granted?.pointsAdded ? `+${data.granted.pointsAdded} 🍓` : 'รับรางวัลสำเร็จ');
+      setRedeemCode('');
+      setTimeout(() => { setRedeemStatus('idle'); setRedeemMsg(''); }, 4000);
+      fetchPoints();
+    } catch {
+      setRedeemStatus('error');
+      setRedeemMsg('ระบบขัดข้อง ลองใหม่อีกครั้ง');
+    }
+  };
+
   if (!isAuthenticated || !user) return null;
 
+  const pct = maxCap > 0 ? Math.min((points / maxCap) * 100, 100) : 0;
+
   return (
-    <button
-      onClick={() => navigate('/points')}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group"
-      style={{
-        background: dark ? 'rgba(200,149,108,0.08)' : 'rgba(200,149,108,0.1)',
-        borderColor: dark ? 'rgba(200,149,108,0.2)' : 'rgba(200,149,108,0.25)',
-      }}
-    >
-      <span className="text-xl shrink-0 group-hover:scale-110 transition-transform">🍓</span>
-      <div className="flex-1 min-w-0 text-left">
-        <p className="text-sm font-semibold" style={{ color: dark ? '#f3e9dc' : '#2a1a0e' }}>
-          เช็คแต้มของคุณ
-        </p>
-        <p className="text-[11px]" style={{ color: dark ? 'rgba(203,179,160,0.6)' : 'rgba(124,92,62,0.65)' }}>
-          ดูคะแนนสะสมและรางวัล
+    <div className="rounded-2xl overflow-hidden border flex flex-col" style={{ background: cardBg, borderColor: border }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2">
+          <img src={strawberryIcon} alt="" className="w-4 h-4 object-contain" />
+          <span className="text-xs font-bold" style={{ color: textSec }}>แต้มสะสม</span>
+        </div>
+        {loading && <Sparkles className="w-3 h-3 animate-pulse" style={{ color: accent }} />}
+      </div>
+
+      {/* Points display */}
+      <div className="px-4 pb-3 space-y-2.5">
+        {/* Big number */}
+        <div className="flex items-end gap-1.5">
+          <span className="text-3xl font-bold leading-none" style={{ color: textPri }}>
+            {loading ? '—' : points.toLocaleString()}
+          </span>
+          <span className="text-xs pb-0.5" style={{ color: textMuted }}>/ {maxCap.toLocaleString()}</span>
+          <span className="text-base pb-0.5 ml-0.5">🍓</span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="relative h-2 rounded-full overflow-hidden" style={{ background: dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.15)' }}>
+          <motion.div
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{ background: 'linear-gradient(to right, #c8956c, #e8b48a)' }}
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </div>
+
+        {/* Pct label */}
+        <p className="text-[10px]" style={{ color: textMuted }}>
+          {loading ? 'กำลังโหลด...' : `${pct.toFixed(0)}% ของเป้าหมาย`}
         </p>
       </div>
-      <span className="text-xs shrink-0" style={{ color: dark ? 'rgba(200,149,108,0.5)' : 'rgba(200,149,108,0.7)' }}>→</span>
-    </button>
+
+      {/* Divider */}
+      <div className="mx-4 h-px" style={{ background: border }} />
+
+      {/* Redeem code */}
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Gift className="w-3 h-3" style={{ color: accent }} />
+          <span className="text-[11px] font-semibold" style={{ color: textSec }}>กรอกโค้ดรับรางวัล</span>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            value={redeemCode}
+            onChange={e => setRedeemCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRedeem()}
+            placeholder="โค้ดของคุณ..."
+            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl text-xs outline-none border"
+            style={{
+              background: dark ? 'rgba(200,149,108,0.06)' : 'rgba(200,149,108,0.07)',
+              borderColor: border,
+              color: textPri,
+            }}
+          />
+          <motion.button
+            whileTap={{ scale: 0.94 }}
+            onClick={handleRedeem}
+            disabled={redeemStatus === 'loading' || !redeemCode.trim()}
+            className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-opacity"
+            style={{ background: 'linear-gradient(135deg, #e0b080, #c8956c)' }}
+          >
+            {redeemStatus === 'loading' ? '...' : 'ยืนยัน'}
+          </motion.button>
+        </div>
+
+        {/* Feedback */}
+        <AnimatePresence>
+          {redeemMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-1.5"
+            >
+              {redeemStatus === 'success'
+                ? <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                : <XCircle className="w-3 h-3 text-destructive shrink-0" />}
+              <span className="text-[11px]" style={{ color: redeemStatus === 'success' ? '#10b981' : '#ef4444' }}>
+                {redeemMsg}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
 
@@ -656,7 +804,7 @@ export function CozyRightPanel() {
   return (
     <aside className="w-[264px] shrink-0 flex flex-col gap-4 h-[100dvh] overflow-y-auto py-5 px-3">
       <ProfileCard />
-      <PointsLink />
+      <PointsWidget />
       <MusicPlayerWidget />
     </aside>
   );

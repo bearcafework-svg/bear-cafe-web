@@ -551,6 +551,15 @@
   }
 }
 
+/* ─── Homepage — Desktop 110% zoom ──────────────────────────────────────── */
+/* Matches the user's preferred 110% browser zoom proportion.
+   Only activates at lg (1024px+). Mobile/tablet unaffected. */
+@media (min-width: 1024px) {
+  .homepage-zoom {
+    zoom: 1.10;
+  }
+}
+
 /* ─── Custom Scrollbar — Global (Option C) ───────────────────────────────────
    Mobile  : ซ่อน scrollbar ทั้งหมด (เลื่อนด้วยนิ้วได้ปกติ)
    Desktop : แถบบางๆ สี honey ตามธีม light/dark
