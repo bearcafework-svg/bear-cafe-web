@@ -1,328 +1,188 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { HomeSidebar } from '@/components/bear-cafe/HomeSidebar';
-import { BannerCarousel } from '@/components/bear-cafe/BannerCarousel';
-import { HomeCategoryCard, MoreCategoriesCard } from '@/components/bear-cafe/HomeCategoryCard';
-import { AllCategoriesModal } from '@/components/bear-cafe/AllCategoriesModal';
-import { LoadingBear } from '@/components/bear-cafe/LoadingBear';
-import { Footer } from '@/components/bear-cafe/Footer';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CategoryGuidance } from '@/components/bear-cafe/CategoryGuidance';
 import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
-import { SecretTableWidget } from '@/components/bear-cafe/SecretTableWidget';
-import { SecretCafeCTA } from '@/components/bear-cafe/SecretCafeCTA';
+import { LoadingBear } from '@/components/bear-cafe/LoadingBear';
+import { CozySidebar } from '@/components/bear-cafe/CozySidebar';
+import { CozyFeatureCards } from '@/components/bear-cafe/CozyFeatureCards';
+import { CommunityCarousel } from '@/components/bear-cafe/CommunityCarousel';
+import { CozyRightPanel } from '@/components/bear-cafe/CozyRightPanel';
 import { useCooldown } from '@/hooks/useCooldown';
-import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
-import { Menu, X, Users2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-
-interface Category {
-  id: string;
-  icon: string;
-  name: string;
-  description: string | null;
-}
-
-// Number of categories to show in the main grid (5 items)
-// Show "More" card only if there are 6+ categories
-const VISIBLE_CATEGORIES = 5;
-const MIN_CATEGORIES_FOR_MORE = 6;
-const VOICE_STATE_STALE_MINUTES = 3;
+import { Menu, X } from 'lucide-react';
 
 export default function Index() {
-  const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [serverCount, setServerCount] = useState<number | null>(null);
-  const [showAllCategories, setShowAllCategories] = useState(false);
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-  // Match Stats (for role milestones)
-  const [matchCount, setMatchCount] = useState(0);
-  const [nextMilestone, setNextMilestone] = useState(25);
+  const [rightOpen, setRightOpen] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchStats = async () => {
-      const { data } = await supabase
-        .from('user_gacha_stats')
-        .select('match_count')
-        .eq('discord_id', user.discord_id)
-        .maybeSingle();
-      
-      if (data) {
-        const count = data.match_count || 0;
-        setMatchCount(count);
-        const milestones = [25, 50, 100, 500, 1000];
-        setNextMilestone(milestones.find(m => m > count) || 1000);
-      }
-    };
-    fetchStats();
-  }, [user]);
+  const { isOnCooldown, formattedTime, remainingMinutes } = useCooldown(
+    user?.id ?? null
+  );
 
-  // Cooldown state
-  const { isOnCooldown, formattedTime, remainingMinutes } = useCooldown(user?.id ?? null);
+  // Greeting based on time of day
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'อรุณสวัสดิ์ 🌤️';
+    if (h < 17) return 'สวัสดีตอนบ่าย ☀️';
+    if (h < 21) return 'สวัสดีตอนเย็น 🌇';
+    return 'ดึกแล้วนะ 🌙';
+  })();
 
-  // Fetch categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, icon, name, description')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+  const displayName = user?.discord_username ?? user?.username ?? 'เพื่อน';
 
-      if (!error && data) {
-        setCategories(data);
-      }
-      setLoading(false);
-    };
-
-    fetchCategories();
-  }, []);
-
-  // Fetch server count with realtime updates
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchServerCount = async () => {
-      const thresholdTime = new Date(
-        Date.now() - VOICE_STATE_STALE_MINUTES * 60 * 1000
-      ).toISOString();
-
-      const { count, error } = await supabase
-        .from('voice_states')
-        .select('discord_user_id', { count: 'exact', head: true })
-        .eq('is_connected', true)
-        .not('channel_id', 'is', null)
-        .gte('updated_at', thresholdTime);
-
-      if (!error && isMounted) {
-        setServerCount(count ?? 0);
-      }
-    };
-
-    fetchServerCount();
-
-    const channel = supabase
-      .channel('voice-states-count')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'voice_states' },
-        () => {
-          fetchServerCount();
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] Voice states subscription active');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[Realtime] Voice states subscription error');
-        }
-      });
-
-    // Smart polling fallback: refresh every 15 seconds in case realtime fails
-    const fallbackInterval = setInterval(fetchServerCount, 15000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(fallbackInterval);
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Fetch Discord member count
-  const [memberCount, setMemberCount] = useState<number | null>(null);
-  
-  useEffect(() => {
-    const fetchMemberCount = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('discord-member-count');
-        if (!error && data) {
-          setMemberCount(data.member_count);
-        }
-      } catch (err) {
-        console.error('Failed to fetch member count:', err);
-      }
-    };
-
-    fetchMemberCount();
-    
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchMemberCount, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const visibleCategories = categories.slice(0, VISIBLE_CATEGORIES);
-  const remainingCount = Math.max(0, categories.length - VISIBLE_CATEGORIES);
-  const showMoreCard = categories.length >= MIN_CATEGORIES_FOR_MORE;
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cream via-peach/20 to-blush/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
         <LoadingBear message="กำลังโหลด..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-cream via-peach/20 to-blush/30 dark:from-background dark:via-background dark:to-muted/20">
-      {/* Green Tea Warning Popup */}
+    <div className="min-h-screen flex bg-[hsl(var(--background))] overflow-hidden">
+      {/* ── Popups ── */}
       <GreenTeaWarningPopup userId={user?.id} />
-
-      {/* Cooldown Box - Fixed on right side */}
-      <CooldownBox 
+      <CooldownBox
         isOnCooldown={isOnCooldown}
         formattedTime={formattedTime}
         remainingMinutes={remainingMinutes}
       />
 
-      <div className="flex-1 flex">
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="lg:hidden fixed top-4 left-4 z-50 w-11 h-11 rounded-full bg-white dark:bg-mocha shadow-lg flex items-center justify-center border border-latte/30 dark:border-coffee/30"
-          aria-label="เปิดเมนู"
-        >
-          {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+      {/* ══════════════════════════════════════════════════════
+          LEFT SIDEBAR — desktop always visible, mobile overlay
+         ══════════════════════════════════════════════════════ */}
 
-        {/* Sidebar - Desktop */}
-        <div className="hidden lg:block sticky top-0 h-screen">
-          <HomeSidebar onlineCount={serverCount} memberCount={memberCount} />
-        </div>
+      {/* Mobile sidebar toggle */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center"
+        aria-label="เปิดเมนู"
+      >
+        {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+      </button>
 
-        {/* Sidebar - Mobile Overlay */}
-        {sidebarOpen && (
-          <div className="lg:hidden fixed inset-0 z-40">
-            <div 
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="relative z-50 w-[280px] max-w-[85vw] h-full">
-              <HomeSidebar onlineCount={serverCount} memberCount={memberCount} />
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 pt-16 lg:pt-4 lg:p-8 overflow-auto">
-          <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
-            {/* Banner Carousel */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <BannerCarousel />
-            </motion.div>
-
-            {/* Category Guidance */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-            >
-              <CategoryGuidance />
-            </motion.div>
-
-            {/* Secret Cafe CTA Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.07 }}
-            >
-              <SecretCafeCTA />
-            </motion.div>
-
-            {/* Category Grid */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <p className="text-sm font-semibold text-muted-foreground mb-3">สำหรับหาเพื่อนลงห้อง</p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
-            >
-              {visibleCategories.map((category, index) => (
-                <motion.div
-                  key={category.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
-                >
-                  <HomeCategoryCard
-                    id={category.id}
-                    icon={category.icon}
-                    name={category.name}
-                    description={category.description}
-                    isLocked={isOnCooldown}
-                    formattedTime={formattedTime}
-                    requireLogin={!isAuthenticated}
-                  />
-                </motion.div>
-              ))}
-
-              {/* More Categories Card - only show if 6+ categories */}
-              {showMoreCard && remainingCount > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + VISIBLE_CATEGORIES * 0.05 }}
-                >
-                  <MoreCategoriesCard
-                    remainingCount={remainingCount}
-                    onClick={() => navigate('/create-session')}
-                    isLocked={isOnCooldown}
-                    formattedTime={formattedTime}
-                  />
-                </motion.div>
-              )}
-            </motion.div>
-
-            {/* Match Count — subtle bar below grid */}
-            {user && matchCount > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-card/60 dark:bg-card/40 backdrop-blur-sm border border-border/40"
-              >
-                <Users2 className="w-4 h-4 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <Progress 
-                    value={(matchCount / nextMilestone) * 100} 
-                    className="h-2 bg-muted/30 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-[hsl(var(--honey))] [&>div]:to-primary [&>div]:rounded-full" 
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap font-medium">
-                  {matchCount}/{nextMilestone} ครั้ง
-                </span>
-              </motion.div>
-            )}
-          </div>
-        </main>
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block shrink-0">
+        <CozySidebar />
       </div>
 
-      {/* Footer */}
-      <Footer />
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-40">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="relative z-50 w-[220px] h-full">
+            <CozySidebar />
+          </div>
+        </div>
+      )}
 
-      {/* All Categories Modal */}
-      <AllCategoriesModal
-        open={showAllCategories}
-        onOpenChange={setShowAllCategories}
-        categories={categories}
-        isLocked={isOnCooldown}
-        formattedTime={formattedTime}
-      />
+      {/* ══════════════════════════════════════════════════════
+          CENTER CONTENT
+         ══════════════════════════════════════════════════════ */}
+      <main className="flex-1 min-w-0 overflow-y-auto h-[100dvh]">
+        {/* Subtle warm paper background */}
+        <div className="absolute inset-0 bg-pattern-dots opacity-[0.025] pointer-events-none" />
+
+        <div className="relative max-w-2xl mx-auto px-5 pt-16 lg:pt-8 pb-12 space-y-8">
+
+          {/* ── Welcome heading ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45 }}
+            className="space-y-2"
+          >
+            {/* Tiny greeting */}
+            <p className="text-sm text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey)/0.8)] font-medium">
+              {greeting}
+            </p>
+
+            {/* Main heading */}
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+              {isAuthenticated
+                ? `เฮ้ ${displayName}! 🐻`
+                : 'Bear Cafe ยินดีต้อนรับ 🐻'}
+            </h1>
+
+            {/* Sub-heading */}
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg">
+              เหงาอยู่รึเปล่า? มาแฮงค์เอาท์กันที่นี่เลย
+              <br className="hidden sm:block" />
+              หาเพื่อนใหม่ สุ่มแชท หรือแค่มาเดินเล่นก็ได้ ไม่ตัดสิน 🍯
+            </p>
+
+            {/* Tiny decorative stars */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-[hsl(var(--honey)/0.5)] text-xs select-none">✦ ✧ ✦</span>
+            </div>
+          </motion.div>
+
+          {/* ── Feature cards ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.45 }}
+          >
+            <CozyFeatureCards
+              isOnCooldown={isOnCooldown}
+              formattedTime={formattedTime}
+            />
+          </motion.div>
+
+          {/* ── Community carousel ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.45 }}
+          >
+            <CommunityCarousel />
+          </motion.div>
+
+          {/* ── Footer note ── */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+            className="text-[11px] text-center text-muted-foreground/50 pb-2"
+          >
+            © 2026 BEAR CAFE by Zeabiu · All rights reserved
+          </motion.p>
+        </div>
+      </main>
+
+      {/* ══════════════════════════════════════════════════════
+          RIGHT PANEL — desktop always visible, mobile toggle
+         ══════════════════════════════════════════════════════ */}
+
+      {/* Desktop right panel */}
+      <div className="hidden xl:block shrink-0 border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))]">
+        <CozyRightPanel />
+      </div>
+
+      {/* Mobile right panel toggle */}
+      <button
+        onClick={() => setRightOpen(!rightOpen)}
+        className="xl:hidden fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center text-base"
+        aria-label="เปิดแผงขวา"
+      >
+        🎵
+      </button>
+
+      {rightOpen && (
+        <div className="xl:hidden fixed inset-0 z-40">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setRightOpen(false)}
+          />
+          <div className="absolute right-0 top-0 bottom-0 z-50 w-[260px] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))] border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] overflow-y-auto">
+            <CozyRightPanel />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
