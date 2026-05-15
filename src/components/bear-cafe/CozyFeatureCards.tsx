@@ -32,15 +32,6 @@ function MaskingTape({ color = 'honey', rotate = -1 }: { color?: 'honey' | 'mint
   );
 }
 
-// Tiny leaf doodle
-function Leaf({ className }: { className?: string }) {
-  return (
-    <span className={cn('text-[hsl(var(--matcha)/0.6)] select-none pointer-events-none text-sm', className)}>
-      🌿
-    </span>
-  );
-}
-
 // ── Card 1: สุ่มแชทคุย ──────────────────────────────────────────────────────
 function SecretChatCard() {
   const navigate = useNavigate();
@@ -57,7 +48,6 @@ function SecretChatCard() {
 
       {/* Doodle sparkle */}
       <span className="absolute top-5 right-5 text-xs text-[hsl(var(--honey)/0.5)] select-none">✦</span>
-      <Leaf className="absolute bottom-5 left-4" />
 
       {/* Image */}
       <div className="w-28 h-28 mb-4 flex items-center justify-center">
@@ -85,7 +75,6 @@ function TableChatCard() {
       <MaskingTape color="mint" rotate={1} />
 
       <span className="absolute top-5 right-5 text-xs text-[hsl(var(--matcha)/0.4)] select-none">✧</span>
-      <Leaf className="absolute bottom-5 right-4" />
 
       {/* Image — slightly desaturated */}
       <div className="w-28 h-28 mb-4 flex items-center justify-center">
@@ -208,7 +197,6 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
       <MaskingTape color="blush" rotate={2} />
 
       <span className="absolute top-5 left-5 text-xs text-[hsl(var(--blush)/0.6)] select-none">✦</span>
-      <Leaf className="absolute bottom-5 right-4" />
 
       {/* Image */}
       <div className="w-28 h-28 mb-4 flex items-center justify-center">

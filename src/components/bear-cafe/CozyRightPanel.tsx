@@ -279,6 +279,38 @@ function ProfileCard() {
   );
 }
 
+// ─── Points quick-link ────────────────────────────────────────────────────────
+function PointsLink() {
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { resolvedTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+
+  if (!isAuthenticated || !user) return null;
+
+  return (
+    <button
+      onClick={() => navigate('/points')}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group"
+      style={{
+        background: dark ? 'rgba(200,149,108,0.08)' : 'rgba(200,149,108,0.1)',
+        borderColor: dark ? 'rgba(200,149,108,0.2)' : 'rgba(200,149,108,0.25)',
+      }}
+    >
+      <span className="text-xl shrink-0 group-hover:scale-110 transition-transform">🍓</span>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-semibold" style={{ color: dark ? '#f3e9dc' : '#2a1a0e' }}>
+          เช็คแต้มของคุณ
+        </p>
+        <p className="text-[11px]" style={{ color: dark ? 'rgba(203,179,160,0.6)' : 'rgba(124,92,62,0.65)' }}>
+          ดูคะแนนสะสมและรางวัล
+        </p>
+      </div>
+      <span className="text-xs shrink-0" style={{ color: dark ? 'rgba(200,149,108,0.5)' : 'rgba(200,149,108,0.7)' }}>→</span>
+    </button>
+  );
+}
+
 // ─── Music Player Widget ──────────────────────────────────────────────────────
 function MusicPlayerWidget() {
   const { resolvedTheme } = useTheme();
@@ -624,6 +656,7 @@ export function CozyRightPanel() {
   return (
     <aside className="w-[264px] shrink-0 flex flex-col gap-4 h-[100dvh] overflow-y-auto py-5 px-3">
       <ProfileCard />
+      <PointsLink />
       <MusicPlayerWidget />
     </aside>
   );

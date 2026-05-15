@@ -123,7 +123,6 @@ export function CozySidebar() {
         {isAuthenticated && (
           <NavItem icon={pointIcon} label="เช็คแต้มของคุณ" href="/points" />
         )}
-        <NavItem icon={lotteryIcon} label="โปรโมทเซิร์ฟเวอร์ฟรี" href="/discord-servers" />
         {user?.is_owner && (
           <NavItem icon={lotteryIcon} label="ลอตเตอรี่" href="/lottery" />
         )}
@@ -162,9 +161,12 @@ export function CozySidebar() {
         <MascotMessage />
       </div>
 
-      {/* Social links only — no copyright */}
-      <div className="relative shrink-0 px-3 pb-4 pt-1 flex flex-col items-center gap-2">
-        <span className="absolute top-0 right-4 text-base opacity-20 select-none pointer-events-none">☕</span>
+      {/* Separator */}
+      <div className="mx-4 h-px bg-[hsl(var(--sidebar-border))] shrink-0" />
+
+      {/* Social links only */}
+      <div className="relative shrink-0 px-3 pb-4 pt-2 flex flex-col items-center gap-2">
+        {/* Tiny doodle coffee cup — removed */}
 
         <div className="flex items-center gap-3">
           <a href="https://discord.gg/bearcafe" target="_blank" rel="noopener noreferrer"
