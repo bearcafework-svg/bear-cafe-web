@@ -42,10 +42,14 @@ const ERROR_PATTERNS: { pattern: string; icon: React.ReactNode; title: string; c
 ];
 
 const COLOR_STYLES: Record<string, { bg: string; border: string; iconBg: string; text: string; btnClass: string }> = {
-  red: { bg: 'bg-red-50/80 dark:bg-red-950/30', border: 'border-red-200/60 dark:border-red-800/40', iconBg: 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400', text: 'text-red-700 dark:text-red-300', btnClass: 'bg-red-500 hover:bg-red-600 text-white' },
-  amber: { bg: 'bg-amber-50/80 dark:bg-amber-950/30', border: 'border-amber-200/60 dark:border-amber-800/40', iconBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-300', btnClass: 'bg-amber-500 hover:bg-amber-600 text-white' },
-  orange: { bg: 'bg-orange-50/80 dark:bg-orange-950/30', border: 'border-orange-200/60 dark:border-orange-800/40', iconBg: 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400', text: 'text-orange-700 dark:text-orange-300', btnClass: 'bg-orange-500 hover:bg-orange-600 text-white' },
-  blue: { bg: 'bg-blue-50/80 dark:bg-blue-950/30', border: 'border-blue-200/60 dark:border-blue-800/40', iconBg: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400', text: 'text-blue-700 dark:text-blue-300', btnClass: 'bg-blue-500 hover:bg-blue-600 text-white' },
+  // warm red → uses destructive token so it stays on-palette in both themes
+  red: { bg: 'bg-destructive/10 dark:bg-destructive/20', border: 'border-destructive/30 dark:border-destructive/40', iconBg: 'bg-destructive/15 dark:bg-destructive/25 text-destructive', text: 'text-destructive', btnClass: 'bg-destructive hover:bg-destructive/90 text-white' },
+  // honey amber — primary Bear Cafe accent
+  amber: { bg: 'bg-[#e9a84e]/10 dark:bg-[#e9a84e]/15', border: 'border-[#e9a84e]/30 dark:border-[#e9a84e]/25', iconBg: 'bg-[#e9a84e]/20 dark:bg-[#e9a84e]/20 text-[#b07d30] dark:text-[#e0b48a]', text: 'text-[#8b5e1a] dark:text-[#e0b48a]', btnClass: 'bg-[#c8956c] hover:bg-[#b07d58] text-white' },
+  // warm orange — slightly deeper honey
+  orange: { bg: 'bg-[#c8956c]/10 dark:bg-[#c8956c]/15', border: 'border-[#c8956c]/30 dark:border-[#c8956c]/25', iconBg: 'bg-[#c8956c]/20 dark:bg-[#c8956c]/20 text-[#8b5e3c] dark:text-[#e0b48a]', text: 'text-[#7c4a20] dark:text-[#e0b48a]', btnClass: 'bg-[#c8956c] hover:bg-[#b07d58] text-white' },
+  // "blue" states (expired, already used) → warm muted brown instead of cold blue
+  blue: { bg: 'bg-[#8b5e3c]/10 dark:bg-[#8b5e3c]/15', border: 'border-[#8b5e3c]/25 dark:border-[#8b5e3c]/20', iconBg: 'bg-[#8b5e3c]/15 dark:bg-[#8b5e3c]/20 text-[#8b5e3c] dark:text-[#cbb3a0]', text: 'text-[#6b4423] dark:text-[#cbb3a0]', btnClass: 'bg-[#8b5e3c] hover:bg-[#7a5234] text-white' },
   gray: { bg: 'bg-muted/50', border: 'border-border', iconBg: 'bg-muted text-muted-foreground', text: 'text-muted-foreground', btnClass: 'bg-muted-foreground hover:bg-muted-foreground/80 text-white' },
 };
 
@@ -126,22 +130,23 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-sm border-rose-200/60 dark:border-coffee/40 overflow-hidden">
-        {/* Top accent bar */}
+      <AlertDialogContent className="max-w-sm border-[#c8956c]/30 dark:border-[#c8956c]/20 overflow-hidden">
+        {/* Top accent bar — honey gradient */}
         <motion.div
-          className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-400 via-pink-500 to-rose-400"
+          className="absolute top-0 left-0 right-0 h-1"
+          style={{ background: 'linear-gradient(to right, #e0b080, #c8956c, #e0b080)' }}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
           transition={{ duration: 0.4 }}
         />
 
-        {/* Confetti-like sparkles */}
+        {/* Confetti-like sparkles — warm honey tones */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {[...Array(6)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-2 h-2 rounded-full bg-rose-300/40 dark:bg-rose-500/20"
-              style={{ left: `${15 + i * 14}%`, top: `${10 + (i % 3) * 20}%` }}
+              className="absolute w-2 h-2 rounded-full"
+              style={{ background: 'rgba(200,149,108,0.35)', left: `${15 + i * 14}%`, top: `${10 + (i % 3) * 20}%` }}
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: [0, 1.2, 0.8], opacity: [0, 0.8, 0] }}
               transition={{ duration: 1.5, delay: 0.2 + i * 0.1, repeat: 1 }}
@@ -177,7 +182,7 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
             )}
           </motion.div>
 
-          <AlertDialogTitle className="text-xl font-display bg-gradient-to-r from-rose-600 via-pink-500 to-rose-600 bg-clip-text text-transparent">
+          <AlertDialogTitle className="text-xl font-display" style={{ background: 'linear-gradient(to right, #c8956c, #e0b080, #c8956c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
             🎉 รับรางวัลสำเร็จ!
           </AlertDialogTitle>
 
@@ -186,13 +191,14 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
               {/* Points reward */}
               {showPoints && (
                 <motion.div
-                  className="flex items-center justify-center gap-3 rounded-xl border border-rose-200/60 bg-rose-50/70 px-4 py-3.5 dark:border-coffee/40 dark:bg-coffee/20"
+                  className="flex items-center justify-center gap-3 rounded-xl px-4 py-3.5"
+                  style={{ border: '1px solid rgba(200,149,108,0.3)', background: 'rgba(200,149,108,0.08)' }}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.15 }}
                 >
                   <img src={strawberryIcon} alt="" className="w-8 h-8" />
-                  <span className="text-base font-bold text-rose-700 dark:text-rose-200">
+                  <span className="text-base font-bold" style={{ color: '#8b5e1a' }}>
                     +{reward.pointsAdded?.toLocaleString() ?? 0} สตอเบอรี่
                   </span>
                 </motion.div>
@@ -203,8 +209,8 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
                 <motion.div
                   className="flex items-center justify-center gap-3 rounded-xl border px-4 py-3.5"
                   style={{
-                    borderColor: reward.roleColor ? `${reward.roleColor}40` : undefined,
-                    backgroundColor: reward.roleColor ? `${reward.roleColor}10` : undefined,
+                    borderColor: reward.roleColor ? `${reward.roleColor}40` : 'rgba(200,149,108,0.25)',
+                    backgroundColor: reward.roleColor ? `${reward.roleColor}10` : 'rgba(200,149,108,0.06)',
                   }}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -217,7 +223,7 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
                     <span className="text-xs text-muted-foreground">ได้รับยศใหม่</span>
                     <span
                       className="text-sm font-bold"
-                      style={{ color: reward.roleColor || undefined }}
+                      style={{ color: reward.roleColor || '#c8956c' }}
                     >
                       {reward.roleName || 'ยศพิเศษ'}
                     </span>
@@ -229,7 +235,10 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
         </AlertDialogHeader>
 
         <div className="flex justify-center pt-1 relative z-10">
-          <AlertDialogAction className="rounded-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-semibold px-8 shadow-lg shadow-rose-200/50 dark:shadow-rose-900/30">
+          <AlertDialogAction
+            className="rounded-full text-white font-semibold px-8"
+            style={{ background: 'linear-gradient(135deg, #e0b080, #c8956c)', boxShadow: '0 4px 14px rgba(200,149,108,0.35)' }}
+          >
             เยี่ยมเลย! 🍓
           </AlertDialogAction>
         </div>

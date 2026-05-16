@@ -9,6 +9,7 @@ import honeyJarIcon from '@/assets/HoneyJarIcon.png';
 import strawberryIcon from '@/assets/strawberry-icon.png';
 import { useMusic } from '@/lib/music-context';
 import type { Track, MusicCategory } from '@/lib/music-context';
+import { RewardPopup, type RewardPopupData } from '@/components/bear-cafe/RewardPopup';
 
 // ─── Rain ambient hook ────────────────────────────────────────────────────────
 function useRainAmbient() {
@@ -171,6 +172,8 @@ function PointsWidget() {
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemStatus, setRedeemStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [redeemMsg, setRedeemMsg] = useState('');
+  const [rewardPopupOpen, setRewardPopupOpen] = useState(false);
+  const [rewardPopup, setRewardPopup] = useState<RewardPopupData | null>(null);
 
   // colour tokens
   const cardBg    = dark ? 'rgba(22,14,9,0.95)'     : 'rgba(250,246,242,0.95)';
@@ -221,20 +224,89 @@ function PointsWidget() {
           expired: 'โค้ดหมดอายุแล้ว', already_redeemed: 'คุณเคยใช้โค้ดนี้แล้ว',
           limit_reached: 'โค้ดถูกใช้ครบโควต้าแล้ว', disabled: 'โค้ดถูกปิดใช้งาน',
         };
+        const errMsg = msgs[data.error] ?? 'โค้ดไม่ถูกต้อง';
         setRedeemStatus('error');
-        setRedeemMsg(msgs[data.error] ?? 'โค้ดไม่ถูกต้อง');
+        setRedeemMsg(errMsg);
+        setRewardPopup({ type: 'points', message: errMsg });
+        setRewardPopupOpen(true);
         return;
       }
+
+      // Grant Discord role if included
+      if (data.granted?.roleGranted) {
+        try {
+          await supabase.functions.invoke('grant-discord-role', {
+            body: { discordUserId: user.discord_id, discordRoleId: data.granted.roleGranted },
+          });
+        } catch { /* non-blocking */ }
+      }
+
+      // Fetch role details for popup
+      let roleName: string | undefined;
+      let roleEmoji: string | undefined;
+      let roleColor: string | undefined;
+
+      if (data.granted?.roleGranted) {
+        // Try Supabase table first
+        const { data: roleData } = await supabase
+          .from('discord_roles')
+          .select('display_name, emoji, color')
+          .eq('discord_role_id', data.granted.roleGranted)
+          .maybeSingle();
+        if (roleData) {
+          roleName = roleData.display_name;
+          roleEmoji = roleData.emoji ?? undefined;
+          roleColor = roleData.color ?? undefined;
+        }
+        // Fallback: bot API
+        if (!roleName || !roleEmoji) {
+          try {
+            const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
+              body: { role_id: data.granted.roleGranted },
+            });
+            if (roleInfo && !roleInfo.error) {
+              roleName = roleName || roleInfo.name;
+              roleEmoji = roleEmoji || roleInfo.icon || roleInfo.unicode_emoji || undefined;
+              roleColor = roleColor || roleInfo.color || undefined;
+            }
+          } catch { /* ignore */ }
+        }
+        if (!roleName) roleName = `ยศพิเศษ (${data.granted.roleGranted.slice(-6)})`;
+        if (!roleEmoji) roleEmoji = '🎭';
+      }
+
+      // Update points display
       const raw = data.pointsNow ?? (typeof data.points === 'number' ? data.points : Number(data.points));
       if (Number.isFinite(raw)) setPoints(Math.min(raw, maxCap));
+
+      // Determine popup type
+      const hasPoints = !!data.granted?.pointsAdded;
+      const hasRole = !!data.granted?.roleGranted;
+      const popupType: RewardPopupData['type'] = hasPoints && hasRole ? 'both' : hasRole ? 'role' : 'points';
+      const rewardMessage = hasPoints && hasRole
+        ? `ได้รับ +${data.granted.pointsAdded.toLocaleString()} 🍓 และยศใหม่`
+        : hasRole ? 'ได้รับยศใหม่แล้ว 🎭'
+        : hasPoints ? `+${data.granted.pointsAdded.toLocaleString()} 🍓` : 'รับรางวัลสำเร็จ';
+
       setRedeemStatus('success');
-      setRedeemMsg(data.granted?.pointsAdded ? `+${data.granted.pointsAdded} 🍓` : 'รับรางวัลสำเร็จ');
+      setRedeemMsg(rewardMessage);
+      setRewardPopup({
+        type: popupType,
+        pointsAdded: data.granted?.pointsAdded,
+        roleName,
+        roleEmoji,
+        roleColor,
+        message: rewardMessage,
+      });
+      setRewardPopupOpen(true);
       setRedeemCode('');
-      setTimeout(() => { setRedeemStatus('idle'); setRedeemMsg(''); }, 4000);
       fetchPoints();
     } catch {
+      const errMsg = 'ระบบขัดข้อง ลองใหม่อีกครั้ง';
       setRedeemStatus('error');
-      setRedeemMsg('ระบบขัดข้อง ลองใหม่อีกครั้ง');
+      setRedeemMsg(errMsg);
+      setRewardPopup({ type: 'points', message: errMsg });
+      setRewardPopupOpen(true);
     }
   };
 
@@ -243,6 +315,7 @@ function PointsWidget() {
   const pct = maxCap > 0 ? Math.min((points / maxCap) * 100, 100) : 0;
 
   return (
+    <>
     <div className="rounded-2xl overflow-hidden border flex flex-col" style={{ background: cardBg, borderColor: border }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -332,6 +405,20 @@ function PointsWidget() {
         </AnimatePresence>
       </div>
     </div>
+
+      <RewardPopup
+        open={rewardPopupOpen}
+        onOpenChange={(open) => {
+          setRewardPopupOpen(open);
+          if (!open) {
+            setRewardPopup(null);
+            setRedeemStatus('idle');
+            setRedeemMsg('');
+          }
+        }}
+        reward={rewardPopup}
+      />
+    </>
   );
 }
 
