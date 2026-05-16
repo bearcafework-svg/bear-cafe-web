@@ -1023,7 +1023,7 @@ const MusicPanel = memo(function MusicPanel({
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          ????????
+                          หมวดหมู่
                         </p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -1317,10 +1317,10 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
         className="bg-[hsl(var(--card))] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-center space-y-4"
       >
         <p className="font-semibold text-foreground text-lg">
-          ????????????????
+          แชทเป็นยังไงบ้าง?
         </p>
         <p className="text-sm text-muted-foreground">
-          ??????????????????????????????????
+          ให้คะแนนการสนทนาครั้งนี้หน่อยน้า
         </p>
         <div className="flex justify-center gap-3">
           {[1, 2, 3, 4, 5].map(s => (
@@ -1331,7 +1331,7 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
               onClick={() => setSelected(s)}
               className="text-3xl transition-transform hover:scale-110 select-none"
             >
-              {s <= (hovered || selected) ? '?' : '?'}
+              {s <= (hovered || selected) ? '⭐' : '☆'}
             </button>
           ))}
         </div>
@@ -1340,13 +1340,13 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
           disabled={selected === 0}
           className="w-full py-2.5 rounded-xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] disabled:opacity-40 text-white font-semibold transition-colors"
         >
-          ????????
+          ส่งคะแนน
         </button>
         <button
           onClick={() => onRate(0)}
           className="text-xs text-muted-foreground hover:text-[hsl(var(--bear-brown))] transition-colors"
         >
-          ??????????
+          ข้ามไปก่อน
         </button>
       </motion.div>
     </div>
@@ -1793,13 +1793,13 @@ export default function SecretChatRoom() {
     // sender_id = null ? system message (no FK violation)
     if (session?.id && session.user_a_id === user?.id) {
       const welcomeText = [
-        '?? **???????????????????**',
+        '⚠️ **คำเตือนก่อนเริ่มแชท**',
         '',
-        '?????????????????????????????????????????????????? ?????? ???????????????????????????? ????????????????????? **#???????????????????** ?????????????????? Discord ??????',
+        'หากคุณพบว่าเพื่อนสนทนาของคุณมีการใช้ถ้อยคำไม่สุภาพ คุกคาม หรือทำให้คุณรู้สึกไม่ปลอดภัย สามารถแจ้งปัญหาได้ที่ **#🚨︰พื้นที่แจ้งปัญหา** ผ่านทางเซิร์ฟเวอร์ Discord ของเรา',
         '',
-        '????? **??????????????????????????????????** ????????????????????????????????????????????????????????? ????????????? **????????????????????????????????????**',
+        'กรุณา **แคปหน้าจอแชททุกครั้งโดยห้ามครอปภาพ** เพื่อให้ทีมงานสามารถตรวจสอบบริบทของบทสนทนาได้อย่างครบถ้วน เนื่องจากระบบ **ไม่มีการบันทึกประวัติแชทของผู้ใช้งาน**',
         '',
-        '? ?????????????? ?????????????? **24 ???????** ??????????????????????????????????????',
+        '⏰ เมื่อเกิดปัญหา กรุณาแจ้งภายใน **24 ชั่วโมง** เพื่อให้สามารถดำเนินการได้อย่างรวดเร็ว',
       ].join('\n');
 
       (supabase as any).from('chat_messages').insert({
@@ -2205,7 +2205,7 @@ export default function SecretChatRoom() {
 
   // Thai role labels � friendly display names
   const ROLE_TH: Record<string, string> = {
-    talk: '?? ????????????', listen: '?? ??????????????', both: '?? ??????????', chill: '? ??? ?',
+    talk: '🗣️ อยากเล่า', listen: '👂 อยากฟัง', both: '💬 ทั้งคู่', chill: '☕ ชิลๆ',
   };
 
   const getAvatarImg = (key: string) => profiles.find(p => p.id === key)?.image_url ?? null;
@@ -2336,12 +2336,12 @@ export default function SecretChatRoom() {
               <div className="space-y-1.5">
                 <p className="font-bold text-foreground text-xl">????????????????!</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  ?????????????? ???????????????????
+                  พบเพื่อนสนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
                 </p>
                 {/* Partner role badge */}
                 {partnerRole && (
                   <div className="flex items-center justify-center gap-1.5 pt-1">
-                    <span className="text-xs text-muted-foreground">????????????????:</span>
+                    <span className="text-xs text-muted-foreground">บทบาทฝ่ายตรงข้าม:</span>
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">
                       {ROLE_TH[partnerRole] ?? partnerRole}
                     </span>
@@ -2507,7 +2507,7 @@ export default function SecretChatRoom() {
             <div className="space-y-2">
               <p className="font-bold text-foreground text-xl">กำลังหาหมีมาพิมพ์แชทกับคุณ...</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                ????????? ???????????????????{' '}
+                รอสักครู่ กำลังสุ่มแชทในหัวข้อ{' '}
                 <span className="font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">{topicName}</span>
               </p>
               {/* Queue counter */}
@@ -2517,7 +2517,7 @@ export default function SecretChatRoom() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'hsl(var(--primary))' }} />
                     <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'hsl(var(--primary))' }} />
                   </span>
-                  {queueCount > 0 ? `${queueCount} คนกำลังรอสนทนา` : 'ยังไม่มีใครรออยู่...'}
+                  {queueCount > 0 ? `${queueCount} คนกำลังรอสนทนา` : 'ไม่มีพบหมีนั่งคาเฟ่เลย...'}
                 </span>
               </div>
               {moodConfig.enabled && (
