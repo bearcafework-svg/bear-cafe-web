@@ -2460,7 +2460,7 @@ export default function SecretChatRoom() {
                 className={`flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1.5 rounded-full border transition-colors ${
                 isUrgent
                   ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
-                  ? 'bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] border-[hsl(var(--latte))] dark:border-[hsl(var(--coffee))]'
+                  : 'bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] border-[hsl(var(--latte))] dark:border-[hsl(var(--coffee))]'
               }`}>
                 <Clock className="w-3.5 h-3.5" />
                 {countdownDisplay}
