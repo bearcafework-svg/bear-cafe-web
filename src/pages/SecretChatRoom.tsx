@@ -90,7 +90,6 @@ function useRainAmbient() {
   const [on, setOn] = useState(false);
   const [volume, setVolumeState] = useState(0.5);
 
-  // ????? audio element ??????????
   useEffect(() => {
     const el = new Audio('/RainSounds.mp3');
     el.loop = true;
@@ -626,7 +625,7 @@ const MusicPanel = memo(function MusicPanel({
               <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain" />
-                  <span className="text-sm font-bold" style={{ color: textSecondary }}>เพลง</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>เพลงคาเฟ่</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {/* โหมดประหยัด toggle */}
@@ -679,7 +678,7 @@ const MusicPanel = memo(function MusicPanel({
                   className="font-bold text-lg leading-tight truncate"
                   style={{ color: textPrimary }}
                 >
-                  {player.currentTrack?.title ?? '�'}
+                  {player.currentTrack?.title ?? '—'}
                 </motion.p>
                 {player.currentTrack?.artist && (
                   <p className="text-sm truncate font-medium" style={{ color: textAccent }}>
@@ -869,7 +868,7 @@ const MusicPanel = memo(function MusicPanel({
                       }} />
                   </div>
                   <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: textMuted }}>
-                    {player.volume === 0 ? '�' : Math.round(player.volume * 100)}
+                    {player.volume === 0 ? '—' : Math.round(player.volume * 100)}
                   </span>
                 </div>
               </div>
@@ -2081,8 +2080,8 @@ export default function SecretChatRoom() {
     // Add more entries here as needed; normalization handles bypass attempts.
     const BLACKLIST: string[] = [
       // Thai
-      '???', '??', '????', '?????', '?????', '???', '?????', '??????',
-      '???', '??', '????', '???', '???', '??????',
+      'ควย', 'หี', 'เย็ด', 'สัตว์', 'เหี้ย', 'สัด', 'อีดอก', 'ไอ้ดอก',
+      'มึง', 'กู', 'ควาย', 'ฆ่า', 'ตาย', 'ระเบิด',
       // English
       'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'nigger', 'kill',
       'murder', 'rape', 'porn', 'sex',
@@ -2092,7 +2091,7 @@ export default function SecretChatRoom() {
 
     if (hitWord) {
       // -- Flagged: log violation + insert system warning ----------------------
-      const warningText = '?? ???. ???: ?????! ?????????????????????????????????????????? ??????????????????';
+      const warningText = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
 
       await Promise.all([
         // Log for admin observation tab (Realtime ? admin sees it instantly)
@@ -2385,14 +2384,14 @@ export default function SecretChatRoom() {
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {bannedWarning === '__ai__'
-              ? '????????????????????????????? ????????????????? ??'
+              ? 'ข้อความนี้อาจขัดต่อกฎของคาเฟ่ ลองปรับคำพูดดูน้า 🐻'
               : bannedWarning === '__thai__'
-              ? '??????????????? � ????????????'
+              ? 'ข้อความถูกบล็อก — พบคำต้องห้าม'
               : bannedWarning === '__local__'
-              ? '??????????????? � ?????????????? ?????????????????? ??'
+              ? 'ข้อความถูกบล็อก — พบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า 🐻'
               : bannedWarning === '__error__'
-              ? '?????????????????????????????? ??????????????????'
-              : '??????????????? � ????????????'
+              ? 'ไม่สามารถส่งข้อความได้ในขณะนี้ ลองใหม่อีกครั้งน้า'
+              : 'ข้อความถูกบล็อก — พบคำต้องห้าม'
             }
           </motion.div>
         )}
@@ -2408,7 +2407,7 @@ export default function SecretChatRoom() {
             className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-500 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-lg"
           >
             <Clock className="w-4 h-4 shrink-0 animate-pulse" />
-            ???????????? {countdownDisplay} ?????????????! ?
+            เหลือเวลาอีก {countdownDisplay} รีบคุยด้วยน้า! ⏰
           </motion.div>
         )}
       </AnimatePresence>
@@ -2422,7 +2421,7 @@ export default function SecretChatRoom() {
                 <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[hsl(var(--latte)/0.6)] dark:ring-[hsl(var(--coffee)/0.5)]">
                   {partnerImg
                     ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
-                    : <span className="text-lg">??</span>}
+                    : <span className="text-lg">🐻</span>}
                 </div>
                 <div>
                   <p className="font-bold text-foreground text-sm leading-tight">{partnerAlias}</p>
@@ -2434,7 +2433,7 @@ export default function SecretChatRoom() {
                     <p className="text-[11px] text-muted-foreground">
                       {topicName}
                       {partnerRole && partnerRole !== 'both' && (
-                        <span className="ml-1 opacity-70">� {ROLE_TH[partnerRole] ?? partnerRole}</span>
+                        <span className="ml-1 opacity-70">· {ROLE_TH[partnerRole] ?? partnerRole}</span>
                       )}
                     </p>
                   </div>
@@ -2446,7 +2445,7 @@ export default function SecretChatRoom() {
                   <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <p className="font-bold text-foreground text-base">????????</p>
+                  <p className="font-bold text-foreground text-base">สุ่มคุยแชทแบบไร้ตัวตน</p>
                   <p className="text-xs text-muted-foreground">{topicName}</p>
                 </div>
               </div>
@@ -2468,7 +2467,7 @@ export default function SecretChatRoom() {
             )}
 
             {/* Theme toggle */}
-            <Tooltip text={theme === 'dark' ? '?????????' : '???????'}>
+            <Tooltip text={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
               <button
                 ref={themeRef}
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -2482,7 +2481,7 @@ export default function SecretChatRoom() {
             </Tooltip>
 
             {/* Leave � solid red */}
-            <Tooltip text="??????????" align="right">
+            <Tooltip text="สิ้นสุดการแชท" align="right">
               <button onClick={leaveTable}
                 ref={leaveRef}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm">
@@ -2506,7 +2505,7 @@ export default function SecretChatRoom() {
               <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
             </motion.div>
             <div className="space-y-2">
-              <p className="font-bold text-foreground text-xl">???????????????...</p>
+              <p className="font-bold text-foreground text-xl">กำลังหาหมีมาพิมพ์แชทกับคุณ...</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 ????????? ???????????????????{' '}
                 <span className="font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">{topicName}</span>
@@ -2518,12 +2517,12 @@ export default function SecretChatRoom() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'hsl(var(--primary))' }} />
                     <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'hsl(var(--primary))' }} />
                   </span>
-                  {queueCount > 0 ? `${queueCount} ?????????????` : '?????????...'}
+                  {queueCount > 0 ? `${queueCount} คนกำลังรอสนทนา` : 'ยังไม่มีใครรออยู่...'}
                 </span>
               </div>
               {moodConfig.enabled && (
                 <p className="text-xs text-muted-foreground">
-                  ???????? {moodConfig.similar_phase_delay_seconds} ?????? ???????????????????? mood ?????????
+                  หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยังหมวดหมู่ใกล้เคียง
                 </p>
               )}
             </div>
@@ -2539,8 +2538,8 @@ export default function SecretChatRoom() {
         {matchStatus === 'matched' && messages.length === 0 && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-center py-6">
             <div className="bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] rounded-2xl px-5 py-3 text-center max-w-xs">
-              <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">????????????????</p>
-              <p className="text-xs text-muted-foreground mt-1">?????? {Math.floor(SESSION_DURATION / 60)} ???? ????????????????</p>
+              <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">เจอหมีแล้ว!</p>
+              <p className="text-xs text-muted-foreground mt-1">มีเวลา {Math.floor(SESSION_DURATION / 60)} นาที เริ่มสนทนาได้เลย</p>
             </div>
           </motion.div>
         )}
@@ -2557,7 +2556,7 @@ export default function SecretChatRoom() {
                     : <span key={i}>{part}</span>
                 );
 
-              const isWarning = msg.content.includes('???.') || msg.content.includes('?????');
+              const isWarning = msg.content.includes('รปภ.') || msg.content.includes('ติ๊ดๆ');
 
               return (
                 <motion.div
@@ -2568,12 +2567,12 @@ export default function SecretChatRoom() {
                 >
                   {/* Bear mascot avatar */}
                   <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 self-start mt-1 shadow-sm border-2 border-[hsl(var(--primary)/0.3)]">
-                    <img src={bearMascotIcon} alt="??????????" className="w-full h-full object-cover" />
+                    <img src={bearMascotIcon} alt="น้องฮันนี่" className="w-full h-full object-cover" />
                   </div>
 
                   <div className="max-w-[80%] space-y-1">
                     <span className="text-[10px] text-muted-foreground px-1 font-medium">
-                      ?????????? � ???????????????
+                      น้องฮันนี่ · ฝ่ายความปลอดภัย
                     </span>
                     <div className={`px-4 py-3 rounded-2xl rounded-bl-sm text-xs leading-relaxed shadow-sm ${
                       isWarning
@@ -2601,7 +2600,7 @@ export default function SecretChatRoom() {
               >
                 {!isMyMessage(msg) && (
                   <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
-                    {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">??</span>}
+                    {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
                   </div>
                 )}
                 <div className={`max-w-[75%] sm:max-w-[65%] space-y-1 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
@@ -2624,7 +2623,7 @@ export default function SecretChatRoom() {
         {partnerTyping && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex gap-3 items-end">
             <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
-              {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">??</span>}
+              {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
             </div>
             <div className="bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] rounded-2xl rounded-bl-sm px-5 py-3.5 flex gap-1.5 items-center shadow-sm">
               {[0, 0.15, 0.3].map((delay, i) => (
@@ -2699,9 +2698,9 @@ export default function SecretChatRoom() {
                 <LogOut className="w-7 h-7 text-red-500" />
               </div>
               <div className="space-y-1.5">
-                <p className="font-bold text-foreground text-lg">???????????</p>
+                <p className="font-bold text-foreground text-lg">สิ้นสุดการแชท</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  ?????????????????????? ?????????????????????
+                  การสนทนาจะสิ้นสุดทันที และไม่สามารถกลับมาได้
                 </p>
               </div>
               <div className="flex gap-3">
@@ -2709,13 +2708,13 @@ export default function SecretChatRoom() {
                   onClick={() => setShowLeaveConfirm(false)}
                   className="flex-1 h-11 rounded-xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] font-semibold text-sm hover:bg-[hsl(var(--latte))] dark:hover:bg-[hsl(var(--coffee))] transition-colors"
                 >
-                  ???????
+                  คุยต่อ
                 </button>
                 <button
                   onClick={confirmLeave}
                   className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors shadow-sm"
                 >
-                  ??????
+                  ออกเลย
                 </button>
               </div>
             </motion.div>
