@@ -23,10 +23,10 @@ interface ChatProfile {
 type ChatRole = 'talk' | 'listen' | 'both' | 'chill';
 
 const ROLE_FALLBACK: { key: ChatRole; label: string; sub: string; icon: string }[] = [
-  { key: 'talk',   label: 'Talk',   sub: 'อยากเล่า ระบาย หรือแชร์เรื่องราว', icon: '💬' },
-  { key: 'listen', label: 'Listen', sub: 'อยากฟัง รับฟัง และให้กำลังใจ',      icon: '👂' },
-  { key: 'both',   label: 'Both',   sub: 'คุยได้ทั้งสองฝ่าย ยืดหยุ่น',        icon: '🤝' },
-  { key: 'chill',  label: 'Chill',  sub: 'ชิล ๆ ไม่จริงจัง แค่อยากคุย',       icon: '☕' },
+  { key: 'talk',   label: 'Talk',   sub: 'อยากเล่า ระบาย หรือแชร์เรื่องในใจ', icon: '💬' },
+  { key: 'listen', label: 'Listen', sub: 'อยากฟัง ให้กำลังใจ อยู่เป็นเพื่อน',  icon: '👂' },
+  { key: 'both',   label: 'Both',   sub: 'คุยได้ทั้งสองทาง ไม่ยึดติด',         icon: '🤝' },
+  { key: 'chill',  label: 'Chill',  sub: 'ชิล ๆ ไม่จริงจัง แค่อยากคุยเล่น',   icon: '☕' },
 ];
 
 const ROLE_ICONS: Record<string, string> = { talk: '💬', listen: '👂', both: '🤝', chill: '☕' };
@@ -42,18 +42,18 @@ interface DBRole {
 }
 
 const CATEGORY_THEMES: Record<string, { bg: string; card: string; accent: string; pill: string }> = {
-  heal:            { bg: 'from-rose-100 via-pink-50 to-rose-50 dark:from-rose-950/50 dark:via-pink-950/30 dark:to-rose-950/20',       card: 'bg-white/80 dark:bg-rose-950/20',   accent: '#e879a0', pill: 'bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300' },
-  casual:          { bg: 'from-amber-100 via-orange-50 to-amber-50 dark:from-amber-950/50 dark:via-orange-950/30 dark:to-amber-950/20', card: 'bg-white/80 dark:bg-amber-950/20',  accent: '#f59e0b', pill: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' },
-  'deep talk':     { bg: 'from-violet-100 via-purple-50 to-violet-50 dark:from-violet-950/50 dark:via-purple-950/30 dark:to-violet-950/20', card: 'bg-white/80 dark:bg-violet-950/20', accent: '#8b5cf6', pill: 'bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300' },
-  'open mind':     { bg: 'from-sky-100 via-cyan-50 to-sky-50 dark:from-sky-950/50 dark:via-cyan-950/30 dark:to-sky-950/20',             card: 'bg-white/80 dark:bg-sky-950/20',    accent: '#0ea5e9', pill: 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300' },
-  'same interest': { bg: 'from-emerald-100 via-teal-50 to-emerald-50 dark:from-emerald-950/50 dark:via-teal-950/30 dark:to-emerald-950/20', card: 'bg-white/80 dark:bg-emerald-950/20', accent: '#10b981', pill: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  heal:            { bg: 'from-rose-100 via-pink-50 to-[hsl(var(--background))] dark:from-rose-950/30 dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]',       card: 'bg-[hsl(var(--card))]',   accent: '#e879a0', pill: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300' },
+  casual:          { bg: 'from-amber-100 via-orange-50 to-[hsl(var(--background))] dark:from-amber-950/30 dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]', card: 'bg-[hsl(var(--card))]',  accent: '#f59e0b', pill: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300' },
+  'deep talk':     { bg: 'from-violet-100 via-purple-50 to-[hsl(var(--background))] dark:from-violet-950/30 dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]', card: 'bg-[hsl(var(--card))]', accent: '#8b5cf6', pill: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300' },
+  'open mind':     { bg: 'from-sky-100 via-cyan-50 to-[hsl(var(--background))] dark:from-sky-950/30 dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]',             card: 'bg-[hsl(var(--card))]',    accent: '#0ea5e9', pill: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300' },
+  'same interest': { bg: 'from-emerald-100 via-teal-50 to-[hsl(var(--background))] dark:from-emerald-950/30 dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]', card: 'bg-[hsl(var(--card))]', accent: '#10b981', pill: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' },
 };
 
 const DEFAULT_THEME = {
-  bg: 'from-[#fdf8f3] via-[#f9f0e8] to-[#f5ede4] dark:from-[#1a1410] dark:via-[#1e1812] dark:to-[#221810]',
-  card: 'bg-white/80 dark:bg-[#2a1e14]/60',
-  accent: '#c8956c',
-  pill: 'bg-[#f0e6d8] text-[#7c5c3e] dark:bg-[#3a2a1e] dark:text-[#c8956c]',
+  bg: 'from-[hsl(var(--cream))] via-[hsl(var(--latte)/0.4)] to-[hsl(var(--background))] dark:from-[hsl(var(--mocha))] dark:via-[hsl(var(--background))] dark:to-[hsl(var(--background))]',
+  card: 'bg-[hsl(var(--card))]',
+  accent: 'hsl(var(--honey))',
+  pill: 'bg-[hsl(var(--latte))] text-[hsl(var(--bear-brown))] dark:bg-[hsl(var(--coffee))] dark:text-[hsl(var(--honey))]',
 };
 
 function getTheme(name: string) {
@@ -175,12 +175,12 @@ export default function SecretChatMenu() {
   return (
     <div className={`min-h-screen bg-gradient-to-br transition-all duration-700 secret-menu-zoom ${theme.bg}`}>
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-orange-200/60 dark:border-white/10">
+      <header className="sticky top-0 z-30 bg-[hsl(var(--cream)/0.85)] dark:bg-[hsl(var(--mocha)/0.85)] backdrop-blur-xl border-b border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)]">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost" size="icon"
             onClick={() => step === 'role' ? setStep('category') : navigate('/')}
-            className="rounded-xl w-8 h-8 text-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-white/10 shrink-0"
+            className="rounded-xl w-8 h-8 text-foreground hover:bg-[hsl(var(--latte)/0.5)] dark:hover:bg-[hsl(var(--coffee)/0.3)] shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -190,9 +190,9 @@ export default function SecretChatMenu() {
               <Coffee className="w-4.5 h-4.5" style={{ color: theme.accent }} />
             </div>
             <div>
-              <h1 className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base leading-tight">คาเฟ่ลับ</h1>
-              <p className="text-[11px] text-orange-700/70 dark:text-[#9c7c5e]">
-                {step === 'category' ? 'เลือกหมวดสนทนา' : `${selectedCategory?.name} · เลือกบทบาท`}
+              <h1 className="font-bold text-foreground text-base leading-tight">คาเฟ่ลับ</h1>
+              <p className="text-[11px] text-muted-foreground">
+                {step === 'category' ? 'เลือกหมวด' : `${selectedCategory?.name} · เลือกบทบาท`}
               </p>
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function SecretChatMenu() {
           {/* Theme toggle */}
           <button
             onClick={() => setColorTheme(colorTheme === 'dark' ? 'light' : 'dark')}
-            className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-white/10 transition-colors"
+            className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-foreground hover:bg-[hsl(var(--latte)/0.5)] dark:hover:bg-[hsl(var(--coffee)/0.3)] transition-colors"
             title={colorTheme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
           >
             {colorTheme === 'dark'
@@ -233,41 +233,40 @@ export default function SecretChatMenu() {
                 <motion.div
                   animate={{ y: [0, -6, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-20 h-20 rounded-3xl bg-white/70 dark:bg-white/10 backdrop-blur-sm border border-white/60 dark:border-white/10 flex items-center justify-center text-4xl mx-auto shadow-lg"
+                  className="w-20 h-20 rounded-3xl bg-[hsl(var(--card)/0.8)] backdrop-blur-sm border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.3)] flex items-center justify-center text-4xl mx-auto shadow-lg"
                 >
                   ☕
                 </motion.div>
                 <div>
-                  <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60 mb-1">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-[hsl(var(--honey)/0.7)] mb-1">
                     คาเฟ่ลับเปิดใจ
                   </p>
-                  <h2 className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-2xl">เลือกหมวดสนทนา</h2>
-                  <p className="text-sm text-[#9c7c5e] mt-1.5 leading-relaxed max-w-sm mx-auto">
-                    พื้นที่พูดคุยแบบไม่เปิดเผยตัวตน คุยได้อย่างสบายใจในแบบของคุณ
+                  <h2 className="font-bold text-foreground text-2xl">เลือกหมวดสนทนา</h2>
+                  <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed max-w-sm mx-auto">
+                    ไม่ต้องเปิดเผยตัวตน คุยได้สบาย ๆ ในแบบที่เป็นตัวเอง
                   </p>
                   {/* Queue counter */}
                   <div className="flex items-center justify-center gap-2 mt-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                      style={{ background: 'rgba(200,149,108,0.12)', color: '#c8956c', border: '1px solid rgba(200,149,108,0.25)' }}>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] border border-[hsl(var(--border))]">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#c8956c' }} />
-                        <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#c8956c' }} />
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-[hsl(var(--primary))]" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--primary))]" />
                       </span>
                       {queueCount > 0
-                        ? `${queueCount} คนกำลังรอสนทนา`
-                        : 'ยังไม่มีคนรออยู่'}
+                        ? `${queueCount} คนกำลังรออยู่`
+                        : 'ยังไม่มีใครรออยู่'}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
+                <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] mb-3">
                   วันนี้อยากคุยเรื่องอะไร?
                 </p>
 
                 {loading ? (
-                  <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-[#9c7c5e]" /></div>
+                  <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {categories.map((cat, i) => {
@@ -281,7 +280,7 @@ export default function SecretChatMenu() {
                           whileHover={{ y: -3, scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => { setSelectedCategory(cat); setStep('role'); }}
-                          className="group w-full text-left rounded-2xl border border-orange-200/80 dark:border-white/10 p-5 transition-all bg-white/90 dark:bg-black/20 backdrop-blur-sm hover:bg-white dark:hover:bg-black/30 shadow-sm hover:shadow-lg"
+                          className="group w-full text-left rounded-2xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.4)] p-5 transition-all bg-[hsl(var(--card)/0.9)] backdrop-blur-sm hover:bg-[hsl(var(--card))] shadow-sm hover:shadow-lg"
                         >
                           <div className="flex items-start gap-4">
                             {cat.image_url ? (
@@ -292,12 +291,12 @@ export default function SecretChatMenu() {
                               </div>
                             )}
                             <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-lg">{cat.name}</p>
+                              <p className="font-bold text-foreground text-lg">{cat.name}</p>
                               {cat.description && (
-                                <p className="text-sm text-orange-700/70 dark:text-[#9c7c5e] mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
+                                <p className="text-sm text-muted-foreground mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
                               )}
                             </div>
-                            <ChevronRight className="w-4 h-4 text-[#c8b09a] dark:text-[#5a4030] shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
+                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
                           </div>
                         </motion.button>
                       );
@@ -314,7 +313,7 @@ export default function SecretChatMenu() {
 
               {/* Hero label */}
               <div className="text-center pt-4 space-y-1">
-                <p className="text-xs font-semibold tracking-widest uppercase text-[#c8956c]/80 dark:text-[#c8956c]/60">
+                <p className="text-xs font-semibold tracking-widest uppercase text-[hsl(var(--honey)/0.7)]">
                   คาเฟ่ลับเปิดใจ · เลือกบทบาท
                 </p>
               </div>
@@ -331,7 +330,7 @@ export default function SecretChatMenu() {
 
               {/* Role selection */}
               <div>
-                <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c] mb-3">
+                <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] mb-3">
                   คุณอยากเป็นฝ่ายไหนในการสนทนา?
                 </p>
                 <div className="grid grid-cols-2 gap-3">
@@ -344,7 +343,7 @@ export default function SecretChatMenu() {
                         whileTap={{ scale: 0.97 }}
                         onClick={() => setSelectedRole(r.key)}
                         className={`rounded-2xl border-2 p-4 text-left transition-all backdrop-blur-sm ${
-                          active ? 'shadow-lg' : 'border-white/40 dark:border-white/10 bg-white/50 dark:bg-black/10 hover:bg-white/70 dark:hover:bg-black/20'
+                          active ? 'shadow-lg' : 'border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] bg-[hsl(var(--card)/0.6)] hover:bg-[hsl(var(--card)/0.85)]'
                         }`}
                         style={active ? {
                           borderColor: theme.accent,
@@ -359,8 +358,8 @@ export default function SecretChatMenu() {
                             <span className="text-2xl">{ROLE_ICONS[r.key] ?? '💬'}</span>
                           )}
                           <div>
-                            <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base">{r.label}</p>
-                            <p className="text-xs text-orange-700/70 dark:text-[#9c7c5e] mt-0.5 leading-relaxed">{r.sub}</p>
+                            <p className="font-bold text-foreground text-base">{r.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{r.sub}</p>
                           </div>
                         </div>
                         {active && (
@@ -382,12 +381,12 @@ export default function SecretChatMenu() {
               <div className="space-y-4">
                 {/* Alias */}
                 <div>
-                  <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-2">ชื่อสมมติ</p>
-                  <div className="flex items-center gap-3 bg-white/70 dark:bg-black/20 backdrop-blur-sm rounded-2xl px-4 py-3.5 border border-white/50 dark:border-white/10 shadow-sm">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">ชื่อสมมติ</p>
+                  <div className="flex items-center gap-3 bg-[hsl(var(--card)/0.8)] backdrop-blur-sm rounded-2xl px-4 py-3.5 border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] shadow-sm">
                     {rollingAlias ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-[#9c7c5e] mx-auto" />
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" />
                     ) : (
-                      <span className="font-bold text-orange-900 dark:text-[#e8d9c8] flex-1 text-lg">{alias}</span>
+                      <span className="font-bold text-foreground flex-1 text-lg">{alias}</span>
                     )}
                     <button
                       onClick={rollAlias}
@@ -404,7 +403,7 @@ export default function SecretChatMenu() {
                 {/* Profile — game-style horizontal scroll selector */}
                 {profiles.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-[#9c7c5e] uppercase tracking-wider mb-3">รูปโปรไฟล์</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">รูปโปรไฟล์</p>
                     <div className="relative">
                       <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -442,7 +441,7 @@ export default function SecretChatMenu() {
                               </div>
                               <span
                                 className="text-[11px] leading-tight text-center w-full font-medium break-words"
-                                style={{ color: active ? theme.accent : '#9c7c5e' }}
+                                style={{ color: active ? theme.accent : 'hsl(var(--muted-foreground))' }}
                               >
                                 {p.name}
                               </span>
@@ -464,12 +463,12 @@ export default function SecretChatMenu() {
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/80 dark:bg-black/25 backdrop-blur-sm rounded-2xl border border-white/60 dark:border-white/10 p-4 flex items-center gap-4 shadow-sm"
+                  className="bg-[hsl(var(--card)/0.85)] backdrop-blur-sm rounded-2xl border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] p-4 flex items-center gap-4 shadow-sm"
                 >
                   <img src={selectedProfile.image_url} alt={selectedProfile.name} className="w-12 h-12 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-orange-900 dark:text-[#e8d9c8] text-base truncate">{alias || '...'}</p>
-                    <p className="text-xs text-[#9c7c5e] mt-0.5">
+                    <p className="font-bold text-foreground text-base truncate">{alias || '...'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {roles.find(r => r.key === selectedRole)?.label} · {selectedCategory.name}
                     </p>
                   </div>
@@ -495,7 +494,7 @@ export default function SecretChatMenu() {
                 )}
               </motion.button>
 
-              <p className="text-center text-xs text-[#9c7c5e]">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
+              <p className="text-center text-xs text-muted-foreground">ตัวตนจริงของคุณจะถูกเก็บเป็นความลับ</p>
             </motion.div>
           )}
 

@@ -119,8 +119,8 @@ export default function SessionHistoryPage() {
             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </Button>
           <div className="min-w-0">
-            <h1 className="font-display font-bold text-lg sm:text-xl text-foreground truncate">📜 ประวัติแมตช์</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">รายการแมตช์ย้อนหลัง 7 วัน</p>
+            <h1 className="font-display font-bold text-lg sm:text-xl text-foreground truncate">📜 ประวัติหาเพื่อน</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">ย้อนหลัง 7 วัน</p>
           </div>
         </div>
       </header>
@@ -135,9 +135,9 @@ export default function SessionHistoryPage() {
         >
           <Info className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0 mt-0.5" />
           <div className="text-sm sm:text-base text-foreground min-w-0">
-            <p className="font-semibold">ระบบเก็บประวัติย้อนหลัง 7 วัน</p>
+            <p className="font-semibold">เก็บประวัติย้อนหลัง 7 วัน</p>
             <p className="text-muted-foreground text-xs sm:text-sm mt-1 sm:mt-1.5">
-              เพื่อประสิทธิภาพของเว็บไซต์ ข้อมูลที่เก่ากว่า 7 วันจะถูกลบออกโดยอัตโนมัติ
+              ข้อมูลเก่ากว่า 7 วันจะถูกลบออกอัตโนมัติ
             </p>
           </div>
         </motion.div>
@@ -157,8 +157,8 @@ export default function SessionHistoryPage() {
                 >
                   <Coffee className="w-9 h-9 sm:w-12 sm:h-12 text-primary" />
                 </motion.div>
-                <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">ยังไม่มีประวัติแมตช์</h2>
-                <p className="text-sm sm:text-base text-muted-foreground mt-2 sm:mt-3">เริ่มแมตช์แรกของคุณเลย! 🐻</p>
+                <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">ยังไม่มีประวัติเลย</h2>
+                <p className="text-sm sm:text-base text-muted-foreground mt-2 sm:mt-3">ออกไปหาเพื่อนกันเถอะ! 🐻</p>
                 <motion.div
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
@@ -168,7 +168,7 @@ export default function SessionHistoryPage() {
                     onClick={() => navigate('/')}
                   >
                     <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 mr-2.5" />
-                    เริ่มแมตช์
+                    เริ่มหาเพื่อน
                   </Button>
                 </motion.div>
               </CardContent>
@@ -245,7 +245,7 @@ export default function SessionHistoryPage() {
                         <div className="flex items-start gap-2 sm:gap-2.5 col-span-2">
                           <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground mt-0.5 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-muted-foreground">บทบาทที่เลือก</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">ยศที่เลือก</p>
                             <Badge variant="secondary" className="mt-1 sm:mt-1.5 font-medium gap-1.5 sm:gap-2 text-xs sm:text-sm py-1 px-2.5">
                               {session.selected_role.emoji && (
                                 <IconDisplay 

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -41,7 +41,7 @@ interface ChatProfile {
 
 const SESSION_DURATION = 7 * 60;
 
-// ─── Similar Mood config loader ───────────────────────────────────────────────
+// --- Similar Mood config loader -----------------------------------------------
 interface SimilarMoodConfig {
   enabled: boolean;
   similar_phase_delay_seconds: number;
@@ -60,13 +60,13 @@ async function loadSimilarMoodConfig(): Promise<SimilarMoodConfig> {
   return { enabled: false, similar_phase_delay_seconds: 15, map: {} };
 }
 
-// Bidirectional check: A→B or B→A
+// Bidirectional check: A?B or B?A
 function isSimilarMood(a: string, b: string, map: Record<string, string[]>): boolean {
   return (map[a]?.includes(b) ?? false) || (map[b]?.includes(a) ?? false);
 }
 
 // Role compatibility matrix
-// talk ↔ listen, both ↔ any, chill ↔ chill|both
+// talk ? listen, both ? any, chill ? chill|both
 function isCompatibleRole(a: string, b: string): boolean {
   if (a === 'both' || b === 'both') return true;
   if (a === 'talk'   && b === 'listen') return true;
@@ -90,7 +90,7 @@ function useRainAmbient() {
   const [on, setOn] = useState(false);
   const [volume, setVolumeState] = useState(0.5);
 
-  // สร้าง audio element ครั้งเดียว
+  // ????? audio element ??????????
   useEffect(() => {
     const el = new Audio('/RainSounds.mp3');
     el.loop = true;
@@ -122,7 +122,7 @@ function useRainAmbient() {
   return { on, toggle, volume, setVolume };
 }
 
-// ─── Music Player ─────────────────────────────────────────────────────────────
+// --- Music Player -------------------------------------------------------------
 interface Track { title: string; src: string; image_url?: string | null; artist?: string | null; }
 interface MusicCategory { label: string; tracks: Track[]; }
 
@@ -164,9 +164,9 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   const [catIdx, setCatIdx] = useState(0);
   const [trackIdx, setTrackIdx] = useState(0);
   const [loopMode, setLoopMode] = useState<LoopMode>('all');
-  const [progress, setProgress] = useState(0);   // 0–100
+  const [progress, setProgress] = useState(0);   // 0�100
   const [duration, setDuration] = useState(0);   // seconds
-  const [volume, setVolumeState] = useState(0.8); // 0–1
+  const [volume, setVolumeState] = useState(0.8); // 0�1
 
   // Load library from DB on mount
   useEffect(() => {
@@ -205,7 +205,7 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
     if (audioRef.current) audioRef.current.loop = loopMode === 'one';
   }, [loopMode]);
 
-  // Progress tracking — kept for auto-advance logic only (not displayed)
+  // Progress tracking � kept for auto-advance logic only (not displayed)
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
@@ -295,8 +295,8 @@ function useMusicPlayer(audioRef: React.RefObject<HTMLAudioElement>) {
   return { playing, toggle, syncPlayingState, skipNext, skipPrev, selectTrack, cycleLoop, loopMode, currentTrack, currentCat, catIdx, trackIdx, library, volume, setVolume };
 }
 
-// ─── Bar Waveform Visualizer ──────────────────────────────────────────────────
-const BAR_COUNT = 18; // reduced from 28 — fewer bars = less GPU work on mobile
+// --- Bar Waveform Visualizer --------------------------------------------------
+const BAR_COUNT = 18; // reduced from 28 � fewer bars = less GPU work on mobile
 const BAR_SEEDS = Array.from({ length: BAR_COUNT }, (_, i) => ({
   duration: 0.8 + ((i * 137 + 31) % 9) * 0.1,
   delay:    ((i * 53  + 17) % 11) * 0.06,
@@ -324,14 +324,14 @@ const BarWaveform = memo(({ playing }: { playing: boolean }) => (
           width: 3,
           originY: 1,
           willChange: 'transform',
-          background: playing ? 'linear-gradient(to top, #c8956c, #e8b48a)' : 'rgba(200,149,108,0.2)',
+          background: playing ? 'linear-gradient(to top, hsl(var(--primary)), hsl(var(--honey)))' : 'hsl(var(--border))',
         }}
       />
     ))}
   </div>
 ));
 
-// ─── Volume Slider ────────────────────────────────────────────────────────────
+// --- Volume Slider ------------------------------------------------------------
 function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
   const pct = Math.round(volume * 100);
   const isMuted = volume === 0;
@@ -345,12 +345,12 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
   return (
     <div
       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl dark:bg-black/20"
-      style={{ background: 'rgba(200,149,108,0.07)', border: '1px solid rgba(200,149,108,0.15)' }}
+      style={{ background: 'hsl(var(--latte) / 0.5)', border: '1px solid hsl(var(--border))' }}
     >
       <button
         onClick={toggleMute}
-        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#9c7c5e] dark:text-[#cbb3a0] hover:text-[#c8956c] dark:hover:text-[#e0b48a] transition-colors"
-        title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
+        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-[hsl(var(--primary))] transition-colors"
+        title={isMuted ? '?????????' : '????????'}
       >
         {isMuted ? (
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -366,11 +366,11 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
 
       <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
         <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
-          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(200,149,108,0.15)' }}>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'hsl(var(--border))' }}>
             {/* Use CSS width directly — no spring animation on layout property */}
             <div
               className="h-full rounded-full transition-[width] duration-75"
-              style={{ width: `${pct}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }}
+              style={{ width: `${pct}%`, background: 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--honey)))' }}
             />
           </div>
         </div>
@@ -391,15 +391,15 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
         />
       </div>
 
-      <span className="shrink-0 text-[10px] font-mono text-[#9c7c5e]/60 dark:text-[#cbb3a0]/50 tabular-nums w-6 text-right">
-        {isMuted ? '—' : `${pct}`}
+      <span className="shrink-0 text-[10px] font-mono text-muted-foreground/60 tabular-nums w-6 text-right">
+        {isMuted ? '�' : `${pct}`}
       </span>
     </div>
   );
 }
 
 
-// ─── Vinyl Disc (small, header) ───────────────────────────────────────────────
+// --- Vinyl Disc (small, header) -----------------------------------------------
 const VinylDisc = memo(({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) => (
   <div className="relative flex items-center justify-center">
     <motion.div
@@ -418,21 +418,21 @@ const VinylDisc = memo(({ imageUrl, playing }: { imageUrl?: string | null; playi
         <div key={r} className="absolute rounded-full border border-white/[0.05]" style={{ width: r * 2, height: r * 2 }} />
       ))}
       <div className="absolute inset-0 rounded-full pointer-events-none" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)' }} />
-      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c8956c]/35 shadow-inner z-10">
+      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[hsl(var(--primary)/0.35)] shadow-inner z-10">
         {imageUrl ? (
           <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#1a0e06] flex items-center justify-center">
-            <Music2 className="w-6 h-6 text-[#c8956c]/55" />
+            <Music2 className="w-6 h-6 text-[hsl(var(--primary)/0.5)]" />
           </div>
         )}
       </div>
-      <div className="absolute w-3.5 h-3.5 rounded-full bg-[#1a0e06] border-2 border-[#c8956c]/35 z-20" />
+      <div className="absolute w-3.5 h-3.5 rounded-full bg-[hsl(var(--mocha))] border-2 border-[hsl(var(--primary)/0.35)] z-20" />
     </motion.div>
   </div>
 ));
 
-// ─── Desktop Trigger Button ───────────────────────────────────────────────────
+// --- Desktop Trigger Button ---------------------------------------------------
 const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onClick: () => void }) => {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === 'dark';
@@ -450,14 +450,14 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
       top: 'calc(80px + env(safe-area-inset-top, 0px))',
       zIndex: 50,
       willChange: 'transform',
-      background: dark ? 'rgba(26,18,13,0.92)' : 'rgba(248,243,237,0.92)',
+      background: dark ? 'hsl(var(--mocha) / 0.92)' : 'hsl(var(--cream) / 0.92)',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       boxShadow: dark ? '4px 0 20px rgba(0,0,0,0.4)' : '4px 0 20px rgba(0,0,0,0.12)',
       border: '1px solid rgba(200,149,108,0.25)',
       borderLeft: 'none',
     }}
-    title="เปิด Music Player"
+    title="???? Music Player"
   >
     <motion.div
       animate={playing ? { rotate: 360 } : { rotate: 0 }}
@@ -469,8 +469,8 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
         boxShadow: playing ? '0 0 12px rgba(200,149,108,0.5)' : '0 2px 6px rgba(0,0,0,0.3)',
       }}
     >
-      <div className="w-3.5 h-3.5 rounded-full border border-[#c8956c]/40 z-10 bg-gradient-to-br from-[#3a2410] to-[#1a0e06]" />
-      <div className="absolute w-2 h-2 rounded-full bg-[#1a0e06] border border-[#c8956c]/30 z-20" />
+      <div className="w-3.5 h-3.5 rounded-full border border-[hsl(var(--primary)/0.4)] z-10 bg-gradient-to-br from-[hsl(var(--mocha))] to-[hsl(var(--coffee))]" />
+      <div className="absolute w-2 h-2 rounded-full bg-[hsl(var(--mocha))] border border-[hsl(var(--primary)/0.3)] z-20" />
     </motion.div>
     {playing && (
       <div className="flex flex-col gap-[3px] items-center">
@@ -478,7 +478,7 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
           <motion.div
             key={i}
             className="w-1 rounded-full"
-            style={{ background: dark ? '#e0b48a' : '#c8956c', height: 8, originY: 0.5, willChange: 'transform' }}
+            style={{ background: dark ? 'hsl(var(--honey))' : 'hsl(var(--primary))', height: 8, originY: 0.5, willChange: 'transform' }}
             initial={{ height: 8, scaleY: 0.375, originY: 0.5 }}
             animate={{ scaleY: [0.375, 1, 0.375] }}
             transition={{ duration: 0.55, repeat: Infinity, delay: d, ease: 'easeInOut' }}
@@ -488,7 +488,7 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
     )}
     <span
       className="text-[9px] font-bold"
-      style={{ color: dark ? '#cbb3a0' : '#7c5c3e', writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}
+      style={{ color: dark ? 'hsl(var(--bear-brown))' : 'hsl(var(--bear-brown))', writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.15em' }}
     >
       MUSIC
     </span>
@@ -496,7 +496,7 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
   );
 });
 
-// ─── Music Drawer (Left Slide-in) ────────────────────────────────────────────
+// --- Music Drawer (Left Slide-in) --------------------------------------------
 const MusicPanel = memo(function MusicPanel({
   player, onClose, perfMode, onTogglePerfMode, rainOn, onToggleRain, rainVolume, onRainVolume,
 }: {
@@ -514,24 +514,24 @@ const MusicPanel = memo(function MusicPanel({
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === 'dark';
 
-  // ── theme-aware color tokens ──────────────────────────────────────────────
-  const panelBg      = dark ? 'rgba(22,14,9,0.96)'    : 'rgba(250,246,242,0.94)';
-  const miniBarBg    = dark ? 'rgba(22,14,9,0.97)'    : 'rgba(250,246,242,0.95)';
-  const miniBarBorder= dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
-  const searchBg     = dark ? 'rgba(200,149,108,0.08)' : 'rgba(200,149,108,0.1)';
-  const trackActiveBg= dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.1)';
-  const trackHoverBg = dark ? 'rgba(200,149,108,0.07)' : 'rgba(200,149,108,0.06)';
-  const thumbBg      = dark ? 'rgba(255,255,255,0.06)' : 'rgba(232,217,200,0.5)';
-  const volBg        = dark ? 'rgba(200,149,108,0.06)' : 'rgba(200,149,108,0.07)';
-  const textPrimary  = dark ? '#f3e9dc' : '#2a1a0e';
-  const textSecondary= dark ? '#cbb3a0' : '#7c5c3e';
-  const textAccent   = dark ? '#e0b48a' : '#c8956c';
-  const textMuted    = dark ? 'rgba(203,179,160,0.5)' : 'rgba(156,124,94,0.6)';
-  const borderAccent = dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)';
+  // -- theme-aware color tokens (Bear Cafe design system) ------------------
+  const panelBg      = dark ? 'hsl(var(--mocha) / 0.96)'    : 'hsl(var(--cream) / 0.94)';
+  const miniBarBg    = dark ? 'hsl(var(--mocha) / 0.97)'    : 'hsl(var(--cream) / 0.95)';
+  const miniBarBorder= dark ? 'hsl(var(--coffee) / 0.5)'    : 'hsl(var(--latte) / 0.6)';
+  const searchBg     = dark ? 'hsl(var(--coffee) / 0.5)'    : 'hsl(var(--latte) / 0.5)';
+  const trackActiveBg= dark ? 'hsl(var(--coffee))'          : 'hsl(var(--latte))';
+  const trackHoverBg = dark ? 'hsl(var(--coffee) / 0.6)'    : 'hsl(var(--latte) / 0.6)';
+  const thumbBg      = dark ? 'hsl(var(--coffee))'          : 'hsl(var(--latte))';
+  const volBg        = dark ? 'hsl(var(--coffee) / 0.5)'    : 'hsl(var(--latte) / 0.4)';
+  const textPrimary  = dark ? 'hsl(var(--foreground))'      : 'hsl(var(--foreground))';
+  const textSecondary= dark ? 'hsl(var(--bear-brown))'      : 'hsl(var(--bear-brown))';
+  const textAccent   = dark ? 'hsl(var(--honey))'           : 'hsl(var(--primary))';
+  const textMuted    = dark ? 'hsl(var(--muted-foreground))': 'hsl(var(--muted-foreground))';
+  const borderAccent = dark ? 'hsl(var(--coffee) / 0.5)'    : 'hsl(var(--latte) / 0.6)';
 
-  // useMotionValue for drag — position updates bypass React reconciler entirely
+  // useMotionValue for drag � position updates bypass React reconciler entirely
   const x = useMotionValue(0);
-  // Reduce blur to 4px while dragging — derived from x, no setState needed
+  // Reduce blur to 4px while dragging � derived from x, no setState needed
   const blurAmount = useTransform(x, [0, 60], [16, 4]);
   const backdropBlur = useTransform(blurAmount, v => `blur(${Math.round(v)}px)`);
 
@@ -553,7 +553,7 @@ const MusicPanel = memo(function MusicPanel({
 
   return (
     <>
-      {/* Grain overlay — desktop only, hidden on mobile to save GPU */}
+      {/* Grain overlay � desktop only, hidden on mobile to save GPU */}
       <div
         className="fixed inset-0 pointer-events-none hidden md:block"
         style={{
@@ -563,7 +563,7 @@ const MusicPanel = memo(function MusicPanel({
         }}
       />
 
-      {/* Drawer — useMotionValue drag bypasses React reconciler, transform-only, contained */}
+      {/* Drawer � useMotionValue drag bypasses React reconciler, transform-only, contained */}
       <motion.div
         key="music-panel"
         initial={{ x: '-100%' }}
@@ -583,14 +583,14 @@ const MusicPanel = memo(function MusicPanel({
           backdropFilter: perfMode ? 'none' : backdropBlur,
           WebkitBackdropFilter: perfMode ? 'none' : backdropBlur,
           background: perfMode
-            ? (dark ? 'rgba(22,14,9,0.99)' : 'rgba(250,246,242,0.99)')
+            ? (dark ? 'hsl(var(--mocha))' : 'hsl(var(--cream))')
             : panelBg,
           boxShadow: dark ? '8px 0 32px rgba(0,0,0,0.5)' : '8px 0 32px rgba(0,0,0,0.2)',
           borderRight: `1px solid ${borderAccent}`,
         }}
         onDragStart={() => { /* blur handled by useTransform(x) */ }}
         onDrag={(_, info) => {
-          // Snap to integer pixels — eliminates subpixel rendering jitter
+          // Snap to integer pixels � eliminates subpixel rendering jitter
           const snapped = Math.round(info.offset.x);
           if (snapped !== Math.round(x.get())) x.set(snapped);
         }}
@@ -626,10 +626,10 @@ const MusicPanel = memo(function MusicPanel({
               <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain" />
-                  <span className="text-sm font-bold" style={{ color: textSecondary }}>เพลงคาเฟ่</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>?????????</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  {/* โหมดประหยัด toggle */}
+                  {/* ??????????? toggle */}
                   <motion.button
                     whileTap={{ scale: 0.92 }}
                     onClick={onTogglePerfMode}
@@ -638,7 +638,7 @@ const MusicPanel = memo(function MusicPanel({
                       color: perfMode ? textAccent : textMuted,
                       background: perfMode ? `${textAccent}20` : 'transparent',
                     }}
-                    title={perfMode ? 'โหมดประหยัด: เปิดอยู่ (กดเพื่อปิด)' : 'โหมดประหยัด: ปิดอยู่ (กดเพื่อเปิด — ลดกระตุก)'}
+                    title={perfMode ? '???????????: ???????? (??????????)' : '???????????: ??????? (??????????? � ????????)'}
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -649,7 +649,7 @@ const MusicPanel = memo(function MusicPanel({
                     onClick={() => setView('library')}
                     className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
                     style={{ color: textMuted }}
-                    title="คลังเพลง"
+                    title="????????"
                   >
                     <Library className="w-4 h-4" />
                   </motion.button>
@@ -679,7 +679,7 @@ const MusicPanel = memo(function MusicPanel({
                   className="font-bold text-lg leading-tight truncate"
                   style={{ color: textPrimary }}
                 >
-                  {player.currentTrack?.title ?? '—'}
+                  {player.currentTrack?.title ?? '�'}
                 </motion.p>
                 {player.currentTrack?.artist && (
                   <p className="text-sm truncate font-medium" style={{ color: textAccent }}>
@@ -708,7 +708,7 @@ const MusicPanel = memo(function MusicPanel({
                     color: player.loopMode !== 'none' ? textAccent : textMuted,
                     background: player.loopMode !== 'none' ? (dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)') : 'transparent',
                   }}
-                  title={player.loopMode === 'none' ? 'ไม่วนซ้ำ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
+                  title={player.loopMode === 'none' ? '????????' : player.loopMode === 'all' ? '????????????' : '????????????'}
                 >
                   {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                 </motion.button>
@@ -755,7 +755,7 @@ const MusicPanel = memo(function MusicPanel({
                   <SkipForward className="w-5 h-5" />
                 </motion.button>
 
-                {/* Rain toggle button — แทนที่ spacer */}
+                {/* Rain toggle button � ?????? spacer */}
                 <motion.button
                   whileTap={{ scale: 0.88 }}
                   onClick={onToggleRain}
@@ -765,13 +765,13 @@ const MusicPanel = memo(function MusicPanel({
                     color: rainOn ? '#60a5fa' : textMuted,
                     outline: rainOn ? '1.5px solid rgba(96,165,250,0.4)' : 'none',
                   }}
-                  title={rainOn ? 'ปิดเสียงฝน' : 'เปิดเสียงฝน'}
+                  title={rainOn ? '??????????' : '???????????'}
                 >
-                  🌧
+                  ??
                 </motion.button>
               </div>
 
-              {/* Rain volume slider — โผล่เมื่อเปิดเสียงฝน */}
+              {/* Rain volume slider � ???????????????????? */}
               <AnimatePresence>
                 {rainOn && (
                   <motion.div
@@ -785,7 +785,7 @@ const MusicPanel = memo(function MusicPanel({
                       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl"
                       style={{ background: dark ? 'rgba(96,165,250,0.08)' : 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)' }}
                     >
-                      <span className="text-base shrink-0">🌧</span>
+                      <span className="text-base shrink-0">??</span>
                       <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
                         <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
                           <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(96,165,250,0.15)' }}>
@@ -805,7 +805,7 @@ const MusicPanel = memo(function MusicPanel({
                           className="absolute text-base pointer-events-none select-none"
                           style={{ left: `calc(${rainVolume * 100}% - 10px)`, top: '50%', transform: 'translateY(-50%)', zIndex: 20, lineHeight: 1 }}
                         >
-                          🌧
+                          ??
                         </span>
                       </div>
                       <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: dark ? 'rgba(147,197,253,0.7)' : 'rgba(96,165,250,0.8)' }}>
@@ -841,14 +841,14 @@ const MusicPanel = memo(function MusicPanel({
                     )}
                   </button>
                   <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
-                    {/* Track fill — no transition, follows value instantly */}
+                    {/* Track fill � no transition, follows value instantly */}
                     <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
                       <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.15)' }}>
                         <div className="h-full rounded-full"
                           style={{ width: `${player.volume * 100}%`, background: 'linear-gradient(to right, #c8956c, #e8b48a)' }} />
                       </div>
                     </div>
-                    {/* Range input — opacity:0.001 so iPad/iOS touch events work correctly */}
+                    {/* Range input � opacity:0.001 so iPad/iOS touch events work correctly */}
                     <input
                       type="range" min={0} max={100} step={0.5}
                       value={player.volume * 100}
@@ -856,7 +856,7 @@ const MusicPanel = memo(function MusicPanel({
                       className="w-full absolute inset-0"
                       style={{ opacity: 0.001, cursor: 'pointer', height: '100%', margin: 0, padding: 0, touchAction: 'none' }}
                     />
-                    {/* HoneyJar thumb — position matches value exactly, no rounding */}
+                    {/* HoneyJar thumb � position matches value exactly, no rounding */}
                     <img src={honeyJarIcon} alt="" draggable={false}
                       style={{
                         position: 'absolute',
@@ -869,7 +869,7 @@ const MusicPanel = memo(function MusicPanel({
                       }} />
                   </div>
                   <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: textMuted }}>
-                    {player.volume === 0 ? '—' : Math.round(player.volume * 100)}
+                    {player.volume === 0 ? '�' : Math.round(player.volume * 100)}
                   </span>
                 </div>
               </div>
@@ -950,7 +950,7 @@ const MusicPanel = memo(function MusicPanel({
                 </motion.button>
                 <div className="flex items-center gap-2 flex-1">
                   <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" />
-                  <span className="text-sm font-bold" style={{ color: textSecondary }}>คลังเพลง</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>????????</span>
                 </div>
                 <motion.button
                   whileTap={{ scale: 0.92 }}
@@ -970,7 +970,7 @@ const MusicPanel = memo(function MusicPanel({
                   <input
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="ค้นหาเพลง, ศิลปิน..."
+                    placeholder="?????????, ??????..."
                     className="flex-1 bg-transparent text-xs outline-none"
                     style={{ color: textPrimary }}
                   />
@@ -986,10 +986,10 @@ const MusicPanel = memo(function MusicPanel({
                 {searchQuery ? (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-3" style={{ color: textMuted }}>
-                      ผลการค้นหา ({filteredAll.length})
+                      ?????????? ({filteredAll.length})
                     </p>
                     {filteredAll.length === 0 ? (
-                      <p className="text-xs text-center py-8" style={{ color: textMuted }}>ไม่พบเพลง</p>
+                      <p className="text-xs text-center py-8" style={{ color: textMuted }}>?????????</p>
                     ) : (
                       <div className="space-y-1">
                         {filteredAll.map(({ track, catIdx, trackIdx: ti, catLabel }) => {
@@ -1019,12 +1019,12 @@ const MusicPanel = memo(function MusicPanel({
                   </div>
                 ) : (
                   <>
-                    {/* Categories — Pinterest card grid (ขึ้นก่อน) */}
+                    {/* Categories � Pinterest card grid (????????) */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          หมวดหมู่
+                          ????????
                         </p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -1057,8 +1057,8 @@ const MusicPanel = memo(function MusicPanel({
                               <div className="absolute top-3 right-3 z-10">
                                 <div className="w-9 h-9 rounded-full border border-white/15 flex items-center justify-center"
                                   style={{ background: 'conic-gradient(from 0deg, #120a04, #2a1a0e, #120a04, #1e1208, #2a1a0e, #120a04)', boxShadow: isCurrentCat ? '0 0 10px rgba(200,149,108,0.5)' : '0 2px 8px rgba(0,0,0,0.4)' }}>
-                                  <div className="w-3 h-3 rounded-full overflow-hidden border border-[#c8956c]/30">
-                                    {firstTrack?.image_url ? <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-[#2a1a0e]" />}
+                                  <div className="w-3 h-3 rounded-full overflow-hidden border border-[hsl(var(--primary)/0.3)]">
+                                    {firstTrack?.image_url ? <img src={firstTrack.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-[hsl(var(--mocha))]" />}
                                   </div>
                                 </div>
                               </div>
@@ -1066,7 +1066,7 @@ const MusicPanel = memo(function MusicPanel({
                                 <div className="absolute top-3 left-3 z-10">
                                   <motion.div className="flex gap-[2px] items-end" style={{ height: 12 }}>
                                     {[0, 0.12, 0.24].map((d, i) => (
-                                      <motion.div key={i} className="w-[2.5px] rounded-full bg-[#c8956c]"
+                                      <motion.div key={i} className="w-[2.5px] rounded-full bg-[hsl(var(--primary))]"
                                         animate={{ height: ['3px', '10px', '3px'] }}
                                         transition={{ duration: 0.5, repeat: Infinity, delay: d }} />
                                     ))}
@@ -1075,7 +1075,7 @@ const MusicPanel = memo(function MusicPanel({
                               )}
                               <div className="relative z-10 p-3 w-full">
                                 <p className="text-white text-xs font-bold truncate leading-tight" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{cat.label}</p>
-                                <p className="text-white/50 text-[10px] mt-0.5">{cat.tracks.length} เพลง</p>
+                                <p className="text-white/50 text-[10px] mt-0.5">{cat.tracks.length} ????</p>
                               </div>
                             </motion.button>
                           );
@@ -1088,7 +1088,7 @@ const MusicPanel = memo(function MusicPanel({
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          เพลงทั้งหมด ({allTracks.length})
+                          ??????????? ({allTracks.length})
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -1131,7 +1131,7 @@ const MusicPanel = memo(function MusicPanel({
                 )}
               </div>
 
-              {/* Mini player pill — always visible in library */}
+              {/* Mini player pill � always visible in library */}
               <div
                 className="absolute bottom-0 left-0 right-0 px-4 py-3 z-20"
                 style={{
@@ -1152,7 +1152,7 @@ const MusicPanel = memo(function MusicPanel({
                       : <Music2 className="w-4 h-4" style={{ color: `${textAccent}88` }} />}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{player.currentTrack?.title ?? '—'}</p>
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{player.currentTrack?.title ?? '�'}</p>
                     <p className="text-[10px] truncate" style={{ color: textMuted }}>{player.currentTrack?.artist ?? player.currentCat?.label ?? ''}</p>
                   </div>
                   <motion.button
@@ -1182,7 +1182,7 @@ const MusicPanel = memo(function MusicPanel({
   );
 });
 
-// ─── Large Vinyl Disc (hero, drawer player view) ─────────────────────────────
+// --- Large Vinyl Disc (hero, drawer player view) -----------------------------
 const VinylDiscLarge = memo(({ imageUrl, playing }: { imageUrl?: string | null; playing: boolean }) => (
   <div className="relative flex items-center justify-center">
     <motion.div
@@ -1202,13 +1202,13 @@ const VinylDiscLarge = memo(({ imageUrl, playing }: { imageUrl?: string | null; 
       ))}
       <div className="absolute inset-0 rounded-full pointer-events-none"
         style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 30%, transparent 55%)' }} />
-      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[#c8956c]/25 z-10"
+      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[hsl(var(--primary)/0.25)] z-10"
         style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)' }}>
         {imageUrl ? (
           <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#3a2410] to-[#120a04] flex items-center justify-center">
-            <Music2 className="w-10 h-10 text-[#c8956c]/45" />
+            <Music2 className="w-10 h-10 text-[hsl(var(--primary)/0.4)]" />
           </div>
         )}
       </div>
@@ -1228,7 +1228,7 @@ function findBannedWord(text: string, banned: string[]): string | null {
   return banned.find(w => lower.includes(w)) ?? null;
 }
 
-// ─── Synchronized Countdown ───────────────────────────────────────────────────
+// --- Synchronized Countdown ---------------------------------------------------
 // Computes remaining time from server-authoritative started_at timestamp so
 // both clients stay in sync even after page reload or tab switch.
 function playUrgentSound() {
@@ -1255,7 +1255,7 @@ function playUrgentSound() {
 function useCountdown(
   totalSeconds: number,
   active: boolean,
-  startedAt: string | null,   // server timestamp — used for sync
+  startedAt: string | null,   // server timestamp � used for sync
   onExpire: () => void,
 ) {
   const [remaining, setRemaining] = useState(totalSeconds);
@@ -1315,13 +1315,13 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white dark:bg-[#221810] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-center space-y-4"
+        className="bg-[hsl(var(--card))] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-center space-y-4"
       >
-        <p className="font-semibold text-[#4a3728] dark:text-[#e8d9c8] text-lg">
-          ให้คะแนนการสนทนา
+        <p className="font-semibold text-foreground text-lg">
+          ????????????????
         </p>
-        <p className="text-sm text-[#9c7c5e]">
-          ประสบการณ์ครั้งนี้เป็นอย่างไรบ้าง?
+        <p className="text-sm text-muted-foreground">
+          ??????????????????????????????????
         </p>
         <div className="flex justify-center gap-3">
           {[1, 2, 3, 4, 5].map(s => (
@@ -1332,30 +1332,30 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
               onClick={() => setSelected(s)}
               className="text-3xl transition-transform hover:scale-110 select-none"
             >
-              {s <= (hovered || selected) ? '★' : '☆'}
+              {s <= (hovered || selected) ? '?' : '?'}
             </button>
           ))}
         </div>
         <button
           onClick={() => selected > 0 && onRate(selected)}
           disabled={selected === 0}
-          className="w-full py-2.5 rounded-xl bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 text-white font-semibold transition-colors"
+          className="w-full py-2.5 rounded-xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] disabled:opacity-40 text-white font-semibold transition-colors"
         >
-          ส่งคะแนน
+          ????????
         </button>
         <button
           onClick={() => onRate(0)}
-          className="text-xs text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors"
+          className="text-xs text-muted-foreground hover:text-[hsl(var(--bear-brown))] transition-colors"
         >
-          ข้ามไปก่อน
+          ??????????
         </button>
       </motion.div>
     </div>
   );
 }
 
-// ─── Tooltip (desktop hover) ─────────────────────────────────────────────────
-// align: 'center' | 'right' — ใช้ 'right' สำหรับปุ่มที่อยู่ขอบขวาของหน้าจอ
+// --- Tooltip (desktop hover) -------------------------------------------------
+// align: 'center' | 'right' � ??? 'right' ????????????????????????????????
 function Tooltip({ text, children, align = 'center' }: { text: string; children: React.ReactNode; align?: 'center' | 'right' }) {
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1382,7 +1382,7 @@ function Tooltip({ text, children, align = 'center' }: { text: string; children:
             exit={{ opacity: 0, y: -4, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             className={`absolute top-full ${posClass} mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap pointer-events-none`}
-            style={{ zIndex: 9999, background: 'rgba(42,26,14,0.92)', color: '#f3e9dc', boxShadow: '0 4px 12px rgba(0,0,0,0.25)' }}
+            style={{ zIndex: 9999, background: 'hsl(var(--mocha))', color: 'hsl(var(--foreground))', boxShadow: '0 4px 12px rgba(0,0,0,0.25)' }}
           >
             {text}
             <div className={`absolute bottom-full ${arrowClass} w-0 h-0`}
@@ -1394,7 +1394,7 @@ function Tooltip({ text, children, align = 'center' }: { text: string; children:
   );
 }
 
-// ─── Tutorial ─────────────────────────────────────────────────────────────────
+// --- Tutorial -----------------------------------------------------------------
 // Steps 0-2: shown while waiting for match
 // Steps 3-4: shown after match
 interface TutorialStep {
@@ -1405,11 +1405,11 @@ interface TutorialStep {
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
-  { refKey: 'rain',  title: 'เสียงฝน',        desc: 'เปิด/ปิดเสียงฝนตกเบาๆ เพื่อบรรยากาศผ่อนคลาย',                                tooltipSide: 'below' },
-  { refKey: 'theme', title: 'เปลี่ยนธีมสี',   desc: 'สลับระหว่างโหมดสว่างและโหมดมืด ตามความชอบของคุณ',                             tooltipSide: 'below' },
-  { refKey: 'leave', title: 'ออกจากโต๊ะ',     desc: 'จบการสนทนาและกลับหน้าหลัก ระบบจะขอให้ให้คะแนนก่อน',                          tooltipSide: 'below' },
-  { refKey: 'timer', title: 'นับถอยหลัง',     desc: 'เวลาที่เหลือในการสนทนา (7 นาที) เมื่อเหลือ 1 นาทีจะกะพริบแดง',               tooltipSide: 'below' },
-  { refKey: 'input', title: 'ช่องพิมพ์',      desc: 'พิมพ์ข้อความแล้วกด Enter หรือปุ่มส่ง ระบบจะกรองคำต้องห้ามอัตโนมัติ',         tooltipSide: 'above' },
+  { refKey: 'rain',  title: '???????',        desc: '????/???????????????? ?????????????????????',                                tooltipSide: 'below' },
+  { refKey: 'theme', title: '????????????',   desc: '?????????????????????????????? ????????????????',                             tooltipSide: 'below' },
+  { refKey: 'leave', title: '??????????',     desc: '????????????????????????? ???????????????????????',                          tooltipSide: 'below' },
+  { refKey: 'timer', title: '??????????',     desc: '?????????????????????? (7 ????) ?????????? 1 ???????????????',               tooltipSide: 'below' },
+  { refKey: 'input', title: '?????????',      desc: '?????????????????? Enter ??????????? ?????????????????????????????',         tooltipSide: 'above' },
 ];
 
 // Ref map passed down from main component
@@ -1441,7 +1441,7 @@ function TutorialOverlay({
     const measure = () => {
       const el = refs[s.refKey]?.current;
 
-      // Safety fallback: ref is completely missing — skip gracefully.
+      // Safety fallback: ref is completely missing � skip gracefully.
       if (!el) {
         console.warn(
           `[Tutorial Debug] Step ${step} target "${s.refKey}" is null or size is 0. Waiting for Framer Motion to finish...`
@@ -1452,7 +1452,7 @@ function TutorialOverlay({
       const rect = el.getBoundingClientRect();
 
       if (rect.width > 0 && rect.height > 0) {
-        // Element is fully painted — lock in the rect and stop polling.
+        // Element is fully painted � lock in the rect and stop polling.
         setRingRect(rect);
         clearInterval(intervalId);
       } else {
@@ -1483,7 +1483,7 @@ function TutorialOverlay({
     };
   }, [step, s?.refKey]);
 
-  // Safety: unknown step — render nothing rather than crashing.
+  // Safety: unknown step � render nothing rather than crashing.
   if (!s) return null;
   const isLast = step === total - 1;
 
@@ -1494,7 +1494,7 @@ function TutorialOverlay({
       {/* Dark overlay */}
       <div className="absolute inset-0 bg-black/55 pointer-events-auto" onClick={onSkip} />
 
-      {/* Highlight ring — positioned from measured rect */}
+      {/* Highlight ring � positioned from measured rect */}
       {ringRect && (
         <motion.div
           key={s.refKey}
@@ -1509,20 +1509,20 @@ function TutorialOverlay({
             width:  ringRect.width  + PAD * 2,
             height: ringRect.height + PAD * 2,
             borderRadius: ringRect.height > 40 ? 16 : 9999,
-            border: '2px solid #c8956c',
-            boxShadow: '0 0 0 4px rgba(200,149,108,0.3)',
+            border: '2px solid hsl(var(--primary))',
+            boxShadow: '0 0 0 4px hsl(var(--primary) / 0.3)',
           }}
         />
       )}
 
-      {/* Tooltip — positioned relative to ring */}
+      {/* Tooltip � positioned relative to ring */}
       {ringRect && (
         <motion.div
           key={`tip-${step}`}
           initial={{ opacity: 0, y: s.tooltipSide === 'below' ? -6 : 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.05 }}
-          className="absolute w-72 bg-white dark:bg-[#221810] rounded-2xl shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] p-4 pointer-events-auto"
+          className="absolute w-72 bg-[hsl(var(--card))] rounded-2xl shadow-2xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] p-4 pointer-events-auto"
           style={{
             zIndex: 62,
             // Place below or above the ring, clamp to viewport
@@ -1537,28 +1537,28 @@ function TutorialOverlay({
           }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-[#c8956c] flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <div className="w-6 h-6 rounded-full bg-[hsl(var(--primary))] flex items-center justify-center text-white text-xs font-bold shrink-0">
               {step + 1}
             </div>
-            <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm">{s.title}</p>
+            <p className="font-bold text-foreground text-sm">{s.title}</p>
           </div>
-          <p className="text-xs text-[#7c5c3e] dark:text-[#9c7c5e] leading-relaxed mb-4">{s.desc}</p>
+          <p className="text-xs text-[hsl(var(--bear-brown))] dark:text-muted-foreground leading-relaxed mb-4">{s.desc}</p>
 
           <div className="flex items-center justify-between">
-            <button onClick={onSkip} className="text-xs text-[#9c7c5e] hover:text-[#7c5c3e] transition-colors">
-              ข้ามทั้งหมด
+            <button onClick={onSkip} className="text-xs text-muted-foreground hover:text-[hsl(var(--bear-brown))] transition-colors">
+              ???????????
             </button>
             <div className="flex items-center gap-3">
               <div className="flex gap-1">
                 {Array.from({ length: total }).map((_, i) => (
-                  <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-4 bg-[#c8956c]' : 'w-1.5 bg-[#e8d9c8]'}`} />
+                  <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-4 bg-[hsl(var(--primary))]' : 'w-1.5 bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))]'}`} />
                 ))}
               </div>
               <button
                 onClick={onNext}
-                className="px-4 py-1.5 rounded-xl bg-[#c8956c] hover:bg-[#b07d58] text-white text-xs font-semibold transition-colors"
+                className="px-4 py-1.5 rounded-xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] text-white text-xs font-semibold transition-colors"
               >
-                {isLast ? 'เสร็จแล้ว' : 'ถัดไป'}
+                {isLast ? '?????????' : '?????'}
               </button>
             </div>
           </div>
@@ -1568,7 +1568,7 @@ function TutorialOverlay({
   );
 }
 
-// ─── Match notification sound (Web Audio API — no file needed) ───────────────
+// --- Match notification sound (Web Audio API � no file needed) ---------------
 function playMatchSound() {
   try {
     const ctx = new AudioContext();
@@ -1602,11 +1602,11 @@ export default function SecretChatRoom() {
   const bgmRef = useRef<HTMLAudioElement>(null);
   const player = useMusicPlayer(bgmRef);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
-  // โหมดประหยัด — ปิด backdrop-blur บน panel เพื่อลดการกระตุกบนอุปกรณ์ที่ไม่แรง
+  // ??????????? � ??? backdrop-blur ?? panel ??????????????????????????????????
   const [musicPerfMode, setMusicPerfMode] = useState<boolean>(() => {
     try { return localStorage.getItem('music_perf_mode') === '1'; } catch { return false; }
   });
-  // Perf prompt — แสดงครั้งแรกที่เข้า room ถ้ายังไม่เคยตัดสินใจ
+  // Perf prompt � ??????????????????? room ????????????????????
   const [showPerfPrompt, setShowPerfPrompt] = useState<boolean>(() => {
     try { return localStorage.getItem('music_perf_mode') === null; } catch { return false; }
   });
@@ -1664,7 +1664,7 @@ export default function SecretChatRoom() {
   const [matchStatus, setMatchStatus] = useState<'waiting' | 'matched' | 'ended'>('waiting');
   const [queueCount, setQueueCount] = useState(0);
 
-  // ── Queue count realtime — แสดงจำนวนคนรอขณะ waiting ──────────────────────
+  // -- Queue count realtime � ???????????????? waiting ----------------------
   useEffect(() => {
     if (matchStatus !== 'waiting') return;
     const STALE_MS = 10 * 60 * 1000;
@@ -1693,7 +1693,7 @@ export default function SecretChatRoom() {
   const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
   const matchStartRef = useRef<number>(Date.now());
 
-  // Tutorial state — show once per session, stored in localStorage
+  // Tutorial state � show once per session, stored in localStorage
   const TUTORIAL_KEY = 'cafe_room_tutorial_done';
   const [tutorialStep, setTutorialStep] = useState<number>(() =>
     localStorage.getItem(TUTORIAL_KEY) ? -1 : 0
@@ -1704,21 +1704,21 @@ export default function SecretChatRoom() {
     if (next >= TUTORIAL_STEPS.length) { skipTutorial(); } else { setTutorialStep(next); }
   };
 
-  // Refs for tutorial highlight — typed correctly so React attaches them
+  // Refs for tutorial highlight � typed correctly so React attaches them
   const rainRef  = useRef<HTMLButtonElement>(null);
   const musicRef = useRef<HTMLButtonElement>(null);
   const leaveRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<HTMLDivElement>(null);
   const themeRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
-  // "Join Table" overlay — shown when a match is found, dismissed by user click.
+  // "Join Table" overlay � shown when a match is found, dismissed by user click.
   // The click IS a user gesture, so audio play is allowed by the browser.
   const [showJoinOverlay, setShowJoinOverlay] = useState(false);
   // isRoomReady: true only after the user has dismissed the join overlay,
   // guaranteeing all room UI elements (timer, input) are fully mounted.
   const [isRoomReady, setIsRoomReady] = useState(false);
 
-  // Stable object — only recreated if refs themselves change (they don't)
+  // Stable object � only recreated if refs themselves change (they don't)
   const tutorialRefs = useMemo<TutorialRefs>(() => ({
     rain:  rainRef  as React.RefObject<HTMLElement>,
     music: musicRef as React.RefObject<HTMLElement>,
@@ -1746,12 +1746,12 @@ export default function SecretChatRoom() {
     }
   }, [matchStatus, isRoomReady]);
 
-  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed.
+  // Called when the user clicks "????????????" � direct user gesture ? audio allowed.
   // CRITICAL: el.play() MUST be the very first synchronous call so the browser's
   // transient activation token is still valid. Any await or setState before it
   // will cause a NotAllowedError.
   const handleJoinTable = useCallback(() => {
-    // ── 1. Trigger audio FIRST — synchronous, before any state updates ──────
+    // -- 1. Trigger audio FIRST � synchronous, before any state updates ------
     const el = bgmRef.current;
     if (el) {
       if (!el.src || el.src === window.location.href) {
@@ -1775,11 +1775,11 @@ export default function SecretChatRoom() {
         window.alert(`Audio Error: ${error.name} - ${error.message}`);
       }
     }
-    // ── 2. Update state AFTER play() has been called ─────────────────────────
+    // -- 2. Update state AFTER play() has been called -------------------------
     setShowJoinOverlay(false);
     setIsRoomReady(true);
 
-    // ── 3. Write started_at to DB so both clients can sync the countdown ─────
+    // -- 3. Write started_at to DB so both clients can sync the countdown -----
     if (session?.id && !session.started_at) {
       (supabase as any)
         .from('chat_sessions')
@@ -1790,17 +1790,17 @@ export default function SecretChatRoom() {
         });
     }
 
-    // ── 4. Insert bot safety welcome message — user_a only (ป้องกันส่ง 2 ครั้ง) ──
-    // sender_id = null → system message (no FK violation)
+    // -- 4. Insert bot safety welcome message � user_a only (?????????? 2 ?????) --
+    // sender_id = null ? system message (no FK violation)
     if (session?.id && session.user_a_id === user?.id) {
       const welcomeText = [
-        '⚠️ **คำเตือนก่อนเริ่มแชท**',
+        '?? **???????????????????**',
         '',
-        'หากคุณพบว่าเพื่อนสนทนาของคุณมีการใช้ถ้อยคำไม่สุภาพ คุกคาม หรือทำให้คุณรู้สึกไม่ปลอดภัย สามารถแจ้งปัญหาได้ที่ **#🚨︰พื้นที่แจ้งปัญหา** ผ่านทางเซิร์ฟเวอร์ Discord ของเรา',
+        '?????????????????????????????????????????????????? ?????? ???????????????????????????? ????????????????????? **#???????????????????** ?????????????????? Discord ??????',
         '',
-        'กรุณา **แคปหน้าจอแชททุกครั้งโดยห้ามครอปภาพ** เพื่อให้ทีมงานสามารถตรวจสอบบริบทของบทสนทนาได้อย่างครบถ้วน เนื่องจากระบบ **ไม่มีการบันทึกประวัติแชทของผู้ใช้งาน**',
+        '????? **??????????????????????????????????** ????????????????????????????????????????????????????????? ????????????? **????????????????????????????????????**',
         '',
-        '⏰ เมื่อเกิดปัญหา กรุณาแจ้งภายใน **24 ชั่วโมง** เพื่อให้สามารถดำเนินการได้อย่างรวดเร็ว',
+        '? ?????????????? ?????????????? **24 ???????** ??????????????????????????????????????',
       ].join('\n');
 
       (supabase as any).from('chat_messages').insert({
@@ -1869,7 +1869,7 @@ export default function SecretChatRoom() {
 
   const handleExpire = useCallback(async () => {
     if (!session) return;
-    // Only PATCH if session is still active — avoids 400 on already-ended sessions
+    // Only PATCH if session is still active � avoids 400 on already-ended sessions
     if (session.status === 'active') {
       await (supabase as any)
         .from('chat_sessions')
@@ -1897,12 +1897,12 @@ export default function SecretChatRoom() {
     // Record when we started waiting (for similar-phase delay)
     matchStartRef.current = Date.now();
 
-    // ── Cleanup helper ────────────────────────────────────────────────────────
+    // -- Cleanup helper --------------------------------------------------------
     const cleanupQueue = () => {
       (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
     };
 
-    // Stale cleanup — call the DB function instead of a client-side cutoff
+    // Stale cleanup � call the DB function instead of a client-side cutoff
     (supabase as any).rpc('cleanup_stale_queue').then(() => {});
 
     const onBeforeUnload = () => cleanupQueue();
@@ -1920,7 +1920,7 @@ export default function SecretChatRoom() {
       setMatchStatus('matched');
     };
 
-    // ── tryMatch: uses atomic DB function to eliminate race conditions ────────
+    // -- tryMatch: uses atomic DB function to eliminate race conditions --------
     const tryMatch = async () => {
       if (matchedRef) return;
 
@@ -1931,7 +1931,7 @@ export default function SecretChatRoom() {
         .from('chat_queue')
         .select('*')
         .neq('user_id', user.id)
-        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // ป้องกันผี: ข้ามคนที่รอนานเกิน 10 นาที
+        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // ?????????: ?????????????????? 10 ????
         .order('joined_at', { ascending: true })
         .limit(20);
 
@@ -1951,7 +1951,7 @@ export default function SecretChatRoom() {
       }
       if (!best || bestScore < 0) return;
 
-      // ── Atomic match via DB function (advisory lock + transaction) ────────
+      // -- Atomic match via DB function (advisory lock + transaction) --------
       // This prevents two clients from simultaneously matching the same partner.
       const { data: sessions, error } = await (supabase as any).rpc('try_match_users', {
         p_user_a_id:     user.id,
@@ -1972,9 +1972,9 @@ export default function SecretChatRoom() {
       handleMatch(sessions[0] as ChatSession);
     };
 
-    // ── Polling with per-client jitter to avoid thundering herd ──────────────
-    // Base interval 3s + random 0–2s offset so 100 clients don't all fire
-    // at the same millisecond. Effective rate: ~1 query per 3–5s per client.
+    // -- Polling with per-client jitter to avoid thundering herd --------------
+    // Base interval 3s + random 0�2s offset so 100 clients don't all fire
+    // at the same millisecond. Effective rate: ~1 query per 3�5s per client.
     const POLL_BASE_MS  = 3000;
     const POLL_JITTER_MS = 2000;
     const jitter = Math.random() * POLL_JITTER_MS;
@@ -1987,7 +1987,7 @@ export default function SecretChatRoom() {
       (intervalRef as any).current = interval;
     }, jitter);
 
-    // ── Realtime: primary notification path (faster than polling) ────────────
+    // -- Realtime: primary notification path (faster than polling) ------------
     const queueChannel = supabase
       .channel(`queue-watch-${user.id}`)
       .on('postgres_changes', {
@@ -1996,7 +1996,7 @@ export default function SecretChatRoom() {
         table: 'chat_sessions',
         filter: `user_b_id=eq.${user.id}`,
       }, (payload) => {
-        // user_b receives the session via Realtime — no need to delete queue
+        // user_b receives the session via Realtime � no need to delete queue
         // (the atomic function already deleted it server-side)
         handleMatch(payload.new as ChatSession);
       })
@@ -2062,9 +2062,9 @@ export default function SecretChatRoom() {
 
     const content = input.trim();
 
-    // ── Local moderation (zero latency, no network) ───────────────────────────
-    // Normalize: collapse bypass attempts like ค-ว-ย / ค.ว.ย / ค@ว#ย → ควย
-    // Thai vowel marks (U+0E30–U+0E4E) are combining chars — keep them.
+    // -- Local moderation (zero latency, no network) ---------------------------
+    // Normalize: collapse bypass attempts like ?-?-? / ?.?.? / ?@?#? ? ???
+    // Thai vowel marks (U+0E30�U+0E4E) are combining chars � keep them.
     const normalize = (s: string) =>
       s
         .toLowerCase()
@@ -2077,12 +2077,12 @@ export default function SecretChatRoom() {
 
     const normalized = normalize(content);
 
-    // Blacklist — exact substrings checked against normalized text.
+    // Blacklist � exact substrings checked against normalized text.
     // Add more entries here as needed; normalization handles bypass attempts.
     const BLACKLIST: string[] = [
       // Thai
-      'ควย', 'หี', 'เย็ด', 'สัตว์', 'เหี้ย', 'สัด', 'อีดอก', 'ไอ้ดอก',
-      'มึง', 'กู', 'ควาย', 'ฆ่า', 'ตาย', 'ระเบิด',
+      '???', '??', '????', '?????', '?????', '???', '?????', '??????',
+      '???', '??', '????', '???', '???', '??????',
       // English
       'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'nigger', 'kill',
       'murder', 'rape', 'porn', 'sex',
@@ -2091,11 +2091,11 @@ export default function SecretChatRoom() {
     const hitWord = BLACKLIST.find(w => normalized.includes(normalize(w)));
 
     if (hitWord) {
-      // ── Flagged: log violation + insert system warning ──────────────────────
-      const warningText = '🐻 รปภ. หมี: ติ๊ดๆ! ข้อความถูกบล็อกเนื่องจากตรวจพบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า';
+      // -- Flagged: log violation + insert system warning ----------------------
+      const warningText = '?? ???. ???: ?????! ?????????????????????????????????????????? ??????????????????';
 
       await Promise.all([
-        // Log for admin observation tab (Realtime → admin sees it instantly)
+        // Log for admin observation tab (Realtime ? admin sees it instantly)
         (supabase as any).from('chat_violations').insert({
           session_id:    session.id,
           user_id:       user.id,
@@ -2118,7 +2118,7 @@ export default function SecretChatRoom() {
       return;
     }
 
-    // ── Also check DB banned-word list (admin-managed) ────────────────────────
+    // -- Also check DB banned-word list (admin-managed) ------------------------
     const foundWord = findBannedWord(content, bannedWords);
     if (foundWord) {
       await (supabase as any).from('chat_violations').insert({
@@ -2132,7 +2132,7 @@ export default function SecretChatRoom() {
       return;
     }
 
-    // ── Clean — insert message ────────────────────────────────────────────────
+    // -- Clean � insert message ------------------------------------------------
     setSending(true);
     setInput('');
     await (supabase as any).from('chat_messages').insert({
@@ -2156,10 +2156,10 @@ export default function SecretChatRoom() {
 
   const leaveTable = useCallback(async () => {
     if (session) {
-      // Has matched — ask for confirmation first
+      // Has matched � ask for confirmation first
       setShowLeaveConfirm(true);
     } else {
-      // Still waiting — just remove from queue, no confirm needed
+      // Still waiting � just remove from queue, no confirm needed
       await (supabase as any).from('chat_queue').delete().eq('user_id', user?.id);
       navigate('/');
     }
@@ -2204,9 +2204,9 @@ export default function SecretChatRoom() {
     ? (session.user_a_id === user?.id ? session.user_b_role : session.user_a_role)
     : null;
 
-  // Thai role labels — friendly display names
+  // Thai role labels � friendly display names
   const ROLE_TH: Record<string, string> = {
-    talk: '💬 พิมพ์ไม่หยุด', listen: '👂 ผู้รับฟังที่ดี', both: '🤝 ได้ทั้งสอง', chill: '☕ ชิล ๆ',
+    talk: '?? ????????????', listen: '?? ??????????????', both: '?? ??????????', chill: '? ??? ?',
   };
 
   const getAvatarImg = (key: string) => profiles.find(p => p.id === key)?.image_url ?? null;
@@ -2215,14 +2215,14 @@ export default function SecretChatRoom() {
   const isMyMessage = (msg: Message) => msg.sender_id === user?.id;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#faf6f1] dark:bg-[#1a1410] secret-room-zoom" style={{ isolation: 'isolate' }}>
+    <div className="fixed inset-0 flex flex-col bg-[hsl(var(--background))] secret-room-zoom" style={{ isolation: 'isolate' }}>
       <audio ref={bgmRef} />
 
-      {/* Music panel + backdrop — at root level, above everything */}
+      {/* Music panel + backdrop � at root level, above everything */}
       <AnimatePresence>
         {showMusicPanel && (
           <>
-            {/* Backdrop — z-[998], below panel */}
+            {/* Backdrop � z-[998], below panel */}
             <motion.div
               key="music-backdrop"
               initial={{ opacity: 0 }}
@@ -2233,13 +2233,13 @@ export default function SecretChatRoom() {
               style={{ zIndex: 998 }}
               onClick={() => setShowMusicPanel(false)}
             />
-            {/* Panel — z-[999] */}
+            {/* Panel � z-[999] */}
             <MusicPanel player={player} onClose={() => setShowMusicPanel(false)} perfMode={musicPerfMode} onTogglePerfMode={() => setMusicPerfMode(v => { const next = !v; try { localStorage.setItem('music_perf_mode', next ? '1' : '0'); } catch {} return next; })} rainOn={rainOn} onToggleRain={toggleRain} rainVolume={rainVolume} onRainVolume={setRainVolume} />
           </>
         )}
       </AnimatePresence>
 
-      {/* Desktop floating trigger — visible on md+ when panel is closed */}
+      {/* Desktop floating trigger � visible on md+ when panel is closed */}
       <AnimatePresence>
         {!showMusicPanel && (
           <MusicTriggerButton playing={player.playing} onClick={() => setShowMusicPanel(true)} />
@@ -2255,7 +2255,7 @@ export default function SecretChatRoom() {
         />
       )}
 
-      {/* Perf prompt — แสดงครั้งแรกที่เข้า room */}
+      {/* Perf prompt � ??????????????????? room */}
       <AnimatePresence>
         {showPerfPrompt && (
           <motion.div
@@ -2271,40 +2271,39 @@ export default function SecretChatRoom() {
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 20, opacity: 0, scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="w-full max-w-sm rounded-3xl p-6 shadow-2xl border"
+              className="w-full max-w-sm rounded-3xl p-6 shadow-2xl border bg-[hsl(var(--card))]"
               style={{
-                background: 'rgba(250,246,242,0.97)',
-                borderColor: 'rgba(200,149,108,0.25)',
+                borderColor: 'hsl(var(--border))',
               }}
             >
               {/* Icon */}
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                style={{ background: 'rgba(200,149,108,0.12)' }}>
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="#c8956c" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                style={{ background: 'hsl(var(--latte))' }}>
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
               </div>
               {/* Text */}
-              <p className="text-center font-bold text-[#2a1a0e] text-base mb-1">เว็บกระตุกอยู่ไหม?</p>
-              <p className="text-center text-sm text-[#7c5c3e] leading-relaxed mb-5">
-                เปิดโหมดประหยัดพลังงานช่วยได้นะคะ<br />
-                <span className="text-[11px] text-[#9c7c5e]">ปิด blur effect เพื่อให้ animation ลื่นขึ้น</span>
+              <p className="text-center font-bold text-foreground text-base mb-1">??????????????????</p>
+              <p className="text-center text-sm text-[hsl(var(--bear-brown))] leading-relaxed mb-5">
+                ?????????????????????????????????<br />
+                <span className="text-[11px] text-muted-foreground">??? blur effect ???????? animation ????????</span>
               </p>
               {/* Buttons */}
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => dismissPerfPrompt(true)}
-                  className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(145deg, #e0b080, #c8956c)', boxShadow: '0 4px 16px rgba(200,149,108,0.4)' }}
+                  className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98] bg-[hsl(var(--primary))]"
+                  style={{ boxShadow: '0 4px 16px hsl(var(--primary) / 0.4)' }}
                 >
-                  ⚡ เปิดโหมดประหยัดพลังงาน
+                  ? ??????????????????????
                 </button>
                 <button
                   onClick={() => dismissPerfPrompt(false)}
                   className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98]"
                   style={{ background: 'rgba(239,68,68,0.9)', boxShadow: '0 4px 12px rgba(239,68,68,0.25)' }}
                 >
-                  ไม่ต้องการ
+                  ??????????
                 </button>
               </div>
             </motion.div>
@@ -2312,7 +2311,7 @@ export default function SecretChatRoom() {
         )}
       </AnimatePresence>
 
-      {/* Join Table overlay — shown on match, dismissed by user click to unlock AudioContext */}
+      {/* Join Table overlay � shown on match, dismissed by user click to unlock AudioContext */}
       <AnimatePresence>
         {showJoinOverlay && (
           <motion.div
@@ -2326,25 +2325,25 @@ export default function SecretChatRoom() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.92, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="bg-white dark:bg-[#221810] rounded-3xl p-8 max-w-xs w-full mx-4 shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-center space-y-5"
+              className="bg-[hsl(var(--card))] rounded-3xl p-8 max-w-xs w-full mx-4 shadow-2xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-center space-y-5"
             >
               <motion.div
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-20 h-20 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center mx-auto shadow-lg overflow-hidden"
+                className="w-20 h-20 rounded-3xl bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] flex items-center justify-center mx-auto shadow-lg overflow-hidden"
               >
                 <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
               </motion.div>
               <div className="space-y-1.5">
-                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">จับคู่สำเร็จแล้ว!</p>
-                <p className="text-sm text-[#9c7c5e] leading-relaxed">
-                  พบคู่สนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
+                <p className="font-bold text-foreground text-xl">????????????????!</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  ?????????????? ???????????????????
                 </p>
                 {/* Partner role badge */}
                 {partnerRole && (
                   <div className="flex items-center justify-center gap-1.5 pt-1">
-                    <span className="text-xs text-[#9c7c5e]">บทบาทฝ่ายตรงข้าม:</span>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c]">
+                    <span className="text-xs text-muted-foreground">????????????????:</span>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">
                       {ROLE_TH[partnerRole] ?? partnerRole}
                     </span>
                   </div>
@@ -2354,9 +2353,9 @@ export default function SecretChatRoom() {
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={handleJoinTable}
-                className="w-full h-12 rounded-2xl bg-[#c8956c] hover:bg-[#b07d58] text-white font-bold text-base transition-colors shadow-lg"
+                className="w-full h-12 rounded-2xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] text-white font-bold text-base transition-colors shadow-lg"
               >
-                เข้าร่วมโต๊ะ
+                ????????????
               </motion.button>
             </motion.div>
           </motion.div>
@@ -2386,20 +2385,20 @@ export default function SecretChatRoom() {
           >
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {bannedWarning === '__ai__'
-              ? 'ข้อความนี้อาจขัดต่อกฎของคาเฟ่ ลองปรับคำพูดดูน้า 🐻'
+              ? '????????????????????????????? ????????????????? ??'
               : bannedWarning === '__thai__'
-              ? 'ข้อความถูกบล็อก — พบคำต้องห้าม'
+              ? '??????????????? � ????????????'
               : bannedWarning === '__local__'
-              ? 'ข้อความถูกบล็อก — พบคำสุ่มเสี่ยง รบกวนใช้คำสุภาพน้า 🐻'
+              ? '??????????????? � ?????????????? ?????????????????? ??'
               : bannedWarning === '__error__'
-              ? 'ไม่สามารถส่งข้อความได้ในขณะนี้ ลองใหม่อีกครั้งน้า'
-              : 'ข้อความถูกบล็อก — พบคำต้องห้าม'
+              ? '?????????????????????????????? ??????????????????'
+              : '??????????????? � ????????????'
             }
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Urgent time warning banner — appears at 60s remaining */}
+      {/* Urgent time warning banner � appears at 60s remaining */}
       <AnimatePresence>
         {isUrgent && isRoomReady && (
           <motion.div
@@ -2409,33 +2408,33 @@ export default function SecretChatRoom() {
             className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-500 text-white text-sm font-semibold px-5 py-2 rounded-full shadow-lg"
           >
             <Clock className="w-4 h-4 shrink-0 animate-pulse" />
-            เหลือเวลาอีก {countdownDisplay} รีบคุยด้วยน้า! ⏰
+            ???????????? {countdownDisplay} ?????????????! ?
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <header className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-b border-[#e8d9c8] dark:border-[#3a2a1e] z-20">
+      <header className="shrink-0 bg-[hsl(var(--cream)/0.95)] dark:bg-[hsl(var(--mocha)/0.95)] backdrop-blur-md border-b border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] z-20">
         <div className="px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {matchStatus === 'matched' && session ? (
               <>
-                <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[#e8d9c8] dark:ring-[#3a2a1e]">
+                <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 ring-2 ring-[hsl(var(--latte)/0.6)] dark:ring-[hsl(var(--coffee)/0.5)]">
                   {partnerImg
                     ? <img src={partnerImg} alt={partnerAlias} className="w-full h-full object-cover" />
-                    : <span className="text-lg">🐻</span>}
+                    : <span className="text-lg">??</span>}
                 </div>
                 <div>
-                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-sm leading-tight">{partnerAlias}</p>
+                  <p className="font-bold text-foreground text-sm leading-tight">{partnerAlias}</p>
                   <div className="flex items-center gap-1 mt-0.5">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                     </span>
-                    <p className="text-[11px] text-[#9c7c5e]">
+                    <p className="text-[11px] text-muted-foreground">
                       {topicName}
                       {partnerRole && partnerRole !== 'both' && (
-                        <span className="ml-1 opacity-70">· {ROLE_TH[partnerRole] ?? partnerRole}</span>
+                        <span className="ml-1 opacity-70">� {ROLE_TH[partnerRole] ?? partnerRole}</span>
                       )}
                     </p>
                   </div>
@@ -2443,12 +2442,12 @@ export default function SecretChatRoom() {
               </>
             ) : (
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] flex items-center justify-center shrink-0 overflow-hidden">
                   <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-base">คาเฟ่ลับ</p>
-                  <p className="text-xs text-[#9c7c5e]">{topicName}</p>
+                  <p className="font-bold text-foreground text-base">????????</p>
+                  <p className="text-xs text-muted-foreground">{topicName}</p>
                 </div>
               </div>
             )}
@@ -2461,7 +2460,7 @@ export default function SecretChatRoom() {
                 className={`flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1.5 rounded-full border transition-colors ${
                 isUrgent
                   ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800 animate-pulse'
-                  : 'bg-[#f0e6d8] dark:bg-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] border-[#e8d9c8] dark:border-[#4a3728]'
+                  ? 'bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] border-[hsl(var(--latte))] dark:border-[hsl(var(--coffee))]'
               }`}>
                 <Clock className="w-3.5 h-3.5" />
                 {countdownDisplay}
@@ -2469,11 +2468,11 @@ export default function SecretChatRoom() {
             )}
 
             {/* Theme toggle */}
-            <Tooltip text={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
+            <Tooltip text={theme === 'dark' ? '?????????' : '???????'}>
               <button
                 ref={themeRef}
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="w-9 h-9 rounded-full flex items-center justify-center transition-all border bg-transparent text-[#9c7c5e] border-[#e8d9c8] hover:border-[#c8956c]"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all border bg-transparent text-muted-foreground border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]"
               >
                 {theme === 'dark'
                   ? <Sun className="w-4 h-4" />
@@ -2482,8 +2481,8 @@ export default function SecretChatRoom() {
               </button>
             </Tooltip>
 
-            {/* Leave — solid red */}
-            <Tooltip text="ออกจากโต๊ะ" align="right">
+            {/* Leave � solid red */}
+            <Tooltip text="??????????" align="right">
               <button onClick={leaveTable}
                 ref={leaveRef}
                 className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-red-500 hover:bg-red-600 border border-red-500 hover:border-red-600 transition-all shadow-sm">
@@ -2502,36 +2501,35 @@ export default function SecretChatRoom() {
             <motion.div
               animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-32 h-32 rounded-3xl bg-[#f0e6d8] dark:bg-[#3a2a1e] flex items-center justify-center shadow-xl overflow-hidden"
+              className="w-32 h-32 rounded-3xl bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] flex items-center justify-center shadow-xl overflow-hidden"
             >
               <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
             </motion.div>
             <div className="space-y-2">
-              <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-xl">กำลังหาคู่สนทนา...</p>
-              <p className="text-sm text-[#9c7c5e] leading-relaxed">
-                รอสักครู่ กำลังจับคู่ในหัวข้อ{' '}
-                <span className="font-semibold text-[#7c5c3e] dark:text-[#c8956c]">{topicName}</span>
+              <p className="font-bold text-foreground text-xl">???????????????...</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                ????????? ???????????????????{' '}
+                <span className="font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">{topicName}</span>
               </p>
               {/* Queue counter */}
               <div className="flex justify-center pt-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ background: 'rgba(200,149,108,0.12)', color: '#c8956c', border: '1px solid rgba(200,149,108,0.25)' }}>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] border border-[hsl(var(--border))]">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#c8956c' }} />
-                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#c8956c' }} />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'hsl(var(--primary))' }} />
+                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'hsl(var(--primary))' }} />
                   </span>
-                  {queueCount > 0 ? `${queueCount} คนกำลังรออยู่` : 'กำลังโหลด...'}
+                  {queueCount > 0 ? `${queueCount} ?????????????` : '?????????...'}
                 </span>
               </div>
               {moodConfig.enabled && (
-                <p className="text-xs text-[#c8b09a]">
-                  หากรอนาน {moodConfig.similar_phase_delay_seconds} วินาที จะขยายการจับคู่ไปยัง mood ใกล้เคียง
+                <p className="text-xs text-muted-foreground">
+                  ???????? {moodConfig.similar_phase_delay_seconds} ?????? ???????????????????? mood ?????????
                 </p>
               )}
             </div>
             <div className="flex gap-2">
               {[0, 0.2, 0.4].map((d, i) => (
-                <motion.div key={i} className="w-3 h-3 rounded-full bg-[#c8956c]"
+                <motion.div key={i} className="w-3 h-3 rounded-full bg-[hsl(var(--primary))]"
                   animate={{ y: [0, -10, 0] }} transition={{ duration: 0.9, repeat: Infinity, delay: d }} />
               ))}
             </div>
@@ -2540,16 +2538,16 @@ export default function SecretChatRoom() {
 
         {matchStatus === 'matched' && messages.length === 0 && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-center py-6">
-            <div className="bg-[#f0e6d8] dark:bg-[#3a2a1e] rounded-2xl px-5 py-3 text-center max-w-xs">
-              <p className="text-sm font-semibold text-[#7c5c3e] dark:text-[#c8956c]">จับคู่สำเร็จแล้ว</p>
-              <p className="text-xs text-[#9c7c5e] mt-1">มีเวลา {Math.floor(SESSION_DURATION / 60)} นาที เริ่มสนทนาได้เลย</p>
+            <div className="bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] rounded-2xl px-5 py-3 text-center max-w-xs">
+              <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))]">????????????????</p>
+              <p className="text-xs text-muted-foreground mt-1">?????? {Math.floor(SESSION_DURATION / 60)} ???? ????????????????</p>
             </div>
           </motion.div>
         )}
 
         <AnimatePresence initial={false}>
           {messages.map(msg => {
-            // ── System message (Bear Guard / น้องฮันนี่) ─────────────────────
+            // -- System message (Bear Guard / ??????????) ---------------------
             if (msg.is_system) {
               // Render **bold** markdown inline
               const renderBold = (text: string) =>
@@ -2559,7 +2557,7 @@ export default function SecretChatRoom() {
                     : <span key={i}>{part}</span>
                 );
 
-              const isWarning = msg.content.includes('รปภ.') || msg.content.includes('ติ๊ดๆ');
+              const isWarning = msg.content.includes('???.') || msg.content.includes('?????');
 
               return (
                 <motion.div
@@ -2569,18 +2567,18 @@ export default function SecretChatRoom() {
                   className="flex gap-3 flex-row"
                 >
                   {/* Bear mascot avatar */}
-                  <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 self-start mt-1 shadow-sm border-2 border-[#c8956c]/30">
-                    <img src={bearMascotIcon} alt="น้องฮันนี่" className="w-full h-full object-cover" />
+                  <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 self-start mt-1 shadow-sm border-2 border-[hsl(var(--primary)/0.3)]">
+                    <img src={bearMascotIcon} alt="??????????" className="w-full h-full object-cover" />
                   </div>
 
                   <div className="max-w-[80%] space-y-1">
-                    <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
-                      น้องฮันนี่ · ฝ่ายความปลอดภัย
+                    <span className="text-[10px] text-muted-foreground px-1 font-medium">
+                      ?????????? � ???????????????
                     </span>
                     <div className={`px-4 py-3 rounded-2xl rounded-bl-sm text-xs leading-relaxed shadow-sm ${
                       isWarning
                         ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300'
-                        : 'bg-[#f0e6d8] dark:bg-[#2a1a0e] border border-[#e8d9c8] dark:border-[#3a2a1e] text-[#4a3728] dark:text-[#e8d9c8]'
+                        : 'bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-foreground'
                     }`}>
                       {msg.content.split('\n').map((line, i) => (
                         <p key={i} className={line === '' ? 'h-2' : ''}>
@@ -2593,7 +2591,7 @@ export default function SecretChatRoom() {
               );
             }
 
-            // ── Normal message ────────────────────────────────────────────────
+            // -- Normal message ------------------------------------------------
             return (
               <motion.div
                 key={msg.id}
@@ -2602,18 +2600,18 @@ export default function SecretChatRoom() {
                 className={`flex gap-3 ${isMyMessage(msg) ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {!isMyMessage(msg) && (
-                  <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
-                    {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
+                  <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 self-end shadow-sm">
+                    {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">??</span>}
                   </div>
                 )}
                 <div className={`max-w-[75%] sm:max-w-[65%] space-y-1 flex flex-col ${isMyMessage(msg) ? 'items-end' : 'items-start'}`}>
-                  <span className="text-[10px] text-[#9c7c5e] px-1 font-medium">
+                  <span className="text-[10px] text-muted-foreground px-1 font-medium">
                     {isMyMessage(msg) ? myAlias : partnerAlias}
                   </span>
                   <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
                     isMyMessage(msg)
-                      ? 'bg-[#c8956c] text-white rounded-br-sm'
-                      : 'bg-white dark:bg-[#2a1e14] text-[#4a3728] dark:text-[#e8d9c8] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-bl-sm'
+                      ? 'bg-[hsl(var(--primary))] text-white rounded-br-sm'
+                      : 'bg-[hsl(var(--card))] text-foreground border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] rounded-bl-sm'
                   }`}>
                     {msg.content}
                   </div>
@@ -2625,12 +2623,12 @@ export default function SecretChatRoom() {
 
         {partnerTyping && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex gap-3 items-end">
-            <div className="w-9 h-9 rounded-full bg-[#f0e6d8] dark:bg-[#3a2a1e] overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
-              {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">🐻</span>}
+            <div className="w-9 h-9 rounded-full bg-[hsl(var(--latte))] dark:bg-[hsl(var(--coffee))] overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+              {partnerImg ? <img src={partnerImg} alt="" className="w-full h-full object-cover" /> : <span className="text-base">??</span>}
             </div>
-            <div className="bg-white dark:bg-[#2a1e14] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-2xl rounded-bl-sm px-5 py-3.5 flex gap-1.5 items-center shadow-sm">
+            <div className="bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] rounded-2xl rounded-bl-sm px-5 py-3.5 flex gap-1.5 items-center shadow-sm">
               {[0, 0.15, 0.3].map((delay, i) => (
-                <motion.div key={i} className="w-2 h-2 rounded-full bg-[#c8b09a]"
+                <motion.div key={i} className="w-2 h-2 rounded-full bg-[hsl(var(--bear-brown)/0.5)] dark:bg-[hsl(var(--honey)/0.4)]"
                   animate={{ y: [0, -5, 0] }} transition={{ duration: 0.7, repeat: Infinity, delay }} />
               ))}
             </div>
@@ -2643,22 +2641,22 @@ export default function SecretChatRoom() {
 
       {/* Input */}
       {matchStatus === 'matched' && (
-        <div className="shrink-0 bg-[#faf6f1]/95 dark:bg-[#1a1410]/95 backdrop-blur-md border-t border-[#e8d9c8] dark:border-[#3a2a1e] px-3 sm:px-5 py-3">
+        <div className="shrink-0 bg-[hsl(var(--cream)/0.95)] dark:bg-[hsl(var(--mocha)/0.95)] backdrop-blur-md border-t border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] px-3 sm:px-5 py-3">
           <form
             className="flex gap-2 items-end max-w-4xl mx-auto"
             onSubmit={e => { e.preventDefault(); sendMessage(); }}
           >
             <div
               ref={inputRef}
-              className="flex-1 bg-white dark:bg-[#221810] border border-[#e8d9c8] dark:border-[#3a2a1e] rounded-xl px-3.5 py-2.5 focus-within:border-[#c8956c] focus-within:shadow-sm transition-all"
+              className="flex-1 bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] rounded-xl px-3.5 py-2.5 focus-within:border-[hsl(var(--primary))] focus-within:shadow-sm transition-all"
             >
               <textarea
                 value={input}
                 onChange={e => handleInputChange(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder="พิมพ์ข้อความ..."
+                placeholder="????????????..."
                 rows={1}
-                className="w-full bg-transparent text-sm text-[#4a3728] dark:text-[#e8d9c8] placeholder:text-[#c8b09a] resize-none outline-none leading-relaxed"
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 resize-none outline-none leading-relaxed"
                 style={{ maxHeight: 100 }}
               />
             </div>
@@ -2666,12 +2664,12 @@ export default function SecretChatRoom() {
               type="submit"
               whileTap={{ scale: 0.92 }}
               onPointerDown={e => {
-                // ป้องกัน blur บน textarea ก่อน sendMessage จะ fire
+                // ??????? blur ?? textarea ???? sendMessage ?? fire
                 e.preventDefault();
                 sendMessage();
               }}
               disabled={!input.trim() || sending}
-              className="w-10 h-10 rounded-full bg-[#c8956c] hover:bg-[#b07d58] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
+              className="w-10 h-10 rounded-full bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] disabled:opacity-40 flex items-center justify-center text-white transition-all shrink-0 shadow-md"
             >
               {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </motion.button>
@@ -2695,29 +2693,29 @@ export default function SecretChatRoom() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="bg-white dark:bg-[#221810] rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-center space-y-4"
+              className="bg-[hsl(var(--card))] rounded-2xl p-6 max-w-xs w-full mx-4 shadow-2xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-center space-y-4"
             >
               <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center mx-auto">
                 <LogOut className="w-7 h-7 text-red-500" />
               </div>
               <div className="space-y-1.5">
-                <p className="font-bold text-[#4a3728] dark:text-[#e8d9c8] text-lg">ออกจากโต๊ะ?</p>
-                <p className="text-sm text-[#9c7c5e] leading-relaxed">
-                  การสนทนาจะสิ้นสุดทันที และไม่สามารถกลับมาได้
+                <p className="font-bold text-foreground text-lg">???????????</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  ?????????????????????? ?????????????????????
                 </p>
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowLeaveConfirm(false)}
-                  className="flex-1 h-11 rounded-xl border border-[#e8d9c8] dark:border-[#3a2a1e] text-[#7c5c3e] dark:text-[#c8956c] font-semibold text-sm hover:bg-[#f0e6d8] dark:hover:bg-[#2a1a0e] transition-colors"
+                  className="flex-1 h-11 rounded-xl border border-[hsl(var(--latte)/0.6)] dark:border-[hsl(var(--coffee)/0.5)] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] font-semibold text-sm hover:bg-[hsl(var(--latte))] dark:hover:bg-[hsl(var(--coffee))] transition-colors"
                 >
-                  อยู่ต่อ
+                  ???????
                 </button>
                 <button
                   onClick={confirmLeave}
                   className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors shadow-sm"
                 >
-                  ออกเลย
+                  ??????
                 </button>
               </div>
             </motion.div>

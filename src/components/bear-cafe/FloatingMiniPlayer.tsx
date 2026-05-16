@@ -21,13 +21,15 @@ export function FloatingMiniPlayer() {
 
   // Hide on homepage — the right panel already shows the full player there
   if (location.pathname === '/') return null;
+  // Hide on secret chat room — it has its own built-in music player
+  if (location.pathname === '/secret-chat/room') return null;
   // Hide if nothing is playing and never played
   if (!music.playing && !music.currentTrack?.title) return null;
 
   const textPri  = dark ? '#f3e9dc' : '#2a1a0e';
-  const textSec  = dark ? '#cbb3a0' : '#7c5c3e';
-  const textMuted= dark ? 'rgba(203,179,160,0.5)' : 'rgba(156,124,94,0.6)';
-  const bg       = dark ? 'rgba(22,14,9,0.96)'    : 'rgba(250,246,242,0.97)';
+  const textSec  = dark ? '#cbb3a0' : '#8B5E3C';
+  const textMuted= dark ? 'rgba(203,179,160,0.5)' : 'rgba(139,94,60,0.55)';
+  const bg       = dark ? 'rgba(22,14,9,0.96)'    : 'rgba(248,235,216,0.97)';
   const border   = dark ? 'rgba(200,149,108,0.22)' : 'rgba(200,149,108,0.3)';
   const vinylBg  = dark
     ? 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008)'
@@ -43,8 +45,14 @@ export function FloatingMiniPlayer() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 340, damping: 30 }}
-            className="rounded-2xl overflow-hidden shadow-2xl w-64"
-            style={{ background: bg, border: `1px solid ${border}` }}
+            className="rounded-2xl overflow-hidden w-64"
+            style={{
+              background: bg,
+              border: `1px solid ${border}`,
+              boxShadow: dark
+                ? '0 8px 32px rgba(200,149,108,0.18), 0 2px 12px rgba(0,0,0,0.5)'
+                : '0 8px 32px rgba(139,94,60,0.15), 0 2px 12px rgba(0,0,0,0.1)',
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -101,7 +109,7 @@ export function FloatingMiniPlayer() {
                 whileTap={{ scale: 0.92 }}
                 onClick={music.toggle}
                 className="w-11 h-11 rounded-full text-white flex items-center justify-center shadow-md"
-                style={{ background: 'linear-gradient(145deg, #e0b080, #c8956c, #b07d58)' }}
+                style={{ background: 'linear-gradient(145deg, #E9A84E, #c8956c, #b07d58)' }}
               >
                 {music.playing
                   ? <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -126,7 +134,7 @@ export function FloatingMiniPlayer() {
               {music.playing && (
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(to right, #c8956c, #e8b48a)' }}
+                  style={{ background: 'linear-gradient(to right, #c8956c, #E9A84E)' }}
                   animate={{ width: ['0%', '100%'] }}
                   transition={{ duration: 180, ease: 'linear', repeat: Infinity }}
                 />

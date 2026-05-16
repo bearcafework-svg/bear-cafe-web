@@ -501,7 +501,7 @@ export default function CreateSessionPage() {
       <header className="border-b border-latte dark:border-espresso/50 bg-cream/50 dark:bg-mocha/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
           <PageHeader
-            title="คุณกำลังสร้างแมตช์"
+            title="หาเพื่อนลงห้อง ʕ •ᴥ• ʔ"
             showBack
             backTo="/"
           />
