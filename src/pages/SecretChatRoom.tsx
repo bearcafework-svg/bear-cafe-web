@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
+﻿import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -350,7 +350,7 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
       <button
         onClick={toggleMute}
         className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-[hsl(var(--primary))] transition-colors"
-        title={isMuted ? '?????????' : '????????'}
+        title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
       >
         {isMuted ? (
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -457,7 +457,7 @@ const MusicTriggerButton = memo(({ playing, onClick }: { playing: boolean; onCli
       border: '1px solid rgba(200,149,108,0.25)',
       borderLeft: 'none',
     }}
-    title="???? Music Player"
+    title="เปิด Music Player"
   >
     <motion.div
       animate={playing ? { rotate: 360 } : { rotate: 0 }}
@@ -626,10 +626,10 @@ const MusicPanel = memo(function MusicPanel({
               <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <img src={honeyJarIcon} alt="" className="w-5 h-5 object-contain" />
-                  <span className="text-sm font-bold" style={{ color: textSecondary }}>?????????</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>เพลง</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  {/* ??????????? toggle */}
+                  {/* โหมดประหยัด toggle */}
                   <motion.button
                     whileTap={{ scale: 0.92 }}
                     onClick={onTogglePerfMode}
@@ -638,7 +638,7 @@ const MusicPanel = memo(function MusicPanel({
                       color: perfMode ? textAccent : textMuted,
                       background: perfMode ? `${textAccent}20` : 'transparent',
                     }}
-                    title={perfMode ? '???????????: ???????? (??????????)' : '???????????: ??????? (??????????? � ????????)'}
+                    title={perfMode ? 'โหมดประหยัด: เปิดอยู่ (ปิด blur)' : 'โหมดประหยัด: ปิดอยู่ (เปิด blur — อาจช้าบนมือถือ)'}
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -649,7 +649,7 @@ const MusicPanel = memo(function MusicPanel({
                     onClick={() => setView('library')}
                     className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
                     style={{ color: textMuted }}
-                    title="????????"
+                    title="คลังเพลง"
                   >
                     <Library className="w-4 h-4" />
                   </motion.button>
@@ -708,7 +708,7 @@ const MusicPanel = memo(function MusicPanel({
                     color: player.loopMode !== 'none' ? textAccent : textMuted,
                     background: player.loopMode !== 'none' ? (dark ? 'rgba(200,149,108,0.18)' : 'rgba(200,149,108,0.15)') : 'transparent',
                   }}
-                  title={player.loopMode === 'none' ? '????????' : player.loopMode === 'all' ? '????????????' : '????????????'}
+                  title={player.loopMode === 'none' ? 'เล่นตามลำดับ' : player.loopMode === 'all' ? 'วนซ้ำทั้งหมด' : 'วนซ้ำเพลงนี้'}
                 >
                   {player.loopMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                 </motion.button>
@@ -755,7 +755,7 @@ const MusicPanel = memo(function MusicPanel({
                   <SkipForward className="w-5 h-5" />
                 </motion.button>
 
-                {/* Rain toggle button � ?????? spacer */}
+                {/* Rain toggle — ใช้แทน spacer */}
                 <motion.button
                   whileTap={{ scale: 0.88 }}
                   onClick={onToggleRain}
@@ -765,13 +765,13 @@ const MusicPanel = memo(function MusicPanel({
                     color: rainOn ? '#60a5fa' : textMuted,
                     outline: rainOn ? '1.5px solid rgba(96,165,250,0.4)' : 'none',
                   }}
-                  title={rainOn ? '??????????' : '???????????'}
+                  title={rainOn ? 'ปิดเสียงฝน' : 'เปิดเสียงฝน'}
                 >
-                  ??
+                  🌧️
                 </motion.button>
               </div>
 
-              {/* Rain volume slider � ???????????????????? */}
+              {/* Rain volume slider — แสดงเมื่อเปิดเสียงฝน */}
               <AnimatePresence>
                 {rainOn && (
                   <motion.div
@@ -785,7 +785,7 @@ const MusicPanel = memo(function MusicPanel({
                       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl"
                       style={{ background: dark ? 'rgba(96,165,250,0.08)' : 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)' }}
                     >
-                      <span className="text-base shrink-0">??</span>
+                      <span className="text-base shrink-0">🌧️</span>
                       <div className="relative flex-1 flex items-center" style={{ height: 32 }}>
                         <div className="absolute inset-y-0 flex items-center w-full pointer-events-none">
                           <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(96,165,250,0.15)' }}>
@@ -805,7 +805,7 @@ const MusicPanel = memo(function MusicPanel({
                           className="absolute text-base pointer-events-none select-none"
                           style={{ left: `calc(${rainVolume * 100}% - 10px)`, top: '50%', transform: 'translateY(-50%)', zIndex: 20, lineHeight: 1 }}
                         >
-                          ??
+                          🌧️
                         </span>
                       </div>
                       <span className="shrink-0 text-[10px] font-mono tabular-nums w-6 text-right" style={{ color: dark ? 'rgba(147,197,253,0.7)' : 'rgba(96,165,250,0.8)' }}>
@@ -950,7 +950,7 @@ const MusicPanel = memo(function MusicPanel({
                 </motion.button>
                 <div className="flex items-center gap-2 flex-1">
                   <img src={honeyJarIcon} alt="" className="w-4 h-4 object-contain" />
-                  <span className="text-sm font-bold" style={{ color: textSecondary }}>????????</span>
+                  <span className="text-sm font-bold" style={{ color: textSecondary }}>คลังเพลง</span>
                 </div>
                 <motion.button
                   whileTap={{ scale: 0.92 }}
@@ -970,7 +970,7 @@ const MusicPanel = memo(function MusicPanel({
                   <input
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="?????????, ??????..."
+                    placeholder="ชื่อเพลง, ศิลปิน..."
                     className="flex-1 bg-transparent text-xs outline-none"
                     style={{ color: textPrimary }}
                   />
@@ -986,10 +986,10 @@ const MusicPanel = memo(function MusicPanel({
                 {searchQuery ? (
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-3" style={{ color: textMuted }}>
-                      ?????????? ({filteredAll.length})
+                      ผลการค้นหา ({filteredAll.length})
                     </p>
                     {filteredAll.length === 0 ? (
-                      <p className="text-xs text-center py-8" style={{ color: textMuted }}>?????????</p>
+                      <p className="text-xs text-center py-8" style={{ color: textMuted }}>ไม่พบเพลง</p>
                     ) : (
                       <div className="space-y-1">
                         {filteredAll.map(({ track, catIdx, trackIdx: ti, catLabel }) => {
@@ -1019,7 +1019,7 @@ const MusicPanel = memo(function MusicPanel({
                   </div>
                 ) : (
                   <>
-                    {/* Categories � Pinterest card grid (????????) */}
+                    {/* หมวดหมู่ — Pinterest card grid */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
@@ -1405,11 +1405,11 @@ interface TutorialStep {
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
-  { refKey: 'rain',  title: '???????',        desc: '????/???????????????? ?????????????????????',                                tooltipSide: 'below' },
-  { refKey: 'theme', title: '????????????',   desc: '?????????????????????????????? ????????????????',                             tooltipSide: 'below' },
-  { refKey: 'leave', title: '??????????',     desc: '????????????????????????? ???????????????????????',                          tooltipSide: 'below' },
-  { refKey: 'timer', title: '??????????',     desc: '?????????????????????? (7 ????) ?????????? 1 ???????????????',               tooltipSide: 'below' },
-  { refKey: 'input', title: '?????????',      desc: '?????????????????? Enter ??????????? ?????????????????????????????',         tooltipSide: 'above' },
+  { refKey: 'rain',  title: 'เสียงฝน',       desc: 'เปิด/ปิดเสียงฝนเพื่อบรรยากาศ',                                             tooltipSide: 'below' },
+  { refKey: 'theme', title: 'ธีมสี',          desc: 'สลับโหมดสว่าง/มืดได้ตามชอบ',                                               tooltipSide: 'below' },
+  { refKey: 'leave', title: 'ออกจากห้อง',    desc: 'กดเพื่อจบการสนทนาและออกไป',                                                 tooltipSide: 'below' },
+  { refKey: 'timer', title: 'เวลาที่เหลือ',  desc: 'นับถอยหลัง 7 นาที กด 1 ดาวขึ้นไปเพื่อให้คะแนน',                          tooltipSide: 'below' },
+  { refKey: 'input', title: 'พิมพ์ข้อความ',  desc: 'พิมพ์แล้วกด Enter ส่งได้เลย หรือกด Shift+Enter ขึ้นบรรทัดใหม่',          tooltipSide: 'above' },
 ];
 
 // Ref map passed down from main component

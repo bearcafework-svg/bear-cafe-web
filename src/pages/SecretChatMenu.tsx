@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -331,7 +331,7 @@ export default function SecretChatMenu() {
               {/* Role selection */}
               <div>
                 <p className="text-sm font-semibold text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] mb-3">
-                  คุณอยากเป็นฝ่ายไหนในการสนทนา?
+                  วันนี้อยากเป็นฝ่ายไหนในการสนทนา?
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {roles.map(r => {
