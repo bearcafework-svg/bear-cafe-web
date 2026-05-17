@@ -1087,7 +1087,7 @@ const MusicPanel = memo(function MusicPanel({
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #c8956c, #e8b48a)' }} />
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: textMuted }}>
-                          ??????????? ({allTracks.length})
+                          คลังเพลง ({allTracks.length})
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -1354,7 +1354,7 @@ function RatingDialog({ onRate }: { onRate: (stars: number) => void }) {
 }
 
 // --- Tooltip (desktop hover) -------------------------------------------------
-// align: 'center' | 'right' � ??? 'right' ????????????????????????????????
+// align: 'center' | 'right' — ใช้ 'right' เมื่อ tooltip อยู่ชิดขอบขวาของหน้าจอ
 function Tooltip({ text, children, align = 'center' }: { text: string; children: React.ReactNode; align?: 'center' | 'right' }) {
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1545,7 +1545,7 @@ function TutorialOverlay({
 
           <div className="flex items-center justify-between">
             <button onClick={onSkip} className="text-xs text-muted-foreground hover:text-[hsl(var(--bear-brown))] transition-colors">
-              ???????????
+              ข้ามทั้งหมด
             </button>
             <div className="flex items-center gap-3">
               <div className="flex gap-1">
@@ -1557,7 +1557,7 @@ function TutorialOverlay({
                 onClick={onNext}
                 className="px-4 py-1.5 rounded-xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] text-white text-xs font-semibold transition-colors"
               >
-                {isLast ? '?????????' : '?????'}
+                {isLast ? 'เริ่มเลย!' : 'ถัดไป'}
               </button>
             </div>
           </div>
@@ -1601,11 +1601,11 @@ export default function SecretChatRoom() {
   const bgmRef = useRef<HTMLAudioElement>(null);
   const player = useMusicPlayer(bgmRef);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
-  // ??????????? � ??? backdrop-blur ?? panel ??????????????????????????????????
+  // โหมดประหยัดพลังงาน — ปิด backdrop-blur ใน panel เพื่อเพิ่มประสิทธิภาพบนอุปกรณ์ที่ช้า
   const [musicPerfMode, setMusicPerfMode] = useState<boolean>(() => {
     try { return localStorage.getItem('music_perf_mode') === '1'; } catch { return false; }
   });
-  // Perf prompt � ??????????????????? room ????????????????????
+  // Perf prompt — แสดงครั้งแรกที่เข้า room เพื่อถามว่าต้องการเปิดโหมดประหยัดพลังงานไหม
   const [showPerfPrompt, setShowPerfPrompt] = useState<boolean>(() => {
     try { return localStorage.getItem('music_perf_mode') === null; } catch { return false; }
   });
@@ -1663,7 +1663,7 @@ export default function SecretChatRoom() {
   const [matchStatus, setMatchStatus] = useState<'waiting' | 'matched' | 'ended'>('waiting');
   const [queueCount, setQueueCount] = useState(0);
 
-  // -- Queue count realtime � ???????????????? waiting ----------------------
+  // -- Queue count realtime — นับเฉพาะตอน waiting ----------------------
   useEffect(() => {
     if (matchStatus !== 'waiting') return;
     const STALE_MS = 10 * 60 * 1000;
@@ -1745,7 +1745,7 @@ export default function SecretChatRoom() {
     }
   }, [matchStatus, isRoomReady]);
 
-  // Called when the user clicks "????????????" � direct user gesture ? audio allowed.
+  // Called when the user clicks "เข้าร่วมโต๊ะ" — direct user gesture → audio allowed.
   // CRITICAL: el.play() MUST be the very first synchronous call so the browser's
   // transient activation token is still valid. Any await or setState before it
   // will cause a NotAllowedError.
@@ -1789,7 +1789,7 @@ export default function SecretChatRoom() {
         });
     }
 
-    // -- 4. Insert bot safety welcome message � user_a only (?????????? 2 ?????) --
+    // -- 4. Insert bot safety welcome message — user_a only (ส่งครั้งเดียว 2 ฝ่าย) --
     // sender_id = null ? system message (no FK violation)
     if (session?.id && session.user_a_id === user?.id) {
       const welcomeText = [
@@ -1930,7 +1930,7 @@ export default function SecretChatRoom() {
         .from('chat_queue')
         .select('*')
         .neq('user_id', user.id)
-        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // ?????????: ?????????????????? 10 ????
+        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // กรองออก: รายการที่รอนานเกิน 10 นาที
         .order('joined_at', { ascending: true })
         .limit(20);
 
@@ -2254,7 +2254,7 @@ export default function SecretChatRoom() {
         />
       )}
 
-      {/* Perf prompt � ??????????????????? room */}
+      {/* Perf prompt — แสดงครั้งแรกที่เข้า room */}
       <AnimatePresence>
         {showPerfPrompt && (
           <motion.div
@@ -2283,10 +2283,10 @@ export default function SecretChatRoom() {
                 </svg>
               </div>
               {/* Text */}
-              <p className="text-center font-bold text-foreground text-base mb-1">??????????????????</p>
+              <p className="text-center font-bold text-foreground text-base mb-1">เปิดโหมดประหยัดพลังงาน?</p>
               <p className="text-center text-sm text-[hsl(var(--bear-brown))] leading-relaxed mb-5">
-                ?????????????????????????????????<br />
-                <span className="text-[11px] text-muted-foreground">??? blur effect ???????? animation ????????</span>
+                อุปกรณ์บางรุ่นอาจกระตุกเมื่อเปิดเพลงพร้อมกับ animation<br />
+                <span className="text-[11px] text-muted-foreground">ปิด blur effect และลด animation เพื่อความลื่นไหล</span>
               </p>
               {/* Buttons */}
               <div className="flex flex-col gap-2.5">
@@ -2295,14 +2295,14 @@ export default function SecretChatRoom() {
                   className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98] bg-[hsl(var(--primary))]"
                   style={{ boxShadow: '0 4px 16px hsl(var(--primary) / 0.4)' }}
                 >
-                  ? ??????????????????????
+                  ⚡ เปิดโหมดประหยัดพลังงาน
                 </button>
                 <button
                   onClick={() => dismissPerfPrompt(false)}
                   className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all active:scale-[0.98]"
                   style={{ background: 'rgba(239,68,68,0.9)', boxShadow: '0 4px 12px rgba(239,68,68,0.25)' }}
                 >
-                  ??????????
+                  ไม่ต้องการ
                 </button>
               </div>
             </motion.div>
@@ -2334,7 +2334,7 @@ export default function SecretChatRoom() {
                 <img src={pixelCoffeeIcon} alt="coffee" className="w-full h-full object-cover" />
               </motion.div>
               <div className="space-y-1.5">
-                <p className="font-bold text-foreground text-xl">????????????????!</p>
+                <p className="font-bold text-foreground text-xl">เจอคู่แล้ว! ☕</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   พบเพื่อนสนทนาแล้ว กดเพื่อเข้าร่วมโต๊ะ
                 </p>
@@ -2354,7 +2354,7 @@ export default function SecretChatRoom() {
                 onClick={handleJoinTable}
                 className="w-full h-12 rounded-2xl bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.85)] text-white font-bold text-base transition-colors shadow-lg"
               >
-                ????????????
+                เข้าร่วมโต๊ะ ☕
               </motion.button>
             </motion.div>
           </motion.div>
@@ -2546,7 +2546,7 @@ export default function SecretChatRoom() {
 
         <AnimatePresence initial={false}>
           {messages.map(msg => {
-            // -- System message (Bear Guard / ??????????) ---------------------
+            // -- System message (Bear Guard / ข้อความระบบ) ---------------------
             if (msg.is_system) {
               // Render **bold** markdown inline
               const renderBold = (text: string) =>
@@ -2653,7 +2653,7 @@ export default function SecretChatRoom() {
                 value={input}
                 onChange={e => handleInputChange(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder="????????????..."
+                placeholder="พิมพ์ข้อความ..."
                 rows={1}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 resize-none outline-none leading-relaxed"
                 style={{ maxHeight: 100 }}
@@ -2663,7 +2663,7 @@ export default function SecretChatRoom() {
               type="submit"
               whileTap={{ scale: 0.92 }}
               onPointerDown={e => {
-                // ??????? blur ?? textarea ???? sendMessage ?? fire
+                // ป้องกัน blur ใน textarea ก่อน sendMessage จะ fire
                 e.preventDefault();
                 sendMessage();
               }}
