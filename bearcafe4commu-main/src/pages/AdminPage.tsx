@@ -158,8 +158,6 @@ export default function AdminPage() {
     }
   }, [user, hasAdminAccess, navigate, toast]);
 
-  if (!hasAdminAccess) return null;
-
   // Filter nav items based on role + custom permissions
   const visibleItems = NAV_ITEMS.filter(item => {
     if (isOwner) return true; // owner เห็นทุกหน้า
@@ -271,6 +269,8 @@ export default function AdminPage() {
       setActiveTab('lottery');
     }
   }, []);
+
+  if (!hasAdminAccess) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream via-latte/30 to-peach/20 dark:from-background dark:via-background dark:to-muted/20">
