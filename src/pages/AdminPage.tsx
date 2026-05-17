@@ -166,8 +166,6 @@ export default function AdminPage() {
     }
   }, [user, hasAdminAccess, navigate, toast]);
 
-  if (!hasAdminAccess) return null;
-
   // Filter nav items based on role + custom permissions (merged, not overridden)
   const visibleItems = NAV_ITEMS.filter(item => {
     if (isOwner) return true; // Owner sees all
@@ -303,6 +301,8 @@ export default function AdminPage() {
       localStorage.setItem('admin_active_tab', section);
     }
   }, [section]);
+
+  if (!hasAdminAccess) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream via-latte/30 to-peach/20 dark:from-background dark:via-background dark:to-muted/20">
