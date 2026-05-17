@@ -715,7 +715,7 @@ export default function CreateSessionPage() {
             <Card className={bannedWordError || linkError ? "border-destructive/50" : ""}>
               <CardHeader className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                 <CardTitle className="text-sm sm:text-base md:text-lg">
-                  รบกวนระบุรายละเอียด<span className="text-destructive ml-1">*</span>
+                  รบกวนระบุรายละเอียด <span className="text-xs text-muted-foreground font-normal">(ไม่จำเป็นต้องพิมพ์อะไร)</span><span className="text-destructive ml-1 text-xs font-normal"> ระบุหรือไม่ระบุก็ได้</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">

@@ -347,8 +347,8 @@ export default function CreateSessionPage() {
       await refreshCooldown();
       
       if (isOnCooldown) {
-        toast.error('กรุณารอก่อนสร้างแมตช์ใหม่', {
-          description: `คุณต้องรออีก ${remainingMinutes} นาที ก่อนสร้างแมตช์ใหม่ได้`,
+        toast.error('รอแป๊บนึงก่อนนะ', {
+          description: `อีก ${remainingMinutes} นาทีถึงจะสร้างแมตช์ใหม่ได้`,
         });
         setIsSubmitting(false);
         return;
@@ -401,11 +401,11 @@ export default function CreateSessionPage() {
         
         // Show specific error based on error code
         if (errorCode === 'ACTIVE_SESSION_EXISTS') {
-          toast.error('มีแมตช์ที่ยังไม่หมดเวลาอยู่แล้ว', {
-            description: 'กรุณารอให้หมดเวลา หรือยุติแมตช์ก่อนสร้างใหม่',
+          toast.error('มีแมตช์ที่ยังไม่หมดเวลาอยู่', {
+            description: 'รอให้หมดเวลาก่อน หรือยุติแมตช์แล้วค่อยสร้างใหม่',
           });
         } else {
-          toast.error('บันทึกข้อมูลไม่สำเร็จ', {
+          toast.error('บันทึกไม่สำเร็จ', {
             description: retryAfter
               ? `${message} (${Math.ceil(retryAfter / 60)} นาที)`
               : message,
@@ -475,8 +475,8 @@ export default function CreateSessionPage() {
         }
 
         console.error('Session Bot API error:', sessionWebhookError);
-        toast.warning('แมตช์ถูกสร้างแล้ว', {
-          description: 'แต่ไม่สามารถส่งไปยัง Discord ได้',
+        toast.warning('สร้างแมตช์แล้ว', {
+          description: 'แต่ส่งไปยัง Discord ไม่ได้',
         });
       } else {
         toast.success('เริ่มแมตช์สำเร็จ! 🐻', {
@@ -488,7 +488,7 @@ export default function CreateSessionPage() {
     } catch (error) {
       console.error('Submit error:', error);
       toast.error('เกิดข้อผิดพลาด', {
-        description: 'กรุณาลองใหม่อีกครั้ง',
+        description: 'ลองใหม่อีกทีนะ',
       });
     } finally {
       setIsSubmitting(false);
@@ -513,7 +513,7 @@ export default function CreateSessionPage() {
 
         {isRoleBanned && (
           <div className="mt-3 sm:mt-4 rounded-xl sm:rounded-2xl border border-destructive/40 bg-destructive/10 p-3 sm:p-4 text-xs sm:text-sm text-destructive">
-            บัญชีของคุณถูกจำกัดการใช้งานจาก Role ใน Discord กรุณาติดต่อทีมงานหากคิดว่าเป็นข้อผิดพลาด
+            บัญชีถูกจำกัดสิทธิ์จาก Role ใน Discord ติดต่อทีมงานได้เลยถ้าคิดว่าผิดพลาด
           </div>
         )}
 
@@ -521,7 +521,7 @@ export default function CreateSessionPage() {
         {currentStep === 1 && (
           <div className="animate-fade-in">
             <h2 className="font-display font-bold text-base sm:text-lg md:text-xl text-center mb-3 sm:mb-4 md:mb-6 text-foreground">
-              เลือกหมวดหมู่ที่ต้องการ
+              เลือกหมวดหมู่ที่ชอบเลย
             </h2>
             {loadingData ? (
               <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm">
@@ -591,8 +591,8 @@ export default function CreateSessionPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-muted-foreground px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
-                  <p>ยังไม่มี Role ให้เลือกในตอนนี้</p>
-                  <p>สามารถไปเพิ่ม Role ที่หน้า Admin แล้วกลับมาเลือกใหม่ได้ทันที</p>
+                  <p>ยังไม่มียศให้เลือกตอนนี้</p>
+                  <p>ไปเพิ่มได้ที่หน้า Admin แล้วกลับมาเลือกใหม่ได้เลย</p>
                   <Button variant="outline" asChild size="sm">
                     <Link to="/admin">ไปหน้า Admin</Link>
                   </Button>
@@ -675,7 +675,7 @@ export default function CreateSessionPage() {
                             {loadingVoice ? (
                               <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                                 <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
-                                <span>กำลังตรวจสอบสถานะ...</span>
+                                <span>กำลังเช็กสถานะ...</span>
                               </div>
                             ) : voiceState?.is_connected ? (
                               <>
@@ -689,9 +689,9 @@ export default function CreateSessionPage() {
                               </>
                             ) : (
                               <>
-                                <p className="font-medium text-muted-foreground text-xs sm:text-sm">ไม่ได้อยู่ในห้องเสียง</p>
+                                <p className="font-medium text-muted-foreground text-xs sm:text-sm">ยังไม่ได้อยู่ในห้องเสียง</p>
                                 <p className="text-[10px] sm:text-sm text-muted-foreground">
-                                  เข้าร่วมห้องเสียงใน Discord เพื่อเริ่มแมตช์
+                                  เข้าห้องเสียงใน Discord ก่อนเลย
                                 </p>
                               </>
                             )}
@@ -706,8 +706,7 @@ export default function CreateSessionPage() {
                     <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-xs sm:text-sm">
-                        กรุณาเข้าห้องเสียงใน Discord ก่อนกดถัดไป
-                        หากห้องไม่ขึ้นทั้งที่ท่านอยู่ในห้องแล้ว กรุณาลองออกและเข้าห้องใหม่ หรือรีเฟรชหน้าเว็บ 1 ครั้งค่ะ
+                        เข้าห้องเสียงใน Discord ก่อนนะ ถ้าห้องยังไม่ขึ้นทั้งที่เข้าอยู่แล้ว ลองออกแล้วเข้าใหม่ หรือรีเฟรชหน้าเว็บสักครั้ง
                       </AlertDescription>
                     </Alert>
                   )}
@@ -719,12 +718,12 @@ export default function CreateSessionPage() {
             <Card className={bannedWordError || linkError ? "border-destructive/50" : ""}>
               <CardHeader className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                 <CardTitle className="text-sm sm:text-base md:text-lg">
-                  รบกวนระบุรายละเอียด<span className="text-destructive ml-1">*</span>
+                  เขียนอะไรสักนิด <span className="text-xs text-muted-foreground font-normal">(ไม่บังคับ)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
                 <Textarea
-                  placeholder="เพิ่มข้อความหรือรายละเอียดเพิ่มเติมอย่างน้อย 10 อักษรขึ้นไป"
+                  placeholder="บอกอะไรสักนิดก็ได้ เช่น ชอบเล่นเกมอะไร หรืออยากคุยเรื่องอะไร (10-200 ตัวอักษร)"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={200}
@@ -758,10 +757,10 @@ export default function CreateSessionPage() {
                     </div>
                     <div className="space-y-2 sm:space-y-2.5 text-sm sm:text-base min-w-0">
                       <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm sm:text-base">
-                        ข้อห้ามเกี่ยวกับการเลี่ยงระบบคำต้องห้าม
+                        ห้ามเลี่ยงคำต้องห้าม
                       </p>
                       <p className="text-amber-700/80 dark:text-amber-400/70 leading-relaxed text-xs sm:text-sm">
-                        ห้ามดัดแปลงคำต้องห้ามเพื่อหลีกเลี่ยงการตรวจสอบ ไม่ว่าจะเป็นการเปลี่ยนตัวอักษร ใช้สัญลักษณ์ หรือสะกดผิดโดยเจตนา
+                        ห้ามดัดแปลงคำต้องห้ามไม่ว่าจะเปลี่ยนตัวอักษร ใช้สัญลักษณ์แทน หรือสะกดผิดโดยตั้งใจ
                       </p>
                       <div className="bg-amber-100/50 dark:bg-amber-900/20 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 space-y-1 sm:space-y-1.5">
                         <p className="text-[11px] sm:text-xs text-amber-600 dark:text-amber-500 font-medium">ตัวอย่างที่ไม่อนุญาต:</p>
@@ -871,7 +870,7 @@ export default function CreateSessionPage() {
                 <CardContent className="flex items-center gap-2.5 sm:gap-3 py-3 sm:py-4 px-3 sm:px-4">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-destructive animate-pulse shrink-0" />
                   <div className="min-w-0">
-                    <p className="font-medium text-destructive text-xs sm:text-sm">ยังไม่สามารถสร้างแมตช์ได้</p>
+                    <p className="font-medium text-destructive text-xs sm:text-sm">ยังสร้างแมตช์ไม่ได้</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">
                       กรุณารออีก <span className="font-bold text-destructive">{formattedTime}</span> ก่อนสร้างแมตช์ใหม่
                     </p>
