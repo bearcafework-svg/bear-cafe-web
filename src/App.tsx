@@ -30,6 +30,7 @@ import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
 import SecretChatMenu from "./pages/SecretChatMenu";
 import SecretChatRoom from "./pages/SecretChatRoom";
+import BearBobaMergePage from "./pages/BearBobaMergePage";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ function AppRoutes() {
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/secret-chat" element={<ProtectedRoute><SecretChatMenu /></ProtectedRoute>} />
       <Route path="/secret-chat/room" element={<ProtectedRoute><SecretChatRoom /></ProtectedRoute>} />
+      <Route path="/games/bear-boba" element={<BearBobaMergePage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       
