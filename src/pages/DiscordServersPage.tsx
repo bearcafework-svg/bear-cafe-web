@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Footer } from '@/components/bear-cafe/Footer';
+import { ExpiredServerCard } from '@/components/discord/ExpiredServerCard';
+import { EditLinkDialog } from '@/components/discord/EditLinkDialog';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -49,6 +51,8 @@ interface DiscordServer {
   highlight_color: string | null;
   carousel_order: number | null;
   notify_channel_id: string | null;
+  invite_status: "valid" | "expired" | "unknown";
+  invite_last_checked_at: string | null;
   // joined client-side
   avg_rating?: number;
   rating_count?: number;
@@ -535,6 +539,12 @@ export default function DiscordServersPage() {
   const [inviteUrl, setInviteUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
 
+  // ── Invite status state ───────────────────────────────────────────────────
+  const [ownerExpiredServers, setOwnerExpiredServers] = useState<DiscordServer[]>([]);
+  const [editLinkServer, setEditLinkServer] = useState<DiscordServer | null>(null);
+  const [isEditLinkOpen, setIsEditLinkOpen] = useState(false);
+  const [isUpdatingLink, setIsUpdatingLink] = useState(false);
+
   const userId = user?.discord_id || null;
 
   // ── Bot settings dialog state ─────────────────────────────────────────────
@@ -607,7 +617,7 @@ export default function DiscordServersPage() {
       setLoading(true);
       const [catRes, serverRes, ratingRes] = await Promise.all([
         (supabase.from('discord_server_categories' as any).select('*').order('sort_order', { ascending: true })) as any,
-        (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').order('bumped_at', { ascending: false })) as any,
+        (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').neq('invite_status', 'expired').order('bumped_at', { ascending: false })) as any,
         (supabase.from('server_ratings' as any).select('server_id, rating, user_id')) as any,
       ]);
 
@@ -637,6 +647,19 @@ export default function DiscordServersPage() {
       });
 
       setServers(enriched);
+
+      // Owner expired query — only when authenticated (Req 2.3, 4.3)
+      if (isAuthenticated && user?.discord_id) {
+        const { data: expiredData } = await (supabase
+          .from('discord_servers' as any)
+          .select('*')
+          .eq('status', 'approved')
+          .eq('invite_status', 'expired')
+          .eq('owner_id', user.discord_id)) as any;
+        setOwnerExpiredServers((expiredData || []) as DiscordServer[]);
+      } else {
+        setOwnerExpiredServers([]);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -896,7 +919,7 @@ export default function DiscordServersPage() {
 
   // ── Filter + Sort ─────────────────────────────────────────────────────────────
   const featuredServers = [...servers]
-    .filter((s) => s.is_featured)
+    .filter((s) => s.is_featured && s.invite_status !== 'expired')
     .sort((a, b) => (a.carousel_order ?? 999) - (b.carousel_order ?? 999));
 
   const filteredServers = servers
@@ -1029,6 +1052,30 @@ export default function DiscordServersPage() {
           </div>
         )}
 
+        {/* Owner expired servers section — visible only to the server owner (Req 2.3, 4.3, 4.4, 5.1, 5.2, 5.6) */}
+        {isAuthenticated && ownerExpiredServers.length > 0 && (
+          <div className="mt-8 sm:mt-12">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle className="w-5 h-5 text-orange-500" aria-hidden="true" />
+              <h3 className="text-base sm:text-lg font-bold text-foreground">
+                เซิร์ฟเวอร์ของคุณที่ลิงก์หมดอายุ
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              {ownerExpiredServers.map((server) => (
+                <ExpiredServerCard
+                  key={server.id}
+                  server={server}
+                  onEditLink={(s) => {
+                    setEditLinkServer(s);
+                    setIsEditLinkOpen(true);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Login prompt */}
         {!isAuthenticated && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-8 sm:mt-12 text-center">
@@ -1042,6 +1089,28 @@ export default function DiscordServersPage() {
       </div>
 
       <Footer />
+
+      {/* EditLinkDialog — for owner to update expired invite links (Req 5.3–5.6, 6.1–6.9) */}
+      <EditLinkDialog
+        server={editLinkServer}
+        open={isEditLinkOpen}
+        onOpenChange={(open) => {
+          setIsEditLinkOpen(open);
+          if (!open) setEditLinkServer(null);
+        }}
+        onSuccess={(serverId) => {
+          // Move server from expired section to public listing
+          const updated = ownerExpiredServers.find((s) => s.id === serverId);
+          if (updated) {
+            setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== serverId));
+            setServers((prev) => [
+              { ...updated, invite_status: 'valid' as const },
+              ...prev,
+            ]);
+          }
+          setEditLinkServer(null);
+        }}
+      />
 
       {/* ── Bot Settings Dialog ── */}
       <Dialog open={!!botDialogServer} onOpenChange={(o) => !o && setBotDialogServer(null)}>
