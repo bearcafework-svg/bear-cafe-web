@@ -38,46 +38,21 @@ const ASCEND_BONUS = 250, COMBO_WINDOW = 2000;
 
 // ─── ITEMS — bear images ──────────────────────────────────────────────────────
 const ITEMS = [
-  { id:0, img:"/game1/bearG1.svg", name:"ไข่มุกหมีจิ๋ว",  r:16, score:1,  glow:"rgba(139,94,60,0.6)"  },
-  { id:1, img:"/game1/bearG2.svg", name:"แก้วคุมะเล็ก",  r:22, score:3,  glow:"rgba(200,168,122,0.5)" },
-  { id:2, img:"/game1/bearG3.svg", name:"ชานมหมีนุ่ม",  r:28, score:7,  glow:"rgba(143,167,122,0.6)" },
-  { id:3, img:"/game1/bearG4.svg", name:"แก้วโต๊ะสั่น",  r:35, score:12, glow:"rgba(233,168,78,0.5)"  },
-  { id:4, img:"/game1/bearG5.svg", name:"ถังชานมหมี",  r:44, score:22, glow:"rgba(233,168,78,0.7)"  },
-  { id:5, img:"/game1/bearG6.svg", name:"หมีทองหน้าร้าน", r:54, score:55, glow:"rgba(233,168,78,0.9)"  },
+  { id:0, img:"/game1/bearG1.svg", name:"Bear Lv.1",  r:16, score:1,  glow:"rgba(139,94,60,0.6)"  },
+  { id:1, img:"/game1/bearG2.svg", name:"Bear Lv.2",  r:22, score:3,  glow:"rgba(200,168,122,0.5)" },
+  { id:2, img:"/game1/bearG3.svg", name:"Bear Lv.3",  r:28, score:7,  glow:"rgba(180,130,80,0.55)" },
+  { id:3, img:"/game1/bearG4.svg", name:"Bear Lv.4",  r:35, score:12, glow:"rgba(233,168,78,0.5)"  },
+  { id:4, img:"/game1/bearG5.svg", name:"Bear Lv.5",  r:44, score:22, glow:"rgba(233,168,78,0.7)"  },
+  { id:5, img:"/game1/bearG6.svg", name:"Golden Bear", r:54, score:55, glow:"rgba(233,168,78,0.9)"  },
 ];
 
 // ─── KUMA MESSAGES ────────────────────────────────────────────────────────────
 const KUMA: Record<string, string[]> = {
-  idle: [
-    "คุมะรับออเดอร์อยู่ วางแก้วเลย!",
-    "ไข่มุกเด้ง ๆ พร้อมเสิร์ฟแล้ว",
-    "แตะตรงราง แล้วปล่อยให้ร้านวุ่นวาย",
-    "รวมแก้วให้ไว ลูกค้ารอหน้าร้านแล้ว",
-  ],
-  combo: [
-    "โอ๊ย รวมกันเฉยเลย 😭",
-    "ไข่มุกล้นแล้ววว 🧋",
-    "คุมะชงไม่ทันแล้ว!",
-    "โต๊ะสั่น แต่คะแนนพุ่ง!",
-    "ชานมถล่มร้านแล้วว",
-  ],
-  danger: [
-    "แก้วจะชนป้ายร้านแล้วนะ!",
-    "คุมะรับไม่ทันแล้ว ☕",
-    "โอเค อันนี้เริ่มน่ากลัว 😂",
-    "ขยับนิดนึง ร้านแน่นมาก",
-  ],
-  ascend: [
-    "หมีทองมาแล้ว?!?",
-    "แก้วนั่นใหญ่มาก!",
-    "ทั้งร้านเงียบไปหนึ่งวิ",
-    "หมีทองเด้งกลับมาเสิร์ฟต่อ!",
-  ],
-  best: [
-    "ป้ายสถิติหน้าร้านต้องเขียนใหม่!",
-    "ยอดขายวันนี้แตกแตนแล้ว",
-    "คุมะจดคะแนนแทบไม่ทัน",
-  ],
+  idle:   ["วางตรงไหนก็ได้เลย~ ☕","cozy ๆ ไม่รีบ 🐾","merge ติดๆ ได้คอมโบ!","แตะหรือคลิกเพื่อปล่อย"],
+  combo:  ["🔥 ต่อเลย!","คอมโบเด็ด!","✨ คะแนนคูณแล้ว!","ไปต่อ!"],
+  danger: ["⚠️ เกือบล้นแล้ว!","ใจเย็นๆ เลือกดีๆ","เว้นที่ไว้บ้างนะ 😰","หาช่องว่างก่อน!"],
+  ascend: ["👑 เทพมาก!","หมีทองกลับมาแล้ว ✨","เก่งจริงๆ เล่นต่อ!","ไม่มีจุดจบ~"],
+  best:   ["🏆 สถิติใหม่!","โอ้โห!","ทำลายสถิติแล้ว!"],
 };
 const tip = (k: string) => { const a = KUMA[k] ?? KUMA.idle; return a[Math.floor(Math.random()*a.length)]; };
 const rnd3 = () => Math.floor(Math.random()*3);
@@ -128,9 +103,7 @@ function playPop(freq=520, vol=0.15) {
     gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.18);
     osc.start(); osc.stop(ctx.currentTime+0.2);
     setTimeout(()=>ctx.close(),300);
-  } catch {
-    // AudioContext can be blocked until user interaction or unavailable in tests.
-  }
+  } catch(_){}
 }
 function playAscend() { [440,554,659,880].forEach((f,i)=>setTimeout(()=>playPop(f,0.1),i*80)); }
 
@@ -154,19 +127,14 @@ function drawScene(
   bg.addColorStop(0,bc.bgTop); bg.addColorStop(0.5,bc.bg); bg.addColorStop(1,bc.bgBot);
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
 
-  // Soft cafe wall details: shelves and order rail, kept subtle so the board stays readable
-  ctx.fillStyle=bc.dark?"rgba(248,235,216,0.035)":"rgba(61,32,8,0.045)";
-  ctx.fillRect(WALL_W+18,DROP_Y+44,innerW-36,2);
-  ctx.fillRect(WALL_W+34,DROP_Y+84,innerW-68,2);
-  ctx.fillStyle=bc.dark?"rgba(233,168,78,0.05)":"rgba(196,134,42,0.08)";
-  for (let gx=WALL_W+28;gx<W-WALL_W-20;gx+=48) {
-    ctx.beginPath(); ctx.roundRect(gx,DROP_Y+28,18,12,4); ctx.fill();
-  }
+  // Grain
+  ctx.fillStyle="rgba(233,168,78,0.022)";
+  for (let gx=16;gx<W;gx+=20) for (let gy=DROP_Y;gy<H;gy+=20) ctx.fillRect(gx,gy,1.5,1.5);
 
-  // Top counter light
-  const tg=ctx.createLinearGradient(0,DROP_Y,0,DROP_Y+74);
-  tg.addColorStop(0,"rgba(233,168,78,0.08)"); tg.addColorStop(1,"rgba(233,168,78,0)");
-  ctx.fillStyle=tg; ctx.fillRect(WALL_W,DROP_Y,innerW,74);
+  // Top glow
+  const tg=ctx.createLinearGradient(0,DROP_Y,0,DROP_Y+60);
+  tg.addColorStop(0,"rgba(233,168,78,0.06)"); tg.addColorStop(1,"rgba(233,168,78,0)");
+  ctx.fillStyle=tg; ctx.fillRect(WALL_W,DROP_Y,innerW,60);
 
   // Danger tint — warm honey-amber, stays on-palette
   if (dangerLevel>0) { ctx.fillStyle=`${bc.honeyDim}${Math.round(dangerLevel*0.12*255).toString(16).padStart(2,"0")}`; ctx.fillRect(WALL_W,DROP_Y,innerW,innerH+FLOOR_H); }
@@ -281,7 +249,7 @@ export default function BearBobaMerge() {
     ITEMS.forEach((item,i)=>{
       const img=new Image(); img.src=item.img; imgsRef.current[i]=img;
     });
-  },[]);
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Responsive canvas size
   useEffect(()=>{
@@ -337,7 +305,7 @@ export default function BearBobaMerge() {
           const nb=new Ball(mx,Math.min(my,CH-FLOOR_H-ITEMS[0].r-5),0); nb.vy=-9; nb.age=0; g.balls.push(nb);
           g.score+=ASCEND_BONUS; g.ascends++;
           if (g.score>bestRef.current) bestRef.current=g.score;
-          spawn(mx,my,["🧋","🐻","👑","🧋","☕"],18); playAscend();
+          spawn(mx,my,["👑","✨","🌟","💛","⭐","🎊"],24); playAscend();
           setUI(u=>({...u,score:g.score,best:bestRef.current,ascends:g.ascends,kuma:tip("ascend"),ascFlash:true}));
           setTimeout(()=>setUI(u=>({...u,ascFlash:false})),1400);
         } else {
@@ -346,11 +314,10 @@ export default function BearBobaMerge() {
           const now=Date.now();
           g.combo=(now-g.lastMergeAt<COMBO_WINDOW)?g.combo+1:1; g.lastMergeAt=now;
           g.score+=ITEMS[nt].score*Math.max(1,g.combo);
-          const wasBest = g.score>bestRef.current;
-          if (wasBest) bestRef.current=g.score;
-          spawn(mx,my,nt>=4?["🧋","🐻","☕","🧋"]:["🧋","•","☕"],nt>=3?12:7);
+          if (g.score>bestRef.current) bestRef.current=g.score;
+          spawn(mx,my,nt>=4?["🐻","✨","💛","⭐"]:["✨","💛","🍂"],nt>=3?14:8);
           playPop(360+nt*80,0.13);
-          const uk=g.combo>=2?tip("combo"):wasBest?tip("best"):undefined;
+          const uk=g.combo>=2?tip("combo"):undefined;
           setUI(u=>({...u,score:g.score,best:bestRef.current,combo:g.combo,...(uk?{kuma:uk}:{})}));
         }
         merged=true; break outer;
@@ -392,7 +359,7 @@ export default function BearBobaMerge() {
     };
     rafRef.current=requestAnimationFrame(loop);
     return ()=>cancelAnimationFrame(rafRef.current);
-  },[]);
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Drop ──────────────────────────────────────────────────────────────────
   const drop=useCallback((clientX:number)=>{
@@ -405,7 +372,7 @@ export default function BearBobaMerge() {
     playPop(280+nt*40,0.08);
     coolRef.current=true; setTimeout(()=>coolRef.current=false,320);
     const nn=rnd3(); nextRef.current=nn; setUI(u=>({...u,next:nn}));
-  },[]);
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Input handlers ────────────────────────────────────────────────────────
   const getX=useCallback((cx:number)=>{
@@ -441,12 +408,12 @@ export default function BearBobaMerge() {
       width:"100%",minHeight:"100dvh",
       background:`linear-gradient(160deg,${bc.bgTop} 0%,${bc.bg} 50%,${bc.bgBot} 100%)`,
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",
-      fontFamily:"'Noto Sans Thai','Hiragino Kaku Gothic Pro',system-ui,sans-serif",
+      fontFamily:"'Noto Sans Thai','Noto Sans',system-ui,sans-serif",
       padding:"12px 8px 16px",boxSizing:"border-box",
       userSelect:"none",touchAction:"none",position:"relative",overflow:"hidden",
     }}>
       <GameCSS/>
-      <CafeBackdrop bc={bc}/>
+      <BgDust honey={bc.honey}/>
 
       {/* HEADER */}
       <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",maxWidth:canvasSize.w+8,marginBottom:8}}>
@@ -459,15 +426,15 @@ export default function BearBobaMerge() {
           onMouseLeave={e=>{e.currentTarget.style.background=bc.uiBg;e.currentTarget.style.color=bc.textSub;}}
         >←</button>
 
-        <div style={{lineHeight:1.05,textAlign:"left",flex:1,minWidth:0,marginLeft:10}}>
-          <div style={{fontSize:16,fontWeight:950,color:bc.textMain,letterSpacing:"-0.03em"}}>Bear Boba Rush</div>
-          <div style={{fontSize:10,fontWeight:800,color:bc.honey,letterSpacing:"0.08em",textTransform:"uppercase"}}>ร้านเริ่มวุ่นแล้ว</div>
+        <div style={{lineHeight:1.2,textAlign:"center"}}>
+          <div style={{fontSize:15,fontWeight:900,color:bc.textMain,letterSpacing:"-0.01em",textShadow:`0 0 12px ${bc.honey}66`}}>Bear Boba</div>
+          <div style={{fontSize:11,fontWeight:600,color:bc.honey,letterSpacing:"0.04em"}}>Merge ☕</div>
         </div>
 
         <div style={{display:"flex",gap:5}}>
-          <ScorePill label="ยอด" value={score} bc={bc}/>
-          <ScorePill label="ท็อป"  value={best}  bc={bc} gold/>
-          <ScorePill label="ทอง"    value={ascends} bc={bc} sm/>
+          <ScorePill label="SCORE" value={score} bc={bc}/>
+          <ScorePill label="BEST"  value={best}  bc={bc} gold/>
+          <ScorePill label="👑"    value={ascends} bc={bc} sm/>
         </div>
 
         <button onClick={restart} aria-label="เริ่มใหม่" style={{
@@ -487,7 +454,7 @@ export default function BearBobaMerge() {
             padding:"3px 16px",background:`linear-gradient(90deg,${bc.honeyDim},${bc.honey})`,
             borderRadius:20,fontSize:11,fontWeight:800,color:bc.brownDark,letterSpacing:"0.06em",
             boxShadow:`0 2px 12px ${bc.honey}70`,animation:"comboBounce .3s ease-out",
-          }}>🧋 คอมโบ ×{combo} — ไข่มุกเด้ง!</div>
+          }}>🔥 ×{combo} คอมโบ</div>
         )}
       </div>
 
@@ -499,7 +466,6 @@ export default function BearBobaMerge() {
           ?`0 0 0 2px ${bc.honeyDim}${Math.round(danger*0.5*255).toString(16).padStart(2,"0")},0 8px 32px rgba(0,0,0,${bc.dark?0.6:0.22}),0 0 40px ${bc.honeyDim}${Math.round(danger*0.18*255).toString(16).padStart(2,"0")}`
           :`0 0 0 1.5px ${bc.uiBorder},0 8px 32px rgba(0,0,0,${bc.dark?0.55:0.18})`,
         transition:"box-shadow 0.4s",outline:`1px solid ${bc.uiBorder}`,
-        animation:danger>0.65?"boardNudge .18s ease-in-out 2":"none",
       }}>
         <canvas ref={canvasRef} width={CW} height={CH}
           style={{display:"block",width:canvasSize.w,height:canvasSize.h,cursor:"none",touchAction:"none"}}
@@ -520,12 +486,12 @@ export default function BearBobaMerge() {
             background:bc.dark?`${bc.bg}EB`:`${bc.bgTop}EE`,
             backdropFilter:"blur(8px)",
             display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10}}>
-            <div style={{fontSize:52}}>🧋</div>
-            <div style={{fontSize:20,fontWeight:900,color:bc.textMain}}>ชานมล้นเคาน์เตอร์!</div>
-            <div style={{fontSize:13,color:bc.textSub,textAlign:"center",lineHeight:1.5}}>
-              {score>0&&score>=best?"ป้ายสถิติใหม่หน้าร้าน! ":"คุมะขอเช็ดพื้นแป๊บ "}<span style={{color:bc.honey,fontWeight:900}}>{score}</span> แต้ม
+            <div style={{fontSize:52}}>🐻</div>
+            <div style={{fontSize:20,fontWeight:900,color:bc.textMain}}>ล้นแล้ว!</div>
+            <div style={{fontSize:13,color:bc.textSub}}>
+              {score>0&&score>=best?"🏆 สถิติใหม่! ":""}<span style={{color:bc.honey}}>⭐ {score}</span> pts
             </div>
-            {ascends>0&&<div style={{fontSize:12,color:bc.honey}}>หมีทองออกหน้าร้าน {ascends} รอบ</div>}
+            {ascends>0&&<div style={{fontSize:12,color:bc.honey}}>👑 ขึ้นระดับ {ascends} ครั้ง</div>}
             <button onClick={restart} style={{
               marginTop:8,padding:"10px 28px",borderRadius:24,border:"none",
               background:`linear-gradient(135deg,${bc.honey},${bc.honeyDim})`,
@@ -534,7 +500,7 @@ export default function BearBobaMerge() {
             }}
               onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.06)";}}
               onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}
-            >เปิดร้านใหม่</button>
+            >☕ เล่นอีกครั้ง</button>
           </div>
         )}
       </div>
@@ -544,19 +510,19 @@ export default function BearBobaMerge() {
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
           background:bc.uiBg,borderRadius:16,padding:"8px 14px",
           border:`1.5px solid ${bc.uiBorder}`,boxShadow:bc.uiShadow,minWidth:72}}>
-          <span style={{fontSize:8,color:bc.honey,letterSpacing:"0.08em",fontWeight:900,marginBottom:4}}>ถ้วยต่อไป</span>
+          <span style={{fontSize:8,color:bc.honey,letterSpacing:"0.1em",fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Next</span>
           <img src={ITEMS[nextId].img} alt={ITEMS[nextId].name} style={{width:36,height:36,objectFit:"contain"}}/>
           <span style={{fontSize:8,color:bc.textSub,marginTop:3}}>{ITEMS[nextId].name}</span>
         </div>
         <div style={{flex:1,background:bc.uiBg,borderRadius:16,padding:"10px 14px",
           border:`1.5px solid ${bc.uiBorder}`,boxShadow:bc.uiShadow,
           display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:22,lineHeight:1,flexShrink:0}}>🧸</span>
-          <span style={{fontSize:12,color:bc.textSub,lineHeight:1.55,fontWeight:700}}>{kuma}</span>
+          <span style={{fontSize:24,lineHeight:1,flexShrink:0}}>🐻</span>
+          <span style={{fontSize:11,color:bc.textSub,lineHeight:1.6}}>{kuma}</span>
         </div>
       </div>
 
-      {/* RECIPE CHAIN */}
+      {/* EVOLUTION CHAIN */}
       <div style={{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"6px 14px",
         background:bc.uiBg,borderRadius:14,border:`1px solid ${bc.uiBorder}`,
         maxWidth:canvasSize.w+8,flexWrap:"wrap",justifyContent:"center"}}>
@@ -568,7 +534,7 @@ export default function BearBobaMerge() {
             </span>
           </span>
         ))}
-        <span style={{fontSize:9,color:bc.honey,fontWeight:900}}>วนกลับไข่มุก</span>
+        <span style={{fontSize:9,color:bc.honey}}>✨</span>
       </div>
     </div>
   );
@@ -595,28 +561,27 @@ function ScorePill({label,value,bc,gold,sm}:{label:string;value:number;bc:BC;gol
 function GameCSS() {
   return (
     <style>{`
-      @keyframes comboBounce{0%{transform:translateY(8px) scale(.86);opacity:0}55%{transform:translateY(-2px) scale(1.08)}100%{transform:translateY(0) scale(1);opacity:1}}
-      @keyframes ascendBounce{0%{transform:scale(.3) rotate(-8deg);opacity:0}55%{transform:scale(1.22) rotate(5deg)}100%{transform:scale(1) rotate(0);opacity:1}}
-      @keyframes boardNudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+      @keyframes floatDust{0%{transform:translateY(0) rotate(0deg);opacity:.03}50%{opacity:.06}100%{transform:translateY(-20px) rotate(10deg);opacity:.03}}
+      @keyframes comboBounce{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+      @keyframes ascendBounce{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
       @keyframes particleFly{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(.2)}}
     `}</style>
   );
 }
 
-// ─── Subtle cafe backdrop ─────────────────────────────────────────────────────
-function CafeBackdrop({bc}:{bc:BC}) {
-  const shelfColor = bc.dark ? "rgba(248,235,216,0.045)" : "rgba(61,32,8,0.07)";
-  const cupColor = bc.dark ? "rgba(233,168,78,0.07)" : "rgba(196,134,42,0.09)";
+// ─── Background dust ──────────────────────────────────────────────────────────
+function BgDust({honey}:{honey:string}) {
+  const glyphs=["☕","🍵","🧸","🌿","🍂","🐾","🫖","🌸","🍯","✿"];
   return (
     <div aria-hidden="true" style={{position:"fixed",inset:0,pointerEvents:"none",overflow:"hidden",zIndex:0}}>
-      <div style={{position:"absolute",left:"7%",right:"7%",top:"14%",height:2,background:shelfColor,borderRadius:999}}/>
-      <div style={{position:"absolute",left:"12%",right:"12%",bottom:"13%",height:2,background:shelfColor,borderRadius:999}}/>
-      {[14,22,72,80].map((left,i)=>(
-        <span key={left} style={{
-          position:"absolute",left:`${left}%`,top:i<2?"10%":"82%",
-          width:18,height:24,borderRadius:"5px 5px 8px 8px",
-          border:`1px solid ${cupColor}`,background:cupColor,
-        }}/>
+      {glyphs.map((g,i)=>(
+        <span key={i} aria-hidden="true" style={{
+          position:"absolute",fontSize:12+(i%4)*7,color:honey,
+          opacity:0.03+(i%3)*0.012,
+          left:`${(i*137)%100}%`,top:`${(i*89+7)%100}%`,
+          animation:`floatDust ${8+i*1.2}s ease-in-out ${i*.6}s infinite alternate`,
+          filter:"blur(.4px)",
+        }}>{g}</span>
       ))}
     </div>
   );
