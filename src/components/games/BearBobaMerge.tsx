@@ -186,14 +186,12 @@ function drawScene(
   // Balls
   for (const b of balls) {
     const item=ITEMS[b.type]; ctx.save();
-    if (b.type>=3) { ctx.shadowColor=item.glow; ctx.shadowBlur=12+b.type*4; }
-    else { ctx.shadowColor="rgba(0,0,0,0.4)"; ctx.shadowBlur=5; }
-    ctx.shadowOffsetY=2;
-    // subtle circle bg
-    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-    ctx.fillStyle=`${bc.honey}1A`; ctx.fill();
-    ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-    // image
+    // Higher-tier bears get a warm honey glow; lower tiers get a soft warm drop shadow
+    if (b.type>=3) {
+      ctx.shadowColor=item.glow; ctx.shadowBlur=12+b.type*4; ctx.shadowOffsetY=2;
+    } else {
+      ctx.shadowColor="rgba(90,56,32,0.35)"; ctx.shadowBlur=5; ctx.shadowOffsetY=2;
+    }
     const img=imgs[b.type];
     if (img?.complete && img.naturalWidth>0) {
       const d=b.r*2.1;
@@ -204,10 +202,6 @@ function drawScene(
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(String(b.type+1),b.x,b.y);
     }
-    // ring — use cream-tinted honey for lower tiers, honey for higher
-    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-    ctx.strokeStyle=b.type>=4?`${bc.honey}80`:`${bc.cream}1F`;
-    ctx.lineWidth=1.5; ctx.stroke();
     ctx.restore();
   }
 }
