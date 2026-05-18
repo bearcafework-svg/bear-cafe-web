@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -30,13 +30,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PROFILE_FETCH_TIMEOUT_MS = 15000;
 
+type UserRoleRow = { role: string | null };
+type PermissionIdRow = { permission_id: string | null };
+type CustomPermissionRow = { allowed_pages: string[] | null };
+type ProfileRow = {
+  id: string;
+  username: string;
+  discord_username: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  discord_id: string;
+  is_banned: boolean | null;
+  ban_reason: string | null;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const buildFallbackUser = (sessionUser: SupabaseUser): User => {
+  const buildFallbackUser = useCallback((sessionUser: SupabaseUser): User => {
     const metadata = sessionUser.user_metadata || {};
     return {
       id: sessionUser.id,
@@ -51,9 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ban_reason: null,
       allowed_pages: [],
     };
-  };
+  }, []);
 
-  const fetchUserProfile = async (sessionUser: SupabaseUser): Promise<User | null> => {
+  const fetchUserProfile = useCallback(async (sessionUser: SupabaseUser): Promise<User | null> => {
     console.log('[Auth] Fetching profile for user:', sessionUser.id);
 
     const [profileResult, rolesResult, permIdsResult] = await Promise.all([
@@ -77,24 +91,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw profileResult.error;
     }
 
-    const profile = profileResult.data;
+    const profile = profileResult.data as ProfileRow | null;
     if (!profile) {
       console.warn('[Auth] Profile not found for user:', sessionUser.id);
       return null;
     }
 
-    const roleSet = new Set((rolesResult.data ?? []).map((r: any) => r.role));
+    const roleRows = (rolesResult.data ?? []) as UserRoleRow[];
+    const roleSet = new Set(roleRows.map((r) => r.role).filter(Boolean));
     const is_owner = roleSet.has('moderator');
     const is_admin = roleSet.has('admin');
 
     const allPages = new Set<string>();
-    const permIds = (permIdsResult.data ?? []).map((r: any) => r.permission_id).filter(Boolean);
+    const permissionRows = (permIdsResult.data ?? []) as PermissionIdRow[];
+    const permIds = permissionRows.map((r) => r.permission_id).filter((id): id is string => Boolean(id));
     if (permIds.length > 0) {
       const { data: cpData } = await supabase
         .from('custom_permissions')
         .select('allowed_pages')
         .in('id', permIds);
-      (cpData ?? []).forEach((cp: any) => {
+      const customPermissions = (cpData ?? []) as CustomPermissionRow[];
+      customPermissions.forEach((cp) => {
         if (Array.isArray(cp.allowed_pages)) {
           cp.allowed_pages.forEach((p: string) => allPages.add(p));
         }
@@ -106,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       id: profile.id,
       username: profile.username,
-      discord_username: (profile as any).discord_username || null,
+      discord_username: profile.discord_username || null,
       avatar_url: profile.avatar_url,
       banner_url: profile.banner_url,
       discord_id: profile.discord_id,
@@ -116,9 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ban_reason: profile.ban_reason,
       allowed_pages: Array.from(allPages),
     };
-  };
+  }, []);
 
-  const fetchUserProfileWithTimeout = async (sessionUser: SupabaseUser): Promise<User> => {
+  const fetchUserProfileWithTimeout = useCallback(async (sessionUser: SupabaseUser): Promise<User> => {
     const timeoutPromise = new Promise<null>((resolve) => {
       window.setTimeout(() => resolve(null), PROFILE_FETCH_TIMEOUT_MS);
     });
@@ -128,13 +145,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return buildFallbackUser(sessionUser);
     }
     return profile;
-  };
+  }, [buildFallbackUser, fetchUserProfile]);
 
-  const loadUserProfile = (sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean) => {
+  const loadUserProfile = useCallback((sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean) => {
     fetchUserProfile(sessionUser)
       .then((profile) => {
         if (!isMounted) return;
-        setUser(profile ?? (prev => prev ?? buildFallbackUser(sessionUser)) as any);
+        setUser(prev => profile ?? prev ?? buildFallbackUser(sessionUser));
         setIsLoading(false);
       })
       .catch((error) => {
@@ -143,9 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(prev => prev ?? buildFallbackUser(sessionUser));
         if (setLoading) setIsLoading(false);
       });
-  };
+  }, [buildFallbackUser, fetchUserProfile]);
 
-  const syncDiscordProfile = async () => {
+  const syncDiscordProfile = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke('sync-discord-profile');
       if (error) { console.warn('[Auth] Profile sync failed:', error.message); return; }
@@ -156,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('[Auth] Profile sync error:', e);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -171,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .subscribe((status) => { console.log('[Auth] Realtime subscription status:', status); });
     return () => { console.log('[Auth] Cleaning up real-time profile subscription'); supabase.removeChannel(channel); };
-  }, [user?.id]);
+  }, [syncDiscordProfile, user?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -206,11 +223,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch((error) => { console.error('[Auth] Init error:', error); if (isMounted) setIsLoading(false); });
 
     return () => { isMounted = false; subscription.unsubscribe(); };
-  }, []);
+  }, [loadUserProfile]);
 
-  const isInIframe = () => { try { return window.self !== window.top; } catch (e) { return true; } };
+  const isInIframe = useCallback(() => { try { return window.self !== window.top; } catch (e) { return true; } }, []);
 
-  const login = async (turnstileToken: string) => {
+  const login = useCallback(async (turnstileToken: string) => {
     if (isRedirecting) { console.log('[Auth] Login already in progress'); return; }
     console.log('[Auth] Starting login flow');
     setIsRedirecting(true);
@@ -225,23 +242,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         else { console.log('[Auth] Redirecting to Discord auth'); window.location.href = response.data.authUrl; }
       } else { console.error('[Auth] Failed to get OAuth URL:', response); setIsRedirecting(false); throw new Error('Failed to get OAuth URL'); }
     } catch (error) { console.error('[Auth] Login error:', error); setIsRedirecting(false); throw error; }
-  };
+  }, [isInIframe, isRedirecting]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     console.log('[Auth] Logging out');
     try { setUser(null); setSession(null); await supabase.auth.signOut(); window.location.href = '/login'; }
     catch (error) { console.error('[Auth] Logout error:', error); window.location.href = '/login'; }
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!session?.user) return;
     console.log('[Auth] Refreshing user profile');
     try { const profile = await fetchUserProfileWithTimeout(session.user); setUser(profile); }
     catch (error) { console.error('[Auth] Failed to refresh user profile:', error); }
-  };
+  }, [fetchUserProfileWithTimeout, session?.user]);
+
+  const value = useMemo(() => ({
+    user,
+    session,
+    isLoading,
+    isAuthenticated: !!session && !!user,
+    login,
+    logout,
+    refreshUser,
+  }), [isLoading, login, logout, refreshUser, session, user]);
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, isAuthenticated: !!session && !!user, login, logout, refreshUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
