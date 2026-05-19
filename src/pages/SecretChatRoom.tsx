@@ -2102,16 +2102,17 @@ export default function SecretChatRoom() {
         return;
       }
 
-      const { data: sessions } = await (supabase as any).rpc('try_match_users', {
-        p_user_a_id: user.id,
-        p_user_b_id: candidate.user_id,
+      const { data: sessions } = await (supabase as any).rpc('switch_bartender_to_user', {
+        p_current_session_id: session.id,
+        p_user_id: user.id,
+        p_candidate_id: candidate.user_id,
         p_topic_id: topicId,
-        p_user_a_alias: alias,
-        p_user_b_alias: candidate.alias,
-        p_user_a_avatar: avatar,
-        p_user_b_avatar: candidate.avatar,
-        p_user_a_role: myRole ?? role ?? 'both',
-        p_user_b_role: candidate.role ?? 'both',
+        p_user_alias: alias,
+        p_candidate_alias: candidate.alias,
+        p_user_avatar: avatar,
+        p_candidate_avatar: candidate.avatar,
+        p_user_role: myRole ?? role ?? 'both',
+        p_candidate_role: candidate.role ?? 'both',
         p_duration_secs: SESSION_DURATION,
       });
       if (sessions?.length) {
@@ -2121,8 +2122,6 @@ export default function SecretChatRoom() {
           is_system: true,
           content: '☕ Bartender: เหมือนจะมีคนแวะมาที่ร้านแล้ว... เดี๋ยวพาไปเจอเพื่อนใหม่ให้น้า',
         });
-        await (supabase as any).from('chat_sessions').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', session.id).eq('status', 'active');
-        await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
         setMatchedWithBartender(false);
         setSession(sessions[0] as ChatSession);
       }
