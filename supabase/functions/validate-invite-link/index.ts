@@ -543,6 +543,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   return json({ error: `Unknown action: ${action}` }, 400);
 });
 
-console.log("token length:", token.length);
-console.log("serviceKey length:", serviceKey.length);
-console.log("match:", token === serviceKey);
+const _debugToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  console.log("[batch:debug] authHeader present:", !!authHeader);
+  console.log("[batch:debug] serviceKey loaded:", serviceKey.length > 0);
+  console.log("[batch:debug] serviceKey length:", serviceKey.length);
+  console.log("[batch:debug] token match:", _debugToken === serviceKey);

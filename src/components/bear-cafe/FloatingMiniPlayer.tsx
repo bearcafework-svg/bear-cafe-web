@@ -56,6 +56,23 @@ export function FloatingMiniPlayer() {
   const [view, setView] = useState<'player' | 'library'>('player');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ── Library data ─────────────────────────────────────────────────────────────
+  const allTracks = useMemo(() => {
+    const result: Array<{ track: Track; ci: number; ti: number; catLabel: string }> = [];
+    music.library.forEach((cat, ci) => {
+      cat.tracks.forEach((t, ti) => result.push({ track: t, ci, ti, catLabel: cat.label }));
+    });
+    return result;
+  }, [music.library]);
+
+  const filteredTracks = useMemo(() => {
+    if (!searchQuery.trim()) return allTracks;
+    const q = searchQuery.toLowerCase();
+    return allTracks.filter(({ track }) =>
+      track.title.toLowerCase().includes(q) || (track.artist ?? '').toLowerCase().includes(q)
+    );
+  }, [allTracks, searchQuery]);
+
   // ── Hide conditions ──────────────────────────────────────────────────────────
   // Hide if not logged in
   if (!isAuthenticated) return null;
@@ -77,23 +94,6 @@ export function FloatingMiniPlayer() {
     ? 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008)'
     : 'conic-gradient(from 0deg, #3a2410, #5c3820, #3a2410)';
   const trackActiveBg = dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.1)';
-
-  // ── Library data ─────────────────────────────────────────────────────────────
-  const allTracks = useMemo(() => {
-    const result: Array<{ track: Track; ci: number; ti: number; catLabel: string }> = [];
-    music.library.forEach((cat, ci) => {
-      cat.tracks.forEach((t, ti) => result.push({ track: t, ci, ti, catLabel: cat.label }));
-    });
-    return result;
-  }, [music.library]);
-
-  const filteredTracks = useMemo(() => {
-    if (!searchQuery.trim()) return allTracks;
-    const q = searchQuery.toLowerCase();
-    return allTracks.filter(({ track }) =>
-      track.title.toLowerCase().includes(q) || (track.artist ?? '').toLowerCase().includes(q)
-    );
-  }, [allTracks, searchQuery]);
 
   return (
     <div className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-2">
