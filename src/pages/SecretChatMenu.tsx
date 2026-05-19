@@ -115,7 +115,7 @@ export default function SecretChatMenu() {
 
   // ── Queue count realtime ──────────────────────────────────────────────────
   useEffect(() => {
-    const STALE_MS = 10 * 60 * 1000; // 10 นาที
+    const STALE_MS = 45 * 1000;
 
     const fetchCount = async () => {
       const cutoff = new Date(Date.now() - STALE_MS).toISOString();
@@ -127,6 +127,10 @@ export default function SecretChatMenu() {
     };
 
     fetchCount();
+    (supabase as any).rpc('cleanup_stale_queue').then(fetchCount);
+    const countInterval = setInterval(() => {
+      (supabase as any).rpc('cleanup_stale_queue').then(fetchCount);
+    }, 15000);
 
     // Subscribe realtime — อัปเดตทุกครั้งที่มีคนเข้า/ออก queue
     const ch = supabase
@@ -134,7 +138,10 @@ export default function SecretChatMenu() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCount)
       .subscribe();
 
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      clearInterval(countInterval);
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   useEffect(() => {

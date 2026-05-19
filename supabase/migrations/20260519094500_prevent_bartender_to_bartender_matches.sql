@@ -44,7 +44,7 @@ BEGIN
       AND is_enabled = true
   ) INTO v_user_b_is_bartender;
 
-  IF v_user_a_is_bartender AND v_user_b_is_bartender THEN
+  IF v_user_b_is_bartender THEN
     RETURN;
   END IF;
 

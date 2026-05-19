@@ -1664,12 +1664,11 @@ export default function SecretChatRoom() {
   const [queueCount, setQueueCount] = useState(0);
   const [matchedWithBartender, setMatchedWithBartender] = useState(false);
   const [bartenderTransitioning, setBartenderTransitioning] = useState(false);
-  const [isCurrentUserBartender, setIsCurrentUserBartender] = useState(false);
 
   // -- Queue count realtime — นับเฉพาะตอน waiting ----------------------
   useEffect(() => {
     if (matchStatus !== 'waiting') return;
-    const STALE_MS = 10 * 60 * 1000;
+    const STALE_MS = 45 * 1000;
     const fetchCount = async () => {
       const cutoff = new Date(Date.now() - STALE_MS).toISOString();
       const { count } = await (supabase as any)
@@ -1679,11 +1678,17 @@ export default function SecretChatRoom() {
       setQueueCount(count ?? 0);
     };
     fetchCount();
+    const countInterval = setInterval(() => {
+      (supabase as any).rpc('cleanup_stale_queue').then(fetchCount);
+    }, 15000);
     const ch = supabase
       .channel('room-queue-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCount)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      clearInterval(countInterval);
+      supabase.removeChannel(ch);
+    };
   }, [matchStatus]);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [bannedWords, setBannedWords] = useState<string[]>([]);
@@ -1694,17 +1699,6 @@ export default function SecretChatRoom() {
   // Similar mood config + phase tracking
   const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
   const matchStartRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (supabase as any)
-      .from('chat_bartender_presence')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('is_enabled', true)
-      .maybeSingle()
-      .then(({ data }: any) => setIsCurrentUserBartender(!!data));
-  }, [user?.id]);
 
   // Tutorial state � show once per session, stored in localStorage
   const TUTORIAL_KEY = 'cafe_room_tutorial_done';
@@ -1831,10 +1825,16 @@ export default function SecretChatRoom() {
   const typingTimeoutRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bartenderTransitioningRef = useRef(false);
 
   useEffect(() => {
-    if (!topicId || !alias) navigate('/secret-chat');
-  }, [topicId, alias, navigate]);
+    if (!topicId || !alias) {
+      if (user?.id) {
+        (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+      }
+      navigate('/secret-chat');
+    }
+  }, [topicId, alias, user?.id, navigate]);
 
   useEffect(() => {
     loadBannedWords().then(setBannedWords);
@@ -1920,8 +1920,17 @@ export default function SecretChatRoom() {
     // Stale cleanup � call the DB function instead of a client-side cutoff
     (supabase as any).rpc('cleanup_stale_queue').then(() => {});
 
+    const refreshQueuePresence = () => {
+      (supabase as any)
+        .from('chat_queue')
+        .update({ joined_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    };
+
     const onBeforeUnload = () => cleanupQueue();
+    const onPageHide = () => cleanupQueue();
     window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('pagehide', onPageHide);
 
     // Track whether this client has already triggered a match to prevent
     // double-firing when both Realtime and polling detect the same event.
@@ -1957,20 +1966,17 @@ export default function SecretChatRoom() {
       const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
 
-      let bartenderIds = new Set<string>();
-      if (isCurrentUserBartender) {
-        const { data: bartenderRows } = await (supabase as any)
-          .from('chat_bartender_presence')
-          .select('user_id')
-          .eq('is_enabled', true);
-        bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
-      }
+      const { data: bartenderRows } = await (supabase as any)
+        .from('chat_bartender_presence')
+        .select('user_id')
+        .eq('is_enabled', true);
+      const bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
 
       // Score candidates and pick the best
       let best: any = null;
       let bestScore = -1;
       for (const candidate of queue) {
-        if (isCurrentUserBartender && bartenderIds.has(candidate.user_id)) continue;
+        if (bartenderIds.has(candidate.user_id)) continue;
         const score = matchScore(topicId, role ?? 'both', candidate, moodConfig);
         if (score > bestScore) { bestScore = score; best = candidate; }
       }
@@ -2030,9 +2036,11 @@ export default function SecretChatRoom() {
       tryMatchBartenderFallback();
       const interval = setInterval(tryMatch, POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
       const bartenderInterval = setInterval(tryMatchBartenderFallback, 1200);
+      const heartbeatInterval = setInterval(refreshQueuePresence, 15000);
       // Store interval id so cleanup can clear it
       (intervalRef as any).current = interval;
       (intervalRef as any).bartender = bartenderInterval;
+      (intervalRef as any).heartbeat = heartbeatInterval;
     }, jitter);
 
     // -- Realtime: primary notification path (faster than polling) ------------
@@ -2054,16 +2062,20 @@ export default function SecretChatRoom() {
       clearTimeout(initialDelay);
       if ((intervalRef as any).current) clearInterval((intervalRef as any).current);
       if ((intervalRef as any).bartender) clearInterval((intervalRef as any).bartender);
+      if ((intervalRef as any).heartbeat) clearInterval((intervalRef as any).heartbeat);
       supabase.removeChannel(queueChannel);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('pagehide', onPageHide);
       cleanupQueue();
     };
-  }, [user, topicId, alias, avatar, matchStatus, moodConfig, isCurrentUserBartender]);
+  }, [user, topicId, alias, avatar, matchStatus, moodConfig]);
 
   useEffect(() => {
     if (!session || !user || !matchedWithBartender || matchStatus !== 'matched') return;
     const switchToRealUser = async () => {
-      if (bartenderTransitioning) return;
+      if (bartenderTransitioningRef.current) return;
+      bartenderTransitioningRef.current = true;
+      setBartenderTransitioning(true);
       const myRole = session.user_a_id === user.id ? session.user_a_role : session.user_b_role;
       const { data: queue } = await (supabase as any)
         .from('chat_queue')
@@ -2072,7 +2084,11 @@ export default function SecretChatRoom() {
         .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
         .order('joined_at', { ascending: true })
         .limit(10);
-      if (!queue || queue.length === 0) return;
+      if (!queue || queue.length === 0) {
+        bartenderTransitioningRef.current = false;
+        setBartenderTransitioning(false);
+        return;
+      }
 
       const { data: bartenderRows } = await (supabase as any)
         .from('chat_bartender_presence')
@@ -2080,15 +2096,11 @@ export default function SecretChatRoom() {
         .eq('is_enabled', true);
       const bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
       const candidate = queue.find((q: any) => q.user_id !== session.user_a_id && q.user_id !== session.user_b_id && !bartenderIds.has(q.user_id));
-      if (!candidate) return;
-      setBartenderTransitioning(true);
-
-      await (supabase as any).from('chat_messages').insert({
-        session_id: session.id,
-        sender_id: null,
-        is_system: true,
-        content: '☕ Bartender: เหมือนจะมีคนแวะมาที่ร้านแล้ว... เดี๋ยวพาไปเจอเพื่อนใหม่ให้น้า',
-      });
+      if (!candidate) {
+        bartenderTransitioningRef.current = false;
+        setBartenderTransitioning(false);
+        return;
+      }
 
       const { data: sessions } = await (supabase as any).rpc('try_match_users', {
         p_user_a_id: user.id,
@@ -2103,16 +2115,26 @@ export default function SecretChatRoom() {
         p_duration_secs: SESSION_DURATION,
       });
       if (sessions?.length) {
+        await (supabase as any).from('chat_messages').insert({
+          session_id: session.id,
+          sender_id: null,
+          is_system: true,
+          content: '☕ Bartender: เหมือนจะมีคนแวะมาที่ร้านแล้ว... เดี๋ยวพาไปเจอเพื่อนใหม่ให้น้า',
+        });
         await (supabase as any).from('chat_sessions').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', session.id).eq('status', 'active');
         await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
         setMatchedWithBartender(false);
         setSession(sessions[0] as ChatSession);
       }
+      bartenderTransitioningRef.current = false;
       setBartenderTransitioning(false);
     };
     const id = setInterval(switchToRealUser, 2500);
-    return () => clearInterval(id);
-  }, [session?.id, user?.id, matchedWithBartender, matchStatus, bartenderTransitioning, topicId, alias, avatar, role]);
+    return () => {
+      bartenderTransitioningRef.current = false;
+      clearInterval(id);
+    };
+  }, [session?.id, user?.id, matchedWithBartender, matchStatus, topicId, alias, avatar, role]);
 
   useEffect(() => {
     if (!session || !user) return;
