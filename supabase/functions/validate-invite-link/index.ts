@@ -356,6 +356,15 @@ async function handleBatch(
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+// ── DEBUG ──────────────────────────────────────────────────────────────────
+  const _debugToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  console.log("[batch:debug] authHeader present:", !!authHeader);
+  console.log("[batch:debug] authHeader prefix:", authHeader.slice(0, 15));
+  console.log("[batch:debug] serviceKey loaded:", serviceKey.length > 0);
+  console.log("[batch:debug] serviceKey length:", serviceKey.length);
+  console.log("[batch:debug] token === serviceKey:", _debugToken === serviceKey);
+  // ────────────────────────────────────────────────────────────────────────
+
   // ── Step 1: Service-role only (Req 8.3) ──────────────────────────────────
   if (!isServiceRole(authHeader, serviceKey)) {
     return json({ error: "Forbidden — service-role required" }, 403);
@@ -533,3 +542,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   return json({ error: `Unknown action: ${action}` }, 400);
 });
+
+console.log("token length:", token.length);
+console.log("serviceKey length:", serviceKey.length);
+console.log("match:", token === serviceKey);
