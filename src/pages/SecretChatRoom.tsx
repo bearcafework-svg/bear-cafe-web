@@ -1664,6 +1664,7 @@ export default function SecretChatRoom() {
   const [queueCount, setQueueCount] = useState(0);
   const [matchedWithBartender, setMatchedWithBartender] = useState(false);
   const [bartenderTransitioning, setBartenderTransitioning] = useState(false);
+  const [isCurrentUserBartender, setIsCurrentUserBartender] = useState(false);
 
   // -- Queue count realtime — นับเฉพาะตอน waiting ----------------------
   useEffect(() => {
@@ -1693,6 +1694,17 @@ export default function SecretChatRoom() {
   // Similar mood config + phase tracking
   const [moodConfig, setMoodConfig] = useState<SimilarMoodConfig>({ enabled: false, similar_phase_delay_seconds: 15, map: {} });
   const matchStartRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (supabase as any)
+      .from('chat_bartender_presence')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .eq('is_enabled', true)
+      .maybeSingle()
+      .then(({ data }: any) => setIsCurrentUserBartender(!!data));
+  }, [user?.id]);
 
   // Tutorial state � show once per session, stored in localStorage
   const TUTORIAL_KEY = 'cafe_room_tutorial_done';
@@ -1945,10 +1957,20 @@ export default function SecretChatRoom() {
       const { data: queue } = await query;
       if (!queue || queue.length === 0) return;
 
+      let bartenderIds = new Set<string>();
+      if (isCurrentUserBartender) {
+        const { data: bartenderRows } = await (supabase as any)
+          .from('chat_bartender_presence')
+          .select('user_id')
+          .eq('is_enabled', true);
+        bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
+      }
+
       // Score candidates and pick the best
       let best: any = null;
       let bestScore = -1;
       for (const candidate of queue) {
+        if (isCurrentUserBartender && bartenderIds.has(candidate.user_id)) continue;
         const score = matchScore(topicId, role ?? 'both', candidate, moodConfig);
         if (score > bestScore) { bestScore = score; best = candidate; }
       }
@@ -2036,7 +2058,7 @@ export default function SecretChatRoom() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       cleanupQueue();
     };
-  }, [user, topicId, alias, avatar, matchStatus, moodConfig]);
+  }, [user, topicId, alias, avatar, matchStatus, moodConfig, isCurrentUserBartender]);
 
   useEffect(() => {
     if (!session || !user || !matchedWithBartender || matchStatus !== 'matched') return;
@@ -2052,7 +2074,12 @@ export default function SecretChatRoom() {
         .limit(10);
       if (!queue || queue.length === 0) return;
 
-      const candidate = queue.find((q: any) => q.user_id !== session.user_a_id && q.user_id !== session.user_b_id);
+      const { data: bartenderRows } = await (supabase as any)
+        .from('chat_bartender_presence')
+        .select('user_id')
+        .eq('is_enabled', true);
+      const bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
+      const candidate = queue.find((q: any) => q.user_id !== session.user_a_id && q.user_id !== session.user_b_id && !bartenderIds.has(q.user_id));
       if (!candidate) return;
       setBartenderTransitioning(true);
 
