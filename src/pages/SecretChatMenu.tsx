@@ -253,8 +253,8 @@ export default function SecretChatMenu() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--primary))]" />
                       </span>
                       {queueCount > 0
-                        ? `${queueCount} คนกำลังรออยู่`
-                        : 'ยังไม่มีใครรออยู่'}
+                        ? `☕ ตอนนี้มีคนแวะมาที่ร้าน ${queueCount} คน`
+                        : '☕ ตอนนี้ร้านยังเงียบ ๆ'}
                     </span>
                   </div>
                 </div>
