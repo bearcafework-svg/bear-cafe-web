@@ -1870,17 +1870,19 @@ export default function SecretChatRoom() {
 
   const handleExpire = useCallback(async () => {
     if (!session) return;
-    // Only PATCH if session is still active � avoids 400 on already-ended sessions
     if (session.status === 'active') {
       await (supabase as any)
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', session.id)
-        .eq('status', 'active'); // guard: only update if still active
+        .eq('status', 'active');
+      if (matchedWithBartender) {
+        await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
+      }
     }
     setMatchStatus('ended');
     setShowRating(true);
-  }, [session]);
+  }, [session, matchedWithBartender]);
 
   // Countdown only starts after the user has joined (isRoomReady), so the timer
   // doesn't tick away while the join overlay is displayed.
@@ -1979,36 +1981,15 @@ export default function SecretChatRoom() {
       const elapsedMs = Date.now() - matchStartRef.current;
       if (elapsedMs < 7000) return;
 
-      const { data: bartenders } = await (supabase as any)
-        .from('chat_bartender_presence')
-        .select('user_id, alias, avatar, status_text')
-        .eq('is_online', true)
-        .eq('is_available', true)
-        .eq('standby_mode', true)
-        .order('updated_at', { ascending: true })
-        .limit(1);
-
-      const picked = bartenders?.[0];
-      if (!picked) return;
-
-      const { data: sessions, error } = await (supabase as any).rpc('try_match_users', {
-        p_user_a_id: user.id,
-        p_user_b_id: picked.user_id,
+      const { data: sessions, error } = await (supabase as any).rpc('try_match_bartender', {
+        p_user_id: user.id,
         p_topic_id: topicId,
-        p_user_a_alias: alias,
-        p_user_b_alias: picked.alias ?? '☕ Bartender',
-        p_user_a_avatar: avatar,
-        p_user_b_avatar: picked.avatar ?? 'bear',
-        p_user_a_role: role ?? 'both',
-        p_user_b_role: 'both',
+        p_user_alias: alias,
+        p_user_avatar: avatar,
+        p_user_role: role ?? 'both',
         p_duration_secs: SESSION_DURATION,
       });
       if (error || !sessions || sessions.length === 0) return;
-
-      await (supabase as any)
-        .from('chat_bartender_presence')
-        .update({ is_available: false, active_session_id: sessions[0].id, updated_at: new Date().toISOString() })
-        .eq('user_id', picked.user_id);
 
       setMatchedWithBartender(true);
       handleMatch(sessions[0] as ChatSession);
@@ -2096,6 +2077,7 @@ export default function SecretChatRoom() {
       });
       if (sessions?.length) {
         await (supabase as any).from('chat_sessions').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', session.id).eq('status', 'active');
+        await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
         setMatchedWithBartender(false);
         setSession(sessions[0] as ChatSession);
       }
@@ -2266,10 +2248,13 @@ export default function SecretChatRoom() {
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', session.id);
+      if (matchedWithBartender) {
+        await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
+      }
       setMatchStatus('ended');
       setShowRating(true);
     }
-  }, [session]);
+  }, [session, matchedWithBartender]);
 
   const submitRating = useCallback(async (stars: number) => {
     setShowRating(false);
