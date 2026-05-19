@@ -56,6 +56,7 @@ import { BannerManagement } from '@/components/admin/BannerManagement';
 import { SecretTableManagement } from '@/components/admin/SecretTableManagement';
 import { ProfileFramesManagement } from '@/components/admin/ProfileFramesManagement';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
+import { BartenderManagement } from '@/components/admin/BartenderManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -111,6 +112,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'permissions': Key,
   'secret-table': Coffee,
   'campaigns': Send,
+  'bartender-management': Coffee,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -277,6 +279,7 @@ export default function AdminPage() {
         case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'secret-table': return isOwner ? <SecretTableManagement /> : null;
+        case 'bartender-management': return isOwner ? <BartenderManagement /> : null;
         case 'profile-frames': return isOwner ? <ProfileFramesManagement /> : null;
         case 'campaigns': return isOwner ? <CampaignsManagement /> : null;
         default: return null;
