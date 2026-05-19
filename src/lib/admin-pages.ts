@@ -37,6 +37,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'secret-table', label: 'Secret Table', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
+  { id: 'bartender-management', label: 'Bartender Mode', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'profile-frames', label: 'กรอบโปรไฟล์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'campaigns', label: 'แคมเปญโฆษณา', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
 ];
