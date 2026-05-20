@@ -12,6 +12,18 @@ const SUPABASE_KEY =
 const missingUrl = !SUPABASE_URL || SUPABASE_URL.trim().length === 0;
 const missingKey = !SUPABASE_KEY || SUPABASE_KEY.trim().length === 0;
 
+function getJwtRole(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(atob(normalized));
+    return typeof decoded?.role === "string" ? decoded.role : null;
+  } catch {
+    return null;
+  }
+}
+
 if (missingKey) {
   // Shout when Key is missing so it's obvious in the Console.
   console.error(
@@ -44,6 +56,22 @@ if (missingUrl || missingKey) {
   );
 }
 
+const keyRole = getJwtRole(SUPABASE_KEY.trim());
+if (keyRole === "service_role") {
+  throw new Error(
+    "[Supabase] Refusing to initialize client with a service_role key. Use VITE_SUPABASE_ANON_KEY or a publishable anon key on the frontend.",
+  );
+}
+
+export const supabaseConfig = {
+  url: SUPABASE_URL.trim(),
+  hasAnonKey: SUPABASE_KEY.trim().length > 0,
+  keyRole,
+  keySource: import.meta.env.VITE_SUPABASE_ANON_KEY
+    ? "VITE_SUPABASE_ANON_KEY"
+    : "VITE_SUPABASE_PUBLISHABLE_KEY",
+};
+
 const storage =
   typeof window !== "undefined" && "localStorage" in window
     ? window.localStorage
@@ -51,7 +79,7 @@ const storage =
 
 // Client
 export const supabase = createClient<Database>(
-  SUPABASE_URL.trim(),
+  supabaseConfig.url,
   SUPABASE_KEY.trim(),
   {
     auth: {

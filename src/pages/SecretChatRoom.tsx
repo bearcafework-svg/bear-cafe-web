@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseConfig } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { CloudRain, Music2, VolumeX, LogOut, Send, Loader2, Clock, AlertTriangle, SkipForward, SkipBack, Repeat, Repeat1, X, Sun, Moon, Library, Search, ChevronLeft } from 'lucide-react';
 import honeyJarIcon from '@/assets/HoneyJarIcon.png';
@@ -1960,7 +1960,23 @@ export default function SecretChatRoom() {
         p_allow_cross_topic: inSimilarPhase,
         p_allow_bartender: allowBartender,
       });
-      if (error || !sessions || sessions.length === 0) return;
+      if (error) {
+        console.error('[SecretChat] match_secret_chat RPC failed', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          supabaseUrl: supabaseConfig.url,
+          anonKeyConfigured: supabaseConfig.hasAnonKey,
+          keySource: supabaseConfig.keySource,
+          keyRole: supabaseConfig.keyRole,
+          note: error.message?.includes('No API key')
+            ? 'RPC must be called via supabase.rpc() with VITE_SUPABASE_ANON_KEY configured in the deployed environment. Do not open /rest/v1/rpc/* directly in the browser.'
+            : undefined,
+        });
+        return;
+      }
+      if (!sessions || sessions.length === 0) return;
 
       const matchedSession = sessions[0] as ChatSession;
       setMatchedWithBartender(
