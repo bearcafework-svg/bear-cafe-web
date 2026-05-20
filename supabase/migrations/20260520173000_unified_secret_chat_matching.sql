@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION match_secret_chat(
+﻿CREATE OR REPLACE FUNCTION match_secret_chat(
   p_user_id uuid,
   p_topic_id uuid,
   p_user_alias text,
@@ -121,7 +121,7 @@ BEGIN
     duration_seconds
   ) VALUES (
     p_topic_id, p_user_id, v_bartender.user_id,
-    p_user_alias, COALESCE(v_bartender.alias, '☕ Bartender'),
+    p_user_alias, COALESCE(v_bartender.alias, 'เพื่อนในคาเฟ่'),
     p_user_avatar, COALESCE(v_bartender.avatar, 'bear'),
     COALESCE(p_user_role, 'both'), 'both',
     p_duration_secs
@@ -141,3 +141,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION match_secret_chat TO authenticated;
+

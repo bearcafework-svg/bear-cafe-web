@@ -1940,8 +1940,36 @@ export default function SecretChatRoom() {
       if (matchedRef) return;
       matchedRef = true;
       playMatchSound();
+      setQueueCount(0);
       setSession(sess);
       setMatchStatus('matched');
+    };
+
+    const detectBartenderMatch = async (sess: ChatSession) => {
+      const partnerId = sess.user_a_id === user.id ? sess.user_b_id : sess.user_a_id;
+      const { data } = await (supabase as any)
+        .from('chat_bartender_presence')
+        .select('user_id')
+        .eq('user_id', partnerId)
+        .eq('is_enabled', true)
+        .maybeSingle();
+      setMatchedWithBartender(Boolean(data));
+    };
+
+    const findExistingSession = async () => {
+      if (matchedRef) return;
+      const { data } = await (supabase as any)
+        .from('chat_sessions')
+        .select('*')
+        .eq('status', 'active')
+        .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        await detectBartenderMatch(data as ChatSession);
+        handleMatch(data as ChatSession);
+      }
     };
 
     const tryMatch = async (allowBartender: boolean) => {
@@ -1979,10 +2007,11 @@ export default function SecretChatRoom() {
       if (!sessions || sessions.length === 0) return;
 
       const matchedSession = sessions[0] as ChatSession;
-      setMatchedWithBartender(
-        matchedSession.user_b_alias === '☕ Bartender' ||
-        matchedSession.user_b_role === 'both' && allowBartender
-      );
+      if (allowBartender) {
+        await detectBartenderMatch(matchedSession);
+      } else {
+        setMatchedWithBartender(false);
+      }
       handleMatch(matchedSession);
     };
 
@@ -1995,16 +2024,19 @@ export default function SecretChatRoom() {
 
     // Initial delayed start (spread out first wave)
     const initialDelay = setTimeout(() => {
+      findExistingSession();
       tryMatch(false);
       const interval = setInterval(() => tryMatch(false), POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
       const bartenderInterval = setInterval(() => {
         const elapsedMs = Date.now() - matchStartRef.current;
         if (elapsedMs >= 7000) tryMatch(true);
       }, 1200);
+      const sessionCheckInterval = setInterval(findExistingSession, 1500);
       const heartbeatInterval = setInterval(refreshQueuePresence, 15000);
       // Store interval id so cleanup can clear it
       (intervalRef as any).current = interval;
       (intervalRef as any).bartender = bartenderInterval;
+      (intervalRef as any).sessionCheck = sessionCheckInterval;
       (intervalRef as any).heartbeat = heartbeatInterval;
     }, jitter);
 
@@ -2016,9 +2048,19 @@ export default function SecretChatRoom() {
         schema: 'public',
         table: 'chat_sessions',
         filter: `user_b_id=eq.${user.id}`,
-      }, (payload) => {
+      }, async (payload) => {
         // user_b receives the session via Realtime � no need to delete queue
         // (the atomic function already deleted it server-side)
+        await detectBartenderMatch(payload.new as ChatSession);
+        handleMatch(payload.new as ChatSession);
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_sessions',
+        filter: `user_a_id=eq.${user.id}`,
+      }, async (payload) => {
+        await detectBartenderMatch(payload.new as ChatSession);
         handleMatch(payload.new as ChatSession);
       })
       .subscribe();
@@ -2027,6 +2069,7 @@ export default function SecretChatRoom() {
       clearTimeout(initialDelay);
       if ((intervalRef as any).current) clearInterval((intervalRef as any).current);
       if ((intervalRef as any).bartender) clearInterval((intervalRef as any).bartender);
+      if ((intervalRef as any).sessionCheck) clearInterval((intervalRef as any).sessionCheck);
       if ((intervalRef as any).heartbeat) clearInterval((intervalRef as any).heartbeat);
       supabase.removeChannel(queueChannel);
       window.removeEventListener('beforeunload', onBeforeUnload);
@@ -2081,12 +2124,6 @@ export default function SecretChatRoom() {
         p_duration_secs: SESSION_DURATION,
       });
       if (sessions?.length) {
-        await (supabase as any).from('chat_messages').insert({
-          session_id: session.id,
-          sender_id: null,
-          is_system: true,
-          content: '☕ Bartender: เหมือนจะมีคนแวะมาที่ร้านแล้ว... เดี๋ยวพาไปเจอเพื่อนใหม่ให้น้า',
-        });
         setMatchedWithBartender(false);
         setSession(sessions[0] as ChatSession);
       }
@@ -2518,11 +2555,6 @@ export default function SecretChatRoom() {
                 </div>
                 <div>
                   <p className="font-bold text-foreground text-sm leading-tight">{partnerAlias}</p>
-                  {matchedWithBartender && (
-                    <div className="mt-1 inline-flex items-center rounded-full border border-amber-300/60 bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                      ☕ Bartender Staff
-                    </div>
-                  )}
                   <div className="flex items-center gap-1 mt-0.5">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
