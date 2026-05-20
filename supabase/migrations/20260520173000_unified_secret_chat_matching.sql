@@ -18,7 +18,7 @@ DECLARE
   v_bartender chat_bartender_presence%ROWTYPE;
   v_session chat_sessions;
 BEGIN
-  IF NOT pg_try_advisory_xact_lock(('x' || substr(p_user_id::text, 1, 16))::bit(64)::bigint) THEN
+  IF NOT pg_try_advisory_xact_lock(('x' || substr(replace(p_user_id::text, '-', ''), 1, 16))::bit(64)::bigint) THEN
     RETURN;
   END IF;
 

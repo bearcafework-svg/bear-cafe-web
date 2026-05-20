@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION try_match_users(
+﻿CREATE OR REPLACE FUNCTION try_match_users(
   p_user_a_id       uuid,
   p_user_b_id       uuid,
   p_topic_id        uuid,
@@ -20,7 +20,7 @@ DECLARE
   v_user_b_is_bartender boolean;
 BEGIN
   IF NOT pg_try_advisory_xact_lock(
-    ('x' || substr(least(p_user_a_id::text, p_user_b_id::text)::text, 1, 16))::bit(64)::bigint
+    ('x' || substr(replace(least(p_user_a_id::text, p_user_b_id::text), '-', ''), 1, 16))::bit(64)::bigint
   ) THEN
     RETURN;
   END IF;
@@ -79,3 +79,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION try_match_users TO authenticated;
+

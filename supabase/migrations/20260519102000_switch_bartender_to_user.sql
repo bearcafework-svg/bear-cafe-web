@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION switch_bartender_to_user(
+﻿CREATE OR REPLACE FUNCTION switch_bartender_to_user(
   p_current_session_id uuid,
   p_user_id uuid,
   p_candidate_id uuid,
@@ -21,7 +21,7 @@ DECLARE
   v_new_session chat_sessions;
 BEGIN
   IF NOT pg_try_advisory_xact_lock(
-    ('x' || substr(least(p_user_id::text, p_candidate_id::text)::text, 1, 16))::bit(64)::bigint
+    ('x' || substr(replace(least(p_user_id::text, p_candidate_id::text), '-', ''), 1, 16))::bit(64)::bigint
   ) THEN
     RETURN;
   END IF;
@@ -104,3 +104,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION switch_bartender_to_user TO authenticated;
+

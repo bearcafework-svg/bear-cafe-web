@@ -1,16 +1,20 @@
-﻿CREATE OR REPLACE FUNCTION try_match_bartender(
-  p_user_id         uuid,
-  p_topic_id        uuid,
-  p_user_alias      text,
-  p_user_avatar     text,
-  p_user_role       text,
-  p_duration_secs   integer
+CREATE OR REPLACE FUNCTION match_secret_chat(
+  p_user_id uuid,
+  p_topic_id uuid,
+  p_user_alias text,
+  p_user_avatar text,
+  p_user_role text,
+  p_duration_secs integer,
+  p_allow_cross_topic boolean DEFAULT false,
+  p_allow_bartender boolean DEFAULT false
 )
 RETURNS SETOF chat_sessions
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+  v_self_queue chat_queue%ROWTYPE;
+  v_candidate chat_queue%ROWTYPE;
   v_bartender chat_bartender_presence%ROWTYPE;
   v_session chat_sessions;
 BEGIN
@@ -18,7 +22,12 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM chat_queue WHERE user_id = p_user_id) THEN
+  SELECT * INTO v_self_queue
+  FROM chat_queue
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RETURN;
   END IF;
 
@@ -27,6 +36,7 @@ BEGIN
     WHERE user_id = p_user_id
       AND is_enabled = true
   ) THEN
+    DELETE FROM chat_queue WHERE user_id = p_user_id;
     RETURN;
   END IF;
 
@@ -36,6 +46,50 @@ BEGIN
       AND (user_a_id = p_user_id OR user_b_id = p_user_id)
   ) THEN
     DELETE FROM chat_queue WHERE user_id = p_user_id;
+    RETURN;
+  END IF;
+
+  SELECT q.* INTO v_candidate
+  FROM chat_queue q
+  WHERE q.user_id <> p_user_id
+    AND q.joined_at >= now() - interval '45 seconds'
+    AND (p_allow_cross_topic OR q.topic_id = p_topic_id)
+    AND NOT EXISTS (
+      SELECT 1 FROM chat_bartender_presence b
+      WHERE b.user_id = q.user_id
+        AND b.is_enabled = true
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM chat_sessions s
+      WHERE s.status = 'active'
+        AND (s.user_a_id = q.user_id OR s.user_b_id = q.user_id)
+    )
+  ORDER BY q.joined_at ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1;
+
+  IF FOUND THEN
+    INSERT INTO chat_sessions (
+      topic_id, user_a_id, user_b_id,
+      user_a_alias, user_b_alias,
+      user_a_avatar, user_b_avatar,
+      user_a_role, user_b_role,
+      duration_seconds
+    ) VALUES (
+      COALESCE(v_candidate.topic_id, p_topic_id), p_user_id, v_candidate.user_id,
+      p_user_alias, v_candidate.alias,
+      p_user_avatar, v_candidate.avatar,
+      COALESCE(p_user_role, 'both'), COALESCE(v_candidate.role, 'both'),
+      p_duration_secs
+    )
+    RETURNING * INTO v_session;
+
+    DELETE FROM chat_queue WHERE user_id IN (p_user_id, v_candidate.user_id);
+    RETURN NEXT v_session;
+    RETURN;
+  END IF;
+
+  IF NOT p_allow_bartender THEN
     RETURN;
   END IF;
 
@@ -86,5 +140,4 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION try_match_bartender TO authenticated;
-
+GRANT EXECUTE ON FUNCTION match_secret_chat TO authenticated;

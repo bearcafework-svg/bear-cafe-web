@@ -1,4 +1,4 @@
--- ═══════════════════════════════════════════════════════════════
+﻿-- ═══════════════════════════════════════════════════════════════
 -- Performance & correctness fixes for the chat matching system
 -- ═══════════════════════════════════════════════════════════════
 
@@ -49,7 +49,7 @@ DECLARE
   v_session chat_sessions;
 BEGIN
   IF NOT pg_try_advisory_xact_lock(
-    ('x' || substr(least(p_user_a_id::text, p_user_b_id::text)::text, 1, 16))::bit(64)::bigint
+    ('x' || substr(replace(least(p_user_a_id::text, p_user_b_id::text), '-', ''), 1, 16))::bit(64)::bigint
   ) THEN
     RETURN;
   END IF;
@@ -110,3 +110,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION cleanup_stale_queue TO authenticated;
+
