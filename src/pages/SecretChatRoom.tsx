@@ -1872,13 +1872,17 @@ export default function SecretChatRoom() {
         .eq('id', session.id)
         .single();
       if (data?.status === 'ended') {
+        // Clean up our queue row in case it was left behind while backgrounded
+        if (user?.id) {
+          await (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+        }
         setMatchStatus('ended');
         setShowRating(true);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [session?.id, matchStatus]);
+  }, [session?.id, matchStatus, user?.id]);
 
   const handleExpire = useCallback(async () => {
     if (!session) return;
@@ -1891,6 +1895,11 @@ export default function SecretChatRoom() {
       if (matchedWithBartender) {
         await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
       }
+      // Clean up queue for both participants on expiry too
+      await (supabase as any)
+        .from('chat_queue')
+        .delete()
+        .in('user_id', [session.user_a_id, session.user_b_id]);
     }
     setMatchStatus('ended');
     setShowRating(true);
@@ -2166,6 +2175,11 @@ export default function SecretChatRoom() {
         const updated = payload.new as ChatSession;
         setSession(updated);
         if (updated.status === 'ended') {
+          // Clean up our own queue row in case it was left behind
+          // (e.g. the other side cancelled first and we received the Realtime event)
+          if (user?.id) {
+            (supabase as any).from('chat_queue').delete().eq('user_id', user.id);
+          }
           setMatchStatus('ended');
           setShowRating(true);
         }
@@ -2294,6 +2308,7 @@ export default function SecretChatRoom() {
   const confirmLeave = useCallback(async () => {
     setShowLeaveConfirm(false);
     if (session) {
+      // End the session
       await (supabase as any)
         .from('chat_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
@@ -2301,6 +2316,13 @@ export default function SecretChatRoom() {
       if (matchedWithBartender) {
         await (supabase as any).rpc('release_bartender_session', { p_session_id: session.id });
       }
+      // Always clean up queue for BOTH participants so neither gets stuck
+      // The other side's queue row may still exist if they were re-queued or
+      // if a stale row was left from a previous session.
+      await (supabase as any)
+        .from('chat_queue')
+        .delete()
+        .in('user_id', [session.user_a_id, session.user_b_id]);
       setMatchStatus('ended');
       setShowRating(true);
     }
