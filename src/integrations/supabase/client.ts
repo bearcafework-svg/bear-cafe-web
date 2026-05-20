@@ -5,6 +5,7 @@ import type { Database } from "./types";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 const missingUrl = !SUPABASE_URL || SUPABASE_URL.trim().length === 0;
 const missingKey = !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.trim().length === 0;
@@ -54,7 +55,19 @@ if (missingUrl || missingKey) {
 }
 
 const keyRole = getJwtRole(SUPABASE_ANON_KEY.trim());
+if (SUPABASE_SERVICE_ROLE_KEY && SUPABASE_SERVICE_ROLE_KEY.trim().length > 0) {
+  console.error(
+    "[Supabase] Frontend env must not include VITE_SUPABASE_SERVICE_ROLE_KEY. Remove it and keep service_role keys server-side only.",
+  );
+  throw new Error(
+    "[Supabase] Refusing to initialize frontend client because VITE_SUPABASE_SERVICE_ROLE_KEY is exposed in frontend env.",
+  );
+}
+
 if (keyRole === "service_role") {
+  console.error(
+    "[Supabase] VITE_SUPABASE_ANON_KEY appears to be a service_role key. Replace it with the anon public key.",
+  );
   throw new Error(
     "[Supabase] Refusing to initialize frontend client with a service_role key. Set VITE_SUPABASE_ANON_KEY to the project's anon public key only. Move service_role usage to backend/server-side code.",
   );
