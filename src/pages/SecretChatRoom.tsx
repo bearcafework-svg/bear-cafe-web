@@ -1944,83 +1944,30 @@ export default function SecretChatRoom() {
       setMatchStatus('matched');
     };
 
-    // -- tryMatch: uses atomic DB function to eliminate race conditions --------
-    const tryMatch = async () => {
+    const tryMatch = async (allowBartender: boolean) => {
       if (matchedRef) return;
 
       const elapsedSeconds = (Date.now() - matchStartRef.current) / 1000;
       const inSimilarPhase = moodConfig.enabled && elapsedSeconds >= moodConfig.similar_phase_delay_seconds;
 
-      let query = (supabase as any)
-        .from('chat_queue')
-        .select('*')
-        .neq('user_id', user.id)
-        .gte('joined_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // กรองออก: รายการที่รอนานเกิน 10 นาที
-        .order('joined_at', { ascending: true })
-        .limit(20);
-
-      if (!inSimilarPhase) {
-        query = query.eq('topic_id', topicId);
-      }
-
-      const { data: queue } = await query;
-      if (!queue || queue.length === 0) return;
-
-      const { data: bartenderRows } = await (supabase as any)
-        .from('chat_bartender_presence')
-        .select('user_id')
-        .eq('is_enabled', true);
-      const bartenderIds = new Set((bartenderRows ?? []).map((row: any) => row.user_id));
-
-      // Score candidates and pick the best
-      let best: any = null;
-      let bestScore = -1;
-      for (const candidate of queue) {
-        if (bartenderIds.has(candidate.user_id)) continue;
-        const score = matchScore(topicId, role ?? 'both', candidate, moodConfig);
-        if (score > bestScore) { bestScore = score; best = candidate; }
-      }
-      if (!best || bestScore < 0) return;
-
-      // -- Atomic match via DB function (advisory lock + transaction) --------
-      // This prevents two clients from simultaneously matching the same partner.
-      const { data: sessions, error } = await (supabase as any).rpc('try_match_users', {
-        p_user_a_id:     user.id,
-        p_user_b_id:     best.user_id,
-        p_topic_id:      topicId,
-        p_user_a_alias:  alias,
-        p_user_b_alias:  best.alias,
-        p_user_a_avatar: avatar,
-        p_user_b_avatar: best.avatar,
-        p_user_a_role:   role ?? 'both',
-        p_user_b_role:   best.role ?? 'both',
-        p_duration_secs: SESSION_DURATION,
-      });
-
-      // rpc returns an array; empty = partner was already taken (race lost)
-      if (error || !sessions || sessions.length === 0) return;
-
-      setMatchedWithBartender(false);
-      handleMatch(sessions[0] as ChatSession);
-    };
-
-    const tryMatchBartenderFallback = async () => {
-      if (matchedRef) return;
-      const elapsedMs = Date.now() - matchStartRef.current;
-      if (elapsedMs < 7000) return;
-
-      const { data: sessions, error } = await (supabase as any).rpc('try_match_bartender', {
+      const { data: sessions, error } = await (supabase as any).rpc('match_secret_chat', {
         p_user_id: user.id,
         p_topic_id: topicId,
         p_user_alias: alias,
         p_user_avatar: avatar,
         p_user_role: role ?? 'both',
         p_duration_secs: SESSION_DURATION,
+        p_allow_cross_topic: inSimilarPhase,
+        p_allow_bartender: allowBartender,
       });
       if (error || !sessions || sessions.length === 0) return;
 
-      setMatchedWithBartender(true);
-      handleMatch(sessions[0] as ChatSession);
+      const matchedSession = sessions[0] as ChatSession;
+      setMatchedWithBartender(
+        matchedSession.user_b_alias === '☕ Bartender' ||
+        matchedSession.user_b_role === 'both' && allowBartender
+      );
+      handleMatch(matchedSession);
     };
 
     // -- Polling with per-client jitter to avoid thundering herd --------------
@@ -2032,10 +1979,12 @@ export default function SecretChatRoom() {
 
     // Initial delayed start (spread out first wave)
     const initialDelay = setTimeout(() => {
-      tryMatch();
-      tryMatchBartenderFallback();
-      const interval = setInterval(tryMatch, POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
-      const bartenderInterval = setInterval(tryMatchBartenderFallback, 1200);
+      tryMatch(false);
+      const interval = setInterval(() => tryMatch(false), POLL_BASE_MS + Math.random() * POLL_JITTER_MS);
+      const bartenderInterval = setInterval(() => {
+        const elapsedMs = Date.now() - matchStartRef.current;
+        if (elapsedMs >= 7000) tryMatch(true);
+      }, 1200);
       const heartbeatInterval = setInterval(refreshQueuePresence, 15000);
       // Store interval id so cleanup can clear it
       (intervalRef as any).current = interval;
