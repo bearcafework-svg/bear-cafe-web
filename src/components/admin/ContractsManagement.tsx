@@ -591,7 +591,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             headers: {
               'Authorization': `Bearer ${session?.access_token}`,
               'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
             },
             body: JSON.stringify(body),
           }
@@ -627,7 +627,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             headers: {
               'Authorization': `Bearer ${session?.access_token}`,
               'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
             },
             body: JSON.stringify({ channel_url: contract.room_link }),
           }
