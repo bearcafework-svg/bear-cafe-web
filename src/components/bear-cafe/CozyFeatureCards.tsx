@@ -32,107 +32,31 @@ function MaskingTape({ color = 'honey', rotate = -1 }: { color?: 'honey' | 'mint
   );
 }
 
-// ── Card 1: สุ่มแชทคุย ──────────────────────────────────────────────────────
+// ── Card 1: สุ่มแชทคุย (coming soon) ────────────────────────────────────────
 function SecretChatCard() {
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const [activeCount, setActiveCount] = useState<number | null>(null);
-  const [queueCount, setQueueCount] = useState<number>(0);
-
-  useEffect(() => {
-    let mounted = true;
-    const STALE_MS = 10 * 60 * 1000;
-
-    const fetchCounts = async () => {
-      const cutoff = new Date(Date.now() - STALE_MS).toISOString();
-      const [sessRes, queueRes] = await Promise.all([
-        (supabase as any)
-          .from('chat_sessions')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'active'),
-        (supabase as any)
-          .from('chat_queue')
-          .select('*', { count: 'exact', head: true })
-          .gte('joined_at', cutoff),
-      ]);
-      if (mounted) {
-        setActiveCount((sessRes.count ?? 0) * 2);
-        setQueueCount(queueRes.count ?? 0);
-      }
-    };
-
-    fetchCounts();
-
-    const ch = supabase
-      .channel('secret-chat-card')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, fetchCounts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_queue' }, fetchCounts)
-      .subscribe();
-
-    const interval = setInterval(fetchCounts, 30_000);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-      supabase.removeChannel(ch);
-    };
-  }, []);
-
   return (
-    <motion.button
-      whileHover={{ y: -4, scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => navigate(isAuthenticated ? '/secret-chat' : '/login')}
-      className="relative flex flex-col items-center pt-8 pb-6 px-5 rounded-3xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] shadow-md hover:shadow-xl hover:shadow-[hsl(var(--honey)/0.15)] transition-all duration-300 text-center group"
-    >
+    <div className="relative flex flex-col items-center pt-8 pb-6 px-5 rounded-3xl bg-[hsl(var(--card))] border border-[hsl(var(--latte)/0.4)] dark:border-[hsl(var(--coffee)/0.3)] shadow-md text-center opacity-70 cursor-default">
       <MaskingTape color="honey" rotate={-2} />
-      <span className="absolute top-5 right-5 text-xs text-[hsl(var(--honey)/0.5)] select-none">✦</span>
 
-      {/* Image */}
+      <span className="absolute top-5 right-5 text-xs text-[hsl(var(--honey)/0.4)] select-none">✦</span>
+
+      {/* Image — slightly desaturated */}
       <div className="w-28 h-28 mb-4 flex items-center justify-center">
         <img
           src={IMG_1}
           alt="สุ่มแชทคุย"
-          className="w-full h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-contain drop-shadow-sm grayscale-[30%]"
         />
       </div>
 
-      {/* Speech bubble doodle */}
+      {/* Coming soon bubble */}
       <div className="mb-3 px-3 py-1 rounded-full bg-[hsl(var(--honey)/0.15)] border border-[hsl(var(--honey)/0.3)] text-[11px] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] font-medium">
         Let's talk!
       </div>
 
       <h3 className="text-lg font-bold text-foreground leading-tight">สุ่มแชทคุย</h3>
-
-      {/* Live status */}
-      <div className="mt-2 flex flex-col items-center gap-1">
-        {activeCount !== null && activeCount > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--matcha))] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[hsl(var(--matcha))]" />
-            </span>
-            <p className="text-[11px] text-[hsl(var(--matcha))] font-medium">
-              {activeCount} คนกำลังแชทอยู่
-            </p>
-          </div>
-        )}
-        {queueCount > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--honey))] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[hsl(var(--honey))]" />
-            </span>
-            <p className="text-[11px] text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey))] font-medium">
-              {queueCount} คนกำลังรออยู่
-            </p>
-          </div>
-        )}
-        {activeCount === 0 && queueCount === 0 && activeCount !== null && (
-          <p className="text-[11px] text-muted-foreground">เป็นคนแรกเลย!</p>
-        )}
-      </div>
-    </motion.button>
+      <p className="text-xs text-muted-foreground mt-1 font-medium">เร็ว ๆ นี้</p>
+    </div>
   );
 }
 
