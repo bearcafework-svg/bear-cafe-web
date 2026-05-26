@@ -55,6 +55,7 @@ import {
   PieChart,
   Trash2,
   Pencil,
+  Mail,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -803,7 +804,7 @@ export function TradingHistoryManagement() {
                     style: 5,
                     label: '︲เช็คยอดโดเนทของคุณ',
                     emoji: { id: '1256669436350562355', name: 'bee20000', animated: false },
-                    url: 'https://discord.com/channels/1144251788493602848/1508608796967305216',
+                    url: 'https://discord.com/channels/1144251788493602848/1144581735665905766',
                     custom_id: 'p_306458809797185538',
                   },
                 ],
@@ -1261,14 +1262,14 @@ export function TradingHistoryManagement() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-orange-400 hover:text-orange-500 hover:bg-orange-500/10"
+                              className="h-6 w-6 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEmbedTarget(r);
                               }}
                               title="ส่ง Thank you embed"
                             >
-                              <span className="text-xs">🐟</span>
+                              <Mail className="h-3.5 w-3.5" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1527,7 +1528,7 @@ export function TradingHistoryManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span>🐟</span> ยืนยันการส่ง Thank you embed
+              <Mail className="h-5 w-5 text-blue-500" /> ยืนยันการส่ง Thank you embed
             </DialogTitle>
             <DialogDescription>
               ระบบจะส่ง embed ขอบคุณไปยัง Discord สำหรับ{' '}
@@ -1565,7 +1566,7 @@ export function TradingHistoryManagement() {
               disabled={isSendingEmbed}
               className="gap-2 bg-honey hover:bg-honey/90 text-accent-foreground"
             >
-              {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🐟</span>}
+              {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               ส่ง embed
             </Button>
           </DialogFooter>
