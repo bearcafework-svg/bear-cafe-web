@@ -1305,7 +1305,7 @@ export function TradingHistoryManagement() {
                           )}
                           <div className="flex items-center gap-1 text-xs text-orange-500 font-semibold">
                             <span>🐟</span>
-                            <span>{salmonPointMap.get(r.member_id) ?? 0}</span>
+                            <span>{Math.floor((r.amount || 0) / 100)}</span>
                           </div>
                         </div>
 
