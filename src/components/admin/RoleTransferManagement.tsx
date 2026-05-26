@@ -459,7 +459,7 @@ export function RoleTransferManagement() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   เลือกแล้ว {selectedCount} / {transferableCount} ยศ
-                  {blockedCount > 0 && <span className="text-amber-500 ml-2">(ห้ามย้าย {blockedCount} ยศ)</span>}
+                  {blockedCount > 0 && <span className="text-amber-500 ml-2">(ยศห้ามย้าย {blockedCount} ยศ จะถูกลบออกจากต้นทาง)</span>}
                 </span>
                 <span className="font-medium">{Math.round(progressPercent)}%</span>
               </div>
@@ -498,7 +498,7 @@ export function RoleTransferManagement() {
                         {isBlocked && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-500 shrink-0">
                             <ShieldBan className="w-3 h-3 mr-0.5" />
-                            {role.blockReason === 'non_transferable' ? 'ห้ามย้าย' : 'Bot'}
+                            {role.blockReason === 'non_transferable' ? 'ลบจากต้นทาง' : 'Bot'}
                           </Badge>
                         )}
                       </div>
@@ -510,14 +510,14 @@ export function RoleTransferManagement() {
 
             {/* Transfer Result */}
             {transferResult && (
-              <div className="mt-4 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+              <div className="mt-4 p-4 rounded-lg bg-success/10 border border-success/30 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-emerald-600 dark:text-emerald-400">
+                  <p className="font-medium text-success">
                     ย้ายสำเร็จ {transferResult.transferred} ยศ
                   </p>
                   {transferResult.skipped > 0 && (
-                    <p className="text-muted-foreground mt-1">ข้ามไป {transferResult.skipped} ยศ (ห้ามย้าย)</p>
+                    <p className="text-amber-500 mt-1">ลบยศห้ามย้าย {transferResult.skipped} ยศออกจากต้นทาง (ไม่ถูกเพิ่มให้ปลายทาง)</p>
                   )}
                 </div>
               </div>
@@ -640,7 +640,7 @@ export function RoleTransferManagement() {
                           </TableCell>
                           <TableCell>
                             <Badge variant={log.status === 'completed' ? 'default' : log.status === 'partial' ? 'secondary' : 'outline'}
-                              className={log.status === 'completed' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0' : ''}>
+                              className={log.status === 'completed' ? 'bg-success/15 text-success border-0' : ''}>
                               {log.status === 'completed' ? 'สำเร็จ' : log.status === 'partial' ? 'บางส่วน' : log.status}
                             </Badge>
                           </TableCell>
@@ -662,7 +662,10 @@ export function RoleTransferManagement() {
             <AlertDialogTitle>ยืนยันการย้ายบทบาท</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>ย้าย <strong>{selectedCount} ยศ</strong> จาก <strong>{sourceMember?.username}</strong> ไปยัง <strong>{targetMember?.username}</strong></p>
-              <p className="text-amber-500">⚠️ ยศจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
+              {blockedCount > 0 && (
+                <p className="text-amber-500">⚠️ ยศห้ามย้าย {blockedCount} ยศ จะถูกลบออกจากต้นทางแต่ไม่ถูกเพิ่มให้ปลายทาง</p>
+              )}
+              <p className="text-amber-500">⚠️ ยศที่ย้ายจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

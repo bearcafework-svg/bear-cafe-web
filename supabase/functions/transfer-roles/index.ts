@@ -182,8 +182,10 @@ Deno.serve(async (req): Promise<Response> => {
       const sourceMember = await sourceMemberRes.json();
       const sourceCurrentRoles: string[] = sourceMember.roles || [];
 
-      // Remove transferred roles from source
-      const newSourceRoles = sourceCurrentRoles.filter(id => !safeRoles.includes(id));
+      // Remove transferred roles AND non-transferable roles from source
+      // Non-transferable roles are deleted from source but not added to target
+      const rolesToRemoveFromSource = [...safeRoles, ...skippedRoles];
+      const newSourceRoles = sourceCurrentRoles.filter(id => !rolesToRemoveFromSource.includes(id));
 
       // BULK update: PATCH target (add roles)
       const patchTarget = await discordFetch(
@@ -237,13 +239,18 @@ Deno.serve(async (req): Promise<Response> => {
         completed_at: new Date().toISOString(),
       });
 
-      console.log(`Transferred ${safeRoles.length} roles from ${sourceDiscordId} to ${targetDiscordId}`);
+      console.log(`Transferred ${safeRoles.length} roles from ${sourceDiscordId} to ${targetDiscordId}, removed ${skippedRoles.length} non-transferable roles from source`);
+
+      const parts: string[] = [`ย้ายยศสำเร็จ ${safeRoles.length} ยศ`];
+      if (skippedRoles.length > 0) {
+        parts.push(`ลบยศห้ามย้าย ${skippedRoles.length} ยศออกจากต้นทาง`);
+      }
 
       return new Response(JSON.stringify({
         success: true,
         transferred: safeRoles.length,
         skipped: skippedRoles.length,
-        message: `ย้ายยศสำเร็จ ${safeRoles.length} ยศ${skippedRoles.length > 0 ? ` (ข้าม ${skippedRoles.length} ยศ)` : ''}`,
+        message: parts.join(', '),
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
