@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
@@ -319,7 +318,7 @@ export function NonTransferableRolesManagement() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldBan className="w-5 h-5 text-amber-500" />
+              <ShieldBan className="w-5 h-5 text-honey" />
               {editingRole ? 'แก้ไข Role ห้ามย้าย' : 'เพิ่ม Role ห้ามย้าย'}
             </DialogTitle>
             <DialogDescription>
@@ -358,7 +357,7 @@ export function NonTransferableRolesManagement() {
                     <Input placeholder="ค้นหา Role..." value={addSearchQuery}
                       onChange={e => setAddSearchQuery(e.target.value)} className="pl-9" />
                   </div>
-                  <ScrollArea className="h-64 rounded-md border">
+                  <div className="rounded-md border">
                     {loadingDiscordRoles ? (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" /> กำลังโหลด...
@@ -376,7 +375,7 @@ export function NonTransferableRolesManagement() {
                               key={role.id}
                               onClick={() => toggleDiscordRole(role.id)}
                               className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${
-                                checked ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50 border border-transparent'
+                                checked ? 'bg-honey/10 border border-honey/30' : 'hover:bg-muted/50 border border-transparent'
                               }`}
                             >
                               <Checkbox
@@ -396,7 +395,7 @@ export function NonTransferableRolesManagement() {
                         })}
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>เหตุผล (ไม่บังคับ - ใช้กับทุก Role ที่เลือก)</Label>
