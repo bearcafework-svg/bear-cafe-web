@@ -14,5 +14,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+  },
   // VITE_* env vars are automatically exposed to client by Vite
 });

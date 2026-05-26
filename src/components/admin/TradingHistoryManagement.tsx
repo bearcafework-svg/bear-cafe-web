@@ -68,6 +68,7 @@ import {
   Line,
 } from 'recharts';
 import { formatThaiDate } from '@/lib/thai-date';
+import { computeSalmonPreview } from '@/lib/salmonPoint';
 
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
@@ -133,6 +134,14 @@ interface DiscordProfile {
   avatar_url: string | null;
 }
 
+/** แปลงตัวเลขเป็น Unicode Mathematical Digits (𝟢𝟣𝟤...) พร้อม comma separator เมื่อ >= 1000 */
+function toUnicodeNumber(n: number): string {
+  const unicodeDigits = ['𝟢','𝟣','𝟤','𝟥','𝟦','𝟧','𝟨','𝟩','𝟪','𝟫'];
+  // Format with comma for thousands
+  const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return formatted.replace(/[0-9]/g, (d) => unicodeDigits[parseInt(d)]);
+}
+
 /** Parse the `transaction` field which may be "DD/MM/YYYY" (พ.ศ. or ค.ศ.) */
 function parseTransactionDate(raw: string | null): Date | null {
   if (!raw) return null;
@@ -173,6 +182,12 @@ export function TradingHistoryManagement() {
   const [editTarget, setEditTarget] = useState<TradingRecord | null>(null);
   const [editForm, setEditForm] = useState({ amount: '', transaction: '', type_bill: '', item: '' });
   const [editLoading, setEditLoading] = useState(false);
+
+  // Send embed state
+  const [embedTarget, setEmbedTarget] = useState<TradingRecord | null>(null);
+  const [isSendingEmbed, setIsSendingEmbed] = useState(false);
+  // salmon_point map: member_id -> salmon_point
+  const [salmonPointMap, setSalmonPointMap] = useState<Map<string, number>>(new Map());
 
   // Auto update - moved after fetchData declaration via separate useEffect below
 
@@ -501,6 +516,24 @@ export function TradingHistoryManagement() {
     }
   }, []);
 
+  const fetchSalmonPoints = useCallback(async (discordIds: string[]) => {
+    const uniqueIds = [...new Set(discordIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+    try {
+      const { data } = await supabase
+        .from('user_points')
+        .select('discord_id, salmon_point')
+        .in('discord_id', uniqueIds);
+      if (data) {
+        const map = new Map<string, number>();
+        data.forEach((p) => map.set(p.discord_id, p.salmon_point ?? 0));
+        setSalmonPointMap(map);
+      }
+    } catch (err) {
+      console.error('Failed to fetch salmon points', err);
+    }
+  }, []);
+
   const resolveDisplayName = useCallback(
     (id: string): { name: string; discord_username: string | null; avatar: string | null } => {
       if (!id) return { name: '-', discord_username: null, avatar: null };
@@ -526,6 +559,7 @@ export function TradingHistoryManagement() {
 
       const allIds = data.flatMap((r) => [r.service_id, r.member_id].filter(Boolean) as string[]);
       fetchProfiles(allIds);
+      fetchSalmonPoints([...new Set(data.map((r) => r.member_id).filter(Boolean))]);
       setRecords(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -533,7 +567,7 @@ export function TradingHistoryManagement() {
     } finally {
       setLoading(false);
     }
-  }, [fetchProfiles]);
+  }, [fetchProfiles, fetchSalmonPoints]);
 
   useEffect(() => {
     fetchData();
@@ -587,6 +621,9 @@ export function TradingHistoryManagement() {
   }, [records, serviceQuery, memberQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
+
+  // Salmon point preview for create-bill form (Requirements 8.1, 8.2, 8.3)
+  const salmonPointPreview = useMemo(() => computeSalmonPreview(newBill.amount), [newBill.amount]);
   const paginatedRecords = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredRecords.slice(start, start + ITEMS_PER_PAGE);
@@ -703,6 +740,95 @@ export function TradingHistoryManagement() {
 
   const formatCurrency = (n: number) =>
     n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  // คำนวณยอดรวม amount ต่อ member_id จากทุก records
+  const totalAmountByMember = useMemo(() => {
+    const map = new Map<string, number>();
+    records.forEach((r) => {
+      const prev = map.get(r.member_id) ?? 0;
+      map.set(r.member_id, prev + (r.amount || 0));
+    });
+    return map;
+  }, [records]);
+
+  const handleSendEmbed = async (r: TradingRecord) => {
+    setIsSendingEmbed(true);
+    try {
+      const memberId = r.member_id;
+      const latestAmount = r.amount || 0;
+      const totalAmount = totalAmountByMember.get(memberId) ?? latestAmount;
+      const profile = profileMap.get(memberId);
+      const avatarUrl = profile?.avatar_url ?? '';
+
+      // แปลงตัวเลขเป็น Unicode
+      const latestAmountStr = toUnicodeNumber(latestAmount);
+      const totalAmountStr = toUnicodeNumber(totalAmount);
+
+      const payload = {
+        flags: 32768,
+        components: [
+          {
+            type: 17,
+            components: [
+              {
+                type: 12,
+                items: [
+                  {
+                    media: {
+                      url: 'https://media.discordapp.net/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png?ex=6a1689fe&is=6a15387e&hm=70fc39c297f577a46fa8c0e93dd254c0d4ade5a6cb7f6ace9b5adb11b8891422&',
+                    },
+                  },
+                ],
+              },
+              { type: 14, spacing: 2 },
+              {
+                type: 9,
+                components: [
+                  {
+                    type: 10,
+                    content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
+                  },
+                ],
+                accessory: {
+                  type: 11,
+                  media: { url: avatarUrl },
+                },
+              },
+              { type: 14, spacing: 2 },
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 2,
+                    style: 5,
+                    label: '︲เช็คยอดโดเนทของคุณ',
+                    emoji: { id: '1256669436350562355', name: 'bee20000', animated: false },
+                    url: 'https://discord.com/channels/1144251788493602848/1508608796967305216',
+                    custom_id: 'p_306458809797185538',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`Webhook failed: ${res.status}`);
+      toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-green-500 text-white' });
+    } catch (err: any) {
+      console.error('Send embed failed:', err);
+      toast({ title: 'ส่ง embed ไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSendingEmbed(false);
+      setEmbedTarget(null);
+    }
+  };
 
   const formatPeriodLabel = (val: string) => {
     if (periodMode === 'day') {
@@ -825,6 +951,11 @@ export function TradingHistoryManagement() {
                   <div className="space-y-2">
                     <Label htmlFor="amount">ยอดการสั่งซื้อ (บาท)</Label>
                     <Input type="number" id="amount" value={newBill.amount} onChange={(e) => setNewBill({...newBill, amount: e.target.value})} placeholder="0.00" />
+                    {salmonPointPreview !== null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        🐟 Salmon Point ที่จะได้รับ: <span className="font-semibold text-foreground">{salmonPointPreview}</span> แต้ม
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>ประเภทของบิล</Label>
@@ -1130,6 +1261,18 @@ export function TradingHistoryManagement() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-6 w-6 text-orange-400 hover:text-orange-500 hover:bg-orange-500/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEmbedTarget(r);
+                              }}
+                              title="ส่ง Thank you embed"
+                            >
+                              <span className="text-xs">🐟</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1180,7 +1323,7 @@ export function TradingHistoryManagement() {
                           <UserBadge id={r.member_id} />
                         </div>
 
-                        {/* Amount & Bill type */}
+                        {/* Amount & Bill type & Salmon point */}
                         <div className="flex items-center gap-3 flex-wrap">
                           <div className="flex items-center gap-1.5">
                             <CreditCard className="w-3.5 h-3.5 text-primary" />
@@ -1191,6 +1334,10 @@ export function TradingHistoryManagement() {
                               {r.type_bill}
                             </Badge>
                           )}
+                          <div className="flex items-center gap-1 text-xs text-orange-500 font-semibold">
+                            <span>🐟</span>
+                            <span>{salmonPointMap.get(r.member_id) ?? 0}</span>
+                          </div>
                         </div>
 
                         {/* Item */}
@@ -1370,6 +1517,56 @@ export function TradingHistoryManagement() {
               }
             }} disabled={editLoading} className="gap-2">
               {editLoading && <Loader2 className="h-4 w-4 animate-spin" />} บันทึก
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Embed Confirm Dialog */}
+      <Dialog open={Boolean(embedTarget)} onOpenChange={(o) => !o && setEmbedTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>🐟</span> ยืนยันการส่ง Thank you embed
+            </DialogTitle>
+            <DialogDescription>
+              ระบบจะส่ง embed ขอบคุณไปยัง Discord สำหรับ{' '}
+              <strong>{resolveDisplayName(embedTarget?.member_id ?? '').name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          {embedTarget && (
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ผู้ซื้อ</span>
+                <span className="font-medium">{resolveDisplayName(embedTarget.member_id).name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ยอดบิลนี้</span>
+                <span className="font-bold text-primary">{formatCurrency(embedTarget.amount || 0)} บาท</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ยอดรวมทั้งหมด</span>
+                <span className="font-bold">{formatCurrency(totalAmountByMember.get(embedTarget.member_id) ?? 0)} บาท</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">🐟 Salmon Point</span>
+                <span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEmbedTarget(null)} disabled={isSendingEmbed}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={() => embedTarget && handleSendEmbed(embedTarget)}
+              disabled={isSendingEmbed}
+              className="gap-2 bg-honey hover:bg-honey/90 text-accent-foreground"
+            >
+              {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🐟</span>}
+              ส่ง embed
             </Button>
           </DialogFooter>
         </DialogContent>

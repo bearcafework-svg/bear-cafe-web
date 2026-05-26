@@ -13,15 +13,15 @@ Migration timestamp ที่ใช้: `20260602000000` (ต่อจาก `20
 
 ## Tasks
 
-- [ ] 1. สร้าง SQL migration file สำหรับ salmon_point feature ทั้งหมด
+- [x] 1. สร้าง SQL migration file สำหรับ salmon_point feature ทั้งหมด
   - สร้างไฟล์ `supabase/migrations/20260602000000_add_salmon_point_feature.sql`
   - เพิ่มคอลัมน์ `salmon_point INTEGER NOT NULL DEFAULT 0 CHECK (salmon_point >= 0)` ใน `user_points` ด้วย `ALTER TABLE`
   - สร้างตาราง `salmon_point_logs` พร้อมคอลัมน์ครบตามที่ design กำหนด: `id` (uuid PK), `discord_id` (text NOT NULL), `bill_id` (uuid NOT NULL), `change_type` (text NOT NULL), `old_salmon_point` (integer), `new_salmon_point` (integer), `delta` (integer), `amount_before` (numeric), `amount_after` (numeric), `created_at` (timestamptz DEFAULT now())
   - สร้าง indexes: `idx_salmon_point_logs_discord_id`, `idx_salmon_point_logs_bill_id`, `idx_salmon_point_logs_created_at`
   - _Requirements: 1.1, 1.2, 2.1_
 
-- [ ] 2. Implement trigger function `fn_sync_salmon_point()` ใน migration
-  - [ ] 2.1 เขียน trigger function `fn_sync_salmon_point()` ใน migration file เดียวกัน
+- [x] 2. Implement trigger function `fn_sync_salmon_point()` ใน migration
+  - [x] 2.1 เขียน trigger function `fn_sync_salmon_point()` ใน migration file เดียวกัน
     - ใช้ `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`
     - Handle `TG_OP = 'INSERT'`: คำนวณ `delta = FLOOR(NEW.amount / 100)`, ตั้ง `change_type = 'insert'`
     - Handle `TG_OP = 'UPDATE'`: early return ถ้า `FLOOR(NEW.amount/100) = FLOOR(OLD.amount/100)`, คำนวณ `delta = FLOOR(NEW.amount/100) - FLOOR(OLD.amount/100)`, ตั้ง `change_type = 'update'`
@@ -65,7 +65,7 @@ Migration timestamp ที่ใช้: `20260602000000` (ต่อจาก `20
     - Generate sequence ของ operations (insert/update/delete) 1–20 รายการ
     - ทดสอบว่า `salmon_point >= 0` หลังทุก operation โดยใช้ pure simulation function
 
-- [ ] 3. สร้าง trigger และ RLS policies ใน migration
+- [x] 3. สร้าง trigger และ RLS policies ใน migration
   - สร้าง trigger `trg_sync_salmon_point` บน `trading_history` ด้วย `AFTER INSERT OR UPDATE OR DELETE FOR EACH ROW EXECUTE FUNCTION fn_sync_salmon_point()`
   - เปิด RLS บน `salmon_point_logs` ด้วย `ALTER TABLE salmon_point_logs ENABLE ROW LEVEL SECURITY`
   - สร้าง policy `"Admins can read salmon_point_logs"` สำหรับ SELECT โดย authenticated users ที่มี `jwt_has_page_access('users')`
@@ -73,13 +73,13 @@ Migration timestamp ที่ใช้: `20260602000000` (ต่อจาก `20
   - ไม่สร้าง INSERT policy สำหรับ authenticated role (trigger เขียนผ่าน SECURITY DEFINER เท่านั้น)
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 4. Checkpoint — ตรวจสอบ migration file ก่อน apply
+- [x] 4. Checkpoint — ตรวจสอบ migration file ก่อน apply
   - ตรวจสอบว่า migration file มีครบทุก statement: ALTER TABLE, CREATE TABLE, CREATE INDEX (3 indexes), CREATE OR REPLACE FUNCTION, CREATE TRIGGER, ALTER TABLE ENABLE ROW LEVEL SECURITY, CREATE POLICY (2 policies)
   - ตรวจสอบ syntax ด้วยการ review SQL อย่างละเอียด
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. สร้าง pure TypeScript helper สำหรับ salmon point logic
-  - [ ] 5.1 สร้างไฟล์ `src/lib/salmonPoint.ts` ที่ export pure functions
+- [x] 5. สร้าง pure TypeScript helper สำหรับ salmon point logic
+  - [x] 5.1 สร้างไฟล์ `src/lib/salmonPoint.ts` ที่ export pure functions
     - `computeSalmonDelta(amount: number | null): number` — คืน `Math.floor((amount ?? 0) / 100)` หรือ 0 ถ้า amount เป็น null/undefined
     - `computeNewSalmonPoint(currentSp: number, delta: number): number` — คืน `Math.max(0, currentSp + delta)`
     - `computeSalmonPreview(amountStr: string): number | null` — parse string, คืน `null` ถ้า empty/NaN/negative, คืน `Math.floor(parsed / 100)` ถ้า valid
@@ -97,26 +97,26 @@ Migration timestamp ที่ใช้: `20260602000000` (ต่อจาก `20
     - Generate random floats ใน [0, 1000000]
     - ทดสอบว่า `computeSalmonPreview(String(amount))` ตรงกับ `Math.floor(amount / 100)` เสมอ
 
-- [ ] 6. แก้ไข `TradingHistoryManagement.tsx` — เพิ่ม salmon point preview
-  - [ ] 6.1 Import `computeSalmonPreview` จาก `@/lib/salmonPoint` และเพิ่ม `useMemo` สำหรับ `salmonPointPreview`
+- [x] 6. แก้ไข `TradingHistoryManagement.tsx` — เพิ่ม salmon point preview
+  - [x] 6.1 Import `computeSalmonPreview` จาก `@/lib/salmonPoint` และเพิ่ม `useMemo` สำหรับ `salmonPointPreview`
     - เพิ่ม `salmonPointPreview` computed value โดยใช้ `useMemo` ที่ depend on `newBill.amount`
     - ใช้ `computeSalmonPreview(newBill.amount)` จาก helper ที่สร้างใน task 5.1
     - _Requirements: 8.1, 8.2, 8.3_
 
-  - [ ] 6.2 เพิ่ม salmon point preview UI ใต้ amount input ใน create-bill dialog
+  - [x] 6.2 เพิ่ม salmon point preview UI ใต้ amount input ใน create-bill dialog
     - เพิ่ม JSX element ใต้ `<Input type="number" id="amount" .../>` ใน create-bill dialog
     - แสดง `🐟 Salmon Point ที่จะได้รับ: {salmonPointPreview} แต้ม` เมื่อ `salmonPointPreview !== null`
     - ใช้ class `text-xs text-muted-foreground mt-1` สำหรับ paragraph และ `font-semibold text-foreground` สำหรับตัวเลข
     - ไม่แสดงอะไรเมื่อ `salmonPointPreview === null`
     - _Requirements: 8.1, 8.2, 8.3_
 
-  - [ ] 6.3 ลบปุ่ม "จัดการโดเนท" หรือ manual salmon_point management control ออกจาก UI (ถ้ามี)
+  - [x] 6.3 ลบปุ่ม "จัดการโดเนท" หรือ manual salmon_point management control ออกจาก UI (ถ้ามี)
     - ค้นหาและลบ button หรือ control ใดๆ ที่เกี่ยวกับการจัดการ salmon_point แบบ manual
     - ตรวจสอบว่าไม่มี UI element ที่ให้ admin trigger salmon_point calculation เองอีกต่อไป
     - _Requirements: 7.1, 7.2_
 
-- [ ] 7. ตั้งค่า Vitest และ fast-check สำหรับ project
-  - [ ] 7.1 ติดตั้ง vitest และ fast-check เป็น devDependencies
+- [x] 7. ตั้งค่า Vitest และ fast-check สำหรับ project
+  - [x] 7.1 ติดตั้ง vitest และ fast-check เป็น devDependencies
     - เพิ่ม `vitest`, `@vitest/ui`, `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`, และ `fast-check` ใน `package.json` devDependencies
     - สร้างหรือแก้ไข `vite.config.ts` เพื่อเพิ่ม `test` configuration: `{ globals: true, environment: 'jsdom', setupFiles: ['./src/test/setup.ts'] }`
     - สร้างไฟล์ `src/test/setup.ts` สำหรับ import `@testing-library/jest-dom`
