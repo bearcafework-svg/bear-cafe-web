@@ -426,7 +426,7 @@ export function TradingHistoryManagement() {
         });
       }
 
-      toast({ title: 'สร้างบิลสำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'สร้างบิลสำเร็จ', className: 'bg-success text-success-foreground' });
       setIsAddDialogOpen(false);
       setNewBill({ memberId: '', transactionDate: '', amount: '', billType: 'ธนาคารทั่วไป', customProduct: '' });
       setSelectedProducts([]);
@@ -477,7 +477,7 @@ export function TradingHistoryManagement() {
 
       if (deleteError) throw deleteError;
 
-      toast({ title: 'ลบข้อมูลเรียบร้อยแล้ว', className: 'bg-green-500 text-white' });
+      toast({ title: 'ลบข้อมูลเรียบร้อยแล้ว', className: 'bg-success text-success-foreground' });
       setDeleteTarget(null);
       fetchData(); // Reload data
 
@@ -765,7 +765,7 @@ export function TradingHistoryManagement() {
       const latestAmountStr = toUnicodeNumber(latestAmount);
       const totalAmountStr = toUnicodeNumber(totalAmount);
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         flags: 32768,
         components: [
           {
@@ -781,7 +781,7 @@ export function TradingHistoryManagement() {
                   },
                 ],
               },
-              { type: 14, spacing: 2 },
+              { type: 14, divider: false, spacing: 2 },
               {
                 type: 9,
                 components: [
@@ -790,12 +790,14 @@ export function TradingHistoryManagement() {
                     content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
                   },
                 ],
-                accessory: {
-                  type: 11,
-                  media: { url: avatarUrl },
-                },
+                ...(avatarUrl ? {
+                  accessory: {
+                    type: 11,
+                    media: { url: avatarUrl },
+                  },
+                } : {}),
               },
-              { type: 14, spacing: 2 },
+              { type: 14, divider: false, spacing: 2 },
               {
                 type: 1,
                 components: [
@@ -805,7 +807,6 @@ export function TradingHistoryManagement() {
                     label: '︲เช็คยอดโดเนทของคุณ',
                     emoji: { id: '1256669436350562355', name: 'bee20000', animated: false },
                     url: 'https://discord.com/channels/1144251788493602848/1144581735665905766',
-                    custom_id: 'p_306458809797185538',
                   },
                 ],
               },
@@ -821,7 +822,7 @@ export function TradingHistoryManagement() {
       });
 
       if (!res.ok) throw new Error(`Webhook failed: ${res.status}`);
-      toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
     } catch (err: any) {
       console.error('Send embed failed:', err);
       toast({ title: 'ส่ง embed ไม่สำเร็จ', description: err.message, variant: 'destructive' });
@@ -917,7 +918,7 @@ export function TradingHistoryManagement() {
             <div className="flex items-center gap-2 mr-2 border-r pr-4">
               <Switch checked={webhookEnabled} onCheckedChange={toggleWebhook} id="webhook-toggle" />
               <Label htmlFor="webhook-toggle" className="text-xs flex items-center gap-1 cursor-pointer select-none">
-                {webhookEnabled ? <Bell className="h-3 w-3 text-green-500" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
+                {webhookEnabled ? <Bell className="h-3 w-3 text-success" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
                 แจ้งเตือน Discord
               </Label>
             </div>
@@ -926,7 +927,7 @@ export function TradingHistoryManagement() {
           {/* Create Bill Dialog */}
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700">
+              <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90">
                 <Plus className="h-4 w-4" /> สร้างบิลใหม่
               </Button>
             </DialogTrigger>
@@ -1508,7 +1509,7 @@ export function TradingHistoryManagement() {
                   item: editForm.item,
                 }).eq('id', editTarget.id);
                 if (error) throw error;
-                toast({ title: 'บันทึกเรียบร้อย', className: 'bg-green-500 text-white' });
+                toast({ title: 'บันทึกเรียบร้อย', className: 'bg-success text-success-foreground' });
                 setEditTarget(null);
                 fetchData();
               } catch (err: any) {
