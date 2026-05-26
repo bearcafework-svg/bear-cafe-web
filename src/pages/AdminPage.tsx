@@ -46,6 +46,7 @@ import { ContractsManagement } from '@/components/admin/ContractsManagement';
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
+import { RolesToDeleteManagement } from '@/components/admin/RolesToDeleteManagement';
 import { BulkRoleManagement } from '@/components/admin/BulkRoleManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
@@ -273,6 +274,7 @@ export default function AdminPage() {
         case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
         case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
+        case 'roles-to-delete': return canAccessPage('roles-to-delete') ? <RolesToDeleteManagement /> : null;
         case 'lottery': return canAccessPage('lottery') ? <AdminLottery /> : null;
         case 'gacha': return canAccessPage('gacha') ? <GachaManagement /> : null;
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;

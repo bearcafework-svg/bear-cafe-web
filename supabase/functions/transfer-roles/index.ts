@@ -96,16 +96,30 @@ Deno.serve(async (req): Promise<Response> => {
         .select('discord_role_id');
       const blockedIds = new Set((nonTransferable || []).map((r: any) => r.discord_role_id));
 
+      // Get roles-to-delete-on-transfer (deleted from source, NOT given to target)
+      const { data: rolesToDelete } = await supabase
+        .from('roles_to_delete_on_transfer')
+        .select('discord_role_id');
+      const deleteOnTransferIds = new Set((rolesToDelete || []).map((r: any) => r.discord_role_id));
+
       // Map roles
       const rolesDetail = memberRoles.map((roleId: string) => {
         const guildRole = guildRoles.find((gr: any) => gr.id === roleId);
+        const isNonTransferable = blockedIds.has(roleId);
+        const isDeleteOnTransfer = deleteOnTransferIds.has(roleId);
+        const isBlocked = isNonTransferable || guildRole?.managed || false;
+        let blockReason: string | null = null;
+        if (isNonTransferable) blockReason = 'non_transferable';
+        else if (guildRole?.managed) blockReason = 'bot_managed';
+
         return {
           id: roleId,
           name: guildRole?.name || roleId,
           color: guildRole?.color === 0 ? null : `#${(guildRole?.color || 0).toString(16).padStart(6, '0')}`,
           managed: guildRole?.managed || false,
-          blocked: blockedIds.has(roleId) || guildRole?.managed || false,
-          blockReason: blockedIds.has(roleId) ? 'non_transferable' : guildRole?.managed ? 'bot_managed' : null,
+          blocked: isBlocked,
+          blockReason,
+          deleteOnTransfer: isDeleteOnTransfer,
         };
       }).filter((r: any) => r.name !== '@everyone');
 
@@ -140,7 +154,13 @@ Deno.serve(async (req): Promise<Response> => {
         .select('discord_role_id');
       const blockedIds = new Set((nonTransferable || []).map((r: any) => r.discord_role_id));
 
-      // Filter out blocked roles
+      // Get roles-to-delete-on-transfer (deleted from source, NOT given to target)
+      const { data: rolesToDeleteData } = await supabase
+        .from('roles_to_delete_on_transfer')
+        .select('discord_role_id');
+      const deleteOnTransferIds = new Set((rolesToDeleteData || []).map((r: any) => r.discord_role_id));
+
+      // Filter out blocked (non-transferable) roles from the transfer list
       const safeRoles = rolesToTransfer.filter(id => !blockedIds.has(id));
       const skippedRoles = rolesToTransfer.filter(id => blockedIds.has(id));
 
@@ -182,9 +202,11 @@ Deno.serve(async (req): Promise<Response> => {
       const sourceMember = await sourceMemberRes.json();
       const sourceCurrentRoles: string[] = sourceMember.roles || [];
 
-      // Remove transferred roles AND non-transferable roles from source
-      // Non-transferable roles are deleted from source but not added to target
-      const rolesToRemoveFromSource = [...safeRoles, ...skippedRoles];
+      // Roles to remove from source:
+      // 1. safeRoles — transferred to target (removed from source)
+      // 2. roles_to_delete_on_transfer that the source currently has (deleted, NOT given to target)
+      const deleteOnTransferInSource = sourceCurrentRoles.filter(id => deleteOnTransferIds.has(id));
+      const rolesToRemoveFromSource = [...new Set([...safeRoles, ...deleteOnTransferInSource])];
       const newSourceRoles = sourceCurrentRoles.filter(id => !rolesToRemoveFromSource.includes(id));
 
       // BULK update: PATCH target (add roles)
@@ -239,17 +261,17 @@ Deno.serve(async (req): Promise<Response> => {
         completed_at: new Date().toISOString(),
       });
 
-      console.log(`Transferred ${safeRoles.length} roles from ${sourceDiscordId} to ${targetDiscordId}, removed ${skippedRoles.length} non-transferable roles from source`);
+      console.log(`Transferred ${safeRoles.length} roles from ${sourceDiscordId} to ${targetDiscordId}, deleted ${deleteOnTransferInSource.length} roles-to-delete from source`);
 
       const parts: string[] = [`ย้ายยศสำเร็จ ${safeRoles.length} ยศ`];
-      if (skippedRoles.length > 0) {
-        parts.push(`ลบยศห้ามย้าย ${skippedRoles.length} ยศออกจากต้นทาง`);
-      }
+      if (skippedRoles.length > 0) parts.push(`ข้าม ${skippedRoles.length} ยศ (ห้ามย้าย)`);
+      if (deleteOnTransferInSource.length > 0) parts.push(`ลบ ${deleteOnTransferInSource.length} ยศออกจากต้นทาง`);
 
       return new Response(JSON.stringify({
         success: true,
         transferred: safeRoles.length,
         skipped: skippedRoles.length,
+        deleted: deleteOnTransferInSource.length,
         message: parts.join(', '),
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

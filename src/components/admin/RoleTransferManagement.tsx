@@ -35,6 +35,7 @@ interface RolePreview {
   managed: boolean;
   blocked: boolean;
   blockReason: string | null;
+  deleteOnTransfer: boolean;
 }
 
 interface TransferLog {
@@ -69,7 +70,7 @@ export function RoleTransferManagement() {
   const [loadingTarget, setLoadingTarget] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [transferResult, setTransferResult] = useState<{ transferred: number; skipped: number } | null>(null);
+  const [transferResult, setTransferResult] = useState<{ transferred: number; skipped: number; deleted: number } | null>(null);
   const [logs, setLogs] = useState<TransferLog[]>([]);
   const [logsOpen, setLogsOpen] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -253,7 +254,7 @@ export function RoleTransferManagement() {
 
       if (error) throw error;
 
-      setTransferResult({ transferred: data.transferred, skipped: data.skipped });
+      setTransferResult({ transferred: data.transferred, skipped: data.skipped, deleted: data.deleted ?? 0 });
       toast({ title: 'ย้ายบทบาทสำเร็จ', description: data.message });
 
       setTimeout(() => { previewSource(sourceDiscordId); if (logsOpen) fetchLogs(); }, 1500);
@@ -267,6 +268,7 @@ export function RoleTransferManagement() {
 
   const transferableCount = roles.filter(r => !r.blocked).length;
   const blockedCount = roles.filter(r => r.blocked).length;
+  const deleteOnTransferCount = roles.filter(r => r.deleteOnTransfer).length;
   const selectedCount = selectedRoles.size;
   const progressPercent = transferableCount > 0 ? (selectedCount / transferableCount) * 100 : 0;
 
@@ -382,11 +384,11 @@ export function RoleTransferManagement() {
               </div>
             )}
             {sourceMember && !loading && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-honey/10 border border-honey/20">
                 {sourceMember.avatar ? (
                   <img src={sourceMember.avatar} alt="" className="w-10 h-10 rounded-full" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg">👤</div>
+                  <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
                 )}
                 <div>
                   <p className="font-medium">{sourceMember.username}</p>
@@ -423,11 +425,11 @@ export function RoleTransferManagement() {
               </div>
             )}
             {targetMember && !loadingTarget && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-honey/10 border border-honey/20">
                 {targetMember.avatar ? (
                   <img src={targetMember.avatar} alt="" className="w-10 h-10 rounded-full" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-lg">👤</div>
+                  <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
                 )}
                 <div>
                   <p className="font-medium">{targetMember.username}</p>
@@ -459,7 +461,8 @@ export function RoleTransferManagement() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   เลือกแล้ว {selectedCount} / {transferableCount} ยศ
-                  {blockedCount > 0 && <span className="text-amber-500 ml-2">(ยศห้ามย้าย {blockedCount} ยศ จะถูกลบออกจากต้นทาง)</span>}
+                  {blockedCount > 0 && <span className="text-warning ml-2">(ห้ามย้าย {blockedCount} ยศ)</span>}
+                  {deleteOnTransferCount > 0 && <span className="text-destructive ml-2">(ลบจากต้นทาง {deleteOnTransferCount} ยศ)</span>}
                 </span>
                 <span className="font-medium">{Math.round(progressPercent)}%</span>
               </div>
@@ -470,16 +473,19 @@ export function RoleTransferManagement() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {roles.map(role => {
                 const isBlocked = role.blocked;
+                const isDeleteOnTransfer = role.deleteOnTransfer;
                 const isChecked = selectedRoles.has(role.id);
                 return (
                   <div
                     key={role.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
                       isBlocked
-                        ? 'bg-muted/30 border-amber-500/30 opacity-60 cursor-not-allowed'
-                        : isChecked
-                          ? 'bg-primary/5 border-primary/30'
-                          : 'bg-card hover:bg-muted/40 border-border'
+                        ? 'bg-warning/5 border-warning/20 opacity-60 cursor-not-allowed'
+                        : isDeleteOnTransfer
+                          ? 'bg-bear-brown/5 border-bear-brown/20'
+                          : isChecked
+                            ? 'bg-honey/10 border-honey/30'
+                            : 'bg-card hover:bg-latte/20 border-border'
                     }`}
                   >
                     <Checkbox
@@ -488,7 +494,7 @@ export function RoleTransferManagement() {
                       disabled={isBlocked}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className="font-medium text-sm truncate"
                           style={{ color: role.color || undefined }}
@@ -496,9 +502,14 @@ export function RoleTransferManagement() {
                           {role.name}
                         </span>
                         {isBlocked && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-500 shrink-0">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/50 text-warning shrink-0">
                             <ShieldBan className="w-3 h-3 mr-0.5" />
-                            {role.blockReason === 'non_transferable' ? 'ลบจากต้นทาง' : 'Bot'}
+                            {role.blockReason === 'non_transferable' ? 'ห้ามย้าย' : 'Bot'}
+                          </Badge>
+                        )}
+                        {isDeleteOnTransfer && !isBlocked && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-destructive/50 text-destructive shrink-0">
+                            ลบจากต้นทาง
                           </Badge>
                         )}
                       </div>
@@ -510,14 +521,17 @@ export function RoleTransferManagement() {
 
             {/* Transfer Result */}
             {transferResult && (
-              <div className="mt-4 p-4 rounded-lg bg-success/10 border border-success/30 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+              <div className="mt-4 p-4 rounded-xl bg-honey/10 border border-honey/30 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-honey shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-success">
+                  <p className="font-medium text-honey">
                     ย้ายสำเร็จ {transferResult.transferred} ยศ
                   </p>
                   {transferResult.skipped > 0 && (
-                    <p className="text-amber-500 mt-1">ลบยศห้ามย้าย {transferResult.skipped} ยศออกจากต้นทาง (ไม่ถูกเพิ่มให้ปลายทาง)</p>
+                    <p className="text-muted-foreground mt-1">ข้ามไป {transferResult.skipped} ยศ (ห้ามย้าย)</p>
+                  )}
+                  {transferResult.deleted > 0 && (
+                    <p className="text-destructive/80 mt-1">ลบ {transferResult.deleted} ยศออกจากต้นทาง (ไม่ถูกย้ายไปปลายทาง)</p>
                   )}
                 </div>
               </div>
@@ -547,7 +561,7 @@ export function RoleTransferManagement() {
       <Collapsible open={logsOpen} onOpenChange={setLogsOpen}>
         <Card>
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors">
+            <CardHeader className="cursor-pointer hover:bg-honey/5 transition-colors rounded-t-xl">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <History className="w-4 h-4 text-primary" />
@@ -630,7 +644,7 @@ export function RoleTransferManagement() {
                           </TableCell>
                           <TableCell>
                             {(log.roles_skipped?.length || 0) > 0 ? (
-                              <Badge variant="outline" className="gap-1 text-amber-500 border-amber-500/50">
+                              <Badge variant="outline" className="gap-1 text-warning border-warning/50">
                                 <ShieldBan className="w-3 h-3" />
                                 {log.roles_skipped.length}
                               </Badge>
@@ -662,10 +676,10 @@ export function RoleTransferManagement() {
             <AlertDialogTitle>ยืนยันการย้ายบทบาท</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>ย้าย <strong>{selectedCount} ยศ</strong> จาก <strong>{sourceMember?.username}</strong> ไปยัง <strong>{targetMember?.username}</strong></p>
-              {blockedCount > 0 && (
-                <p className="text-amber-500">⚠️ ยศห้ามย้าย {blockedCount} ยศ จะถูกลบออกจากต้นทางแต่ไม่ถูกเพิ่มให้ปลายทาง</p>
+              <p className="text-warning">⚠️ ยศจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
+              {deleteOnTransferCount > 0 && (
+                <p className="text-destructive">🗑️ ยศที่ตั้งค่าให้ลบ {deleteOnTransferCount} ยศ จะถูกลบออกจากต้นทางโดยไม่ถูกย้ายไปปลายทาง</p>
               )}
-              <p className="text-amber-500">⚠️ ยศที่ย้ายจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
