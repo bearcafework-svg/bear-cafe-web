@@ -74,6 +74,12 @@ import { computeSalmonPreview } from '@/lib/salmonPoint';
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
 
+// Edge Function URL สำหรับส่ง Components V2 embed ผ่าน Bot API
+// Bot Token เก็บไว้ใน Edge Function เท่านั้น ไม่ expose ใน frontend
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const EDGE_SEND_TRADING_EMBED = `${SUPABASE_URL}/functions/v1/send-trading-embed`;
+
 const PRODUCT_LIST = [
  "ヽ 𝐂𝐨𝐨𝐤𝐢𝐞 (ยศพรีเมี่ยม 𝐒) 𓂃 🍪",
  "ヽ 𝐌𝐚𝐜𝐚𝐫𝐨𝐧 (ยศพรีเมี่ยม 𝐀) 𓂃 🥯",
@@ -761,67 +767,28 @@ export function TradingHistoryManagement() {
       const profile = profileMap.get(memberId);
       const avatarUrl = profile?.avatar_url ?? '';
 
-      // แปลงตัวเลขเป็น Unicode
-      const latestAmountStr = toUnicodeNumber(latestAmount);
-      const totalAmountStr = toUnicodeNumber(totalAmount);
-
-      const payload: Record<string, unknown> = {
-        flags: 32768,
-        components: [
-          {
-            type: 17,
-            components: [
-              {
-                type: 12,
-                items: [
-                  {
-                    media: {
-                      url: 'https://media.discordapp.net/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png?ex=6a1689fe&is=6a15387e&hm=70fc39c297f577a46fa8c0e93dd254c0d4ade5a6cb7f6ace9b5adb11b8891422&',
-                    },
-                  },
-                ],
-              },
-              { type: 14, divider: false, spacing: 2 },
-              {
-                type: 9,
-                components: [
-                  {
-                    type: 10,
-                    content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
-                  },
-                ],
-                ...(avatarUrl ? {
-                  accessory: {
-                    type: 11,
-                    media: { url: avatarUrl },
-                  },
-                } : {}),
-              },
-              { type: 14, divider: false, spacing: 2 },
-              {
-                type: 1,
-                components: [
-                  {
-                    type: 2,
-                    style: 5,
-                    label: '︲เช็คยอดโดเนทของคุณ',
-                    emoji: { id: '1256669436350562355', name: 'bee20000', animated: false },
-                    url: 'https://discord.com/channels/1144251788493602848/1144581735665905766',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-
-      const res = await fetch(DISCORD_WEBHOOK_URL, {
+      // ส่งผ่าน Edge Function แทน Webhook โดยตรง
+      // เพราะ Components V2 (flags: 32768) ไม่รองรับบน Webhook endpoint — error 400
+      // Bot Token เก็บไว้ใน Edge Function เท่านั้น
+      const res = await fetch(EDGE_SEND_TRADING_EMBED, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          member_id: memberId,
+          latest_amount: latestAmount,
+          total_amount: totalAmount,
+          avatar_url: avatarUrl,
+        }),
       });
 
-      if (!res.ok) throw new Error(`Webhook failed: ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error((errData as any).error || `Edge Function error: ${res.status}`);
+      }
+
       toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
     } catch (err: any) {
       console.error('Send embed failed:', err);

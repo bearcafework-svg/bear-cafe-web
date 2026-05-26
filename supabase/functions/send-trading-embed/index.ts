@@ -1,0 +1,150 @@
+/**
+ * send-trading-embed
+ * ส่ง Components V2 embed ขอบคุณการโดเนทผ่าน Discord Bot API
+ * รับ: { member_id, latest_amount, total_amount, avatar_url, channel_id? }
+ *
+ * ใช้ Bot API แทน Webhook เพราะ Components V2 (flags: 32768, type 17/12/9 ฯลฯ)
+ * ไม่รองรับบน Webhook endpoint — จะ error 400
+ */
+import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+/** แปลงตัวเลขเป็น Unicode Mathematical Digits (𝟢𝟣𝟤...) พร้อม comma separator */
+function toUnicodeNumber(n: number): string {
+  const unicodeDigits = ["𝟢", "𝟣", "𝟤", "𝟥", "𝟦", "𝟧", "𝟨", "𝟩", "𝟪", "𝟫"];
+  const formatted = n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  return formatted.replace(/[0-9]/g, (d) => unicodeDigits[parseInt(d)]);
+}
+
+Deno.serve(async (req): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const memberId: string = body.member_id ?? "";
+    const latestAmount: number = Number(body.latest_amount ?? 0);
+    const totalAmount: number = Number(body.total_amount ?? latestAmount);
+    const avatarUrl: string = body.avatar_url ?? "";
+
+    // Channel ที่บอทจะส่ง embed ขอบคุณ
+    // ตั้งค่าผ่าน env DISCORD_TRADING_EMBED_CHANNEL_ID หรือส่งมาใน body
+    const channelId: string =
+      body.channel_id ??
+      Deno.env.get("DISCORD_TRADING_EMBED_CHANNEL_ID") ??
+      "";
+
+    if (!memberId) {
+      return new Response(
+        JSON.stringify({ error: "member_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!channelId) {
+      return new Response(
+        JSON.stringify({
+          error: "Missing channel_id — set DISCORD_TRADING_EMBED_CHANNEL_ID env var or pass channel_id in body",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const latestAmountStr = toUnicodeNumber(latestAmount);
+    const totalAmountStr = toUnicodeNumber(totalAmount);
+
+    // Components V2 payload — flags: 32768 = IS_COMPONENTS_V2
+    // ต้องส่งผ่าน Bot API เท่านั้น Webhook ไม่รองรับ
+    const payload: Record<string, unknown> = {
+      flags: 32768,
+      components: [
+        {
+          type: 17, // Container
+          components: [
+            {
+              type: 12, // Media Gallery
+              items: [
+                {
+                  media: {
+                    url: "https://media.discordapp.net/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png?ex=6a1689fe&is=6a15387e&hm=70fc39c297f577a46fa8c0e93dd254c0d4ade5a6cb7f6ace9b5adb11b8891422&",
+                  },
+                },
+              ],
+            },
+            { type: 14, divider: false, spacing: 2 }, // Separator
+            {
+              type: 9, // Section
+              components: [
+                {
+                  type: 10, // Text Display
+                  content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
+                },
+              ],
+              ...(avatarUrl
+                ? {
+                    accessory: {
+                      type: 11, // Thumbnail
+                      media: { url: avatarUrl },
+                    },
+                  }
+                : {}),
+            },
+            { type: 14, divider: false, spacing: 2 }, // Separator
+            {
+              type: 1, // Action Row
+              components: [
+                {
+                  type: 2, // Button
+                  style: 5, // Link
+                  label: "︲เช็คยอดโดเนทของคุณ",
+                  emoji: { id: "1256669436350562355", name: "bee20000", animated: false },
+                  url: "https://discord.com/channels/1144251788493602848/1144581735665905766",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = await sendDiscordBotMessage(channelId, payload, {
+      dedupKey: `trading-embed:${memberId}:${latestAmount}:${Date.now()}`,
+    });
+
+    if (!result.success) {
+      console.error("[send-trading-embed] Discord send failed", {
+        memberId,
+        error: result.error,
+        errorCode: result.errorCode ?? null,
+        status: result.status ?? null,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Discord API failed",
+          details: result.error,
+          errorCode: result.errorCode ?? null,
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, message_id: result.messageId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("[send-trading-embed] Error:", err);
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: String(err) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
