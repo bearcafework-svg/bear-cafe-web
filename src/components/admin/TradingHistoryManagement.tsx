@@ -1303,9 +1303,9 @@ export function TradingHistoryManagement() {
                               {r.type_bill}
                             </Badge>
                           )}
-                          <div className="flex items-center gap-1 text-xs text-orange-500 font-semibold">
+                          <div className="flex items-center gap-1 text-xs text-honey font-semibold">
                             <span>🐟</span>
-                            <span>{Math.floor((r.amount || 0) / 100)}</span>
+                            <span>{salmonPointMap.get(r.member_id) ?? '-'}</span>
                           </div>
                         </div>
 

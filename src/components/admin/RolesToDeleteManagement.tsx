@@ -21,7 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
-import { Trash2, Plus, AlertTriangle, Loader2, Search, Pencil } from 'lucide-react';
+import { Trash2, Plus, AlertTriangle, Loader2, Search, Pencil, ArrowRight } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
@@ -289,7 +289,7 @@ export function RolesToDeleteManagement() {
         <CardContent>
           <div className="mb-4 p-4 bg-warning/10 border border-warning/30 rounded-lg flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-            <div className="text-sm">
+            <div className="text-sm flex-1">
               <p className="font-medium text-warning">
                 ยศในรายการนี้จะถูกลบออกจากผู้ทำเรื่องย้าย (ต้นทาง) โดยอัตโนมัติ
               </p>
@@ -297,6 +297,15 @@ export function RolesToDeleteManagement() {
                 ยศเหล่านี้จะ<strong>ไม่ถูกย้าย</strong>ไปให้ผู้รับ (ปลายทาง) — ถูกลบออกจากต้นทางเท่านั้น
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs border-warning/40 text-warning hover:bg-warning/10 hover:border-warning/60"
+              onClick={() => navigate('/admin/role-transfer')}
+            >
+              ไปหน้าย้ายบทบาท
+              <ArrowRight className="w-3 h-3" />
+            </Button>
           </div>
 
           <BulkDeleteToolbar

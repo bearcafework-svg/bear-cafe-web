@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, RefreshCw, ChevronsUpDown, Check } from 'lucide-react';
+import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Profile {
@@ -54,6 +55,7 @@ interface TransferLog {
 }
 
 export function RoleTransferManagement() {
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [sourceDiscordId, setSourceDiscordId] = useState('');
@@ -356,6 +358,23 @@ export function RoleTransferManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Info banner: link to roles-to-delete settings */}
+      <div className="p-3 bg-muted/50 border border-border rounded-xl flex items-center justify-between gap-3 text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Trash2 className="w-4 h-4 shrink-0 text-destructive" />
+          <span>ยศที่ตั้งค่าไว้จะถูกลบออกจากต้นทางอัตโนมัติเมื่อย้าย (ไม่ถูกย้ายไปปลายทาง)</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 gap-1.5 text-xs"
+          onClick={() => navigate('/admin/roles-to-delete')}
+        >
+          จัดการรายการ
+          <ExternalLink className="w-3 h-3" />
+        </Button>
+      </div>
+
       {/* Source & Target Selection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Source */}
