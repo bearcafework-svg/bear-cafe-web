@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
@@ -286,10 +287,10 @@ export function RolesToDeleteManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="mb-4 p-4 bg-warning/10 border border-warning/30 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-amber-600 dark:text-amber-400">
+              <p className="font-medium text-warning">
                 ยศในรายการนี้จะถูกลบออกจากผู้ทำเรื่องย้าย (ต้นทาง) โดยอัตโนมัติ
               </p>
               <p className="text-muted-foreground mt-1">
@@ -447,7 +448,7 @@ export function RolesToDeleteManagement() {
                       className="pl-9"
                     />
                   </div>
-                  <div className="rounded-md border">
+                  <ScrollArea className="h-64 rounded-md border">
                     {loadingDiscordRoles ? (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" /> กำลังโหลด...
@@ -466,7 +467,7 @@ export function RolesToDeleteManagement() {
                               onClick={() => toggleDiscordRole(role.id)}
                               className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${
                                 checked
-                                  ? 'bg-destructive/10 border border-destructive/30'
+                                  ? 'bg-honey/10 border border-honey/30'
                                   : 'hover:bg-muted/50 border border-transparent'
                               }`}
                             >
@@ -494,7 +495,7 @@ export function RolesToDeleteManagement() {
                         })}
                       </div>
                     )}
-                  </div>
+                  </ScrollArea>
                 </div>
                 <div className="space-y-2">
                   <Label>เหตุผล (ไม่บังคับ — ใช้กับทุก Role ที่เลือก)</Label>

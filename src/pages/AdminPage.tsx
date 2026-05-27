@@ -384,7 +384,7 @@ export default function AdminPage() {
         )}
 
         {/* Content */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 overflow-auto">
+        <main className="flex-1 min-w-0 p-4 sm:p-6">
           <div className="max-w-6xl mx-auto space-y-6">
           {/* Mobile maintenance toggle */}
           {isMobile && isOwner && (

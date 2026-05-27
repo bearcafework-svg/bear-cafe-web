@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
@@ -357,7 +358,7 @@ export function NonTransferableRolesManagement() {
                     <Input placeholder="ค้นหา Role..." value={addSearchQuery}
                       onChange={e => setAddSearchQuery(e.target.value)} className="pl-9" />
                   </div>
-                  <div className="rounded-md border">
+                  <ScrollArea className="h-64 rounded-md border">
                     {loadingDiscordRoles ? (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" /> กำลังโหลด...
@@ -395,7 +396,7 @@ export function NonTransferableRolesManagement() {
                         })}
                       </div>
                     )}
-                  </div>
+                  </ScrollArea>
                 </div>
                 <div className="space-y-2">
                   <Label>เหตุผล (ไม่บังคับ - ใช้กับทุก Role ที่เลือก)</Label>
