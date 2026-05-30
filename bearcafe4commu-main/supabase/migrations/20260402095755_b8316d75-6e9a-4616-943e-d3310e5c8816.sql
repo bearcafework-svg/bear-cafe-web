@@ -1,1 +1,0 @@
-ALTER TABLE public.discord_servers ADD COLUMN IF NOT EXISTS click_count integer DEFAULT 0;
