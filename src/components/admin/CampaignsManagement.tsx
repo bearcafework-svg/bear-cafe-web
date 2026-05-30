@@ -275,7 +275,7 @@ export function CampaignsManagement() {
       });
       const ext = isPng ? 'png' : 'jpg';
       const fileName = `${Date.now()}-campaign.${ext}`;
-      const { data, error } = await supabase.storage.from('campaign-images').upload(fileName, compressed);
+      const { data, error } = await supabase.storage.from('campaign-images').upload(fileName, compressed, { cacheControl: '86400' });
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('campaign-images').getPublicUrl(data.path);
       onSuccess(publicUrl);

@@ -183,6 +183,14 @@ export function TagWarnLogsManagement() {
     punishLink: '',
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  // สร้าง object URL สำหรับ preview รูปภาพ และ revoke อัตโนมัติเมื่อ selectedFiles เปลี่ยน
+  const previewUrls = useMemo(() => {
+    const urls = selectedFiles.map(f => URL.createObjectURL(f));
+    return urls;
+  }, [selectedFiles]);
+  useEffect(() => {
+    return () => { previewUrls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [previewUrls]);
   const [webhookEnabled, setWebhookEnabled] = useState(true);
 
   // Load webhook setting
@@ -655,7 +663,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
           
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('warn-images')
-            .upload(fileName, compressedFile);
+            .upload(fileName, compressedFile, { cacheControl: '86400' });
 
           if (uploadError) throw uploadError;
 
@@ -833,7 +841,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
                     <div className="flex gap-2 mt-2 flex-wrap">
                       {selectedFiles.map((f, i) => (
                         <div key={i} className="relative">
-                          <img src={URL.createObjectURL(f)} alt={f.name} className="w-20 h-20 object-cover rounded-lg border border-border" />
+                          <img src={previewUrls[i]} alt={f.name} className="w-20 h-20 object-cover rounded-lg border border-border" />
                           <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md">
                             <X className="h-3 w-3" />
                           </button>

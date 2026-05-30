@@ -242,6 +242,14 @@ export function TradingHistoryManagement() {
   });
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  // สร้าง object URL สำหรับ preview รูปภาพ และ revoke อัตโนมัติเมื่อ selectedFiles เปลี่ยน
+  const previewUrls = useMemo(() => {
+    const urls = selectedFiles.map(f => URL.createObjectURL(f));
+    return urls;
+  }, [selectedFiles]);
+  useEffect(() => {
+    return () => { previewUrls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [previewUrls]);
 
   // Load webhook setting
   useEffect(() => {
@@ -350,7 +358,7 @@ export function TradingHistoryManagement() {
           
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('slip-images')
-            .upload(fileName, compressedFile);
+            .upload(fileName, compressedFile, { cacheControl: '86400' });
 
           if (uploadError) throw uploadError;
 
@@ -990,7 +998,7 @@ export function TradingHistoryManagement() {
                       {selectedFiles.map((f, i) => (
                         <div key={i} className="relative group">
                           <img 
-                            src={URL.createObjectURL(f)} 
+                            src={previewUrls[i]} 
                             alt={f.name}
                             className="w-20 h-20 object-cover rounded-lg border border-border"
                           />

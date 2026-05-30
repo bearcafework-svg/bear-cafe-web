@@ -77,9 +77,21 @@ export function BannerManagement() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // เก็บ object URL ที่สร้างจาก createObjectURL เพื่อ revoke ตอน cleanup
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchBanners();
+  }, []);
+
+  // Cleanup object URL เมื่อ component unmount
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
   }, []);
 
   async function fetchBanners() {
@@ -114,6 +126,11 @@ export function BannerManagement() {
       is_active: true,
     });
     setSelectedFile(null);
+    // Revoke URL เก่าก่อนเปิด dialog ใหม่
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
     setPreviewUrl(null);
     setDialogOpen(true);
   }
@@ -129,6 +146,11 @@ export function BannerManagement() {
       is_active: banner.is_active,
     });
     setSelectedFile(null);
+    // Revoke URL เก่าก่อนเปิด dialog ใหม่
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
     setPreviewUrl(banner.image_url);
     setDialogOpen(true);
   }
@@ -179,7 +201,13 @@ export function BannerManagement() {
     }
 
     setSelectedFile(processed);
-    setPreviewUrl(URL.createObjectURL(processed));
+    // Revoke URL เก่าก่อนสร้างใหม่ เพื่อป้องกัน memory leak
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+    const newUrl = URL.createObjectURL(processed);
+    objectUrlRef.current = newUrl;
+    setPreviewUrl(newUrl);
   }
 
   async function uploadImage(file: File): Promise<string> {
@@ -189,7 +217,7 @@ export function BannerManagement() {
 
     const { error: uploadError } = await supabase.storage
       .from('banners')
-      .upload(filePath, file);
+      .upload(filePath, file, { cacheControl: '31536000', upsert: false });
 
     if (uploadError) throw uploadError;
 
@@ -261,6 +289,11 @@ export function BannerManagement() {
       }
 
       setDialogOpen(false);
+      // Revoke object URL หลัง save สำเร็จ
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
       fetchBanners();
     } catch (error) {
       console.error('Error saving banner:', error);
@@ -445,12 +478,15 @@ export function BannerManagement() {
             กำลังโหลด...
           </div>
         ) : banners.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>ยังไม่มี Banner</p>
+          <div className="text-center py-10 text-muted-foreground">
+            <div className="w-16 h-16 rounded-2xl bg-honey/10 border border-honey/20 flex items-center justify-center mx-auto mb-4">
+              <ImageIcon className="w-8 h-8 text-honey/60" />
+            </div>
+            <p className="font-medium text-foreground/60">ยังไม่มี Banner</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">เพิ่ม Banner แรกเพื่อแสดงบนหน้าหลัก</p>
             <Button
               variant="outline"
-              className="mt-4"
+              className="mt-4 border-honey/30 hover:border-honey/60 hover:bg-honey/5"
               onClick={openCreateDialog}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -517,7 +553,7 @@ export function BannerManagement() {
                     <img
                       src={banner.image_url}
                       alt={banner.title || 'Banner'}
-                      className="w-24 h-8 object-cover rounded"
+                      className="w-24 h-8 object-cover rounded-lg border border-border/40"
                     />
                   </TableCell>
                   <TableCell>
@@ -549,8 +585,8 @@ export function BannerManagement() {
                       variant={banner.is_active ? 'default' : 'secondary'}
                       className={
                         banner.is_active
-                          ? 'bg-success text-success-foreground'
-                          : ''
+                          ? 'bg-matcha/80 text-white border-0'
+                          : 'bg-muted text-muted-foreground border border-border/50'
                       }
                     >
                       {banner.is_active ? (
@@ -604,7 +640,16 @@ export function BannerManagement() {
       </CardContent>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          // Revoke object URL เมื่อ dialog ถูกปิด (กด X หรือ Escape)
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+          }
+        }
+        setDialogOpen(open);
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -631,11 +676,12 @@ export function BannerManagement() {
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="w-full aspect-[3/1] object-cover rounded-lg border"
+                    className="w-full aspect-[3/1] object-cover rounded-xl border border-border/50"
                   />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                  <div className="absolute inset-0 bg-mocha/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
                     <Button
                       variant="secondary"
+                      className="bg-cream/90 text-mocha hover:bg-cream border-0"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="w-4 h-4 mr-2" />
@@ -647,11 +693,14 @@ export function BannerManagement() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full aspect-[3/1] border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors"
+                  className="w-full aspect-[3/1] border-2 border-dashed border-bear-brown/25 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-honey/50 hover:bg-honey/5 transition-colors"
                 >
-                  <Upload className="w-8 h-8 text-muted-foreground" />
+                  <Upload className="w-8 h-8 text-muted-foreground/50" />
                   <span className="text-sm text-muted-foreground">
                     คลิกเพื่ออัพโหลดรูปภาพ
+                  </span>
+                  <span className="text-xs text-muted-foreground/60">
+                    แนะนำ 909 × 304 px
                   </span>
                 </button>
               )}
@@ -740,7 +789,14 @@ export function BannerManagement() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={() => {
+                // Revoke object URL เมื่อกดยกเลิก
+                if (objectUrlRef.current) {
+                  URL.revokeObjectURL(objectUrlRef.current);
+                  objectUrlRef.current = null;
+                }
+                setDialogOpen(false);
+              }}
               disabled={uploading}
             >
               ยกเลิก

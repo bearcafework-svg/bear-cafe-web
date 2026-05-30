@@ -232,11 +232,23 @@ function UploadTab({
 
   function removeItem(idx: number) {
     if (previewIdx === idx) { preview.stop(); setPreviewIdx(null); }
-    setItems(prev => prev.filter((_, i) => i !== idx));
+    setItems(prev => {
+      // Revoke object URL ของ cover image ก่อนลบ item
+      const item = prev[idx];
+      if (item?.imageUrl) URL.revokeObjectURL(item.imageUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
   function updateItem(idx: number, patch: Partial<UploadItem>) {
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, ...patch } : item));
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      // Revoke URL เก่าถ้ามีการเปลี่ยน imageUrl (เช่น กด "ลบรูป")
+      if ('imageUrl' in patch && item.imageUrl && patch.imageUrl !== item.imageUrl) {
+        URL.revokeObjectURL(item.imageUrl);
+      }
+      return { ...item, ...patch };
+    }));
   }
 
   async function togglePreview(idx: number) {
@@ -298,7 +310,7 @@ function UploadTab({
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('chat-music')
-          .upload(path, convertedBlob, { contentType });
+          .upload(path, convertedBlob, { contentType, cacheControl: '31536000' });
 
         if (uploadError) {
           console.error(`[upload] ❌ [${idx}] Storage error:`, JSON.stringify(uploadError, null, 2));
@@ -329,7 +341,7 @@ function UploadTab({
           const imgPath = `covers/${Date.now()}_${sanitizeFilename(item.title)}.${imgExt}`;
           const { error: imgErr } = await supabase.storage
             .from('chat-music')
-            .upload(imgPath, item.imageFile, { contentType: item.imageFile.type });
+            .upload(imgPath, item.imageFile, { contentType: item.imageFile.type, cacheControl: '31536000' });
           if (!imgErr) {
             const { data: imgUrl } = supabase.storage.from('chat-music').getPublicUrl(imgPath);
             coverUrl = imgUrl.publicUrl;
@@ -405,7 +417,13 @@ function UploadTab({
             <div className="flex gap-2">
               <Button
                 variant="outline" size="sm"
-                onClick={() => setItems(prev => prev.filter(i => i.status !== 'done'))}
+                onClick={() => setItems(prev => {
+                  // Revoke object URL ของ cover image ก่อนลบ done items
+                  prev.filter(i => i.status === 'done').forEach(i => {
+                    if (i.imageUrl) URL.revokeObjectURL(i.imageUrl);
+                  });
+                  return prev.filter(i => i.status !== 'done');
+                })}
                 disabled={doneCount === 0}
               >
                 ล้างรายการที่เสร็จ
@@ -676,7 +694,7 @@ function TrackEditDialog({
     try {
       const ext = file.name.split('.').pop() ?? 'jpg';
       const path = `covers/${Date.now()}_${sanitizeFilename(file.name.replace(/\.[^.]+$/, ''))}.${ext}`;
-      const { error } = await supabase.storage.from('chat-music').upload(path, file, { contentType: file.type, upsert: false });
+      const { error } = await supabase.storage.from('chat-music').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from('chat-music').getPublicUrl(path);
       setForm(f => ({ ...f, image_url: urlData.publicUrl }));

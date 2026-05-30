@@ -70,6 +70,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           .upload(fileName, blob, {
             contentType,
             upsert: true,
+            cacheControl: "86400",
           });
 
         if (uploadErr) {

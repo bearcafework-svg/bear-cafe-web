@@ -40,7 +40,7 @@ async function uploadFrameImage(file: File): Promise<string> {
   const path = `frames/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const { error } = await supabase.storage
     .from('cosmetics')
-    .upload(path, file, { contentType: file.type, upsert: false });
+    .upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' });
   if (error) throw new Error(error.message);
   return supabase.storage.from('cosmetics').getPublicUrl(path).data.publicUrl;
 }

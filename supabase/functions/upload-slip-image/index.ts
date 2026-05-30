@@ -58,7 +58,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Upload to slip-images bucket
     const { error: uploadErr } = await supabase.storage
       .from("slip-images")
-      .upload(fileName, arrayBuffer, { contentType, upsert: true });
+      .upload(fileName, arrayBuffer, { contentType, upsert: true, cacheControl: "86400" });
 
     if (uploadErr) {
       return new Response(

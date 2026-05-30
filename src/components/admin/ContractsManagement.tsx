@@ -164,7 +164,7 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
       // Upload ไฟล์ใหม่
       const { error: upErr } = await supabase.storage
         .from('contract-icons')
-        .upload(`type-icons/${type}.${ext}`, file, { upsert: true });
+        .upload(`type-icons/${type}.${ext}`, file, { upsert: true, cacheControl: '31536000' });
       if (upErr) throw upErr;
 
       const { data } = supabase.storage
@@ -647,9 +647,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   const borderColor =
     contract.type !== 'house' ? 'border-border' :
     days === null ? 'border-border' :
-    days <= 3 ? 'border-red-500' :
-    days <= 7 ? 'border-orange-400' :
-    'border-green-500';
+    days <= 3 ? 'border-destructive/70' :
+    days <= 7 ? 'border-warning/70' :
+    'border-[#8FA77A]/70';
 
   const statusText =
     contract.type !== 'house' ? null :
@@ -660,23 +660,24 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
     'สัญญาเช่ายังไม่ใกล้หมด';
 
   const statusColor =
-    days !== null && days <= 3 ? 'text-red-500' :
-    days !== null && days <= 7 ? 'text-orange-400' :
-    'text-green-500';
+    days !== null && days <= 3 ? 'text-destructive' :
+    days !== null && days <= 7 ? 'text-warning' :
+    'text-[#8FA77A]';
 
   const statusDot =
-    days !== null && days <= 3 ? 'bg-red-500' :
-    days !== null && days <= 7 ? 'bg-orange-400' :
-    'bg-green-500';
+    days !== null && days <= 3 ? 'bg-destructive/80' :
+    days !== null && days <= 7 ? 'bg-warning/80' :
+    'bg-[#8FA77A]/80';
 
   const typeLabel =
     contract.type === 'house' ? 'สัญญาเช่าบ้าน' :
     contract.type === 'role' ? 'สัญญาเช่ายศ' : 'สัญญายศส่วนตัว';
 
+  // Bear Cafe palette: house → warm honey-brown, role → muted mocha-purple, personal_role → honey gold
   const typeColor =
-    contract.type === 'house' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-    contract.type === 'role' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-    'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    contract.type === 'house' ? 'bg-[#8B5E3C]/15 text-[#C4895A] border-[#8B5E3C]/30' :
+    contract.type === 'role' ? 'bg-[#8B5E3C]/10 text-[#B8956A] border-[#8B5E3C]/20' :
+    'bg-[#E9A84E]/10 text-[#E9A84E] border-[#E9A84E]/25';
 
   const typeEmoji =
     contract.type === 'house' ? '🏠' :
@@ -815,7 +816,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
             {/* Row 3b: Channel link (own row so it never truncates) */}
             {contract.type === 'house' && contract.room_link && (
               <a href={contract.room_link} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors w-fit">
+                className="flex items-center gap-1.5 text-sm text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit">
                 <span>🔗</span>
                 {loadingHouseChannel
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -826,7 +827,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
 
             {contract.type === 'personal_role' && contract.room_link && (
               <a href={contract.room_link} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors w-fit">
+                className="flex items-center gap-1.5 text-sm text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit">
                 <span>#</span>
                 {loadingExtra
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -846,7 +847,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
                   ) : roleTotal !== null ? (
                     <span className={cn(
                       'text-xs font-semibold px-2 py-0.5 rounded-full',
-                      roleTotal > 5 ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
+                      roleTotal > 5 ? 'bg-destructive/10 text-destructive' : 'bg-[#8FA77A]/10 text-[#8FA77A]'
                     )}>
                       👥 {roleTotal.toLocaleString()} คน{roleTotal > 5 ? ' (เกิน)' : ''}
                     </span>
@@ -956,13 +957,15 @@ export function ContractsManagement() {
 
     // ลอง getPublicUrl ทุก ext แล้วเก็บตัวแรกที่ได้ URL (ไม่ fetch จริง)
     // การ validate จะเกิดที่ <img onError> แทน
+    // ไม่ต่อ ?t= ตอน mount เพื่อให้ browser cache รูปได้ตามปกติ
+    // cache-busting จะทำเฉพาะหลัง upload ใหม่สำเร็จเท่านั้น (ใน handleFileChange)
     for (const type of types) {
       for (const ext of exts) {
         const { data } = supabase.storage
           .from('contract-icons')
           .getPublicUrl(`type-icons/${type}.${ext}`);
         if (data?.publicUrl) {
-          result[type] = `${data.publicUrl}?t=${Date.now()}`;
+          result[type] = data.publicUrl;
           break; // ใช้ png เป็น default, ถ้าไม่มีจะ fallback ที่ onError
         }
       }
@@ -1068,9 +1071,9 @@ export function ContractsManagement() {
         {/* Type counts — clickable quick-filter */}
         {([
           { key: 'all', label: 'ทั้งหมด', count: contracts.length, color: 'bg-muted/60 hover:bg-muted' },
-          { key: 'house', label: '🏠 บ้าน', count: countByType.house, color: 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400' },
-          { key: 'role', label: '👑 ยศ', count: countByType.role, color: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400' },
-          { key: 'personal_role', label: '⭐ ยศส่วนตัว', count: countByType.personal_role, color: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400' },
+          { key: 'house', label: '🏠 บ้าน', count: countByType.house, color: 'bg-[#8B5E3C]/10 hover:bg-[#8B5E3C]/20 text-[#C4895A]' },
+          { key: 'role', label: '👑 ยศ', count: countByType.role, color: 'bg-[#8B5E3C]/10 hover:bg-[#8B5E3C]/20 text-[#B8956A]' },
+          { key: 'personal_role', label: '⭐ ยศส่วนตัว', count: countByType.personal_role, color: 'bg-[#E9A84E]/10 hover:bg-[#E9A84E]/20 text-[#E9A84E]' },
         ] as const).map(({ key, label, count, color }) => (
           <button
             key={key}
@@ -1091,12 +1094,12 @@ export function ContractsManagement() {
           className={cn(
             'rounded-xl px-3 py-2.5 text-left transition-all border',
             urgentCount > 0
-              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30'
+              ? 'bg-destructive/10 hover:bg-destructive/20 border-destructive/30'
               : 'bg-muted/40 border-border/40 opacity-60'
           )}
         >
           <p className="text-[11px] text-muted-foreground font-medium">🚨 ใกล้หมด</p>
-          <p className={cn('text-xl font-bold leading-tight', urgentCount > 0 && 'text-red-400')}>{urgentCount}</p>
+          <p className={cn('text-xl font-bold leading-tight', urgentCount > 0 && 'text-destructive')}>{urgentCount}</p>
         </button>
       </div>
 

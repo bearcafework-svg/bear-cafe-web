@@ -79,7 +79,7 @@ const AI_CATEGORY_TH: Record<string, string> = {
 async function uploadTopicImage(file: File, bucket: string): Promise<string> {
   const ext = file.name.split('.').pop();
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, file);
+  const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: '86400' });
   if (error) throw error;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }

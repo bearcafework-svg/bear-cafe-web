@@ -64,7 +64,7 @@ export function IconUpload({
       const { data, error } = await supabase.storage
         .from('icons')
         .upload(fileName, processed, {
-          cacheControl: '3600',
+          cacheControl: '31536000',
           upsert: false,
         });
 

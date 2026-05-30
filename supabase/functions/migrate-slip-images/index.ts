@@ -118,7 +118,7 @@ async function migrateOneSlip(
 
     const { error: uploadErr } = await supabase.storage
       .from("slip-images")
-      .upload(fileName, blob, { contentType, upsert: true });
+      .upload(fileName, blob, { contentType, upsert: true, cacheControl: "86400" });
 
     if (uploadErr) {
       return { id: rowId, status: "failed", field, error: uploadErr.message };
