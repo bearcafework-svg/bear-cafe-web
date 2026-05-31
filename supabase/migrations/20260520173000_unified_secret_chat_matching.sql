@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION match_secret_chat(
+CREATE OR REPLACE FUNCTION match_secret_chat(
   p_user_id uuid,
   p_topic_id uuid,
   p_user_alias text,

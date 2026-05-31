@@ -40,4 +40,4 @@ FROM sorted_logs
 WHERE public.tag_warn_logs.id = sorted_logs.id;
 
 -- 2. Reset the sequence counter to the correct next value
-SELECT setval(pg_get_serial_sequence('public.tag_warn_logs', 'sequence'), (SELECT MAX(sequence) FROM public.tag_warn_logs));
+SELECT setval(pg_get_serial_sequence('public.tag_warn_logs', 'sequence'), (SELECT COALESCE(MAX(sequence), 1) FROM public.tag_warn_logs));

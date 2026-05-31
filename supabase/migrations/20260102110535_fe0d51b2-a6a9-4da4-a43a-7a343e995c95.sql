@@ -172,6 +172,21 @@ AS $$
   SELECT id FROM public.profiles WHERE discord_id = _discord_id LIMIT 1
 $$;
 
+-- Create helper for discord_id from JWT metadata (fallback to top-level claim)
+CREATE OR REPLACE FUNCTION public.get_jwt_discord_id()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    auth.jwt()->'user_metadata'->>'discord_id',
+    auth.jwt()->'user_metadata'->>'provider_id',
+    auth.jwt()->>'discord_id'
+  )
+$$;
+
 -- Create function to check if user has active session
 CREATE OR REPLACE FUNCTION public.has_active_session(_user_id UUID)
 RETURNS BOOLEAN

@@ -45,6 +45,87 @@ function parseCsvEnv(name: string): string[] {
     .filter(Boolean);
 }
 
+function normalizeUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function callbackUrlForOrigin(origin: string): string | null {
+  const normalized = normalizeUrl(origin);
+  if (!normalized) return null;
+  const url = new URL(normalized);
+  url.pathname = "/auth/callback";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function buildAllowedRedirectUris(params: {
+  defaultRedirectUri: string;
+  allowedOrigins: string[];
+}): Set<string> {
+  const allowed = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    if (!value) return;
+    const normalized = normalizeUrl(value);
+    if (normalized) allowed.add(normalized);
+  };
+
+  add(params.defaultRedirectUri);
+
+  for (const redirectUri of parseCsvEnv("DISCORD_REDIRECT_URIS")) {
+    add(redirectUri);
+  }
+
+  for (const origin of params.allowedOrigins) {
+    add(callbackUrlForOrigin(origin));
+  }
+
+  add("http://localhost:8080/auth/callback");
+  add("http://127.0.0.1:8080/auth/callback");
+
+  return allowed;
+}
+
+function getRequestedRedirectUri(body: Record<string, unknown>): string | null {
+  const redirectUri = typeof body.redirectUri === "string" ? body.redirectUri : null;
+  const redirectUrl = typeof body.redirectUrl === "string" ? body.redirectUrl : null;
+  return normalizeUrl(redirectUri ?? redirectUrl ?? "");
+}
+
+function resolveRedirectUri(params: {
+  requestedRedirectUri: string | null;
+  defaultRedirectUri: string;
+  allowedRedirectUris: Set<string>;
+  requestOrigin: string;
+}): { redirectUri: string | null; error?: "redirect_uri_not_allowed" | "redirect_origin_mismatch" } {
+  const defaultRedirectUri = normalizeUrl(params.defaultRedirectUri);
+  if (!defaultRedirectUri) return { redirectUri: null, error: "redirect_uri_not_allowed" };
+
+  const requested = params.requestedRedirectUri;
+  if (!requested) return { redirectUri: defaultRedirectUri };
+
+  if (!params.allowedRedirectUris.has(requested)) {
+    return { redirectUri: null, error: "redirect_uri_not_allowed" };
+  }
+
+  const normalizedOrigin = normalizeUrl(params.requestOrigin);
+  if (normalizedOrigin) {
+    const requestOrigin = new URL(normalizedOrigin).origin;
+    const redirectOrigin = new URL(requested).origin;
+    if (requestOrigin !== redirectOrigin) {
+      return { redirectUri: null, error: "redirect_origin_mismatch" };
+    }
+  }
+
+  return { redirectUri: requested };
+}
+
 async function fetchDiscordToken(params: {
   code: string;
   redirectUri: string;
@@ -275,9 +356,10 @@ serve(async (req: Request): Promise<Response> => {
       }, 500);
     }
 
-    // redirect_uri is resolved server-side from DISCORD_REDIRECT_URI env var.
-    // ALLOWED_ORIGINS (comma-separated) is used to validate the request Origin header
-    // so only known front-end domains can trigger the OAuth flow.
+    // DISCORD_REDIRECT_URI is the legacy/default callback.
+    // DISCORD_REDIRECT_URIS can add more callbacks, comma-separated.
+    // ALLOWED_ORIGINS validates who can request OAuth URLs and also contributes
+    // origin + /auth/callback entries to the callback allowlist.
     const DISCORD_REDIRECT_URI = Deno.env.get("DISCORD_REDIRECT_URI") ?? "";
     const ALLOWED_ORIGINS = parseCsvEnv("ALLOWED_ORIGINS");
 
@@ -305,6 +387,29 @@ serve(async (req: Request): Promise<Response> => {
     const body = await req.json().catch(() => ({}));
     const code = typeof body?.code === "string" ? body.code : "";
     const turnstileToken = typeof body?.turnstileToken === "string" ? body.turnstileToken : null;
+    const allowedRedirectUris = buildAllowedRedirectUris({
+      defaultRedirectUri: DISCORD_REDIRECT_URI,
+      allowedOrigins: ALLOWED_ORIGINS,
+    });
+    const redirectResult = resolveRedirectUri({
+      requestedRedirectUri: getRequestedRedirectUri(body),
+      defaultRedirectUri: DISCORD_REDIRECT_URI,
+      allowedRedirectUris,
+      requestOrigin,
+    });
+
+    if (!redirectResult.redirectUri) {
+      console.warn("[discord-auth] Blocked redirect URI", {
+        reason: redirectResult.error,
+        requestOrigin,
+      });
+      return jsonResponse({
+        ok: false,
+        error_type: "internal_error",
+        message: "Redirect URI is not allowed",
+        debug_id: debugId,
+      }, 403);
+    }
 
     // ─── MODE 1: Generate authUrl (frontend calls with turnstileToken) ───────
     if (!code && (turnstileToken !== null || !body?.code)) {
@@ -324,7 +429,7 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       const scope = encodeURIComponent("identify guilds");
-      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=${scope}`;
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectResult.redirectUri)}&response_type=code&scope=${scope}`;
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -340,8 +445,7 @@ serve(async (req: Request): Promise<Response> => {
       }, 400);
     }
 
-    // redirect_uri comes from server-side env var — guaranteed to match Discord Portal
-    const redirectUri = DISCORD_REDIRECT_URI;
+    const redirectUri = redirectResult.redirectUri;
 
     // 1) Exchange OAuth code -> token
     const tokenData = await fetchDiscordToken({

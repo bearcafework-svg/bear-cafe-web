@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION try_match_users(
+CREATE OR REPLACE FUNCTION try_match_users(
   p_user_a_id       uuid,
   p_user_b_id       uuid,
   p_topic_id        uuid,
