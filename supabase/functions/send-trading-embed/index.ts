@@ -61,6 +61,13 @@ Deno.serve(async (req): Promise<Response> => {
     const latestAmountStr = toUnicodeNumber(latestAmount);
     const totalAmountStr = toUnicodeNumber(totalAmount);
 
+    // Only use avatarUrl if it looks like a Discord CDN URL (cdn.discordapp.com or media.discordapp.net)
+    // Supabase storage URLs or other non-Discord URLs will cause Discord API to reject the Components V2 payload
+    const isDiscordCdnUrl =
+      avatarUrl.startsWith("https://cdn.discordapp.com/") ||
+      avatarUrl.startsWith("https://media.discordapp.net/");
+    const safeAvatarUrl = isDiscordCdnUrl ? avatarUrl : "";
+
     // Components V2 payload — flags: 32768 = IS_COMPONENTS_V2
     // ต้องส่งผ่าน Bot API เท่านั้น Webhook ไม่รองรับ
     const payload: Record<string, unknown> = {
@@ -74,7 +81,7 @@ Deno.serve(async (req): Promise<Response> => {
               items: [
                 {
                   media: {
-                    url: "https://media.discordapp.net/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png?ex=6a1689fe&is=6a15387e&hm=70fc39c297f577a46fa8c0e93dd254c0d4ade5a6cb7f6ace9b5adb11b8891422&",
+                    url: "https://cdn.discordapp.com/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png",
                   },
                 },
               ],
@@ -88,11 +95,11 @@ Deno.serve(async (req): Promise<Response> => {
                   content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
                 },
               ],
-              ...(avatarUrl
+              ...(safeAvatarUrl
                 ? {
                     accessory: {
                       type: 11, // Thumbnail
-                      media: { url: avatarUrl },
+                      media: { url: safeAvatarUrl },
                     },
                   }
                 : {}),
@@ -124,13 +131,20 @@ Deno.serve(async (req): Promise<Response> => {
         memberId,
         error: result.error,
         errorCode: result.errorCode ?? null,
+        errorCategory: result.errorCategory ?? null,
         status: result.status ?? null,
+        discordErrorCode: result.discordErrorCode ?? null,
+        avatarUrl,
+        safeAvatarUrl,
       });
       return new Response(
         JSON.stringify({
           error: "Discord API failed",
           details: result.error,
           errorCode: result.errorCode ?? null,
+          errorCategory: result.errorCategory ?? null,
+          discordErrorCode: result.discordErrorCode ?? null,
+          discordStatus: result.status ?? null,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

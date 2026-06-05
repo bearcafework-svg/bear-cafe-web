@@ -794,7 +794,14 @@ export function TradingHistoryManagement() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error((errData as any).error || `Edge Function error: ${res.status}`);
+        const detail = [
+          (errData as any).details,
+          (errData as any).errorCode,
+          (errData as any).errorCategory,
+          (errData as any).discordErrorCode ? `Discord code: ${(errData as any).discordErrorCode}` : null,
+          (errData as any).discordStatus ? `HTTP: ${(errData as any).discordStatus}` : null,
+        ].filter(Boolean).join(' | ');
+        throw new Error(detail || (errData as any).error || `Edge Function error: ${res.status}`);
       }
 
       toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
