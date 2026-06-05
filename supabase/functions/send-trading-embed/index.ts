@@ -2,9 +2,6 @@
  * send-trading-embed
  * ส่ง Components V2 embed ขอบคุณการโดเนทผ่าน Discord Bot API
  * รับ: { member_id, latest_amount, total_amount, avatar_url, channel_id? }
- *
- * ใช้ Bot API แทน Webhook เพราะ Components V2 (flags: 32768, type 17/12/9 ฯลฯ)
- * ไม่รองรับบน Webhook endpoint — จะ error 400
  */
 import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
 
@@ -13,7 +10,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/** แปลงตัวเลขเป็น Unicode Mathematical Digits (𝟢𝟣𝟤...) พร้อม comma separator */
 function toUnicodeNumber(n: number): string {
   const unicodeDigits = ["𝟢", "𝟣", "𝟤", "𝟥", "𝟦", "𝟧", "𝟨", "𝟩", "𝟪", "𝟫"];
   const formatted = n.toLocaleString("en-US", {
@@ -35,8 +31,6 @@ Deno.serve(async (req): Promise<Response> => {
     const totalAmount: number = Number(body.total_amount ?? latestAmount);
     const avatarUrl: string = body.avatar_url ?? "";
 
-    // Channel ที่บอทจะส่ง embed ขอบคุณ
-    // ตั้งค่าผ่าน env DISCORD_TRADING_EMBED_CHANNEL_ID หรือส่งมาใน body
     const channelId: string =
       body.channel_id ??
       Deno.env.get("DISCORD_TRADING_EMBED_CHANNEL_ID") ??
@@ -61,15 +55,28 @@ Deno.serve(async (req): Promise<Response> => {
     const latestAmountStr = toUnicodeNumber(latestAmount);
     const totalAmountStr = toUnicodeNumber(totalAmount);
 
-    // Only use avatarUrl if it looks like a Discord CDN URL (cdn.discordapp.com or media.discordapp.net)
-    // Supabase storage URLs or other non-Discord URLs will cause Discord API to reject the Components V2 payload
     const isDiscordCdnUrl =
       avatarUrl.startsWith("https://cdn.discordapp.com/") ||
       avatarUrl.startsWith("https://media.discordapp.net/");
     const safeAvatarUrl = isDiscordCdnUrl ? avatarUrl : "";
 
-    // Components V2 payload — flags: 32768 = IS_COMPONENTS_V2
-    // ต้องส่งผ่าน Bot API เท่านั้น Webhook ไม่รองรับ
+    const textContent = `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`;
+
+    // ถ้ามี avatar ใช้ Section (type 9) + Thumbnail, ถ้าไม่มีใช้ Text Display (type 10) ตรงๆ
+    const contentComponent: Record<string, unknown> = safeAvatarUrl
+      ? {
+          type: 9, // Section
+          components: [{ type: 10, content: textContent }],
+          accessory: {
+            type: 11, // Thumbnail
+            media: { url: safeAvatarUrl },
+          },
+        }
+      : {
+          type: 10, // Text Display
+          content: textContent,
+        };
+
     const payload: Record<string, unknown> = {
       flags: 32768,
       components: [
@@ -87,23 +94,7 @@ Deno.serve(async (req): Promise<Response> => {
               ],
             },
             { type: 14, divider: false, spacing: 2 }, // Separator
-            {
-              type: 9, // Section
-              components: [
-                {
-                  type: 10, // Text Display
-                  content: `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`,
-                },
-              ],
-              ...(safeAvatarUrl
-                ? {
-                    accessory: {
-                      type: 11, // Thumbnail
-                      media: { url: safeAvatarUrl },
-                    },
-                  }
-                : {}),
-            },
+            contentComponent,
             { type: 14, divider: false, spacing: 2 }, // Separator
             {
               type: 1, // Action Row
