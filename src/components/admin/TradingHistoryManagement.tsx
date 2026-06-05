@@ -69,7 +69,7 @@ import {
   Line,
 } from 'recharts';
 import { formatThaiDate } from '@/lib/thai-date';
-import { computeSalmonPreview } from '@/lib/salmonPoint';
+import { computeSalmonPreview, computeSalmonDelta } from '@/lib/salmonPoint';
 
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
@@ -1320,7 +1320,7 @@ export function TradingHistoryManagement() {
                           )}
                           <div className="flex items-center gap-1 text-xs text-honey font-semibold">
                             <span>🐟</span>
-                            <span>{salmonPointMap.get(r.member_id) ?? '-'}</span>
+                            <span>{computeSalmonDelta(r.amount)}</span>
                           </div>
                         </div>
 
