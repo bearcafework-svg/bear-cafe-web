@@ -74,7 +74,7 @@ Deno.serve(async (req): Promise<Response> => {
               items: [
                 {
                   media: {
-                    url: "https://media.discordapp.net/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png?ex=6a1689fe&is=6a15387e&hm=70fc39c297f577a46fa8c0e93dd254c0d4ade5a6cb7f6ace9b5adb11b8891422&",
+                    url: "https://orbxyyjpvpbqwfssnyeq.supabase.co/storage/v1/object/public/chat-embed/bear-cafe-payment-thankyou-banner.jpeg",
                   },
                 },
               ],
