@@ -30,7 +30,7 @@ jobs:
         if: ${{ github.event.inputs.function_name != '' }}
         run: |
           supabase functions deploy ${{ github.event.inputs.function_name }} \
-            --project-ref itulsrbsluwdqwakldjs
+            --project-ref orbxyyjpvpbqwfssnyeq
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
@@ -38,6 +38,6 @@ jobs:
         if: ${{ github.event.inputs.function_name == '' }}
         run: |
           supabase functions deploy \
-            --project-ref itulsrbsluwdqwakldjs
+            --project-ref orbxyyjpvpbqwfssnyeq
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
