@@ -18,7 +18,7 @@ import {
   ArrowLeft, Plus, Users, Info, Loader2,
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
-  Filter, LogIn, ShieldCheck, Handshake, Settings, Hash, BotIcon, RefreshCw,
+  Filter, LogIn, ShieldCheck, Handshake, RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -50,7 +50,6 @@ interface DiscordServer {
   is_partner: boolean;
   highlight_color: string | null;
   carousel_order: number | null;
-  notify_channel_id: string | null;
   invite_status: "valid" | "expired" | "unknown";
   invite_last_checked_at: string | null;
   // joined client-side
@@ -355,7 +354,6 @@ interface ServerCardProps {
   handleClickJoin: (server: DiscordServer) => void;
   handleBump: (serverId: string) => void;
   bumpingId: string | null;
-  openBotDialog: (server: DiscordServer) => void;
   handleRated: (serverId: string, rating: number) => void;
   onRefresh: (server: DiscordServer) => void;
   refreshingId: string | null;
@@ -363,7 +361,7 @@ interface ServerCardProps {
 
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
-  handleClickJoin, handleBump, bumpingId, openBotDialog, handleRated,
+  handleClickJoin, handleBump, bumpingId, handleRated,
   onRefresh, refreshingId,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
@@ -480,18 +478,6 @@ function ServerCard({
           {/* Actions */}
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-2">
             <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
-            {/* Bot settings — only for owner */}
-            {user && server.owner_id === user.discord_id && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-full h-8 w-8 p-0 shrink-0"
-                onClick={() => openBotDialog(server)}
-                title="ตั้งค่าบอทแจ้งเตือน"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </Button>
-            )}
             {/* Refresh — only for owner */}
             {user && server.owner_id === user.discord_id && (
               <Button
@@ -546,70 +532,6 @@ export default function DiscordServersPage() {
   const [isUpdatingLink, setIsUpdatingLink] = useState(false);
 
   const userId = user?.discord_id || null;
-
-  // ── Bot settings dialog state ─────────────────────────────────────────────
-  type TextChannel = { id: string; name: string };
-  type BotStatus = 'idle' | 'checking' | 'no-bot' | 'has-bot';
-
-  const [botDialogServer, setBotDialogServer] = useState<DiscordServer | null>(null);
-  const [botStatus, setBotStatus] = useState<BotStatus>('idle');
-  const [textChannels, setTextChannels] = useState<TextChannel[]>([]);
-  const [selectedChannel, setSelectedChannel] = useState('');
-  const [savingChannel, setSavingChannel] = useState(false);
-
-  const BOT_INVITE_URL =
-    `https://discord.com/api/oauth2/authorize?client_id=${import.meta.env.VITE_DISCORD_BOT_CLIENT_ID ?? ''}&permissions=2048&scope=bot%20applications.commands`;
-
-  const openBotDialog = async (server: DiscordServer) => {
-    setBotDialogServer(server);
-    setSelectedChannel(server.notify_channel_id ?? '');
-    setTextChannels([]);
-    setBotStatus('checking');
-
-    // discord_id is the actual Discord Guild ID — must be a non-empty string
-    const guildId = server.discord_id?.trim();
-    if (!guildId) {
-      setBotStatus('no-bot');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('discord-server-settings', {
-        body: { server_discord_id: guildId, action: 'get_channels' },
-      });
-
-      if (error || !data?.success) {
-        setBotStatus('no-bot');
-        return;
-      }
-
-      setTextChannels((data.channels ?? []) as TextChannel[]);
-      setBotStatus('has-bot');
-    } catch {
-      setBotStatus('no-bot');
-    }
-  };
-
-  const handleSaveChannel = async () => {
-    if (!botDialogServer || !selectedChannel) return;
-    setSavingChannel(true);
-    try {
-      const { error } = await (supabase
-        .from('discord_servers' as any)
-        .update({ notify_channel_id: selectedChannel } as any)
-        .eq('id', botDialogServer.id)) as any;
-      if (error) throw error;
-      setServers((prev) =>
-        prev.map((s) => s.id === botDialogServer.id ? { ...s, notify_channel_id: selectedChannel } : s)
-      );
-      toast({ title: 'บันทึกห้องแจ้งเตือนเรียบร้อย', className: 'bg-green-500 text-white' });
-      setBotDialogServer(null);
-    } catch (err: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: err.message, variant: 'destructive' });
-    } finally {
-      setSavingChannel(false);
-    }
-  };
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
   const fetchData = async () => {
@@ -884,18 +806,6 @@ export default function DiscordServersPage() {
           await (supabase.from('discord_servers' as any).update({ click_count: count } as any).eq('id', server.id)) as any;
           setServers((prev) => prev.map((s) => s.id === server.id ? { ...s, click_count: count } : s));
         }
-
-        // 4. Bot notification — only if server has a notify channel configured
-        if (server.notify_channel_id && server.discord_id?.trim()) {
-          await supabase.functions.invoke('discord-server-settings', {
-            body: {
-              action: 'send_notification',
-              server_discord_id: server.discord_id,
-              channel_id: server.notify_channel_id,
-              message: '🐻 มีเพื่อนใหม่จาก Bear Cafe กำลังเข้าร่วมเซิร์ฟเวอร์ของคุณ!',
-            },
-          });
-        }
       } catch (err) {
         console.error('Click tracking failed:', err);
       }
@@ -1042,7 +952,6 @@ export default function DiscordServersPage() {
                   handleClickJoin={handleClickJoin}
                   handleBump={handleBump}
                   bumpingId={bumpingId}
-                  openBotDialog={openBotDialog}
                   handleRated={handleRated}
                   onRefresh={handleRefreshServer}
                   refreshingId={refreshingId}
@@ -1111,114 +1020,6 @@ export default function DiscordServersPage() {
           setEditLinkServer(null);
         }}
       />
-
-      {/* ── Bot Settings Dialog ── */}
-      <Dialog open={!!botDialogServer} onOpenChange={(o) => !o && setBotDialogServer(null)}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-primary" />
-              ตั้งค่าบอทแจ้งเตือน
-            </DialogTitle>
-            <DialogDescription>
-              {botDialogServer?.name} — เลือกห้องที่บอทจะส่งการแจ้งเตือน
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-3 space-y-4">
-            {/* Checking */}
-            {botStatus === 'checking' && (
-              <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="text-sm">กำลังตรวจสอบสถานะบอท...</span>
-              </div>
-            )}
-
-            {/* No bot */}
-            {botStatus === 'no-bot' && (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 rounded-xl border border-amber-200/60 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-800/30 p-4">
-                  <BotIcon className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-semibold text-amber-800 dark:text-amber-200 mb-1">บอทยังไม่ได้อยู่ในเซิร์ฟเวอร์</p>
-                    <p className="text-amber-700 dark:text-amber-300/80 text-xs leading-relaxed">
-                      เชิญบอทเข้าเซิร์ฟเวอร์ก่อน แล้วกลับมาตั้งค่าห้องแจ้งเตือนได้เลย
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  className="w-full rounded-xl gap-2"
-                  onClick={() => window.open(BOT_INVITE_URL, '_blank', 'noopener,noreferrer')}
-                >
-                  <BotIcon className="h-4 w-4" />
-                  เชิญบอทเข้าเซิร์ฟเวอร์
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full rounded-xl gap-2 text-sm"
-                  onClick={() => botDialogServer && openBotDialog(botDialogServer)}
-                >
-                  <Loader2 className="h-3.5 w-3.5" />
-                  ตรวจสอบอีกครั้ง
-                </Button>
-              </div>
-            )}
-
-            {/* Has bot — show channel selector */}
-            {botStatus === 'has-bot' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-200/60 bg-emerald-50/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
-                  <BotIcon className="h-4 w-4 shrink-0" />
-                  บอทอยู่ในเซิร์ฟเวอร์แล้ว ✓
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium flex items-center gap-1.5">
-                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                    เลือกห้อง Text Channel
-                  </label>
-                  <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="เลือกห้องที่ต้องการ..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {textChannels.map((ch) => (
-                        <SelectItem key={ch.id} value={ch.id}>
-                          <span className="flex items-center gap-1.5">
-                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                            {ch.name}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {botDialogServer?.notify_channel_id && (
-                    <p className="text-xs text-muted-foreground">
-                      ห้องปัจจุบัน: #{textChannels.find((c) => c.id === botDialogServer.notify_channel_id)?.name ?? botDialogServer.notify_channel_id}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setBotDialogServer(null)}>
-              ยกเลิก
-            </Button>
-            {botStatus === 'has-bot' && (
-              <Button
-                className="rounded-xl"
-                disabled={!selectedChannel || savingChannel}
-                onClick={handleSaveChannel}
-              >
-                {savingChannel && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                บันทึก
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Add Server Dialog */}
       <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>

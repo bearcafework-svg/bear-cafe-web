@@ -22,14 +22,10 @@ import MaintenancePage from "./pages/MaintenancePage";
 import NotFound from "./pages/NotFound";
 import PointsPage from "./pages/PointsPage";
 import LotteryPage from "./pages/LotteryPage";
-import GachaPage from "./pages/GachaPage";
 import DiscordServersPage from "./pages/DiscordServersPage";
 import HealingMessagePage from "./pages/HealingMessagePage";
-import MeeDooDuang from "./pages/MeeDooDuang";
 import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
-import SecretChatMenu from "./pages/SecretChatMenu";
-import SecretChatRoom from "./pages/SecretChatRoom";
 import BearBobaMergePage from "./pages/BearBobaMergePage";
 import SpinPrizePage from "./pages/SpinPrizePage";
 
@@ -94,14 +90,10 @@ function AppRoutes() {
       <Route path="/history" element={<ProtectedRoute><SessionHistoryPage /></ProtectedRoute>} />
       <Route path="/points" element={<ProtectedRoute><PointsPage /></ProtectedRoute>} />
       <Route path="/lottery" element={<ProtectedRoute><LotteryPage /></ProtectedRoute>} />
-      <Route path="/gacha" element={<ProtectedRoute><GachaPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
-      <Route path="/meedooduang" element={<MeeDooDuang />} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
-      <Route path="/secret-chat" element={<ProtectedRoute><SecretChatMenu /></ProtectedRoute>} />
-      <Route path="/secret-chat/room" element={<ProtectedRoute><SecretChatRoom /></ProtectedRoute>} />
       <Route path="/bear-boba-merge" element={<BearBobaMergePage />} />
       <Route path="/games/bear-boba" element={<BearBobaMergePage />} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />

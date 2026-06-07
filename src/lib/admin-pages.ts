@@ -32,14 +32,9 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'redeem-codes', label: 'โค้ดแลก', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'roles-to-delete', label: 'ยศที่ต้องลบเมื่อย้าย', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
-  { id: 'maintenance', label: 'โหมดปรับปรุง', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   
   { id: 'discord-servers', label: 'จัดการเซิร์ฟเวอร์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
-  { id: 'secret-table', label: 'Secret Table', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'bartender-management', label: 'Bartender Mode', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'profile-frames', label: 'กรอบโปรไฟล์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'campaigns', label: 'แคมเปญโฆษณา', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
 ];
 

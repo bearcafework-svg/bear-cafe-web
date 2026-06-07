@@ -37,7 +37,6 @@ import { DiscordRolesManagement } from '@/components/admin/DiscordRolesManagemen
 import { RedeemCodesManagement } from '@/components/admin/RedeemCodesManagement';
 import { TagWarnLogsManagement } from '@/components/admin/TagWarnLogsManagement';
 import { TradingHistoryManagement } from '@/components/admin/TradingHistoryManagement';
-import { GachaManagement } from '@/components/admin/GachaManagement';
 import { DiscordServersManagement } from '@/components/admin/DiscordServersManagement';
 import { MaintenanceToggle } from '@/components/admin/MaintenanceToggle';
 import { PermissionsManagement } from '@/components/admin/PermissionsManagement';
@@ -48,16 +47,12 @@ import { RoleTransferManagement } from '@/components/admin/RoleTransferManagemen
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
 import { RolesToDeleteManagement } from '@/components/admin/RolesToDeleteManagement';
 import { BulkRoleManagement } from '@/components/admin/BulkRoleManagement';
-import { StaffManagement } from '@/components/admin/StaffManagement';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
-import { SecretTableManagement } from '@/components/admin/SecretTableManagement';
-import { ProfileFramesManagement } from '@/components/admin/ProfileFramesManagement';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
-import { BartenderManagement } from '@/components/admin/BartenderManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -276,13 +271,8 @@ export default function AdminPage() {
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
         case 'roles-to-delete': return canAccessPage('roles-to-delete') ? <RolesToDeleteManagement /> : null;
         case 'lottery': return canAccessPage('lottery') ? <AdminLottery /> : null;
-        case 'gacha': return canAccessPage('gacha') ? <GachaManagement /> : null;
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
-        case 'staff': return canAccessPage('staff') ? <StaffManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
-        case 'secret-table': return isOwner ? <SecretTableManagement /> : null;
-        case 'bartender-management': return isOwner ? <BartenderManagement /> : null;
-        case 'profile-frames': return isOwner ? <ProfileFramesManagement /> : null;
         case 'campaigns': return isOwner ? <CampaignsManagement /> : null;
         default: return null;
       }

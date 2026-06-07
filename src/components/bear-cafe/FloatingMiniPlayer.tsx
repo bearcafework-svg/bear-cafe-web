@@ -78,8 +78,6 @@ export function FloatingMiniPlayer() {
   if (!isAuthenticated) return null;
   // Hide on homepage — the right panel already shows the full player there
   if (location.pathname === '/') return null;
-  // Hide on secret chat room — it has its own built-in music player
-  if (location.pathname === '/secret-chat/room') return null;
   // Hide if nothing is playing and never played
   if (!music.playing && !music.currentTrack?.title) return null;
 
@@ -91,8 +89,8 @@ export function FloatingMiniPlayer() {
   const bg        = dark ? 'rgba(22,14,9,0.96)'    : 'rgba(248,235,216,0.97)';
   const border    = dark ? 'rgba(200,149,108,0.22)' : 'rgba(200,149,108,0.3)';
   const vinylBg   = dark
-    ? 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008)'
-    : 'conic-gradient(from 0deg, #3a2410, #5c3820, #3a2410)';
+    ? 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008, #2a1a0e, #4a2e1a, #1e1008)'
+    : 'conic-gradient(from 0deg, #3a2410, #5c3820, #3a2410, #4a2e1a, #6b4020, #3a2410)';
   const trackActiveBg = dark ? 'rgba(200,149,108,0.12)' : 'rgba(200,149,108,0.1)';
 
   return (
@@ -438,7 +436,7 @@ export function FloatingMiniPlayer() {
           transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatType: 'loop' }}
           className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
           style={{
-            background: 'conic-gradient(from 0deg, #1e1008, #3a2410, #1e1008, #2a1a0e, #4a2e1a, #1e1008)',
+            background: vinylBg,
             boxShadow: music.playing ? '0 0 10px rgba(200,149,108,0.5)' : '0 2px 6px rgba(0,0,0,0.3)',
           }}
         >

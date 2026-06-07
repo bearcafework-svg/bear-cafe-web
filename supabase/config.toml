@@ -71,12 +71,6 @@ verify_jwt = false
 [functions.upload-slip-image]
 verify_jwt = false
 
-[functions.gacha-spin]
-verify_jwt = false
-
-[functions.process-match-reward]
-verify_jwt = false
-
 [functions.grant-discord-role]
 verify_jwt = false
 
@@ -114,7 +108,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.voice-activity-points]
-verify_jwt = false
-
-[functions.fortune-test]
 verify_jwt = false
