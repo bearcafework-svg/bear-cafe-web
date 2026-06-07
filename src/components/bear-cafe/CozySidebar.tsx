@@ -9,7 +9,6 @@ import pointIcon from '@/assets/point-icon.png';
 import lightmodeIcon from '@/assets/lightmode-icon.png';
 import darkmodeIcon from '@/assets/darkmode-icon.png';
 import historyIcon from '@/assets/history-icon.png';
-import lotteryIcon from '@/assets/lottery-icon.png';
 import ruleIcon from '@/assets/rule-icon.png';
 import settingIcon from '@/assets/setting-icon.png';
 
@@ -118,9 +117,6 @@ export function CozySidebar() {
         )}
         {!isAuthenticated && (
           <NavItem icon={historyIcon} label="ประวัติการใช้งาน" href="/login" />
-        )}
-        {user?.is_owner && (
-          <NavItem icon={lotteryIcon} label="ลอตเตอรี่" href="/lottery" />
         )}
         <NavItem
           icon={ruleIcon}

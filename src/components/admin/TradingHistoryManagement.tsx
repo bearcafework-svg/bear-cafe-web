@@ -69,7 +69,7 @@ import {
   Line,
 } from 'recharts';
 import { formatThaiDate } from '@/lib/thai-date';
-import { computeSalmonPreview } from '@/lib/salmonPoint';
+import { computeSalmonPreview, computeSalmonDelta } from '@/lib/salmonPoint';
 
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
@@ -794,7 +794,14 @@ export function TradingHistoryManagement() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error((errData as any).error || `Edge Function error: ${res.status}`);
+        const detail = [
+          (errData as any).details,
+          (errData as any).errorCode,
+          (errData as any).errorCategory,
+          (errData as any).discordErrorCode ? `Discord code: ${(errData as any).discordErrorCode}` : null,
+          (errData as any).discordStatus ? `HTTP: ${(errData as any).discordStatus}` : null,
+        ].filter(Boolean).join(' | ');
+        throw new Error(detail || (errData as any).error || `Edge Function error: ${res.status}`);
       }
 
       toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
@@ -1313,7 +1320,7 @@ export function TradingHistoryManagement() {
                           )}
                           <div className="flex items-center gap-1 text-xs text-honey font-semibold">
                             <span>🐟</span>
-                            <span>{salmonPointMap.get(r.member_id) ?? '-'}</span>
+                            <span>{computeSalmonDelta(r.amount)}</span>
                           </div>
                         </div>
 

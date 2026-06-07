@@ -440,7 +440,7 @@ export default function SpinPrizePage() {
         className="xl:hidden fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center text-base"
         aria-label="เปิดแผงขวา"
       >
-        🎵
+        🍓
       </button>
 
       {rightOpen && (

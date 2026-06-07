@@ -42,13 +42,14 @@ export function CommunityCarousel() {
 
   const [servers, setServers] = useState<DiscordServer[]>([]);
   const [categories, setCategories] = useState<ServerCategory[]>([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
-      const [catRes, serverRes] = await Promise.all([
+      const [catRes, serverRes, countRes] = await Promise.all([
         (supabase as any)
           .from('discord_server_categories')
           .select('id, name, icon')
@@ -59,9 +60,14 @@ export function CommunityCarousel() {
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
+        (supabase as any)
+          .from('discord_servers')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'approved'),
       ]);
       if (catRes.data) setCategories(catRes.data);
       if (serverRes.data) setServers(serverRes.data);
+      setTotalCount(countRes.count ?? serverRes.data?.length ?? 0);
       setLoading(false);
     };
     fetchAll();
@@ -158,7 +164,7 @@ export function CommunityCarousel() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             รวมเซิร์ฟเวอร์หลากหลายสไตล์มากถึง{' '}
             <span className="font-semibold text-foreground">
-              {loading ? '…' : servers.length}
+              {loading ? '…' : totalCount}
             </span>{' '}
             เซิร์ฟเวอร์ เลือกเข้าตามฟีลที่ชอบได้เลย 💛
           </p>

@@ -47,8 +47,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  BarChart2,
   RotateCcw,
+  Images,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
@@ -88,13 +88,6 @@ type ScheduleConfig = {
   updated_at: string;
 };
 
-type ActivityStats = {
-  channel_id: string;
-  count_24h: number;
-  count_7d: number;
-  count_30d: number;
-  updated_at: string;
-};
 
 interface DiscordChannel {
   id: string;
@@ -145,7 +138,6 @@ export function CampaignsManagement() {
   const [campaigns, setCampaigns] = useState<CampaignMessage[]>([]);
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
-  const [activityStats, setActivityStats] = useState<ActivityStats | null>(null);
   const [tick, setTick] = useState(0); // increments every second to drive countdown
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
@@ -166,21 +158,54 @@ export function CampaignsManagement() {
   const fileInputRef2 = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // ─── Bucket picker state ──────────────────────────────────────────────────
+  const [bucketPickerOpen, setBucketPickerOpen] = useState(false);
+  const [bucketPickerTarget, setBucketPickerTarget] = useState<'image_url' | 'image_url_2'>('image_url');
+  const [bucketFiles, setBucketFiles] = useState<Array<{ name: string; url: string }>>([]);
+  const [loadingBucket, setLoadingBucket] = useState(false);
+
+  const openBucketPicker = async (target: 'image_url' | 'image_url_2') => {
+    setBucketPickerTarget(target);
+    setBucketPickerOpen(true);
+    if (bucketFiles.length > 0) return; // already loaded
+    setLoadingBucket(true);
+    try {
+      const { data, error } = await supabase.storage.from('campaign-images').list('', {
+        limit: 100,
+        sortBy: { column: 'created_at', order: 'desc' },
+      });
+      if (error) throw error;
+      const files = (data || [])
+        .filter((f) => f.name && !f.name.endsWith('/'))
+        .map((f) => ({
+          name: f.name,
+          url: supabase.storage.from('campaign-images').getPublicUrl(f.name).data.publicUrl,
+        }));
+      setBucketFiles(files);
+    } catch (err: any) {
+      toast({ title: 'โหลดรูปไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoadingBucket(false);
+    }
+  };
+
+  const selectBucketImage = (url: string) => {
+    setFormData((p) => ({ ...p, [bucketPickerTarget]: url }));
+    setBucketPickerOpen(false);
+  };
+
   // ─── Fetch campaigns ─────────────────────────────────────────────────────
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const [campaignsRes, scheduleRes, activityRes] = await Promise.all([
-        supabase.from('campaign_messages').select('*').order('sort_order', { ascending: true }),
-        supabase.from('campaign_schedule_config').select('*').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle(),
-        supabase.from('channel_activity_stats').select('*').eq('channel_id', '1144585665883938927').maybeSingle(),
+      const [campaignsRes, scheduleRes] = await Promise.all([
+        (supabase as any).from('campaign_messages').select('*').order('sort_order', { ascending: true }),
+        (supabase as any).from('campaign_schedule_config').select('*').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle(),
       ]);
 
       if (campaignsRes.error) throw campaignsRes.error;
       setCampaigns(campaignsRes.data || []);
       if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
-      // Ignore errors — table may not exist yet if migration hasn't run
-      if (activityRes.data && !activityRes.error) setActivityStats(activityRes.data as ActivityStats);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
@@ -209,7 +234,7 @@ export function CampaignsManagement() {
     // Persist to DB — batch update
     try {
       const updates = updated.map((c) =>
-        supabase
+        (supabase as any)
           .from('campaign_messages')
           .update({ sort_order: c.sort_order })
           .eq('id', c.id)
@@ -349,14 +374,14 @@ export function CampaignsManagement() {
       };
 
       if (editingCampaign) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('campaign_messages')
           .update(payload)
           .eq('id', editingCampaign.id);
         if (error) throw error;
         toast({ title: 'สำเร็จ', description: 'แก้ไขแคมเปญเรียบร้อยแล้ว' });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('campaign_messages')
           .insert([{ ...payload, sort_order: campaigns.length, next_send_at: computeNewNextSendAt() }]);
 
@@ -384,7 +409,7 @@ export function CampaignsManagement() {
 
     try {
       setIsDeleting(true);
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('campaign_messages')
         .delete()
         .eq('id', id);
@@ -533,9 +558,9 @@ export function CampaignsManagement() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const formatCountdown = (nextSendAt: string | null): React.ReactNode => {
     void tick; // depend on tick so this re-evaluates every second
-    if (!nextSendAt) return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950 text-xs">พร้อมส่ง</Badge>;
+    if (!nextSendAt) return <Badge variant="outline" className="text-matcha border-matcha/40 bg-matcha/10 dark:bg-matcha/20 text-xs">พร้อมส่ง</Badge>;
     const ms = new Date(nextSendAt).getTime() - Date.now();
-    if (ms <= 0) return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950 text-xs">พร้อมส่ง</Badge>;
+    if (ms <= 0) return <Badge variant="outline" className="text-matcha border-matcha/40 bg-matcha/10 dark:bg-matcha/20 text-xs">พร้อมส่ง</Badge>;
     const h = Math.floor(ms / 3_600_000);
     const m = Math.floor((ms % 3_600_000) / 60_000);
     const s = Math.floor((ms % 60_000) / 1_000);
@@ -556,35 +581,10 @@ export function CampaignsManagement() {
   useEffect(() => {
     fetchCampaigns();
 
-    // Subscribe to live updates from channel_activity_stats (only if table exists)
-    let sub: ReturnType<typeof supabase.channel> | null = null;
-    supabase
-      .from('channel_activity_stats')
-      .select('channel_id')
-      .limit(1)
-      .then(({ error }) => {
-        if (error) {
-          // Table doesn't exist yet — skip realtime subscription
-          console.info('[campaigns] channel_activity_stats not ready yet, skipping realtime');
-          return;
-        }
-        sub = supabase
-          .channel('channel_activity_stats_realtime')
-          .on(
-            'postgres_changes' as any,
-            { event: '*', schema: 'public', table: 'channel_activity_stats' },
-            (payload: any) => {
-              if (payload.new) setActivityStats(payload.new as ActivityStats);
-            },
-          )
-          .subscribe();
-      });
-
     // Tick every second to drive countdown display without page refresh
     const ticker = setInterval(() => setTick((t) => t + 1), 1000);
 
     return () => {
-      if (sub) supabase.removeChannel(sub);
       clearInterval(ticker);
     };
   }, []);
@@ -646,86 +646,6 @@ export function CampaignsManagement() {
         </CardHeader>
       </Card>
 
-      {/* ─── Channel Activity Stats ─── */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-primary" />
-              กิจกรรมช่อง Discord
-            </CardTitle>
-            {activityStats && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                อัปเดตล่าสุด{' '}
-                {new Date(activityStats.updated_at).toLocaleTimeString('th-TH', {
-                  hour: '2-digit', minute: '2-digit', second: '2-digit',
-                })}
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {!activityStats ? (
-            <div className="flex items-center gap-3 px-6 py-5 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-              <span>รอข้อมูลจาก cron (อัปเดตทุกนาที)...</span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 divide-x divide-border/50">
-              {/* 24h */}
-              <div className="px-6 py-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">24 ชั่วโมง</span>
-                </div>
-                <p className="text-3xl font-bold tabular-nums text-foreground">
-                  {activityStats.count_24h.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
-                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-blue-500 transition-all"
-                    style={{ width: `${Math.min(100, (activityStats.count_24h / Math.max(activityStats.count_7d, 1)) * 100 * 7)}%` }}
-                  />
-                </div>
-              </div>
-              {/* 7d */}
-              <div className="px-6 py-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-violet-500" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">7 วัน</span>
-                </div>
-                <p className="text-3xl font-bold tabular-nums text-foreground">
-                  {activityStats.count_7d.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
-                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-violet-500 transition-all"
-                    style={{ width: `${Math.min(100, (activityStats.count_7d / Math.max(activityStats.count_30d, 1)) * 100 * 4.3)}%` }}
-                  />
-                </div>
-              </div>
-              {/* 30d */}
-              <div className="px-6 py-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">30 วัน</span>
-                </div>
-                <p className="text-3xl font-bold tabular-nums text-foreground">
-                  {activityStats.count_30d.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">ข้อความ</p>
-                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-orange-500 w-full" />
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* ─── Campaigns table ─── */}
       <Card>
         <CardContent className="p-6">
@@ -767,7 +687,7 @@ export function CampaignsManagement() {
                             <TableRow
                               ref={drag.innerRef}
                               {...drag.draggableProps}
-                              className={snapshot.isDragging ? 'opacity-80 bg-muted shadow-lg' : ''}
+                              className={snapshot.isDragging ? 'opacity-80 bg-honey/10 shadow-md' : ''}
                             >
                               {/* Drag handle */}
                               <TableCell className="w-8 pr-0">
@@ -787,7 +707,7 @@ export function CampaignsManagement() {
                               </TableCell>
                               <TableCell>
                                 {campaign.is_active ? (
-                                  <Badge className="bg-green-500">เปิดใช้งาน</Badge>
+                                  <Badge className="bg-matcha/80 hover:bg-matcha text-cream">เปิดใช้งาน</Badge>
                                 ) : (
                                   <Badge variant="secondary">ปิดใช้งาน</Badge>
                                 )}
@@ -802,7 +722,7 @@ export function CampaignsManagement() {
                                     size="sm"
                                     onClick={() => handleOpenTestSend(campaign)}
                                     title="ทดลองส่ง"
-                                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                    className="text-honey hover:text-honey/80 hover:bg-honey/10"
                                   >
                                     <FlaskConical className="w-4 h-4" />
                                   </Button>
@@ -840,12 +760,92 @@ export function CampaignsManagement() {
         </CardContent>
       </Card>
 
+      {/* ─── Bucket Picker Dialog ─── */}
+      <Dialog open={bucketPickerOpen} onOpenChange={setBucketPickerOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Images className="w-5 h-5" />
+              เลือกรูปจาก Bucket — {bucketPickerTarget === 'image_url' ? 'รูปภาพที่ 1' : 'รูปภาพที่ 2'}
+            </DialogTitle>
+            <DialogDescription>
+              คลิกรูปเพื่อเลือก หรืออัปโหลดใหม่จากปุ่มอัปโหลดด้านล่าง
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto min-h-0 py-2">
+            {loadingBucket ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : bucketFiles.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground text-sm">
+                ยังไม่มีรูปภาพใน Bucket — อัปโหลดรูปใหม่ก่อน
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {bucketFiles.map((f) => {
+                  const isSelected =
+                    formData[bucketPickerTarget] === f.url;
+                  return (
+                    <button
+                      key={f.name}
+                      type="button"
+                      onClick={() => selectBucketImage(f.url)}
+                      className={`relative group rounded-xl overflow-hidden border-2 transition-all aspect-video bg-muted ${
+                        isSelected
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-transparent hover:border-primary/50'
+                      }`}
+                    >
+                      <img
+                        src={f.url}
+                        alt={f.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <CheckCircle2 className="w-6 h-6 text-primary drop-shadow" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                        {f.name}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={async () => {
+                setBucketFiles([]);
+                await openBucketPicker(bucketPickerTarget);
+              }}
+            >
+              <RefreshCw className="w-4 h-4" />
+              รีเฟรช
+            </Button>
+            <Button variant="outline" onClick={() => setBucketPickerOpen(false)}>
+              ปิด
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Test Send Dialog ─── */}
       <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FlaskConical className="w-5 h-5 text-blue-500" />
+              <FlaskConical className="w-5 h-5 text-honey" />
               ทดลองส่ง
             </DialogTitle>
             <DialogDescription>
@@ -998,11 +998,15 @@ export function CampaignsManagement() {
               {/* Image 1 */}
               <div>
                 <Label>รูปภาพที่ 1</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="gap-2">
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     อัปโหลด
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => openBucketPicker('image_url')} className="gap-2">
+                    <Images className="w-4 h-4" />
+                    เลือกจาก Bucket
                   </Button>
                   {formData.image_url && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url: '' })}>
@@ -1018,11 +1022,15 @@ export function CampaignsManagement() {
               {/* Image 2 */}
               <div>
                 <Label>รูปภาพที่ 2 (ไม่บังคับ)</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Input type="file" ref={fileInputRef2} onChange={handleImageUpload2} accept="image/*" className="hidden" />
                   <Button type="button" variant="outline" onClick={() => fileInputRef2.current?.click()} disabled={uploading2} className="gap-2">
                     {uploading2 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     อัปโหลด
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => openBucketPicker('image_url_2')} className="gap-2">
+                    <Images className="w-4 h-4" />
+                    เลือกจาก Bucket
                   </Button>
                   {formData.image_url_2 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url_2: '' })}>

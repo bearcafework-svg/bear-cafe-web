@@ -6,7 +6,6 @@ import { CategoryCard } from '@/components/bear-cafe/CategoryCard';
 import { ExpandableRoleCard } from '@/components/bear-cafe/ExpandableRoleCard';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
 import { RulesSection } from '@/components/bear-cafe/RulesSection';
-import { MilestonePopup, MilestoneData } from '@/components/bear-cafe/MilestonePopup';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -105,10 +104,6 @@ export default function CreateSessionPage() {
   const [agreeToRules, setAgreeToRules] = useState(false);
   const [bannedWordError, setBannedWordError] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
-
-  // Milestone popup
-  const [milestoneData, setMilestoneData] = useState<MilestoneData | null>(null);
-  const [showMilestone, setShowMilestone] = useState(false);
 
   // Pre-select category from URL params and optionally jump to step 2
   useEffect(() => {
@@ -415,30 +410,6 @@ export default function CreateSessionPage() {
       }
 
       const session = sessionResponse.session;
-
-      // Call process-match-reward to update match stats
-      try {
-        const { data: rewardData, error: rewardError } = await supabase.functions.invoke('process-match-reward', {
-          body: { discord_id: user.discord_id },
-        });
-        if (rewardError) {
-          console.error('process-match-reward error:', rewardError);
-        } else {
-          console.log('process-match-reward success:', rewardData);
-          // Show milestone popup if milestone reached
-          if (rewardData?.milestone_reached && rewardData?.role_info) {
-            setMilestoneData({
-              milestoneCount: rewardData.milestone_count,
-              roleName: rewardData.role_info.name,
-              roleIcon: rewardData.role_info.icon,
-              roleColor: rewardData.role_info.color,
-            });
-            setShowMilestone(true);
-          }
-        }
-      } catch (rewardErr) {
-        console.error('process-match-reward error (non-blocking):', rewardErr);
-      }
 
       // Get role info if selected
       const selectedRoleData = selectedRole ? availableRoles.find((r) => r.id === selectedRole) : null;
@@ -922,13 +893,6 @@ export default function CreateSessionPage() {
         </div>
         <TurnstileWidget ref={turnstileRef} siteKey={siteKey} action="create_session" />
       </main>
-
-      {/* Milestone Popup */}
-      <MilestonePopup
-        open={showMilestone}
-        onOpenChange={setShowMilestone}
-        data={milestoneData}
-      />
     </div>
   );
 }
