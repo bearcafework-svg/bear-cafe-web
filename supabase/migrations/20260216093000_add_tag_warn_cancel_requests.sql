@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.tag_warn_cancel_requests (
 ALTER TABLE public.tag_warn_cancel_requests ADD COLUMN IF NOT EXISTS request_note TEXT;
 ALTER TABLE public.tag_warn_cancel_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
-CREATE UNIQUE INDEX tag_warn_cancel_requests_pending_unique
+CREATE UNIQUE INDEX IF NOT EXISTS tag_warn_cancel_requests_pending_unique
   ON public.tag_warn_cancel_requests (warn_timestamp)
   WHERE status = 'pending';
 

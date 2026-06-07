@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION switch_bartender_to_user(
+CREATE OR REPLACE FUNCTION switch_bartender_to_user(
   p_current_session_id uuid,
   p_user_id uuid,
   p_candidate_id uuid,

@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION try_match_bartender(
+CREATE OR REPLACE FUNCTION try_match_bartender(
   p_user_id         uuid,
   p_topic_id        uuid,
   p_user_alias      text,

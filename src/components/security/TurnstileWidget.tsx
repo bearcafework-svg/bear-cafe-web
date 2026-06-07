@@ -91,9 +91,19 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
     const initAttemptedRef = useRef(false);
     const errorCountRef = useRef(0);
     const FALLBACK_THRESHOLD = 1; // Reduced from 2 for faster fallback
+    const isDisabled = import.meta.env.VITE_DISABLE_TURNSTILE === 'true';
+
     useEffect(() => {
       if (initAttemptedRef.current) return;
       initAttemptedRef.current = true;
+
+      // Skip Turnstile entirely in dev if disabled
+      if (isDisabled) {
+        console.log('[Turnstile] Disabled in development mode');
+        setIsWidgetReady(true);
+        onReady?.();
+        return;
+      }
 
       let mounted = true;
 
@@ -171,7 +181,13 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
 
     useImperativeHandle(ref, () => ({
       execute: () =>
-        new Promise((resolve, reject) => {
+        new Promise((resolve) => {
+          // If Turnstile is disabled in dev, immediately return bypass token
+          if (isDisabled) {
+            resolve('TURNSTILE_BYPASS_DEV');
+            return;
+          }
+
           // If widget had errors, use a development bypass token immediately
           if (errorCountRef.current >= FALLBACK_THRESHOLD) {
             console.log('[Turnstile] Using bypass token due to widget errors');
@@ -188,8 +204,12 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
           }
 
           resolveRef.current = resolve;
-          rejectRef.current = reject;
-          
+          rejectRef.current = (error: Error) => {
+            console.error('[Turnstile] Execute error:', error);
+            // On execute error, use bypass
+            resolve('TURNSTILE_BYPASS_DEV');
+          };
+
           try {
             window.turnstile.execute(widgetIdRef.current);
           } catch (error) {

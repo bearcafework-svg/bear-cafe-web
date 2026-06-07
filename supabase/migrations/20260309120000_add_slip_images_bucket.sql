@@ -1,3 +1,17 @@
+CREATE TABLE IF NOT EXISTS public.trading_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id text NOT NULL,
+  service_id text,
+  transaction text,
+  item text,
+  amount numeric,
+  type_bill text,
+  slip_url text,
+  slip_url_2 text,
+  log_timestamp text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Create the storage bucket 'slip-images' if it doesn't exist
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('slip-images', 'slip-images', true)

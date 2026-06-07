@@ -25,3 +25,8 @@ dist-ssr
 
 # Environment files
 .env
+*.prod
+supabase/functions/.env
+
+CLAUDE.md
+docs/*.md
