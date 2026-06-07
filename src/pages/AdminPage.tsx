@@ -29,7 +29,6 @@ import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
-import AdminLottery from '@/pages/AdminLottery';
 import { BannedRolesManagement } from '@/components/admin/BannedRolesManagement';
 import { BannedWordsManagement } from '@/components/admin/BannedWordsManagement';
 import { CategoriesManagement } from '@/components/admin/CategoriesManagement';
@@ -101,14 +100,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'roles': Palette,
   'redeem-codes': Ticket,
   'non-transferable-roles': ShieldBan,
-  'maintenance': Settings,
-  'lottery': Ticket,
   'discord-servers': Settings,
-  'staff': Users,
-  'permissions': Key,
-  'secret-table': Coffee,
-  'campaigns': Send,
-  'bartender-management': Coffee,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -270,7 +262,6 @@ export default function AdminPage() {
         case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
         case 'roles-to-delete': return canAccessPage('roles-to-delete') ? <RolesToDeleteManagement /> : null;
-        case 'lottery': return canAccessPage('lottery') ? <AdminLottery /> : null;
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'campaigns': return isOwner ? <CampaignsManagement /> : null;
