@@ -1,11 +1,6 @@
 name: Deploy Supabase Functions
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'supabase/functions/**'
   workflow_dispatch:
     inputs:
       function_name:
