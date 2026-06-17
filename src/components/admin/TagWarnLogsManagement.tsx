@@ -48,6 +48,10 @@ const PUNISH_OPTIONS = [
   { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
   { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
   { value: 'เตะ', label: 'เตะ' },
+  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'ミ ชาเขียวเตือนใจ 𓂃 🍵' },
+  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
+  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
+  { value: 'เตะ', label: 'เตะ' },
   { value: 'แบนถาวร', label: 'แบนถาวร' },
 ];
 
@@ -55,6 +59,8 @@ const PUNISH_OPTIONS = [
 
 interface WarnRecord {
   id: string;
+  log_timestamp: string | null;
+  created_at: string;
   log_timestamp: string | null;
   created_at: string;
   sequence: number;
@@ -696,7 +702,7 @@ export function TagWarnLogsManagement() {
                       </div>
 
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp || r.created_at)}
+                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp ?? r.created_at)}
                       </div>
 
                       {/* barista & member */}
