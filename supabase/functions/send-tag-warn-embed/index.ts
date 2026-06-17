@@ -49,7 +49,8 @@ Deno.serve(async (req): Promise<Response> => {
     const punish: string = String(body.punish ?? "").trim();
     const imageUrl1: string = String(body.image_url_1 ?? "").trim();
     const imageUrl2: string | null = body.image_url_2 ? String(body.image_url_2).trim() || null : null;
-    const isSpoiler: boolean = Boolean(body.is_spoiler ?? false);
+    const isSpoiler1: boolean = Boolean(body.is_spoiler_1 ?? body.is_spoiler ?? false);
+    const isSpoiler2: boolean = Boolean(body.is_spoiler_2 ?? body.is_spoiler ?? false);
     const channelId: string = String(body.channel_id ?? TAG_WARN_CHANNEL_ID).trim();
 
     if (!memberId || !message || !punish || !imageUrl1) {
@@ -66,9 +67,9 @@ Deno.serve(async (req): Promise<Response> => {
 
     // สร้าง media gallery items
     type MediaItem = { media: { url: string }; spoiler?: boolean };
-    const mediaItems: MediaItem[] = [{ media: { url: imageUrl1 }, ...(isSpoiler ? { spoiler: true } : {}) }];
+    const mediaItems: MediaItem[] = [{ media: { url: imageUrl1 }, ...(isSpoiler1 ? { spoiler: true } : {}) }];
     if (imageUrl2) {
-      mediaItems.push({ media: { url: imageUrl2 }, ...(isSpoiler ? { spoiler: true } : {}) });
+      mediaItems.push({ media: { url: imageUrl2 }, ...(isSpoiler2 ? { spoiler: true } : {}) });
     }
 
     const payload: Record<string, unknown> = {
