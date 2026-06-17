@@ -337,6 +337,7 @@ export function TagWarnLogsManagement() {
         image_url: url1,
         image_url_2: url2,
         is_spoiler: spoilerFlags[0] || spoilerFlags[1] || false,
+        log_timestamp: new Date().toISOString(),
       });
       if (insertErr) throw insertErr;
 
@@ -692,7 +693,7 @@ export function TagWarnLogsManagement() {
                       </div>
 
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp ?? r.created_at)}
+                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp || r.created_at)}
                       </div>
 
                       {/* barista & member */}
