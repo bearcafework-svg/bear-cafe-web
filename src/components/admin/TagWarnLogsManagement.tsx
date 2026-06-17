@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -15,82 +16,59 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { PostgrestError } from '@supabase/supabase-js';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import {
-  RefreshCw,
-  ExternalLink,
-  Ban,
-  AlertTriangle,
-  Clock,
-  User,
-  Shield,
-  Hash,
-  MessageSquare,
-  Gavel,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  EyeOff,
-  Eye,
-  Loader2,
-  Plus,
-  ImagePlus,
-  UploadCloud,
-  Trash2,
-  Bell,
-  BellOff,
+  RefreshCw, Ban, AlertTriangle, Clock, User, Shield, Hash,
+  MessageSquare, Gavel, X, ChevronLeft, ChevronRight,
+  EyeOff, Eye, Loader2, Plus, UploadCloud, Trash2,
+  Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send,
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-const API_URL =
-  'https://script.google.com/macros/s/AKfycbycKl_xUfYzwRwRNRH2D9P-nRlx-KClzRRInEVHBWqZfCjzMmmuM9Yt9UfY_e1cjsQV1A/exec';
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEMS_PER_PAGE = 12;
 
-// Webhook สำหรับแจ้งเตือนการเพิ่ม Tag Warn
-const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1438715792362569820/FE5hvcrW3OATp-3dRr4LoMlBYQrUIsLs2r_jv4CXKNe7b7PrjD1kr-8K5U0lJrsTHvQW';
+const PUNISH_OPTIONS = [
+  { value: 'ตักเตือนด้วยวาจา', label: 'ตักเตือนด้วยวาจา' },
+  { value: 'ตักเตือนเป็นลายลักษณ์อักษร', label: 'ตักเตือนเป็นลายลักษณ์อักษร' },
+  { value: 'ชื่อ/รูปไม่เหมาะสม', label: 'ชื่อ/รูปไม่เหมาะสม' },
+  { value: 'พักการใช้งาน 3 วัน', label: 'พักการใช้งาน 3 วัน' },
+  { value: 'พักการใช้งาน 7 วัน', label: 'พักการใช้งาน 7 วัน' },
+  { value: 'พักการใช้งาน 30 วัน', label: 'พักการใช้งาน 30 วัน' },
+  { value: 'แบนถาวร', label: 'แบนถาวร' },
+];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WarnRecord {
   id: string;
-  timestamp: string;
-  sequence: string;
-  email: string;
-  baristaId: string;
-  memberId: string;
-  warningMessage: string;
-  punishment: string;
-  punishmentLink: string;
-  image: string;
-  cancelStatus: string;
-  _cancelledAt?: string;
-  _cancelledBy?: string; // ชื่อคนอนุมัติ (ถ้ามี) หรือคนทำรายการ
-  _localCancelled?: boolean;
+  log_timestamp: string;
+  sequence: number;
+  barista_id: string | null;
+  member_id: string | null;
+  message: string | null;
+  punish: string | null;
+  image_url: string | null;
+  image_url_2: string | null;
+  _cancelStatus?: 'pending' | 'approved' | 'rejected' | null;
+  _cancelledAt?: string | null;
+  _requestedBy?: string | null;
   _showBlur?: boolean;
-  _cancelRequestStatus?: 'pending' | 'approved' | 'rejected';
-  // เพิ่ม Field ใหม่
-  _requestedBy?: string; // ชื่อคนขอ Cancel
-  _approvedBy?: string;  // ชื่อคนอนุมัติ
 }
-
-// อัปเดต Interface เพื่อรับข้อมูล Join จาก Supabase
-interface CancelRequest {
-  warn_timestamp: string;
-  status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-  approved_at: string | null;
-  requested_by_name: string | null;
-  requester: { username: string | null } | null;
-  approver: { username: string | null } | null;
-}
-
-type TagWarnCancelRequestInsert = TablesInsert<'tag_warn_cancel_requests'>;
 
 interface DiscordProfile {
   discord_id: string;
@@ -99,677 +77,423 @@ interface DiscordProfile {
   avatar_url: string | null;
 }
 
-function normalizeWarnTimestampKey(value: string): string {
-  return (value || '').trim();
-}
+type TagWarnCancelRequestInsert = TablesInsert<'tag_warn_cancel_requests'>;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTimestamp(raw: string): string {
   if (!raw) return '-';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleString('th-TH', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   });
 }
 
-function sortWarnRecordsDesc(a: WarnRecord, b: WarnRecord): number {
-  const caseA = Number.parseInt((a.sequence || '').replace(/[^0-9]/g, ''), 10);
-  const caseB = Number.parseInt((b.sequence || '').replace(/[^0-9]/g, ''), 10);
-
-  if (!Number.isNaN(caseA) && !Number.isNaN(caseB) && caseA !== caseB) {
-    return caseB - caseA;
-  }
-
-  const t1 = new Date(a.timestamp).getTime();
-  const t2 = new Date(b.timestamp).getTime();
-  if (!Number.isNaN(t1) && !Number.isNaN(t2)) {
-    return t2 - t1;
-  }
-
-  return (b.sequence || '').localeCompare(a.sequence || '');
-}
-
-function parseImages(imageField: string): string[] {
-  if (!imageField || !imageField.trim()) return [];
-  return imageField
-    .split(',')
-    .map((url) => {
-      const trimmed = url.trim();
-      const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileMatch && fileMatch[1]) {
-        return `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
-      }
-      const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if (idMatch && idMatch[1]) {
-        return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
-      }
-      return trimmed;
-    })
-    .filter((url) => url.length > 0);
-}
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function TagWarnLogsManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // core data
   const [records, setRecords] = useState<WarnRecord[]>([]);
   const recordsRef = useRef<WarnRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [previewImages, setPreviewImages] = useState<string[]>([]);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [cancelTarget, setCancelTarget] = useState<WarnRecord | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<WarnRecord | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  // pagination & filters
   const [currentPage, setCurrentPage] = useState(1);
-  const [profileMap, setProfileMap] = useState<Map<string, DiscordProfile>>(new Map());
   const [caseQuery, setCaseQuery] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
   const [baristaQuery, setBaristaQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
 
-  // Add Warn Log State
+  // profile resolution
+  const [profileMap, setProfileMap] = useState<Map<string, DiscordProfile>>(new Map());
+
+  // image preview
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  // cancel
+  const [cancelTarget, setCancelTarget] = useState<WarnRecord | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  // delete
+  const [deleteTarget, setDeleteTarget] = useState<WarnRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // add warn
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
-  const [newWarn, setNewWarn] = useState({
-    baristaId: '',
-    memberId: '',
-    message: '',
-    punish: '',
-    punishLink: '',
-  });
+  const [newWarn, setNewWarn] = useState({ memberId: '', message: '', punish: '' });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  // สร้าง object URL สำหรับ preview รูปภาพ และ revoke อัตโนมัติเมื่อ selectedFiles เปลี่ยน
-  const previewUrls = useMemo(() => {
-    const urls = selectedFiles.map(f => URL.createObjectURL(f));
-    return urls;
-  }, [selectedFiles]);
-  useEffect(() => {
-    return () => { previewUrls.forEach(url => URL.revokeObjectURL(url)); };
-  }, [previewUrls]);
+  const [spoilerFlags, setSpoilerFlags] = useState<boolean[]>([false, false]);
+  const [spoilerAll, setSpoilerAll] = useState(false);
+
+  // send to discord
+  const [sendTarget, setSendTarget] = useState<WarnRecord | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  // edit
+  const [editTarget, setEditTarget] = useState<WarnRecord | null>(null);
+  const [editForm, setEditForm] = useState({ message: '', punish: '' });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // webhook toggle
   const [webhookEnabled, setWebhookEnabled] = useState(true);
 
-  // Load webhook setting
+  // ── Derived: preview URLs (revoke on change) ──────────────────────────────
+  const previewUrls = useMemo(
+    () => selectedFiles.map((f) => URL.createObjectURL(f)),
+    [selectedFiles],
+  );
   useEffect(() => {
-    const loadSettings = async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'tag_warn_webhook_enabled')
-        .single();
-      if (data) {
-        // data.value is JSONB — could be boolean true/false or string "true"/"false"
-        const val = data.value;
-        setWebhookEnabled(val === true || val === 'true');
+    return () => { previewUrls.forEach((url) => URL.revokeObjectURL(url)); };
+  }, [previewUrls]);
+
+  // ── Derived: filtered + paginated records ─────────────────────────────────
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      if (caseQuery && !String(r.sequence).includes(caseQuery.trim())) return false;
+      if (memberQuery && !(r.member_id ?? '').toLowerCase().includes(memberQuery.toLowerCase())) return false;
+      if (baristaQuery && !(r.barista_id ?? '').toLowerCase().includes(baristaQuery.toLowerCase())) return false;
+      if (dateQuery) {
+        const d = new Date(r.log_timestamp);
+        const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (ymd !== dateQuery) return false;
       }
-    };
-    loadSettings();
-  }, []);
+      return true;
+    });
+  }, [records, caseQuery, memberQuery, baristaQuery, dateQuery]);
 
-  const toggleWebhook = async (enabled: boolean) => {
-    if (!user?.is_owner) return;
-    setWebhookEnabled(enabled);
-    const { error } = await supabase
-      .from('site_settings')
-      .upsert({ key: 'tag_warn_webhook_enabled', value: enabled });
-    
-    if (error) {
-      console.error('Failed to save setting', error);
-      toast({ title: 'บันทึกการตั้งค่าไม่สำเร็จ', variant: 'destructive' });
-    } else {
-      toast({ title: enabled ? 'เปิดการแจ้งเตือน Discord แล้ว' : 'ปิดการแจ้งเตือน Discord แล้ว' });
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
-  // Fetch Discord profiles for username resolution
-  const fetchProfiles = useCallback(async (discordIds: string[]) => {
-    if (discordIds.length === 0) return;
-    const uniqueIds = [...new Set(discordIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return;
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const isCancelled = (r: WarnRecord) => r._cancelStatus === 'approved';
 
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('discord_id, username, discord_username, avatar_url')
-        .in('discord_id', uniqueIds);
-
-      if (data) {
-        const map = new Map<string, DiscordProfile>();
-        data.forEach((p) => map.set(p.discord_id, p));
-        setProfileMap(map);
-      }
-    } catch (err) {
-      console.error('Failed to fetch profiles', err);
-    }
+  const updateRecords = useCallback((next: WarnRecord[]) => {
+    recordsRef.current = next;
+    setRecords(next);
   }, []);
 
   const resolveDisplayName = useCallback(
-    (id: string): { name: string; discord_username: string | null; avatar: string | null } => {
+    (id: string | null): { name: string; discord_username: string | null; avatar: string | null } => {
       if (!id) return { name: '-', discord_username: null, avatar: null };
-      const profile = profileMap.get(id);
-      if (profile) return { name: profile.username, discord_username: (profile as any).discord_username || null, avatar: profile.avatar_url };
+      const p = profileMap.get(id);
+      if (p) return { name: p.username, discord_username: p.discord_username ?? null, avatar: p.avatar_url ?? null };
       if (id.length > 8) return { name: `User-${id.slice(-4)}`, discord_username: null, avatar: null };
       return { name: id, discord_username: null, avatar: null };
     },
     [profileMap],
   );
 
-  const updateRecords = useCallback((newRecords: WarnRecord[]) => {
-    recordsRef.current = newRecords;
-    setRecords(newRecords);
+  const toggleBlur = useCallback((id: string) => {
+    updateRecords(recordsRef.current.map((r) => r.id === id ? { ...r, _showBlur: !r._showBlur } : r));
+  }, [updateRecords]);
+
+  const toggleSpoilerFlag = (idx: number) => {
+    setSpoilerFlags((prev) => { const n = [...prev]; n[idx] = !n[idx]; return n; });
+  };
+
+  const removeFile = (idx: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+    setSpoilerFlags((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const remaining = 2 - selectedFiles.length;
+    if (remaining <= 0) return;
+    setSelectedFiles((prev) => [...prev, ...files.slice(0, remaining)]);
+    setSpoilerFlags((prev) => [...prev, ...Array(Math.min(files.length, remaining)).fill(false)]);
+    e.target.value = '';
+  };
+
+  // ── Fetch profiles ────────────────────────────────────────────────────────
+  const fetchProfiles = useCallback(async (discordIds: string[]) => {
+    const uniqueIds = [...new Set(discordIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('discord_id, username, discord_username, avatar_url')
+      .in('discord_id', uniqueIds);
+    if (data) {
+      const map = new Map<string, DiscordProfile>();
+      (data as DiscordProfile[]).forEach((p) => map.set(p.discord_id, p));
+      setProfileMap(map);
+    }
   }, []);
 
-const fetchData = useCallback(async () => {
+  // ── Fetch data ────────────────────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. ดึงข้อมูลจากตาราง tag_warn_logs
-      const { data: tagWarnData, error: dbError } = await supabase
+      const { data: logs, error: logsErr } = await supabase
         .from('tag_warn_logs')
-        .select('*')
-        .order('log_timestamp', { ascending: false });
+        .select('id, log_timestamp, sequence, barista_id, member_id, message, punish, image_url, image_url_2')
+        .order('sequence', { ascending: false });
+      if (logsErr) throw logsErr;
 
-      if (dbError) throw dbError;
-
-      const formattedData: WarnRecord[] = (tagWarnData || []).map((row) => ({
-        id: row.id,
-        timestamp: row.log_timestamp,
-        // ใช้ sequence จริงถ้ามีและไม่ใช่ 0, ไม่งั้น fallback เป็น id เพื่อป้องกัน key ซ้ำ
-        sequence: (row.sequence != null && row.sequence !== 0 && row.sequence !== '')
-          ? String(row.sequence)
-          : row.id,
-        // เก็บ sequence จริงจาก DB ไว้สำหรับ cancel request (ไม่ใช้ fallback)
-        _rawSequence: (row.sequence != null && row.sequence !== 0 && row.sequence !== '')
-          ? String(row.sequence)
-          : null,
-        email: '',
-        baristaId: row.barista_id || '',
-        memberId: row.member_id || '',
-        warningMessage: row.message || '',
-        punishment: row.punish || '',
-        punishmentLink: row.punish_link || '',
-        image: row.image_url || '',
-        cancelStatus: '',
-      }));
-
-const allIds = formattedData.reduce((acc: string[], r) => {
-  acc.push(r.baristaId, r.memberId);
-  return acc;
-}, []);
-      fetchProfiles(allIds);
-
-      // เก็บสถานะเบลอเดิม โดยใช้เลขเคส (sequence) เป็นตัวอ้างอิง
-      const existingCancelMap = new Map<string, Partial<WarnRecord>>();
-      recordsRef.current.forEach((r) => {
-        const key = String(r.sequence).trim();
-        if (key && (r._cancelRequestStatus || r._localCancelled)) {
-          existingCancelMap.set(key, {
-            _cancelRequestStatus: r._cancelRequestStatus,
-            _localCancelled: r._localCancelled,
-            _cancelledAt: r._cancelledAt,
-            _cancelledBy: r._cancelledBy,
-            _requestedBy: r._requestedBy,
-            _approvedBy: r._approvedBy,
-            _showBlur: r._showBlur,
-          });
-        }
-      });
-
-      // 2. ดึง Cancel Requests ทั้งหมดมาจับคู่ผ่าน "sequence" (เลขเคส) ป้องกันปัญหา Timestamp ไม่ตรงกัน
-      // ใช้ 2-step query เพื่อหลีกเลี่ยง PGRST200 เมื่อ FK ยังไม่ได้ migrate
-      const { data: cancelRaw } = await supabase
+      const { data: cancelReqs } = await supabase
         .from('tag_warn_cancel_requests')
-        .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
-        .order('created_at', { ascending: false });
+        .select('warn_timestamp, status, requested_by_name, approved_at')
+        .in('status', ['pending', 'approved']);
 
-      const cancelRawRows1 = (cancelRaw ?? []) as any[];
-
-      // รวบรวม profile IDs ที่ต้องการ
-      const profileIds = [...new Set([
-        ...cancelRawRows1.map((r: any) => r.requested_by).filter(Boolean),
-        ...cancelRawRows1.map((r: any) => r.approved_by).filter(Boolean),
-      ])];
-      const profileUsernameMap: Record<string, string> = {};
-      if (profileIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', profileIds);
-        (profileRows ?? []).forEach((p: any) => { profileUsernameMap[p.id] = p.username; });
-      }
-
-      // แปลงให้มี requester/approver เหมือนเดิม
-      const cancelData = cancelRawRows1.map((r: any) => ({
-        ...r,
-        requester: r.requested_by ? { username: profileUsernameMap[r.requested_by] ?? null } : null,
-        approver: r.approved_by ? { username: profileUsernameMap[r.approved_by] ?? null } : null,
-      }));
-
-      const cancelRequestMap = new Map<string, any>();
-      cancelData.forEach((r: any) => {
-        const key = String(r.warn_sequence).trim();
-        if (!key || cancelRequestMap.has(key)) return;
-        cancelRequestMap.set(key, r);
+      const cancelMap = new Map<string, { status: 'pending' | 'approved'; requestedBy: string | null; cancelledAt: string | null }>();
+      (cancelReqs ?? []).forEach((req: any) => {
+        cancelMap.set(req.warn_timestamp, {
+          status: req.status,
+          requestedBy: req.requested_by_name ?? null,
+          cancelledAt: req.approved_at ?? null,
+        });
       });
 
-      // จัดการนำ Cancel Status มาใส่ใน Data ปัจจุบัน
-      const enriched = formattedData.map((record) => {
-        const key = String(record.sequence).trim();
-        const cr = cancelRequestMap.get(key);
-        const existing = existingCancelMap.get(key);
-
-        if (!cr) {
-          return {
-            ...record,
-            _cancelRequestStatus: existing?._cancelRequestStatus,
-            _localCancelled: existing?._localCancelled ?? false,
-            _cancelledAt: existing?._cancelledAt,
-            _cancelledBy: existing?._cancelledBy,
-            _requestedBy: existing?._requestedBy,
-            _approvedBy: existing?._approvedBy,
-            _showBlur: existing?._showBlur ?? false,
-          };
-        }
-
-        const isApproved = cr.status === 'approved';
+      const enriched: WarnRecord[] = (logs ?? []).map((log: any) => {
+        const cancel = cancelMap.get(log.log_timestamp);
         return {
-          ...record,
-          _cancelRequestStatus: cr.status,
-          _localCancelled: isApproved,
-          _cancelledAt: isApproved ? formatTimestamp(cr.approved_at ?? cr.created_at ?? '') : undefined,
-          _cancelledBy: isApproved ? (cr.requester?.username ?? cr.requested_by_name ?? '-') : undefined,
-          _requestedBy: cr.requester?.username ?? cr.requested_by_name ?? '-',
-          _approvedBy: isApproved ? (cr.approver?.username ?? '-') : undefined,
-          _showBlur: existing?._showBlur !== undefined ? existing._showBlur : (isApproved || cr.status === 'pending'),
+          ...log,
+          _cancelStatus: cancel?.status ?? null,
+          _cancelledAt: cancel?.cancelledAt ? formatTimestamp(cancel.cancelledAt) : null,
+          _requestedBy: cancel?.requestedBy ?? null,
+          _showBlur: cancel?.status === 'approved' || cancel?.status === 'pending',
         };
       });
 
       updateRecords(enriched);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError(msg);
+      const ids = enriched.flatMap((r) => [r.barista_id, r.member_id]).filter(Boolean) as string[];
+      await fetchProfiles(ids);
+    } catch (e: any) {
+      setError(e?.message ?? 'เกิดข้อผิดพลาด');
     } finally {
       setLoading(false);
     }
   }, [fetchProfiles, updateRecords]);
 
-  // แก้ไข refreshCancelStatuses ให้จับคู่ด้วย Sequence เช่นกัน
-  const refreshCancelStatuses = useCallback(async () => {
-    try {
-      const currentRecords = recordsRef.current;
-      if (currentRecords.length === 0) return;
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-      const { data: cancelRaw2 } = await supabase
-        .from('tag_warn_cancel_requests')
-        .select('warn_sequence, status, created_at, approved_at, requested_by_name, requested_by, approved_by')
-        .order('created_at', { ascending: false });
-
-      const cancelRawRows = (cancelRaw2 ?? []) as any[];
-
-      const profileIds2 = [...new Set([
-        ...cancelRawRows.map((r: any) => r.requested_by).filter(Boolean),
-        ...cancelRawRows.map((r: any) => r.approved_by).filter(Boolean),
-      ])];
-      const profileUsernameMap2: Record<string, string> = {};
-      if (profileIds2.length > 0) {
-        const { data: profileRows2 } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', profileIds2);
-        (profileRows2 ?? []).forEach((p: any) => { profileUsernameMap2[p.id] = p.username; });
-      }
-
-      const cancelRequests2 = cancelRawRows.map((r: any) => ({
-        ...r,
-        requester: r.requested_by ? { username: profileUsernameMap2[r.requested_by] ?? null } : null,
-        approver: r.approved_by ? { username: profileUsernameMap2[r.approved_by] ?? null } : null,
-      }));
-
-      const cancelRequestMap = new Map<string, any>();
-      cancelRequests2.forEach((r: any) => {
-        const key = String(r.warn_sequence).trim();
-        if (!key || cancelRequestMap.has(key)) return;
-        cancelRequestMap.set(key, r);
-      });
-
-      const updated = currentRecords.map((record) => {
-        const key = String(record.sequence).trim();
-        const cr = cancelRequestMap.get(key);
-        if (!cr) return record;
-
-        const isApproved = cr.status === 'approved';
-        const userToggledBlur = record._showBlur;
-        return {
-          ...record,
-          _cancelRequestStatus: cr.status,
-          _localCancelled: isApproved,
-          _cancelledAt: isApproved ? formatTimestamp(cr.approved_at ?? cr.created_at ?? '') : record._cancelledAt,
-          _cancelledBy: isApproved ? (cr.requester?.username ?? cr.requested_by_name ?? '-') : record._cancelledBy,
-          _requestedBy: cr.requester?.username ?? cr.requested_by_name ?? record._requestedBy ?? '-',
-          _approvedBy: isApproved ? (cr.approver?.username ?? '-') : record._approvedBy,
-          _showBlur: userToggledBlur !== undefined ? userToggledBlur : (isApproved || cr.status === 'pending'),
-        };
-      });
-
-      updateRecords(updated);
-    } catch (err) {
-      console.error('Failed to refresh cancel request statuses', err);
-    }
-  }, [updateRecords]);
-
+  // auto-refresh every 30s
   useEffect(() => {
-    fetchData();
-    const interval = window.setInterval(fetchData, 30000);
-    return () => window.clearInterval(interval);
+    const id = setInterval(fetchData, 30_000);
+    return () => clearInterval(id);
   }, [fetchData]);
 
+  // ── Load webhook setting ──────────────────────────────────────────────────
   useEffect(() => {
-    if (recordsRef.current.length === 0) return;
+    supabase.from('site_settings').select('value').eq('key', 'tag_warn_webhook_enabled').single()
+      .then(({ data }) => {
+        if (data) setWebhookEnabled(data.value === true || data.value === 'true');
+      });
+  }, []);
 
-    const onFocus = () => {
-      refreshCancelStatuses();
-    };
-
-    window.addEventListener('focus', onFocus);
-    const interval = window.setInterval(refreshCancelStatuses, 10000);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      window.clearInterval(interval);
-    };
-  }, [refreshCancelStatuses]);
-
-  const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      const caseMatched = !caseQuery.trim() || (r.sequence || '').toLowerCase().includes(caseQuery.trim().toLowerCase());
-      const memberResolved = resolveDisplayName(r.memberId);
-      const memberMatched =
-        !memberQuery.trim() ||
-        r.memberId.toLowerCase().includes(memberQuery.trim().toLowerCase()) ||
-        memberResolved.name.toLowerCase().includes(memberQuery.trim().toLowerCase()) ||
-        (memberResolved.discord_username || '').toLowerCase().includes(memberQuery.trim().toLowerCase());
-      const baristaResolved = resolveDisplayName(r.baristaId);
-      const baristaMatched =
-        !baristaQuery.trim() ||
-        r.baristaId.toLowerCase().includes(baristaQuery.trim().toLowerCase()) ||
-        baristaResolved.name.toLowerCase().includes(baristaQuery.trim().toLowerCase()) ||
-        (baristaResolved.discord_username || '').toLowerCase().includes(baristaQuery.trim().toLowerCase());
-
-      const dateMatched = !dateQuery || (() => {
-        const d = new Date(r.timestamp);
-        if (Number.isNaN(d.getTime())) return false;
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}` === dateQuery;
-      })();
-
-      return caseMatched && memberMatched && baristaMatched && dateMatched;
-    });
-  }, [records, caseQuery, memberQuery, baristaQuery, dateQuery, resolveDisplayName]);
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRecords.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredRecords, currentPage]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [totalPages, currentPage]);
-
-  const handleCancel = async () => {
-    if (!cancelTarget || !user?.id) return;
-    setCancelling(true);
-    try {
-      const payload: TagWarnCancelRequestInsert = {
-        warn_timestamp: cancelTarget.timestamp,
-        warn_sequence: (cancelTarget as any)._rawSequence ?? cancelTarget.sequence,
-        member_id: cancelTarget.memberId,
-        requested_by: user.id,
-        requested_by_name: user.username ?? null,
-      };
-
-      const { error: insertError } = await supabase.from('tag_warn_cancel_requests').insert(payload);
-
-      if (insertError) {
-        const isDuplicate = (insertError as PostgrestError).code === '23505';
-        if (isDuplicate) {
-          toast({ title: 'มีคำขอยกเลิกอยู่แล้ว', description: `เคส #${cancelTarget.sequence} มีคำขอที่กำลังรออนุมัติอยู่` });
-          setCancelTarget(null);
-          return;
-        }
-        throw insertError;
-      }
-
-      const updated = recordsRef.current.map((r) =>
-        r.timestamp === cancelTarget.timestamp ? { ...r, _cancelRequestStatus: 'pending' as const, _showBlur: true } : r,
-      );
-      updateRecords(updated);
-
-      toast({ title: 'ส่งคำขอยกเลิกแล้ว', description: `เคส #${cancelTarget.sequence} ถูกส่งรอ Owner อนุมัติ` });
-      setCancelTarget(null);
-    } catch (err) {
-      console.error('Cancel failed', err);
-      toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' });
-    } finally {
-      setCancelling(false);
+  // ── Toggle webhook ────────────────────────────────────────────────────────
+  const toggleWebhook = async (enabled: boolean) => {
+    if (!user?.is_owner) return;
+    setWebhookEnabled(enabled);
+    const { error: settingsError } = await supabase
+      .from('site_settings')
+      .upsert({ key: 'tag_warn_webhook_enabled', value: enabled });
+    if (settingsError) {
+      toast({ title: 'บันทึกการตั้งค่าไม่สำเร็จ', variant: 'destructive' });
+    } else {
+      toast({ title: enabled ? 'เปิดการแจ้งเตือน Discord แล้ว' : 'ปิดการแจ้งเตือน Discord แล้ว' });
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget || !user?.is_owner) return;
-    setIsDeleting(true);
-
-    try {
-      // 1. Delete images from storage (if any)
-      const images = parseImages(deleteTarget.image);
-      const supabaseImagePaths: string[] = [];
-
-      for (const url of images) {
-        if (url.includes('/storage/v1/object/public/warn-images/')) {
-          const parts = url.split('/warn-images/');
-          if (parts.length > 1) {
-            // Decode URI component to handle spaces/special chars in filename
-            supabaseImagePaths.push(decodeURIComponent(parts[1]));
-          }
-        }
-      }
-
-      if (supabaseImagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from('warn-images')
-          .remove(supabaseImagePaths);
-        
-        if (storageError) {
-          console.error('Failed to delete images:', storageError);
-          // Continue to delete record
-        }
-      }
-
-      // 2. Delete record from database
-      const { error: deleteError } = await supabase
-        .from('tag_warn_logs')
-        .delete()
-        .eq('id', deleteTarget.id);
-
-      if (deleteError) throw deleteError;
-
-      toast({ title: 'ลบข้อมูลเรียบร้อยแล้ว', className: 'bg-green-500 text-white' });
-      setDeleteTarget(null);
-      fetchData(); // Reload data
-
-    } catch (err: any) {
-      console.error('Delete failed:', err);
-      toast({ title: 'เกิดข้อผิดพลาดในการลบ', description: err.message, variant: 'destructive' });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const toggleBlur = (timestamp: string) => {
-    const updated = recordsRef.current.map((r) => (r.timestamp === timestamp ? { ...r, _showBlur: !r._showBlur } : r));
-    updateRecords(updated);
-  };
-
-  const isCancelled = (r: WarnRecord) => Boolean(r.cancelStatus && r.cancelStatus.trim() !== '') || r._localCancelled;
-
-  // Add Warn Logic
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(prev => [...prev, ...files]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
+  // ── Add warn ──────────────────────────────────────────────────────────────
   const handleAddWarn = async () => {
-    // Auto-assign Barista ID from current user
-    const baristaId = user?.discord_id;
-
-    if (!baristaId) {
-      toast({ title: 'ไม่พบข้อมูลผู้ใช้งาน (Barista ID)', variant: 'destructive' });
+    if (!newWarn.memberId.trim() || !newWarn.message.trim() || !newWarn.punish || selectedFiles.length === 0) {
+      toast({ title: 'กรุณากรอกข้อมูลให้ครบถ้วนและอัปโหลดรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
       return;
     }
-
-    if (!newWarn.memberId || !newWarn.message || !newWarn.punish || selectedFiles.length === 0) {
-      toast({ title: 'กรุณากรอกข้อมูลให้ครบและอัปโหลดรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
-      return;
-    }
-
     setAddLoading(true);
     try {
-      const imageUrls: string[] = [];
+      const uploadUrl = async (file: File, idx: number): Promise<string> => {
+        const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+        const ext = file.name.split('.').pop() ?? 'jpg';
+        const path = `tag-warn/${Date.now()}-${idx}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('evidence').upload(path, compressed, { upsert: false });
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(path);
+        return urlData.publicUrl;
+      };
 
-      // 1. Compress and Upload Images
-      for (const file of selectedFiles) {
-        const options = {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        };
-        
-        try {
-          const compressedFile = await imageCompression(file, options);
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${compressedFile.type.split('/')[1]}`;
-          
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('warn-images')
-            .upload(fileName, compressedFile, { cacheControl: '86400' });
+      const url1 = await uploadUrl(selectedFiles[0], 0);
+      const url2 = selectedFiles[1] ? await uploadUrl(selectedFiles[1], 1) : null;
 
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('warn-images')
-            .getPublicUrl(fileName);
-            
-          imageUrls.push(publicUrl);
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          throw new Error('Upload failed');
-        }
-      }
-
-      const finalImageUrl = imageUrls.join(',');
-
-      // 2. Insert to Database
-      const { error: insertError } = await supabase.from('tag_warn_logs').insert({
-        barista_id: baristaId,
-        member_id: newWarn.memberId,
-        message: newWarn.message,
+      const { error: insertErr } = await supabase.from('tag_warn_logs').insert({
+        member_id: newWarn.memberId.trim(),
+        message: newWarn.message.trim(),
         punish: newWarn.punish,
-        punish_link: newWarn.punishLink,
-        image_url: finalImageUrl,
-        log_timestamp: new Date().toISOString(),
+        barista_id: user?.discord_id ?? null,
+        image_url: url1,
+        image_url_2: url2,
       });
+      if (insertErr) throw insertErr;
 
-      if (insertError) throw insertError;
-
-      // 3. Send Discord Webhook
-      if (webhookEnabled && DISCORD_WEBHOOK_URL) {
-        const nowSeconds = Math.floor(Date.now() / 1000);
-        const discordTimestamp = `<t:${nowSeconds}:F> (<t:${nowSeconds}:R>)`;
-        const description = `## <a:bearg22:1396016006572412998>︲__\` แท็กเตือนจากบาริสต้า! \`__
-<:line:1144701793989840997>
-- __\`แท็ก\`__: <@${newWarn.memberId}> — \`${newWarn.memberId}\`
-- __\`เวลา\`__: ${discordTimestamp}
-- __\`บทลงโทษ\`__: **${newWarn.punish}**
-- __\`ลิงก์ลงโทษ\`__: [คลิกฉันสิ](${newWarn.punishLink || '#'})
-### ${newWarn.message}
-`.trim();
-
-        const payload = {
-          username: "⊹ ꒰ แท็กเตือนจากบาริสต้า ꒱ 🚫",
-          content: `<@${newWarn.memberId}>`,
-          embeds: [{
-            description: description,
-            color: 0xFC6868,
-            image: imageUrls.length > 0 ? { url: imageUrls[0] } : undefined
-          }]
-        };
-
-        await fetch(DISCORD_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      }
-
-      toast({ title: 'บันทึกข้อมูลสำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'เพิ่มแท็กเตือนสำเร็จ' });
       setIsAddDialogOpen(false);
-      setNewWarn({ baristaId: '', memberId: '', message: '', punish: '', punishLink: '' });
+      setNewWarn({ memberId: '', message: '', punish: '' });
       setSelectedFiles([]);
-      fetchData(); // Reload data
-
-    } catch (err: any) {
-      console.error('Add warn failed:', err);
-      toast({ title: 'เกิดข้อผิดพลาดในการบันทึก', description: err.message, variant: 'destructive' });
+      setSpoilerFlags([false, false]);
+      setSpoilerAll(false);
+      await fetchData();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e?.message, variant: 'destructive' });
     } finally {
       setAddLoading(false);
     }
   };
 
-  // Loading
+  // ── Send to Discord ───────────────────────────────────────────────────────
+  const handleSendToDiscord = async () => {
+    if (!sendTarget) return;
+    setIsSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-tag-warn-embed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({
+          member_id: sendTarget.member_id,
+          message: sendTarget.message,
+          punish: sendTarget.punish,
+          image_url_1: sendTarget.image_url,
+          image_url_2: sendTarget.image_url_2 ?? undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      toast({ title: 'ส่งแจ้งเตือน Discord สำเร็จ' });
+      setSendTarget(null);
+    } catch (e: any) {
+      toast({ title: 'ส่งแจ้งเตือนไม่สำเร็จ', description: e?.message, variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // ── Save edit ─────────────────────────────────────────────────────────────
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    setIsSavingEdit(true);
+    try {
+      const { error: editErr } = await supabase
+        .from('tag_warn_logs')
+        .update({ message: editForm.message, punish: editForm.punish })
+        .eq('id', editTarget.id);
+      if (editErr) throw editErr;
+      toast({ title: 'แก้ไขข้อมูลสำเร็จ' });
+      setEditTarget(null);
+      await fetchData();
+    } catch (e: any) {
+      toast({ title: 'แก้ไขข้อมูลไม่สำเร็จ', description: e?.message, variant: 'destructive' });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // ── Cancel case ───────────────────────────────────────────────────────────
+  const handleCancel = async () => {
+    if (!cancelTarget || !user) return;
+    setCancelling(true);
+    try {
+      const insert: TagWarnCancelRequestInsert = {
+        warn_timestamp: cancelTarget.log_timestamp,
+        warn_sequence: String(cancelTarget.sequence),
+        member_id: cancelTarget.member_id ?? undefined,
+        requested_by: user.id,
+        requested_by_name: user.username ?? null,
+        status: 'pending',
+      };
+      const { error: reqErr } = await supabase.from('tag_warn_cancel_requests').insert(insert);
+      if (reqErr) throw reqErr;
+      toast({ title: 'ส่งคำขอยกเลิกเคสเรียบร้อย รอ Owner อนุมัติ' });
+      setCancelTarget(null);
+      await fetchData();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e?.message, variant: 'destructive' });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget || !user?.is_owner) return;
+    setIsDeleting(true);
+    try {
+      for (const url of [deleteTarget.image_url, deleteTarget.image_url_2].filter(Boolean) as string[]) {
+        const path = url.split('/evidence/')[1];
+        if (path) await supabase.storage.from('evidence').remove([path]);
+      }
+      const { error: delErr } = await supabase.from('tag_warn_logs').delete().eq('id', deleteTarget.id);
+      if (delErr) throw delErr;
+      toast({ title: 'ลบข้อมูลสำเร็จ' });
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (e: any) {
+      toast({ title: 'ลบข้อมูลไม่สำเร็จ', description: e?.message, variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // ── Early returns ─────────────────────────────────────────────────────────
   if (loading && records.length === 0) {
     return (
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">ประวัติแท็กเตือน</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-4 space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-full" /><Skeleton className="h-8 w-24" /></CardContent></Card>
+            <Card key={i}>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-8 w-24" />
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
     );
   }
 
-  // Error
   if (error && records.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive" />
         <p className="text-lg font-medium">ไม่สามารถโหลดข้อมูลได้</p>
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button onClick={fetchData} variant="outline" className="gap-2"><RefreshCw className="h-4 w-4" /> ลองใหม่</Button>
+        <Button onClick={fetchData} variant="outline" className="gap-2">
+          <RefreshCw className="h-4 w-4" /> ลองใหม่
+        </Button>
       </div>
     );
   }
 
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">ประวัติแท็กเตือน</h2>
-          <p className="text-xs text-muted-foreground">{filteredRecords.length}/{records.length} รายการ • หน้า {currentPage}/{totalPages}</p>
+          <p className="text-xs text-muted-foreground">
+            {filteredRecords.length}/{records.length} รายการ • หน้า {currentPage}/{totalPages}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {user?.is_owner && (
@@ -782,12 +506,18 @@ const allIds = formattedData.reduce((acc: string[], r) => {
             </div>
           )}
           <Badge variant="outline" className="text-xs text-muted-foreground gap-1.5">
-            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
             อัปเดตอัตโนมัติ
           </Badge>
-          
-          {/* Add Warn Button */}
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+
+          {/* Add Warn Dialog */}
+          <Dialog
+            open={isAddDialogOpen}
+            onOpenChange={(o) => {
+              setIsAddDialogOpen(o);
+              if (!o) { setSelectedFiles([]); setSpoilerFlags([false, false]); setSpoilerAll(false); }
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700">
                 <Plus className="h-4 w-4" /> เพิ่มแท็กเตือน
@@ -796,55 +526,57 @@ const allIds = formattedData.reduce((acc: string[], r) => {
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>เพิ่มประวัติแท็กเตือน</DialogTitle>
-                <DialogDescription>กรอกข้อมูลให้ครบถ้วนเพื่อบันทึกและแจ้งเตือนไปยัง Discord</DialogDescription>
+                <DialogDescription>กรอกข้อมูลให้ครบถ้วน — กดปุ่ม 📬 บน card เพื่อส่งแจ้งเตือน Discord ภายหลัง</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
                   <Label htmlFor="memberId">Member ID</Label>
-                  <Input id="memberId" value={newWarn.memberId} onChange={(e) => setNewWarn({...newWarn, memberId: e.target.value})} placeholder="ไอดีสมาชิกที่ถูกเตือน" />
+                  <Input id="memberId" value={newWarn.memberId} onChange={(e) => setNewWarn({ ...newWarn, memberId: e.target.value })} placeholder="ไอดีสมาชิกที่ถูกเตือน" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="message">ข้อความเตือน</Label>
-                  <Textarea id="message" value={newWarn.message} onChange={(e) => setNewWarn({...newWarn, message: e.target.value})} placeholder="ระบุรายละเอียดการเตือน..." className="min-h-[80px]" />
+                  <Label htmlFor="warnMsg">ข้อความเตือน</Label>
+                  <Textarea id="warnMsg" value={newWarn.message} onChange={(e) => setNewWarn({ ...newWarn, message: e.target.value })} placeholder="ระบุรายละเอียดการเตือน..." className="min-h-[80px]" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>บทลงโทษ</Label>
-                    <div className="flex gap-2">
-                      {[
-                        { emoji: "🍵", value: "ミ ชาเขียวเตือนใจ 𓂃 🍵", label: "ชาเขียว" },
-                        { emoji: "☕", value: "ミ ถ้วยกาแฟ 𓂃 ☕", label: "กาแฟ" },
-                        { emoji: "☕☕", value: "ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕", label: "Double Shot" },
-                      ].map((option) => (
-                        <Button
-                          key={option.emoji}
-                          type="button"
-                          variant={newWarn.punish === option.value ? "default" : "outline"}
-                          onClick={() => setNewWarn({ ...newWarn, punish: option.value })}
-                          className="flex-1 text-lg h-10 px-0"
-                          title={option.label}
-                        >
-                          {option.emoji}
-                        </Button>
+                <div className="space-y-2">
+                  <Label>บทลงโทษ</Label>
+                  <Select value={newWarn.punish} onValueChange={(v) => setNewWarn({ ...newWarn, punish: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกบทลงโทษ" /></SelectTrigger>
+                    <SelectContent>
+                      {PUNISH_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="punishLink">ลิงก์หลักฐาน/ลงโทษ</Label>
-                    <Input id="punishLink" value={newWarn.punishLink} onChange={(e) => setNewWarn({...newWarn, punishLink: e.target.value})} placeholder="คัดลอกลิงก์จากห้องลงโทษ" />
-                  </div>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>รูปภาพหลักฐาน (อย่างน้อย 1 รูป)</Label>
-                  <Input type="file" multiple accept="image/*" onChange={handleFileChange} className="cursor-pointer" />
+                  <div className="flex items-center justify-between">
+                    <Label>รูปภาพหลักฐาน (อย่างน้อย 1 รูป, สูงสุด 2 รูป)</Label>
+                    {selectedFiles.length === 2 && (
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox id="spoiler-all" checked={spoilerAll} onCheckedChange={(v) => { const b = !!v; setSpoilerAll(b); setSpoilerFlags([b, b]); }} />
+                        <Label htmlFor="spoiler-all" className="text-xs cursor-pointer">ซ่อนภาพทั้งหมด</Label>
+                      </div>
+                    )}
+                  </div>
+                  {selectedFiles.length < 2 && (
+                    <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-border rounded-lg p-3 hover:border-primary/50 transition-colors">
+                      <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">คลิกเพื่ออัปโหลดรูปภาพ</span>
+                      <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
+                  )}
                   {selectedFiles.length > 0 && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
+                    <div className="flex gap-3 mt-2 flex-wrap">
                       {selectedFiles.map((f, i) => (
                         <div key={i} className="relative">
-                          <img src={previewUrls[i]} alt={f.name} className="w-20 h-20 object-cover rounded-lg border border-border" />
-                          <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md">
+                          <img src={previewUrls[i]} alt={f.name} className={cn('w-24 h-24 object-cover rounded-lg border border-border', spoilerFlags[i] && 'blur-sm')} />
+                          <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md z-10">
                             <X className="h-3 w-3" />
                           </button>
+                          <div className="flex items-center gap-1 mt-1">
+                            <Checkbox id={`spoiler-${i}`} checked={spoilerFlags[i]} onCheckedChange={() => toggleSpoilerFlag(i)} />
+                            <Label htmlFor={`spoiler-${i}`} className="text-[10px] cursor-pointer">ซ่อนภาพ</Label>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -854,7 +586,8 @@ const allIds = formattedData.reduce((acc: string[], r) => {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading}>ยกเลิก</Button>
                 <Button onClick={handleAddWarn} disabled={addLoading} className="gap-2">
-                  {addLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />} บันทึกข้อมูล
+                  {addLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                  บันทึกข้อมูล
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -862,32 +595,15 @@ const allIds = formattedData.reduce((acc: string[], r) => {
         </div>
       </div>
 
+      {/* Search filters */}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Input value={caseQuery} onChange={(e) => { setCaseQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาเลขเคส" />
         <Input value={memberQuery} onChange={(e) => { setMemberQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหา Member ID" />
         <Input value={baristaQuery} onChange={(e) => { setBaristaQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหา Barista ID" />
-        
         <div className="relative">
-          <Input
-            type="date"
-            value={dateQuery}
-            onChange={(e) => {
-              setDateQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="กรองวันที่"
-            className={cn("w-full pr-9", !dateQuery && "text-muted-foreground")}
-          />
+          <Input type="date" value={dateQuery} onChange={(e) => { setDateQuery(e.target.value); setCurrentPage(1); }} className={cn('w-full pr-9', !dateQuery && 'text-muted-foreground')} />
           {dateQuery && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setDateQuery('');
-                setCurrentPage(1);
-              }}
-            >
+            <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground" onClick={() => { setDateQuery(''); setCurrentPage(1); }}>
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -902,101 +618,81 @@ const allIds = formattedData.reduce((acc: string[], r) => {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {paginatedRecords.map((r, idx) => {
               const cancelled = isCancelled(r);
-              const pendingApproval = r._cancelRequestStatus === 'pending';
+              const pendingApproval = r._cancelStatus === 'pending';
               const showBlur = r._showBlur ?? false;
-              const images = parseImages(r.image);
-              const barista = resolveDisplayName(r.baristaId);
-              const member = resolveDisplayName(r.memberId);
-              const memberNameForDisplay = /^User-\d+$/i.test(member.name) ? r.memberId : member.name;
+              const allImages = [r.image_url, r.image_url_2].filter(Boolean) as string[];
+              const barista = resolveDisplayName(r.barista_id);
+              const member = resolveDisplayName(r.member_id);
+              const memberName = /^User-\d+$/i.test(member.name) ? (r.member_id ?? '-') : member.name;
 
               return (
-                <Card key={`${r.timestamp}-${idx}`} className="overflow-hidden transition-all relative">
+                <Card key={r.id} className="overflow-hidden transition-all relative">
                   <CardContent className="p-0">
-                    <div className={`h-1.5 ${cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80'}`} />
+                    <div className={cn('h-1.5', cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80')} />
 
-                    {/* Pending approval overlay */}
+                    {/* overlay — pending */}
                     {pendingApproval && showBlur && (
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
                         <Loader2 className="h-6 w-6 animate-spin text-amber-500 mb-2" />
                         <Badge variant="outline" className="mb-2 text-amber-600 border-amber-500/60">กำลังรอการอนุมัติ</Badge>
                         <p className="text-xs text-muted-foreground text-center">คำขอยกเลิกถูกส่งไปหน้า "รายงาน" แล้ว</p>
-                        <Button variant="outline" size="sm" className="gap-1 text-xs mt-3" onClick={() => toggleBlur(r.timestamp)}>
+                        <Button variant="outline" size="sm" className="gap-1 text-xs mt-3" onClick={() => toggleBlur(r.id)}>
                           <Eye className="h-3 w-3" /> ดูรายละเอียด
                         </Button>
                       </div>
                     )}
 
-                    {/* Cancelled overlay - ปรับปรุงใหม่ */}
+                    {/* overlay — cancelled */}
                     {cancelled && showBlur && (
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm rounded-lg p-4 text-center">
                         <Badge variant="destructive" className="mb-3 gap-1 text-sm"><X className="h-3.5 w-3.5" /> ยกเลิกเคสแล้ว</Badge>
-                        
                         <div className="space-y-1.5 mb-4 text-xs text-muted-foreground">
-                          {r._requestedBy && (
-                            <p className="flex items-center justify-center gap-1">
-                              <User className="h-3 w-3 text-orange-500" />
-                              ผู้ขอ: <span className="font-medium text-foreground">{r._requestedBy}</span>
-                            </p>
-                          )}
-                          {r._approvedBy && (
-                            <p className="flex items-center justify-center gap-1">
-                              <Shield className="h-3 w-3 text-green-500" />
-                              อนุมัติโดย: <span className="font-medium text-foreground">{r._approvedBy}</span>
-                            </p>
-                          )}
-                          {r._cancelledAt && (
-                            <p className="flex items-center justify-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              เมื่อ: {r._cancelledAt}
-                            </p>
-                          )}
+                          {r._requestedBy && <p className="flex items-center justify-center gap-1"><User className="h-3 w-3 text-orange-500" />ผู้ขอ: <span className="font-medium text-foreground">{r._requestedBy}</span></p>}
+                          {r._cancelledAt && <p className="flex items-center justify-center gap-1"><Clock className="h-3 w-3" />เมื่อ: {r._cancelledAt}</p>}
                         </div>
-
-                        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => toggleBlur(r.timestamp)}>
+                        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => toggleBlur(r.id)}>
                           <Eye className="h-3 w-3" /> ดูรายละเอียด
                         </Button>
                       </div>
                     )}
 
-                    <div className={`p-4 space-y-3 ${(cancelled || pendingApproval) && !showBlur ? 'opacity-60' : ''}`}>
-                      {/* Header row */}
+                    <div className={cn('p-4 space-y-3', (cancelled || pendingApproval) && !showBlur && 'opacity-60')}>
+                      {/* header row */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant={cancelled ? 'outline' : 'secondary'} className="gap-1 text-xs font-mono">
-                            <Hash className="h-3 w-3" />{
-                              // ถ้า sequence เป็น UUID (fallback) แสดง ? แทน
-                              r.sequence && r.sequence.includes('-') ? '?' : (r.sequence || idx + 1)
-                            }
+                            <Hash className="h-3 w-3" />{r.sequence ?? idx + 1}
                           </Badge>
                           {cancelled && !showBlur && <Badge variant="destructive" className="gap-1 text-xs"><X className="h-3 w-3" /> ยกเลิกแล้ว</Badge>}
                           {pendingApproval && !showBlur && <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">รออนุมัติ</Badge>}
                         </div>
                         <div className="flex items-center gap-1">
+                          {webhookEnabled && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => setSendTarget(r)} title="ส่งแจ้งเตือน Discord">
+                              <Mail className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
                           {(cancelled || pendingApproval) && !showBlur && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleBlur(r.timestamp)} title="ซ่อน">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleBlur(r.id)} title="ซ่อน">
                               <EyeOff className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           {user?.is_owner && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setDeleteTarget(r)}
-                              title="ลบข้อมูลถาวร"
-                            >
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(r)} title="ลบข้อมูลถาวร">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      {/* Timestamp */}
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />{formatTimestamp(r.timestamp)}
+                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp)}
                       </div>
 
-                      {/* Barista & Member */}
+                      {/* barista & member */}
                       <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
                           <Avatar className="h-7 w-7 shrink-0">
@@ -1005,14 +701,9 @@ const allIds = formattedData.reduce((acc: string[], r) => {
                           </Avatar>
                           <div className="min-w-0">
                             <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Barista</p>
-                            {barista.discord_username ? (
-                              <>
-                                <p className="text-xs font-semibold truncate" title={barista.discord_username}>{barista.discord_username}</p>
-                                <p className="text-[10px] text-muted-foreground truncate" title={barista.name}>{barista.name}</p>
-                              </>
-                            ) : (
-                              <p className="text-xs font-medium truncate" title={r.baristaId}>{barista.name}</p>
-                            )}
+                            {barista.discord_username
+                              ? <><p className="text-xs font-semibold truncate">{barista.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{barista.name}</p></>
+                              : <p className="text-xs font-medium truncate">{barista.name}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
@@ -1022,61 +713,41 @@ const allIds = formattedData.reduce((acc: string[], r) => {
                           </Avatar>
                           <div className="min-w-0">
                             <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Member</p>
-                            {member.discord_username ? (
-                              <>
-                                <p className="text-xs font-semibold truncate" title={member.discord_username}>{member.discord_username}</p>
-                                <p className="text-[10px] text-muted-foreground truncate" title={memberNameForDisplay}>{memberNameForDisplay}</p>
-                              </>
-                            ) : (
-                              <p className="text-xs font-medium break-all" title={r.memberId}>{memberNameForDisplay}</p>
-                            )}
+                            {member.discord_username
+                              ? <><p className="text-xs font-semibold truncate">{member.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{memberName}</p></>
+                              : <p className="text-xs font-medium break-all">{memberName}</p>}
                           </div>
                         </div>
                       </div>
 
-                      {/* Warning message */}
-                      {r.warningMessage && (
+                      {r.message && (
                         <div className="flex gap-2 rounded-md bg-muted/30 p-2">
                           <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-                          <p className="text-sm leading-snug max-h-24 overflow-y-auto pr-1 break-words">{r.warningMessage}</p>
+                          <p className="text-sm leading-snug max-h-24 overflow-y-auto pr-1 break-words">{r.message}</p>
                         </div>
                       )}
 
-                      {/* Punishment with inline link */}
-                      {r.punishment && (
+                      {r.punish && (
                         <div className="flex items-center gap-2 text-sm">
                           <Gavel className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium">{r.punishment}</span>
-                          {r.punishmentLink && (
-                            <a href={r.punishmentLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline ml-1">
-                              <ExternalLink className="h-3 w-3" />ดูหลักฐาน
-                            </a>
-                          )}
+                          <span className="font-medium">{r.punish}</span>
                         </div>
                       )}
 
-                      {/* Image - single large preview */}
-                      {images.length > 0 && (
-                        <div
-                          className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
-                          onClick={() => { setPreviewImages(images); setPreviewIndex(0); }}
-                        >
-                          <img
-                            src={images[0]}
-                            alt="หลักฐาน"
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                          {images.length > 1 && (
-                            <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-md font-medium">
-                              +{images.length - 1} รูป
-                            </span>
-                          )}
+                      {allImages.length > 0 && (
+                        <div className={cn('grid gap-2', allImages.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+                          {allImages.map((imgUrl, imgIdx) => (
+                            <div
+                              key={imgIdx}
+                              className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
+                              onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                            >
+                              <img src={imgUrl} alt={`หลักฐาน ${imgIdx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            </div>
+                          ))}
                         </div>
                       )}
 
-                      {/* Cancel action */}
                       {!cancelled && !pendingApproval && (
                         <div className="pt-1 border-t border-border/50">
                           <Button variant="destructive" size="sm" className="h-7 gap-1 text-xs" onClick={() => setCancelTarget(r)}>
@@ -1100,17 +771,10 @@ const allIds = formattedData.reduce((acc: string[], r) => {
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
-                  .map((p, idx, arr) => (
+                  .map((p, i, arr) => (
                     <React.Fragment key={p}>
-                      {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-muted-foreground px-1">...</span>}
-                      <Button
-                        variant={p === currentPage ? 'default' : 'outline'}
-                        size="sm"
-                        className="h-8 w-8 p-0 text-xs"
-                        onClick={() => setCurrentPage(p)}
-                      >
-                        {p}
-                      </Button>
+                      {i > 0 && arr[i - 1] !== p - 1 && <span className="text-muted-foreground px-1">...</span>}
+                      <Button variant={p === currentPage ? 'default' : 'outline'} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setCurrentPage(p)}>{p}</Button>
                     </React.Fragment>
                   ))}
               </div>
@@ -1144,31 +808,77 @@ const allIds = formattedData.reduce((acc: string[], r) => {
               {previewImages.length > 1 && (
                 <div className="flex items-center justify-center gap-2">
                   {previewImages.map((url, i) => (
-                    <button key={i} onClick={() => setPreviewIndex(i)} className={`w-12 h-12 rounded-md overflow-hidden border-2 transition-all ${i === previewIndex ? 'border-primary ring-1 ring-primary/30' : 'border-border/40 opacity-60 hover:opacity-100'}`}>
+                    <button key={i} type="button" onClick={() => setPreviewIndex(i)} className={cn('w-12 h-12 rounded-md overflow-hidden border-2 transition-all', i === previewIndex ? 'border-primary ring-1 ring-primary/30' : 'border-border/40 opacity-60 hover:opacity-100')}>
                       <img src={url} alt={`${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </button>
                   ))}
                   <span className="text-xs text-muted-foreground ml-2">{previewIndex + 1} / {previewImages.length}</span>
                 </div>
               )}
-              <div className="flex justify-center">
-                <Button variant="outline" size="sm" className="gap-1 text-xs" asChild>
-                  <a href={previewImages[previewIndex]} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /> เปิดในแท็บใหม่</a>
-                </Button>
-              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Confirmation Dialog */}
+      {/* Send to Discord Dialog */}
+      <Dialog open={Boolean(sendTarget)} onOpenChange={(o) => !o && setSendTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-blue-500" /> ยืนยันส่งแจ้งเตือน Discord</DialogTitle>
+            <DialogDescription>
+              ต้องการส่ง Component v2 ไปยัง Discord สำหรับเคส <strong>#{sendTarget?.sequence}</strong> ของสมาชิก <strong>{resolveDisplayName(sendTarget?.member_id ?? null).name}</strong> ใช่หรือไม่?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSendTarget(null)} disabled={isSending}>ยกเลิก</Button>
+            <Button onClick={handleSendToDiscord} disabled={isSending} className="gap-2 bg-blue-600 hover:bg-blue-700">
+              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} ยืนยันส่ง
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={Boolean(editTarget)} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5" /> แก้ไขข้อมูลแท็กเตือน</DialogTitle>
+            <DialogDescription>เคส #{editTarget?.sequence} — {resolveDisplayName(editTarget?.member_id ?? null).name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>ข้อความเตือน</Label>
+              <Textarea value={editForm.message} onChange={(e) => setEditForm({ ...editForm, message: e.target.value })} className="min-h-[80px]" />
+            </div>
+            <div className="space-y-2">
+              <Label>บทลงโทษ</Label>
+              <Select value={editForm.punish} onValueChange={(v) => setEditForm({ ...editForm, punish: v })}>
+                <SelectTrigger><SelectValue placeholder="เลือกบทลงโทษ" /></SelectTrigger>
+                <SelectContent>
+                  {PUNISH_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={isSavingEdit}>ยกเลิก</Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="gap-2">
+              {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} บันทึก
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Confirm Dialog */}
       <Dialog open={Boolean(cancelTarget)} onOpenChange={(o) => !o && setCancelTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" /> ยืนยันยกเลิกเคส</DialogTitle>
             <DialogDescription>
-              คุณต้องการยกเลิกเคส #{cancelTarget?.sequence} ของสมาชิก <strong>{resolveDisplayName(cancelTarget?.memberId ?? '').name}</strong> ใช่หรือไม่?
-              <br /><span className="text-destructive">เมื่อยืนยันแล้ว ระบบจะส่งคำขอไปที่หน้า "รายงาน" เพื่อให้ Owner อนุมัติการยกเลิก</span>
+              คุณต้องการยกเลิกเคส <strong>#{cancelTarget?.sequence}</strong> ของสมาชิก <strong>{resolveDisplayName(cancelTarget?.member_id ?? null).name}</strong> ใช่หรือไม่?
+              <br /><span className="text-destructive">ระบบจะส่งคำขอไปหน้า "รายงาน" เพื่อให้ Owner อนุมัติการยกเลิก</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1180,13 +890,13 @@ const allIds = formattedData.reduce((acc: string[], r) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirm Dialog */}
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="h-5 w-5" /> ยืนยันการลบข้อมูลถาวร</DialogTitle>
             <DialogDescription>
-              คุณต้องการลบเคส #{deleteTarget?.sequence} ของสมาชิก <strong>{resolveDisplayName(deleteTarget?.memberId ?? '').name}</strong> ใช่หรือไม่?
+              คุณต้องการลบเคส <strong>#{deleteTarget?.sequence}</strong> ของสมาชิก <strong>{resolveDisplayName(deleteTarget?.member_id ?? null).name}</strong> ใช่หรือไม่?
               <br /><span className="text-destructive font-semibold">การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลและรูปภาพจะถูกลบออกจากระบบทันที</span>
             </DialogDescription>
           </DialogHeader>
@@ -1198,6 +908,7 @@ const allIds = formattedData.reduce((acc: string[], r) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

@@ -1249,11 +1249,11 @@ export type Database = {
           created_at: string
           id: string
           image_url: string | null
+          image_url_2: string | null
           log_timestamp: string
           member_id: string | null
           message: string | null
           punish: string | null
-          punish_link: string | null
           sequence: number
         }
         Insert: {
@@ -1261,11 +1261,11 @@ export type Database = {
           created_at?: string
           id?: string
           image_url?: string | null
+          image_url_2?: string | null
           log_timestamp?: string
           member_id?: string | null
           message?: string | null
           punish?: string | null
-          punish_link?: string | null
           sequence?: number
         }
         Update: {
@@ -1273,11 +1273,11 @@ export type Database = {
           created_at?: string
           id?: string
           image_url?: string | null
+          image_url_2?: string | null
           log_timestamp?: string
           member_id?: string | null
           message?: string | null
           punish?: string | null
-          punish_link?: string | null
           sequence?: number
         }
         Relationships: []
