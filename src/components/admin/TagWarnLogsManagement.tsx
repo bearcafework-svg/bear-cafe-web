@@ -65,6 +65,7 @@ interface WarnRecord {
   image_url: string | null;
   image_url_2: string | null;
   is_spoiler: boolean;
+  is_spoiler_2: boolean;
   _cancelStatus?: 'pending' | 'approved' | 'rejected' | null;
   _cancelledAt?: string | null;
   _requestedBy?: string | null;
@@ -162,7 +163,7 @@ export function TagWarnLogsManagement() {
       if (memberQuery && !(r.member_id ?? '').toLowerCase().includes(memberQuery.toLowerCase())) return false;
       if (baristaQuery && !(r.barista_id ?? '').toLowerCase().includes(baristaQuery.toLowerCase())) return false;
       if (dateQuery) {
-        const d = new Date(r.log_timestamp);
+        const d = new Date(r.log_timestamp || r.created_at);
         const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         if (ymd !== dateQuery) return false;
       }
@@ -239,7 +240,7 @@ export function TagWarnLogsManagement() {
     try {
       const { data: logs, error: logsErr } = await supabase
         .from('tag_warn_logs')
-        .select('id, log_timestamp, created_at, sequence, barista_id, member_id, message, punish, image_url, image_url_2, is_spoiler')
+        .select('id, log_timestamp, created_at, sequence, barista_id, member_id, message, punish, image_url, image_url_2, is_spoiler, is_spoiler_2')
         .order('sequence', { ascending: false });
       if (logsErr) throw logsErr;
 
@@ -336,7 +337,8 @@ export function TagWarnLogsManagement() {
         barista_id: user?.discord_id ?? null,
         image_url: url1,
         image_url_2: url2,
-        is_spoiler: spoilerFlags[0] || spoilerFlags[1] || false,
+        is_spoiler: spoilerFlags[0] ?? false,
+        is_spoiler_2: spoilerFlags[1] ?? false,
         log_timestamp: new Date().toISOString(),
       });
       if (insertErr) throw insertErr;
@@ -373,7 +375,8 @@ export function TagWarnLogsManagement() {
           punish: sendTarget.punish,
           image_url_1: sendTarget.image_url,
           image_url_2: sendTarget.image_url_2 ?? undefined,
-          is_spoiler: sendTarget.is_spoiler ?? false,
+          is_spoiler_1: sendTarget.is_spoiler ?? false,
+          is_spoiler_2: sendTarget.is_spoiler_2 ?? false,
         }),
       });
       const json = await res.json();
