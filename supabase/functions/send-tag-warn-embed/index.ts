@@ -48,7 +48,7 @@ Deno.serve(async (req): Promise<Response> => {
     const message: string = String(body.message ?? "").trim();
     const punish: string = String(body.punish ?? "").trim();
     const imageUrl1: string = String(body.image_url_1 ?? "").trim();
-    const imageUrl2: string = String(body.image_url_2 ?? "").trim();
+    const imageUrl2: string | null = body.image_url_2 ? String(body.image_url_2).trim() || null : null;
     const isSpoiler: boolean = Boolean(body.is_spoiler ?? false);
     const channelId: string = String(body.channel_id ?? TAG_WARN_CHANNEL_ID).trim();
 
@@ -62,7 +62,7 @@ Deno.serve(async (req): Promise<Response> => {
     const nowSeconds = Math.floor(Date.now() / 1000);
     const discordTimestamp = `<t:${nowSeconds}:F> (<t:${nowSeconds}:R>)`;
 
-    const textContent = `## <a:bearg22:1396016006572412998>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากบาริสต้า 𓂃 \`__\n-# **สาเหตุ:** ${message} <:cuteplant:1152834055528783872>\n\n> (👤)︰<@${memberId}> — ${memberId}\n> (⏰)︰${discordTimestamp}\n> (⚖)︰${punish}`;
+    const textContent = `\n## <a:bearg22:1396016006572412998>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากบาริสต้า 𓂃 \`__\n-# **สาเหตุ:** ${message} <:cuteplant:1152834055528783872>\n\n> (👤)︰<@${memberId}> — ${memberId}\n> (⏰)︰${discordTimestamp}\n> (📝)︰${punish}`;
 
     // สร้าง media gallery items
     type MediaItem = { media: { url: string }; spoiler?: boolean };
@@ -73,7 +73,6 @@ Deno.serve(async (req): Promise<Response> => {
 
     const payload: Record<string, unknown> = {
       flags: 32768,
-      content: `<@${memberId}>`,
       components: [
         {
           type: 17, // Container
