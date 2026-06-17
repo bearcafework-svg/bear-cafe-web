@@ -48,10 +48,6 @@ const PUNISH_OPTIONS = [
   { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
   { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
   { value: 'เตะ', label: 'เตะ' },
-  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'ミ ชาเขียวเตือนใจ 𓂃 🍵' },
-  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
-  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
-  { value: 'เตะ', label: 'เตะ' },
   { value: 'แบนถาวร', label: 'แบนถาวร' },
 ];
 
@@ -59,8 +55,6 @@ const PUNISH_OPTIONS = [
 
 interface WarnRecord {
   id: string;
-  log_timestamp: string | null;
-  created_at: string;
   log_timestamp: string | null;
   created_at: string;
   sequence: number;
