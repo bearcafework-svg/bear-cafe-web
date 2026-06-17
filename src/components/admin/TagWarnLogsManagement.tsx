@@ -43,12 +43,11 @@ import { cn } from '@/lib/utils';
 const ITEMS_PER_PAGE = 12;
 
 const PUNISH_OPTIONS = [
-  { value: 'ตักเตือนด้วยวาจา', label: 'ตักเตือนด้วยวาจา' },
-  { value: 'ตักเตือนเป็นลายลักษณ์อักษร', label: 'ตักเตือนเป็นลายลักษณ์อักษร' },
   { value: 'ชื่อ/รูปไม่เหมาะสม', label: 'ชื่อ/รูปไม่เหมาะสม' },
-  { value: 'พักการใช้งาน 3 วัน', label: 'พักการใช้งาน 3 วัน' },
-  { value: 'พักการใช้งาน 7 วัน', label: 'พักการใช้งาน 7 วัน' },
-  { value: 'พักการใช้งาน 30 วัน', label: 'พักการใช้งาน 30 วัน' },
+  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'ミ ชาเขียวเตือนใจ 𓂃 🍵' },
+  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
+  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
+  { value: 'เตะ', label: 'เตะ' },
   { value: 'แบนถาวร', label: 'แบนถาวร' },
 ];
 
@@ -56,7 +55,8 @@ const PUNISH_OPTIONS = [
 
 interface WarnRecord {
   id: string;
-  log_timestamp: string;
+  log_timestamp: string | null;
+  created_at: string;
   sequence: number;
   barista_id: string | null;
   member_id: string | null;
@@ -64,6 +64,7 @@ interface WarnRecord {
   punish: string | null;
   image_url: string | null;
   image_url_2: string | null;
+  is_spoiler: boolean;
   _cancelStatus?: 'pending' | 'approved' | 'rejected' | null;
   _cancelledAt?: string | null;
   _requestedBy?: string | null;
@@ -81,7 +82,7 @@ type TagWarnCancelRequestInsert = TablesInsert<'tag_warn_cancel_requests'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatTimestamp(raw: string): string {
+function formatTimestamp(raw: string | null | undefined): string {
   if (!raw) return '-';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
@@ -238,7 +239,7 @@ export function TagWarnLogsManagement() {
     try {
       const { data: logs, error: logsErr } = await supabase
         .from('tag_warn_logs')
-        .select('id, log_timestamp, sequence, barista_id, member_id, message, punish, image_url, image_url_2')
+        .select('id, log_timestamp, created_at, sequence, barista_id, member_id, message, punish, image_url, image_url_2, is_spoiler')
         .order('sequence', { ascending: false });
       if (logsErr) throw logsErr;
 
@@ -335,6 +336,7 @@ export function TagWarnLogsManagement() {
         barista_id: user?.discord_id ?? null,
         image_url: url1,
         image_url_2: url2,
+        is_spoiler: spoilerFlags[0] || spoilerFlags[1] || false,
       });
       if (insertErr) throw insertErr;
 
@@ -370,6 +372,7 @@ export function TagWarnLogsManagement() {
           punish: sendTarget.punish,
           image_url_1: sendTarget.image_url,
           image_url_2: sendTarget.image_url_2 ?? undefined,
+          is_spoiler: sendTarget.is_spoiler ?? false,
         }),
       });
       const json = await res.json();
@@ -689,7 +692,7 @@ export function TagWarnLogsManagement() {
                       </div>
 
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp)}
+                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp ?? r.created_at)}
                       </div>
 
                       {/* barista & member */}

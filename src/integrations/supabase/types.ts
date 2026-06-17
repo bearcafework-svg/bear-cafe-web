@@ -1250,6 +1250,7 @@ export type Database = {
           id: string
           image_url: string | null
           image_url_2: string | null
+          is_spoiler: boolean
           log_timestamp: string
           member_id: string | null
           message: string | null
@@ -1262,6 +1263,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_url_2?: string | null
+          is_spoiler?: boolean
           log_timestamp?: string
           member_id?: string | null
           message?: string | null
@@ -1274,6 +1276,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_url_2?: string | null
+          is_spoiler?: boolean
           log_timestamp?: string
           member_id?: string | null
           message?: string | null
