@@ -294,10 +294,10 @@ export default function CreateSessionPage() {
 
   const needsVoiceForMode = sessionMode === 'voice_room' && category?.allow_voice_channel && !voiceState?.is_connected;
   const canProceedStep1 = selectedCategory !== null;
+  const isNoteLengthValid = note.length === 0 || (note.length >= 10 && note.length <= 200);
   const canProceedStep2 = 
     (!category?.require_role_selection || selectedRole !== null) &&
-    note.length >= 10 &&
-    note.length <= 200 &&
+    isNoteLengthValid &&
     !bannedWordError &&
     !linkError &&
     !needsVoiceForMode;
