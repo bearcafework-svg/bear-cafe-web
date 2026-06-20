@@ -71,8 +71,7 @@ const ROLE_OPTIONS = [
   'ヽ 𝐈𝐜𝐞 𝐜𝐫𝐞𝐚𝐦 (ยศพรีเมี่ยม 𝐄) 𓂃 🍦',
 ];
 
-const WEBHOOK_URL =
-  'https://discord.com/api/webhooks/1495041976918216734/zAedA8Zt1UXz7JttAggKoSsHWiaI8npV9KDacXaMYKeHYcj4nxEbRrEZxUePWagRV9NK';
+
 
 function formatRemaining(endAt: string) {
   const diff = new Date(endAt).getTime() - Date.now();
@@ -690,39 +689,16 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   async function sendNotify() {
     if (!contract.end_at) return;
     setSending(true);
-    const endUnix = Math.floor(new Date(contract.end_at).getTime() / 1000);
-    const member_id = contract.member_id;
-    const room_link = contract.room_link ?? '-';
-    const body = {
-  content: `<@${member_id}>`,
-  embeds: [{
-    color: 16758671,
-    description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n  - __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n  - __\`ห้องของคุณ\`__: ${room_link}\n  - __\`ระยะสัญญา\`__: <t:${endUnix}:F> (<t:${endUnix}:R>)\n<:line:1144701793989840997>`,
-    image: {
-      url: 'https://media.discordapp.net/attachments/1144675871798591569/1483156690663772191/804546f5f502196f.png?ex=69eb010e&is=69e9af8e&hm=e99e7cb4b90b1253f97047eee1379e965f7065172b2efeb0b377868d957b1a7c&=&format=webp&quality=lossless', // 👈 ภาพใหญ่ด้านล่าง embed
-    },
-    // หรือถ้าอยากได้ภาพเล็กมุมขวา ใช้ thumbnail แทน:
-    // thumbnail: { url: 'https://example.com/your-image.png' },
-  }],
-  attachments: [],
-  components: [{
-    type: 1,
-    components: [{
-      type: 2,
-      style: 5,
-      emoji: { id: '1212856675053346897', name: 'bearcafe_star' },
-      label: '︲ต่อบ้านเช่าของคุณ',
-      url: 'https://discord.com/channels/1144251788493602848/1202239170219868190',
-    }],
-  }],
-};
+    const end_unix = Math.floor(new Date(contract.end_at).getTime() / 1000);
     try {
-      const res = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const { error } = await supabase.functions.invoke('send-contract-notify', {
+        body: {
+          member_id: contract.member_id,
+          end_unix,
+          room_link: contract.room_link ?? '-',
+        },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (error) throw error;
       toast({ title: 'ส่งการแจ้งเตือนสำเร็จ' });
     } catch (e: any) {
       toast({ title: 'ส่งไม่สำเร็จ', description: e.message, variant: 'destructive' });

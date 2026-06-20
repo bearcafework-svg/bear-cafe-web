@@ -28,7 +28,7 @@ Deno.serve(async (req): Promise<Response> => {
     const room_link: string = body.room_link ?? "-";
     // Channel ที่บอทจะส่งข้อความแจ้งเตือนสัญญาเช่าบ้าน
     // ต้องเป็น Channel ID จริงที่บอทมีสิทธิ์ส่งข้อความ
-    const channelId: string = body.channel_id ?? Deno.env.get("DISCORD_CONTRACT_NOTIFY_CHANNEL_ID") ?? "";
+    const channelId: string = body.channel_id ?? Deno.env.get("DISCORD_CONTRACT_NOTIFY_CHANNEL_ID") ?? "1168874550889566228";
 
     if (!member_id || !end_unix) {
       return new Response(
@@ -45,21 +45,35 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const payload = {
-      content: `<@${member_id}>`,
-      embeds: [{
-        color: 16758671,
-        description: `## <a:bearg11:1396016056035840140>︲__\` แท็กเตือนจากเซอร์วิส \`__\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲บ้านเช่าของคุณใกล้หมดแล้ว *!*\n- __\`แท็ก\`__: <@${member_id}> — \`${member_id}\`\n- __\`ห้องของคุณ\`__: ${room_link}\n- __\`ระยะสัญญา\`__: <t:${end_unix}:F> (<t:${end_unix}:R>)\n<:line:1144701793989840997>`,
-      }],
-      attachments: [],
+      flags: 32768,
       components: [{
-        type: 1,
-        components: [{
-          type: 2,
-          style: 5,
-          emoji: { id: "1212856675053346897", name: "bearcafe_star" },
-          label: "︲ต่อบ้านเช่าของคุณ",
-          url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
-        }],
+        type: 17,
+        components: [
+          {
+            type: 12,
+            items: [{
+              media: {
+                url: "https://cdn.discordapp.com/attachments/1144675871798591569/1517912045306118395/1.png?ex=6a380141&is=6a36afc1&hm=00ddb1a90f5b3dc0f98df846214403c4bc5446bdd3a3a271e152a9203d392f7a&",
+              },
+            }],
+          },
+          { type: 14, spacing: 2 },
+          {
+            type: 10,
+            content: `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 \`__\n-# **สาเหตุ:** บ้านเช่าของคุณใกล้หมดแล้ว หากไม่อยากให้บ้านถูกยึด ต่อด่วน ต่อด่วน ต่อด่วน! <:cuteplant:1152834055528783872>\n\n> (👤)︰<@${member_id}> — ${member_id}\n> (⏰)︰<t:${end_unix}:F> (<t:${end_unix}:R>)\n> (🏡)︰${room_link}`,
+          },
+          { type: 14, spacing: 2 },
+          {
+            type: 1,
+            components: [{
+              type: 2,
+              style: 5,
+              url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
+              custom_id: "p_315510557929115666",
+              label: "คลิกเพื่อต่อบ้านเช่า",
+            }],
+          },
+        ],
       }],
     };
 
