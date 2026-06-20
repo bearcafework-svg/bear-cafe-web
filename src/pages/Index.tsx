@@ -231,3 +231,142 @@ export default function Index() {
     </div>
   );
 }
+
+// <div className="min-h-screen flex bg-[hsl(var(--background))] overflow-hidden homepage-zoom">
+//   {/* ── Popups ── */}
+//   <GreenTeaWarningPopup userId={user?.id} />
+//   <CooldownBox
+//     isOnCooldown={isOnCooldown}
+//     formattedTime={formattedTime}
+//     remainingMinutes={remainingMinutes}
+//   />
+
+//   {/* ══════════════════════════════════════════════════════
+//       LEFT SIDEBAR — desktop always visible, mobile overlay
+//      ══════════════════════════════════════════════════════ */}
+
+//   {/* Mobile sidebar toggle */}
+//   <button
+//     onClick={() => setSidebarOpen(!sidebarOpen)}
+//     className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center"
+//     aria-label="เปิดเมนู"
+//   >
+//     {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+//   </button>
+
+//   {/* Desktop sidebar */}
+//   <div className="hidden lg:block shrink-0">
+//     <CozySidebar />
+//   </div>
+
+//   {/* Mobile sidebar overlay */}
+//   {sidebarOpen && (
+//     <div className="lg:hidden fixed inset-0 z-40">
+//       <div
+//         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+//         onClick={() => setSidebarOpen(false)}
+//       />
+//       <div className="relative z-50 w-[220px] h-full">
+//         <CozySidebar />
+//       </div>
+//     </div>
+//   )}
+
+//   {/* ══════════════════════════════════════════════════════
+//       CENTER CONTENT
+//      ══════════════════════════════════════════════════════ */}
+//   <main className="flex-1 min-w-0 overflow-y-auto h-[100dvh]">
+//     {/* Subtle warm paper background */}
+//     <div className="absolute inset-0 bg-pattern-dots opacity-[0.025] pointer-events-none" />
+
+//     <div className="relative max-w-2xl mx-auto px-5 pt-16 lg:pt-8 pb-12 space-y-8">
+
+//       {/* ── Welcome heading ── */}
+//       <motion.div
+//         initial={{ opacity: 0, y: 14 }}
+//         animate={{ opacity: 1, y: 0 }}
+//         transition={{ duration: 0.45 }}
+//         className="space-y-2"
+//       >
+//         {/* Tiny greeting */}
+//         <p className="text-sm text-[hsl(var(--bear-brown))] dark:text-[hsl(var(--honey)/0.8)] font-medium">
+//           {greeting}
+//         </p>
+
+//         {/* Main heading */}
+//         <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+//           {isAuthenticated
+//             ? `ยินดีต้อนรับ ${displayName} 🐻`
+//             : 'ยินดีต้อนรับสู่ Bear Cafe 🐻'}
+//         </h1>
+
+//         {/* Sub-heading */}
+//         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg">
+//           เหงาอยู่รึเปล่า? แวะมาใช้เวลาที่ Bear Cafe สิ!
+//           <br className="hidden sm:block" />
+//           ทั้งหาเพื่อนใหม่ พูดคุยแบบสบายๆ มีสุ่มแชทให้ลองเล่น
+//           และกิจกรรมสนุกๆ รอให้คุณเข้ามาจอยอีกเพียบ
+//         </p>
+
+//         {/* Tiny decorative stars */}
+//         <div className="flex items-center gap-2 pt-1">
+//           <span className="text-[hsl(var(--honey)/0.5)] text-xs select-none">✦ ✧ ✦</span>
+//         </div>
+//       </motion.div>
+
+//       {/* ── Feature cards ── */}
+//       <motion.div
+//         initial={{ opacity: 0, y: 16 }}
+//         animate={{ opacity: 1, y: 0 }}
+//         transition={{ delay: 0.1, duration: 0.45 }}
+//       >
+//         <CozyFeatureCards
+//           isOnCooldown={isOnCooldown}
+//           formattedTime={formattedTime}
+//         />
+//       </motion.div>
+
+//       {/* ── Community carousel ── */}
+//       <motion.div
+//         initial={{ opacity: 0, y: 16 }}
+//         animate={{ opacity: 1, y: 0 }}
+//         transition={{ delay: 0.2, duration: 0.45 }}
+//       >
+//         <CommunityCarousel />
+//       </motion.div>
+//     </div>
+
+//     {/* ── Footer ── */}
+//     <Footer />
+//   </main>
+
+//   {/* ══════════════════════════════════════════════════════
+//       RIGHT PANEL — desktop always visible, mobile toggle
+//      ══════════════════════════════════════════════════════ */}
+
+//   {/* Desktop right panel */}
+//   <div className="hidden xl:block shrink-0 border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))]">
+//     <CozyRightPanel />
+//   </div>
+
+//   {/* Mobile right panel toggle */}
+//   <button
+//     onClick={() => setRightOpen(!rightOpen)}
+//     className="xl:hidden fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center text-base"
+//     aria-label="เปิดแผงขวา"
+//   >
+//     🍓
+//   </button>
+
+//   {rightOpen && (
+//     <div className="xl:hidden fixed inset-0 z-40">
+//       <div
+//         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+//         onClick={() => setRightOpen(false)}
+//       />
+//       <div className="absolute right-0 top-0 bottom-0 z-50 w-[280px] bg-[hsl(var(--cream))] dark:bg-[hsl(var(--mocha))] border-l border-[hsl(var(--latte)/0.5)] dark:border-[hsl(var(--coffee)/0.4)] overflow-y-auto">
+//         <CozyRightPanel />
+//       </div>
+//     </div>
+//   )}
+// </div>
