@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan, Coffee, Send,
+  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -46,6 +46,7 @@ import { RoleTransferManagement } from '@/components/admin/RoleTransferManagemen
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
 import { RolesToDeleteManagement } from '@/components/admin/RolesToDeleteManagement';
 import { BulkRoleManagement } from '@/components/admin/BulkRoleManagement';
+import { CheckinRewardsManagement } from '@/components/admin/CheckinRewardsManagement';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -98,6 +99,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'categories': FolderOpen,
   'banners': ImageIcon,
   'roles': Palette,
+  'checkin-rewards': CalendarCheck,
   'redeem-codes': Ticket,
   'non-transferable-roles': ShieldBan,
   'discord-servers': Settings,
@@ -144,7 +146,8 @@ export default function AdminPage() {
       .eq('key', 'admin_allowed_pages')
       .maybeSingle()
       .then(({ data }) => {
-        const pages = (data?.value as any)?.pages;
+        const value = data?.value as { pages?: string[] } | null;
+        const pages = value?.pages;
         if (Array.isArray(pages)) setAdminRolePages(pages);
       });
   }, [user?.is_admin, user?.is_owner]);
@@ -256,6 +259,7 @@ export default function AdminPage() {
         case 'categories': return canAccessPage('categories') ? <CategoriesManagement /> : null;
         case 'banners': return canAccessPage('banners') ? <BannerManagement /> : null;
         case 'roles': return canAccessPage('roles') ? <DiscordRolesManagement /> : null;
+        case 'checkin-rewards': return canAccessPage('checkin-rewards') ? <CheckinRewardsManagement /> : null;
         case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
         case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
         case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
@@ -286,7 +290,7 @@ export default function AdminPage() {
       setActiveTab(section);
       localStorage.setItem('admin_active_tab', section);
     }
-  }, [section]);
+  }, [section, activeTab]);
 
   if (!hasAdminAccess) return null;
 
@@ -472,7 +476,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
         supabase.from('user_custom_permissions').select('permission_id').eq('user_id', u.id),
       ]);
       setCustomPermissions((allPerms || []) as CustomPermission[]);
-      setUserCustomPerms((userPerms || []).map((p: any) => p.permission_id));
+      setUserCustomPerms((userPerms || []).map((p) => p.permission_id));
     } catch (e) {
       console.error(e);
     } finally {
@@ -494,8 +498,9 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
       }
       toast({ title: 'บันทึกสิทธิ์แล้ว' });
       setPermDialogUser(null);
-    } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
     } finally {
       setSavingPerms(false);
     }

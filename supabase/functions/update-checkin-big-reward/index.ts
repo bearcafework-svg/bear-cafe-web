@@ -18,7 +18,7 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { reward_type, reward_amount, role_id, description, makeup_cost_per_day } = await req.json();
+    const { reward_type, reward_amount, role_id, description } = await req.json();
 
     if (!reward_type) {
       return json({ ok: false, error: "missing_reward_type" }, 400);
@@ -31,9 +31,6 @@ Deno.serve(async (req): Promise<Response> => {
     }
     if (reward_type === "role" && !role_id) {
       return json({ ok: false, error: "role_id_required" }, 400);
-    }
-    if (makeup_cost_per_day != null && makeup_cost_per_day < 0) {
-      return json({ ok: false, error: "invalid_makeup_cost" }, 400);
     }
 
     // Verify JWT + admin role
@@ -79,7 +76,6 @@ Deno.serve(async (req): Promise<Response> => {
       reward_amount: reward_type !== "role" ? reward_amount : null,
       role_id: reward_type === "role" ? role_id : null,
       description: description ?? null,
-      makeup_cost_per_day: makeup_cost_per_day ?? 50,
       updated_at: new Date().toISOString(),
       updated_by: discordId,
     };

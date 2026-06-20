@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCheckinToday } from "../_shared/checkin-date.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,8 +16,14 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { discord_id } = await req.json();
-    if (!discord_id) return json({ ok: false, error: "missing_discord_id" }, 400);
+    const { year, month } = await req.json();
+
+    if (year == null || month == null) {
+      return json({ ok: false, error: "missing_params" }, 400);
+    }
+    if (month < 1 || month > 12) {
+      return json({ ok: false, error: "invalid_month" }, 400);
+    }
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ ok: false, error: "missing_auth" }, 401);
@@ -32,45 +37,54 @@ Deno.serve(async (req): Promise<Response> => {
     const { data: { user }, error: authError } = await sb.auth.getUser(token);
     if (authError || !user) return json({ ok: false, error: "invalid_token" }, 401);
 
-    const userDiscordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
-    if (userDiscordId !== discord_id) return json({ ok: false, error: "forbidden" }, 403);
-
-    const { year, month, day: currentDay } = getCheckinToday();
-
-    const { data: cycle } = await sb
-      .from("checkin_cycles")
-      .select("id, year, month, completed_days, makeup_days, big_reward_claimed")
-      .eq("discord_id", discord_id)
-      .eq("year", year)
-      .eq("month", month)
-      .maybeSingle();
-
-    const { data: dailyRewards } = await sb
+    // Fetch daily rewards for the specified month
+    const { data: dailyRewards, error: dailyError } = await sb
       .from("checkin_daily_rewards")
-      .select("day_number, reward_type, reward_amount, role_id, makeup_cost, is_active")
+      .select("*")
       .eq("year", year)
       .eq("month", month)
       .order("day_number");
 
-    const { data: bigReward } = await sb
+    if (dailyError) throw dailyError;
+
+    // Fetch big reward (global, not per-month)
+    const { data: bigReward, error: bigError } = await sb
       .from("checkin_big_reward")
-      .select("reward_type, reward_amount, role_id, description")
+      .select("*")
       .maybeSingle();
 
-    const makeupWindowOpen = currentDay > 28;
+    if (bigError) throw bigError;
+
+    // If no rewards exist for this month, auto-seed with defaults
+    if (!dailyRewards || dailyRewards.length === 0) {
+      const defaultRewards = Array.from({ length: 28 }, (_, i) => ({
+        year,
+        month,
+        day_number: i + 1,
+        reward_type: "points",
+        reward_amount: 10,
+        makeup_cost: 50,
+        is_active: true,
+      }));
+
+      const { data: seeded, error: seedError } = await sb
+        .from("checkin_daily_rewards")
+        .insert(defaultRewards)
+        .select();
+
+      if (seedError) throw seedError;
+
+      return json({
+        ok: true,
+        daily_rewards: seeded || [],
+        big_reward: bigReward,
+      });
+    }
 
     return json({
       ok: true,
-      cycle: cycle ?? {
-        year,
-        month,
-        completed_days: [],
-        makeup_days: [],
-        big_reward_claimed: false,
-      },
-      daily_rewards: dailyRewards ?? [],
-      big_reward: bigReward ?? null,
-      makeup_window_open: makeupWindowOpen,
+      daily_rewards: dailyRewards || [],
+      big_reward: bigReward,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "internal_error";

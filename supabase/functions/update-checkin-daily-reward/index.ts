@@ -18,10 +18,13 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { day_number, reward_type, reward_amount, role_id } = await req.json();
+    const { year, month, day_number, reward_type, reward_amount, role_id, makeup_cost } = await req.json();
 
-    if (day_number == null || !reward_type) {
+    if (year == null || month == null || day_number == null || !reward_type) {
       return json({ ok: false, error: "missing_params" }, 400);
+    }
+    if (month < 1 || month > 12) {
+      return json({ ok: false, error: "invalid_month" }, 400);
     }
     if (day_number < 1 || day_number > 28) {
       return json({ ok: false, error: "invalid_day" }, 400);
@@ -34,6 +37,9 @@ Deno.serve(async (req): Promise<Response> => {
     }
     if (reward_type === "role" && !role_id) {
       return json({ ok: false, error: "role_id_required" }, 400);
+    }
+    if (makeup_cost != null && makeup_cost < 0) {
+      return json({ ok: false, error: "invalid_makeup_cost" }, 400);
     }
 
     // Verify JWT + admin role
@@ -74,19 +80,22 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "forbidden" }, 403);
     }
 
-    // Upsert the reward row for this day
+    // Upsert the reward row for this year/month/day
     const payload: Record<string, unknown> = {
+      year,
+      month,
       day_number,
       reward_type,
       reward_amount: reward_type !== "role" ? reward_amount : null,
       role_id: reward_type === "role" ? role_id : null,
+      makeup_cost: makeup_cost ?? 50,
       updated_at: new Date().toISOString(),
       updated_by: discordId,
     };
 
     const { data, error } = await sb
       .from("checkin_daily_rewards")
-      .upsert(payload, { onConflict: "day_number" })
+      .upsert(payload, { onConflict: "year,month,day_number" })
       .select()
       .single();
 

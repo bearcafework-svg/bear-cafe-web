@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { discordFetch } from "../_shared/discord-fetch.ts";
+import { ensureUserPoints } from "../_shared/ensure-user-points.ts";
+import { getCheckinToday } from "../_shared/checkin-date.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,10 +50,7 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Makeup window: must be past day 28 of the current month, same month as target
-    const now = new Date();
-    const nowYear = now.getUTCFullYear();
-    const nowMonth = now.getUTCMonth() + 1;
-    const nowDay = now.getUTCDate();
+    const { year: nowYear, month: nowMonth, day: nowDay } = getCheckinToday();
 
     if (year !== nowYear || month !== nowMonth) {
       return json({ ok: false, error: "makeup_window_expired" }, 400);
@@ -59,6 +58,8 @@ Deno.serve(async (req): Promise<Response> => {
     if (nowDay <= 28) {
       return json({ ok: false, error: "makeup_window_not_open" }, 400);
     }
+
+    await ensureUserPoints(sb, discord_id);
 
     // Load cycle
     const { data: cycle } = await sb
@@ -77,13 +78,21 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "day_already_filled" }, 409);
     }
 
-    // Load makeup cost
-    const { data: bigRewardConfig } = await sb
-      .from("checkin_big_reward")
-      .select("makeup_cost_per_day")
+    // Load daily reward for this day to get makeup cost
+    const { data: reward } = await sb
+      .from("checkin_daily_rewards")
+      .select("*")
+      .eq("year", year)
+      .eq("month", month)
+      .eq("day_number", day_number)
+      .eq("is_active", true)
       .maybeSingle();
 
-    const costPerDay: number = bigRewardConfig?.makeup_cost_per_day ?? 50;
+    if (!reward) {
+      return json({ ok: false, error: "reward_not_configured" }, 404);
+    }
+
+    const costPerDay: number = reward.makeup_cost ?? 50;
 
     // Deduct points atomically with optimistic lock
     const { data: userPoints } = await sb
@@ -107,14 +116,7 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "points_deduction_conflict" }, 409);
     }
 
-    // Load daily reward for this day
-    const { data: reward } = await sb
-      .from("checkin_daily_rewards")
-      .select("*")
-      .eq("day_number", day_number)
-      .eq("is_active", true)
-      .maybeSingle();
-
+    // Grant the daily reward
     const rewardSnapshot: Record<string, unknown> = {};
 
     if (reward) {
