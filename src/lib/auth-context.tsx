@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [profileResult, rolesResult, permIdsResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason')
+        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason, role')
         .eq('id', sessionUser.id)
         .maybeSingle(),
       supabase
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw profileResult.error;
     }
 
-    const profile = profileResult.data as ProfileRow | null;
+    const profile = profileResult.data as (ProfileRow & { role?: string | null }) | null;
     if (!profile) {
       console.warn('[Auth] Profile not found for user:', sessionUser.id);
       return null;
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const roleRows = (rolesResult.data ?? []) as UserRoleRow[];
     const roleSet = new Set(roleRows.map((r) => r.role).filter(Boolean));
-    const is_owner = roleSet.has('moderator');
+    const is_owner = profile.role === 'owner';
     const is_admin = roleSet.has('admin');
 
     const allPages = new Set<string>();
@@ -182,9 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel(`profile-watch-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, (payload) => {
-        const p = payload.new as { is_banned: boolean; ban_reason: string | null; username: string; avatar_url: string | null; banner_url: string | null };
+        const p = payload.new as { is_banned: boolean; ban_reason: string | null; username: string; avatar_url: string | null; banner_url: string | null; role?: string | null };
         console.log('[Auth] Profile update received');
-        setUser(prev => prev ? { ...prev, is_banned: p.is_banned, ban_reason: p.ban_reason, username: p.username, avatar_url: p.avatar_url, banner_url: p.banner_url } : null);
+        setUser(prev => prev ? {
+          ...prev,
+          is_banned: p.is_banned,
+          ban_reason: p.ban_reason,
+          username: p.username,
+          avatar_url: p.avatar_url,
+          banner_url: p.banner_url,
+          is_owner: p.role === 'owner',
+        } : null);
       })
       .subscribe((status) => { console.log('[Auth] Realtime subscription status:', status); });
     return () => { console.log('[Auth] Cleaning up real-time profile subscription'); supabase.removeChannel(channel); };

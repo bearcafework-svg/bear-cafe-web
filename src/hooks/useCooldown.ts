@@ -32,6 +32,7 @@ export function useCooldown(userId: string | null): CooldownState {
     if (isAdmin || isOwner) {
       setIsOnCooldown(false);
       setRemainingSeconds(0);
+      wasOnCooldownRef.current = false;
       setIsLoading(false);
       return;
     }
@@ -82,7 +83,7 @@ export function useCooldown(userId: string | null): CooldownState {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, isAdmin]);
+  }, [userId, isAdmin, isOwner]);
 
   // Initial fetch
   useEffect(() => {

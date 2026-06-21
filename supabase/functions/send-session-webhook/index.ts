@@ -85,7 +85,6 @@ function buildComponentV2Payload(params: {
   voiceStatus: string;
   sessionActionRow: ReturnType<typeof buildSessionActionRow>;
   ads: SessionAd[];
-  content: string;
 }): Record<string, unknown> {
   const {
     discordId,
@@ -97,7 +96,6 @@ function buildComponentV2Payload(params: {
     voiceStatus,
     sessionActionRow,
     ads,
-    content,
   } = params;
 
   // ── Section text ───────────────────────────────────────────────────────
@@ -222,8 +220,9 @@ function buildComponentV2Payload(params: {
     components: containerChildren,
   });
 
+  // NOTE: Components v2 (flags: 32768) does NOT allow the top-level `content` field.
+  // Mentions must live inside a text component instead.
   return {
-    content,
     flags: 32768, // IS_COMPONENTS_V2
     components,
     allowed_mentions: {
@@ -364,16 +363,9 @@ Deno.serve(async (req): Promise<Response> => {
     const avatarUrl = profile.avatar_url ||
       `https://cdn.discordapp.com/embed/avatars/${parseInt(profile.discord_id || '0') % 5}.png`;
 
-    // ── content (mention) ─────────────────────────────────────────────
-    let content = '';
-    if (sessionData.discordRoleId) content += `<@&${sessionData.discordRoleId}>`;
-    if (profile.discord_id) {
-      content += content
-        ? ` ||<@${profile.discord_id}>||`
-        : `||<@${profile.discord_id}>||`;
-    }
-
     // ── สร้าง Component v2 payload ────────────────────────────────────
+    // NOTE: top-level `content` is forbidden with IS_COMPONENTS_V2 (flags 32768)
+    // Mentions are embedded inside the text component instead.
     const botPayload = buildComponentV2Payload({
       discordId: profile.discord_id || '',
       discordRoleId: sessionData.discordRoleId,
@@ -384,7 +376,6 @@ Deno.serve(async (req): Promise<Response> => {
       voiceStatus,
       sessionActionRow: actionRow,
       ads,
-      content,
     });
 
     // ── ส่งผ่าน Bot API ────────────────────────────────────────────────
