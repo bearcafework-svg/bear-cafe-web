@@ -96,6 +96,7 @@ function buildComponentV2Payload(params: {
   voiceStatus: string;
   ads: SessionAd[];
   ctaButtons: GlobalCtaButton[];
+  sessionActionRow: ReturnType<typeof buildSessionActionRow>;
 }): Record<string, unknown> {
   const {
     discordId,
@@ -107,6 +108,7 @@ function buildComponentV2Payload(params: {
     voiceStatus,
     ads,
     ctaButtons,
+    sessionActionRow,
   } = params;
 
   // ── Section text ───────────────────────────────────────────────────────
@@ -120,6 +122,7 @@ function buildComponentV2Payload(params: {
     `> (👤)︰<@${discordId}>` + (note ? ` ${note.slice(0, 300)}` : '') + `\n` +
     `> (💭)︰${categoryName}\n` +
     `> (🌱)︰${voiceStatus}`;
+
 
   // ── Components ────────────────────────────────────────────────────────
   const components: unknown[] = [];
@@ -145,17 +148,23 @@ function buildComponentV2Payload(params: {
     },
   });
 
-  // ปุ่มหลัก: "หาเพื่อนลงห้อง"
+  // ปุ่มหลัก: "หาเพื่อนลงห้อง" + ปุ่ม session (ทัก/ลงห้อง)
+  const mainButtonRow: unknown[] = [
+    {
+      type: 2,
+      style: 5,
+      url: "https://bearcafe4commu.vercel.app/create-session",
+      label: "หาเพื่อนลงห้อง",
+    },
+  ];
+
+  if (sessionActionRow && sessionActionRow.components?.[0]) {
+    mainButtonRow.push(sessionActionRow.components[0]);
+  }
+
   containerChildren.push({
     type: 1,
-    components: [
-      {
-        type: 2,
-        style: 5,
-        url: "https://bearcafe4commu.vercel.app/create-session",
-        label: "หาเพื่อนลงห้อง",
-      },
-    ],
+    components: mainButtonRow,
   });
 
   // Separator
@@ -428,7 +437,6 @@ Deno.serve(async (req): Promise<Response> => {
     // ── avatar fallback ────────────────────────────────────────────────
     const avatarUrl = profile.avatar_url ||
       `https://cdn.discordapp.com/embed/avatars/${parseInt(profile.discord_id || '0') % 5}.png`;
-
     // ── สร้าง Component v2 payload ────────────────────────────────────
     // NOTE: top-level `content` is forbidden with IS_COMPONENTS_V2 (flags 32768)
     // Mentions are embedded inside the text component instead.
@@ -442,6 +450,7 @@ Deno.serve(async (req): Promise<Response> => {
       voiceStatus,
       ads,
       ctaButtons,
+      sessionActionRow: actionRow,
     });
 
     // ── ส่งผ่าน Bot API ────────────────────────────────────────────────
