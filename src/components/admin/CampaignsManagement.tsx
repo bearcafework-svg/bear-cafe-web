@@ -4,6 +4,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SessionAdsManagement } from '@/components/admin/SessionAdsManagement';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -49,6 +51,7 @@ import {
   XCircle,
   RotateCcw,
   Images,
+  Megaphone,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 
@@ -590,6 +593,18 @@ export function CampaignsManagement() {
   }, []);
 
   return (
+    <Tabs defaultValue="campaigns" className="space-y-6">
+      <TabsList className="w-fit">
+        <TabsTrigger value="campaigns" className="gap-2">
+          <Send className="w-4 h-4" />แคมเปญโฆษณา
+        </TabsTrigger>
+        <TabsTrigger value="session-ads" className="gap-2">
+          <Megaphone className="w-4 h-4" />โฆษณาผ่านระบบ
+        </TabsTrigger>
+      </TabsList>
+
+      {/* ── Tab: แคมเปญโฆษณา ── */}
+      <TabsContent value="campaigns" className="mt-0">
     <div className="space-y-6">
       {/* ─── Header ─── */}
       <Card>
@@ -1281,6 +1296,13 @@ export function CampaignsManagement() {
         </DialogContent>
       </Dialog>
     </div>
+      </TabsContent>
+
+      {/* ── Tab: โฆษณาผ่านระบบ ── */}
+      <TabsContent value="session-ads" className="mt-0">
+        <SessionAdsManagement />
+      </TabsContent>
+    </Tabs>
   );
 }
 
