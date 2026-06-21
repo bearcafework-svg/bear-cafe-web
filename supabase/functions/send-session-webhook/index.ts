@@ -103,16 +103,12 @@ function buildComponentV2Payload(params: {
     ? `<@&${discordRoleId}>`
     : 'ไม่ระบุ';
 
-  const noteText = note
-    ? `> (👤)︰<@${discordId}> ${note.slice(0, 300)}\n`
-    : '';
-
   const sectionText =
-    `## <a:27073hispeechbubble:1518217054711189644>︲_ \`𝖭𝗈𝗍𝗂𝖼𝖾 ₊ แจ้งเตือนหาเพื่อนลงห้อง 𓂃\` _\n` +
+    `## <a:27073hispeechbubble:1518217054711189644>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ แจ้งเตือนหาเพื่อนลงห้อง 𓂃 \`__\n` +
     `-# <a:59217leaf:1512014878796152862> — ถึง: ${roleTag}\n\n` +
-    `${noteText}` +
+    `> (👤)︰<@${discordId}>` + (note ? ` ${note.slice(0, 300)}` : '') + `\n` +
     `> (💭)︰${categoryName}\n` +
-    `> (☘)︰${voiceStatus}`;
+    `> (🌱)︰${voiceStatus}`;
 
   // ── Components ────────────────────────────────────────────────────────
   const components: unknown[] = [];
@@ -308,7 +304,7 @@ Deno.serve(async (req): Promise<Response> => {
     if (isVoiceRoom && sessionData.voiceChannelId && guildId) {
       voiceStatus = `https://discord.com/channels/${guildId}/${sessionData.voiceChannelId}`;
     } else {
-      voiceStatus = 'สมาชิกท่านนี้ยังไม่ลงห้อง ลองทักส่วนตัวดูนะคะ <a:bearg14:1396016043490672711>';
+      voiceStatus = 'ทักแชทส่วนตัวเรามาเลย';
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
