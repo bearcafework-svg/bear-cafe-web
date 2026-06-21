@@ -101,6 +101,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'redeem-codes': Ticket,
   'non-transferable-roles': ShieldBan,
   'discord-servers': Settings,
+  'campaigns': Send,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({

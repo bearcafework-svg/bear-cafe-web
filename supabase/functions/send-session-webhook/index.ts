@@ -26,6 +26,12 @@ interface SessionData {
   sessionMode?: string;
 }
 
+interface SessionAd {
+  image_url: string;
+  link_url: string;
+  sort_order: number;
+}
+
 interface SessionComponentValidation {
   actionRow: ReturnType<typeof buildSessionActionRow>;
   fallbackReason?: 'missing_guild_id' | 'missing_discord_id' | 'missing_voice_channel_id';
@@ -46,7 +52,6 @@ function buildValidatedSessionActionRow(params: {
     if (!params.guildId) {
       return { actionRow: null, fallbackReason: 'missing_guild_id' };
     }
-
     if (!params.voiceChannelId) {
       return { actionRow: null, fallbackReason: 'missing_voice_channel_id' };
     }
@@ -63,6 +68,168 @@ function buildValidatedSessionActionRow(params: {
       voiceChannelId: params.voiceChannelId,
       discordUserId: params.discordUserId,
     }),
+  };
+}
+
+/**
+ * สร้าง Component v2 payload สำหรับ Discord Message
+ * flags: 32768 = IS_COMPONENTS_V2
+ */
+function buildComponentV2Payload(params: {
+  discordId: string;
+  discordRoleId?: string;
+  username: string;
+  avatarUrl: string;
+  categoryName: string;
+  note?: string;
+  voiceStatus: string;
+  sessionActionRow: ReturnType<typeof buildSessionActionRow>;
+  ads: SessionAd[];
+  content: string;
+}): Record<string, unknown> {
+  const {
+    discordId,
+    discordRoleId,
+    username,
+    avatarUrl,
+    categoryName,
+    note,
+    voiceStatus,
+    sessionActionRow,
+    ads,
+    content,
+  } = params;
+
+  // ── Section text ───────────────────────────────────────────────────────
+  const roleTag = discordRoleId
+    ? `<@&${discordRoleId}>`
+    : 'ไม่ระบุ';
+
+  const noteText = note
+    ? `> (👤)︰<@${discordId}> ${note.slice(0, 300)}\n`
+    : '';
+
+  const sectionText =
+    `## <a:27073hispeechbubble:1518217054711189644>︲_ \`𝖭𝗈𝗍𝗂𝖼𝖾 ₊ แจ้งเตือนหาเพื่อนลงห้อง 𓂃\` _\n` +
+    `-# <a:59217leaf:1512014878796152862> — ถึง: ${roleTag}\n\n` +
+    `${noteText}` +
+    `> (💭)︰${categoryName}\n` +
+    `> (☘)︰${voiceStatus}`;
+
+  // ── Components ────────────────────────────────────────────────────────
+  const components: unknown[] = [];
+
+  // Container (type 17)
+  const containerChildren: unknown[] = [];
+
+  // Separator บนสุด
+  containerChildren.push({ type: 14, spacing: 1, divider: false });
+
+  // Section: text + avatar thumbnail
+  containerChildren.push({
+    type: 9,
+    components: [
+      {
+        type: 10,
+        content: sectionText,
+      },
+    ],
+    accessory: {
+      type: 11,
+      media: { url: avatarUrl },
+    },
+  });
+
+  // ปุ่มหลัก: "หาเพื่อนลงห้อง" + ปุ่ม session (ทัก/ลงห้อง)
+  const mainButtonRow: unknown[] = [
+    {
+      type: 2,
+      style: 5,
+      url: "https://bearcafe4commu.vercel.app/create-session",
+      label: "หาเพื่อนลงห้อง",
+    },
+  ];
+
+  // เพิ่มปุ่ม session (ทักส่วนตัว / ลงห้องคุย) ถ้ามี
+  if (sessionActionRow && sessionActionRow.components?.[0]) {
+    mainButtonRow.push(sessionActionRow.components[0]);
+  }
+
+  containerChildren.push({
+    type: 1,
+    components: mainButtonRow,
+  });
+
+  // Separator
+  containerChildren.push({ type: 14, spacing: 2 });
+
+  // ── โฆษณา (ads) แทรกตามลำดับ ────────────────────────────────────────
+  for (const ad of ads) {
+    // รูปโฆษณา (media gallery)
+    containerChildren.push({
+      type: 12,
+      items: [
+        {
+          media: { url: ad.image_url },
+          spoiler: false,
+        },
+      ],
+    });
+
+    // Separator บาง
+    containerChildren.push({ type: 14, divider: false });
+
+    // ปุ่มดูรายละเอียด + ปุ่มลงโฆษณา
+    containerChildren.push({
+      type: 1,
+      components: [
+        {
+          type: 2,
+          style: 5,
+          label: "ดูรายละเอียด",
+          emoji: { name: "🔎" },
+          url: ad.link_url,
+        },
+        {
+          type: 2,
+          style: 5,
+          url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
+          label: "ลงโฆษณากับเรา",
+          emoji: { name: "🫂" },
+        },
+      ],
+    });
+  }
+
+  // ถ้าไม่มีโฆษณาเลย ยังแสดงปุ่มลงโฆษณาตัวเดียว
+  if (ads.length === 0) {
+    containerChildren.push({
+      type: 1,
+      components: [
+        {
+          type: 2,
+          style: 5,
+          url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
+          label: "ลงโฆษณากับเรา",
+          emoji: { name: "🫂" },
+        },
+      ],
+    });
+  }
+
+  components.push({
+    type: 17,
+    components: containerChildren,
+  });
+
+  return {
+    content,
+    flags: 32768, // IS_COMPONENTS_V2
+    components,
+    allowed_mentions: {
+      roles: discordRoleId ? [discordRoleId] : [],
+      users: discordId ? [discordId] : [],
+    },
   };
 }
 
@@ -86,7 +253,6 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // ดึงค่า Config จาก Environment Variables
     const channelId = Deno.env.get('DISCORD_SESSION_CHANNEL_ID');
     const guildId = Deno.env.get('DISCORD_GUILD_ID');
 
@@ -100,7 +266,7 @@ Deno.serve(async (req): Promise<Response> => {
 
     const sessionData: SessionData = await req.json();
 
-    console.log('[session-bot-webhook] Processing Bot API request', {
+    console.log('[session-webhook] Processing Component v2 request', {
       sessionId: sessionData.sessionId ?? null,
       sessionMode: sessionData.sessionMode ?? 'unknown',
       hasNote: Boolean(sessionData.note),
@@ -135,34 +301,50 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const discordTimestamp = Math.floor(Date.now() / 1000);
     const sessionMode = normalizeSessionMode(sessionData.sessionMode);
     const isVoiceRoom = sessionMode === 'voice_room';
 
+    // ── voice status text ─────────────────────────────────────────────
     let voiceStatus: string;
     if (isVoiceRoom && sessionData.voiceChannelId && guildId) {
       voiceStatus = `https://discord.com/channels/${guildId}/${sessionData.voiceChannelId}`;
     } else {
-      voiceStatus = '> สมาชิกท่านนี้ยังไม่ลงห้อง ลองทักส่วนตัวดูนะคะ <a:bearg14:1396016043490672711>';
+      voiceStatus = 'สมาชิกท่านนี้ยังไม่ลงห้อง ลองทักส่วนตัวดูนะคะ <a:bearg14:1396016043490672711>';
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('username, avatar_url, discord_id')
-      .eq('id', guardResult.user.id)
-      .maybeSingle();
+    // ── ดึง profile + ads พร้อมกัน ────────────────────────────────────
+    const [profileRes, adsRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('username, avatar_url, discord_id')
+        .eq('id', guardResult.user.id)
+        .maybeSingle(),
+      supabase
+        .from('session_ads')
+        .select('image_url, link_url, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+    ]);
 
-    if (profileError || !profile) {
+    if (profileRes.error || !profileRes.data) {
       return new Response(
         JSON.stringify({ error: 'Profile not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const profile = profileRes.data;
+    const ads: SessionAd[] = adsRes.data ?? [];
+
+    if (adsRes.error) {
+      console.warn('[session-webhook] Failed to fetch ads, continuing without ads', { error: adsRes.error.message });
+    }
+
+    // ── session action row (ทักส่วนตัว / ลงห้อง) ──────────────────────
     const { actionRow, fallbackReason } = buildValidatedSessionActionRow({
       sessionMode,
       guildId,
@@ -171,67 +353,47 @@ Deno.serve(async (req): Promise<Response> => {
     });
 
     if (fallbackReason) {
-      console.warn('[session-bot-webhook] Skipping session button due to missing data', {
+      console.warn('[session-webhook] Skipping session button due to missing data', {
         sessionId: sessionData.sessionId ?? null,
         sessionMode,
         fallbackReason,
-        hasGuildId: Boolean(guildId),
-        hasVoiceChannelId: Boolean(sessionData.voiceChannelId),
-        hasDiscordUserId: Boolean(profile.discord_id),
       });
     }
 
-    // 🎨 สร้าง Embed
-    const embed: Record<string, unknown> = {
-      description: `\n### <:bear_star1:1152782839671169184>︲__\`${profile.username} กำลังหาเพื่อน!\`__\n`,
-      color: 16773103,
-      fields: [
-        { name: 'หมวดหมู่', value: sessionData.categoryName, inline: true },
-        { name: 'บทบาท', value: sessionData.discordRoleId ? `<@&${sessionData.discordRoleId}>` : 'ไม่ระบุ', inline: true },
-        { name: 'วัน/เวลา', value: `<t:${discordTimestamp}:F> — <t:${discordTimestamp}:R>`, inline: true },
-        { name: 'สถานะ', value: voiceStatus, inline: true },
-      ],
-      thumbnail: {
-        url: profile.avatar_url || `https://cdn.discordapp.com/embed/avatars/${parseInt(profile.discord_id || '0') % 5}.png`
-      }
-    };
+    // ── avatar fallback ────────────────────────────────────────────────
+    const avatarUrl = profile.avatar_url ||
+      `https://cdn.discordapp.com/embed/avatars/${parseInt(profile.discord_id || '0') % 5}.png`;
 
-    // ✨ เพิ่ม Footer เฉพาะตอนเลือก "ลงห้องคุย"
-    if (isVoiceRoom) {
-      embed.footer = {
-        text: "กรุณาตรวจสอบก่อนดำเนินการว่าผู้ใช้ยังอยู่ในห้องหรือไม่ เนื่องจากอาจมีกรณีที่ผู้ใช้ออกจากห้องไปแล้วค่ะ",
-        icon_url: "https://cdn.discordapp.com/attachments/1144675871798591569/1481646391771004958/image.png"
-      };
-    }
-
+    // ── content (mention) ─────────────────────────────────────────────
     let content = '';
     if (sessionData.discordRoleId) content += `<@&${sessionData.discordRoleId}>`;
-    if (sessionData.note) {
-      const sanitizedNote = sessionData.note.slice(0, 500).replace(/[<>]/g, '');
-      content += content ? ` ${sanitizedNote}` : sanitizedNote;
-    }
     if (profile.discord_id) {
-      content += content ? ` ||<@${profile.discord_id}>||` : `||<@${profile.discord_id}>||`;
+      content += content
+        ? ` ||<@${profile.discord_id}>||`
+        : `||<@${profile.discord_id}>||`;
     }
 
-    // ประกอบร่าง Payload สำหรับ Bot API พร้อม action row แบบเดียวกับหน้า preview
-    const botPayload = {
-      content: content,
-      embeds: [embed],
-      components: actionRow ? [actionRow] : [],
-      allowed_mentions: {
-        roles: sessionData.discordRoleId ? [sessionData.discordRoleId] : [],
-        users: profile.discord_id ? [profile.discord_id] : [],
-      }
-    };
+    // ── สร้าง Component v2 payload ────────────────────────────────────
+    const botPayload = buildComponentV2Payload({
+      discordId: profile.discord_id || '',
+      discordRoleId: sessionData.discordRoleId,
+      username: profile.username || 'ผู้ใช้',
+      avatarUrl,
+      categoryName: sessionData.categoryName,
+      note: sessionData.note,
+      voiceStatus,
+      sessionActionRow: actionRow,
+      ads,
+      content,
+    });
 
-    // 🚀 ส่งผ่าน Bot API แทน Webhook URL เดิม
+    // ── ส่งผ่าน Bot API ────────────────────────────────────────────────
     const dedupKey = `send-session-webhook:${sessionData.sessionId ?? guardResult.user.id}:${sessionData.sessionMode ?? 'unknown'}`;
 
     const result = await sendDiscordBotMessage(channelId, botPayload, { dedupKey });
 
     if (!result.success) {
-      console.error('[session-bot-webhook] Discord send failed', {
+      console.error('[session-webhook] Discord send failed', {
         sessionId: sessionData.sessionId ?? null,
         sessionMode,
         error: result.error,
@@ -240,6 +402,7 @@ Deno.serve(async (req): Promise<Response> => {
         status: result.status ?? null,
         discordErrorCode: result.discordErrorCode ?? null,
         fallbackReason: fallbackReason ?? null,
+        adsCount: ads.length,
       });
 
       return new Response(
@@ -261,11 +424,12 @@ Deno.serve(async (req): Promise<Response> => {
       details: {
         session_id: sessionData.sessionId ?? null,
         session_mode: sessionData.sessionMode ?? 'unknown',
-        marker: 'bot_session_webhook',
+        marker: 'bot_session_webhook_v2',
         transport: 'discord_bot_api',
         channel_id: channelId,
         message_id: result.messageId ?? null,
         component_fallback_reason: fallbackReason ?? null,
+        ads_count: ads.length,
       },
     });
 
@@ -273,8 +437,9 @@ Deno.serve(async (req): Promise<Response> => {
       JSON.stringify({
         success: true,
         messageId: result.messageId,
-        transport: 'discord_bot_api',
+        transport: 'discord_bot_api_v2',
         componentFallbackReason: fallbackReason ?? null,
+        adsCount: ads.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
