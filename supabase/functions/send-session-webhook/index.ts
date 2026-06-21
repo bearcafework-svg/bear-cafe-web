@@ -123,7 +123,6 @@ function buildComponentV2Payload(params: {
     `> (💭)︰${categoryName}\n` +
     `> (🌱)︰${voiceStatus}`;
 
-
   // ── Components ────────────────────────────────────────────────────────
   const components: unknown[] = [];
 
