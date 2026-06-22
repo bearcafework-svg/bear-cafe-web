@@ -169,6 +169,11 @@ Deno.serve(async (req): Promise<Response> => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Roles that should be deleted from source but NOT transferred to target
+      const deleteOnlyRoles = safeRoles.filter(id => deleteOnTransferIds.has(id));
+      // Roles that should actually be given to the target
+      const rolesToGiveTarget = safeRoles.filter(id => !deleteOnTransferIds.has(id));
+
       // Get current roles of target user
       const targetMemberRes = await discordFetch(
         `https://discord.com/api/v10/guilds/${guildId}/members/${targetDiscordId}`,
@@ -185,8 +190,8 @@ Deno.serve(async (req): Promise<Response> => {
       const targetMember = await targetMemberRes.json();
       const targetCurrentRoles: string[] = targetMember.roles || [];
 
-      // Merge: add transferred roles to target's existing roles
-      const newTargetRoles = [...new Set([...targetCurrentRoles, ...safeRoles])];
+      // Merge: only add roles that are NOT marked as delete-only
+      const newTargetRoles = [...new Set([...targetCurrentRoles, ...rolesToGiveTarget])];
 
       // Get source member current roles
       const sourceMemberRes = await discordFetch(
@@ -203,10 +208,10 @@ Deno.serve(async (req): Promise<Response> => {
       const sourceCurrentRoles: string[] = sourceMember.roles || [];
 
       // Roles to remove from source:
-      // 1. safeRoles — transferred to target (removed from source)
-      // 2. roles_to_delete_on_transfer that the source currently has (deleted, NOT given to target)
-      const deleteOnTransferInSource = sourceCurrentRoles.filter(id => deleteOnTransferIds.has(id));
-      const rolesToRemoveFromSource = [...new Set([...safeRoles, ...deleteOnTransferInSource])];
+      // 1. rolesToGiveTarget — transferred to target (removed from source)
+      // 2. deleteOnlyRoles — deleted from source only, NOT given to target
+      // Both sets together = safeRoles, so just remove all safeRoles from source
+      const rolesToRemoveFromSource = [...new Set([...rolesToGiveTarget, ...deleteOnlyRoles])];
       const newSourceRoles = sourceCurrentRoles.filter(id => !rolesToRemoveFromSource.includes(id));
 
       // BULK update: PATCH target (add roles)
@@ -254,24 +259,24 @@ Deno.serve(async (req): Promise<Response> => {
         source_username: sourceMember.user?.username || null,
         target_discord_id: targetDiscordId,
         target_username: targetMember.user?.username || null,
-        roles_transferred: safeRoles,
+        roles_transferred: rolesToGiveTarget,
         roles_skipped: skippedRoles,
         status: patchSource.ok ? 'completed' : 'partial',
         transferred_by: profile.id,
         completed_at: new Date().toISOString(),
       });
 
-      console.log(`Transferred ${safeRoles.length} roles from ${sourceDiscordId} to ${targetDiscordId}, deleted ${deleteOnTransferInSource.length} roles-to-delete from source`);
+      console.log(`Transferred ${rolesToGiveTarget.length} roles from ${sourceDiscordId} to ${targetDiscordId}, deleted-only ${deleteOnlyRoles.length} roles from source`);
 
-      const parts: string[] = [`ย้ายยศสำเร็จ ${safeRoles.length} ยศ`];
+      const parts: string[] = [`ย้ายยศสำเร็จ ${rolesToGiveTarget.length} ยศ`];
       if (skippedRoles.length > 0) parts.push(`ข้าม ${skippedRoles.length} ยศ (ห้ามย้าย)`);
-      if (deleteOnTransferInSource.length > 0) parts.push(`ลบ ${deleteOnTransferInSource.length} ยศออกจากต้นทาง`);
+      if (deleteOnlyRoles.length > 0) parts.push(`ลบ ${deleteOnlyRoles.length} ยศออกจากต้นทาง (ไม่ถูกย้ายไปปลายทาง)`);
 
       return new Response(JSON.stringify({
         success: true,
-        transferred: safeRoles.length,
+        transferred: rolesToGiveTarget.length,
         skipped: skippedRoles.length,
-        deleted: deleteOnTransferInSource.length,
+        deleted: deleteOnlyRoles.length,
         message: parts.join(', '),
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

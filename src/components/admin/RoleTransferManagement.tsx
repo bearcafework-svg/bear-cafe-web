@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink } from 'lucide-react';
+import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Profile {
@@ -76,6 +76,12 @@ export function RoleTransferManagement() {
   const [logs, setLogs] = useState<TransferLog[]>([]);
   const [logsOpen, setLogsOpen] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  // Log filter & pagination state
+  const [logSearch, setLogSearch] = useState('');
+  const [logDateFrom, setLogDateFrom] = useState('');
+  const [logDateTo, setLogDateTo] = useState('');
+  const [logPage, setLogPage] = useState(1);
+  const LOG_PAGE_SIZE = 10;
   const { toast } = useToast();
 
   // Fetch all profiles on mount
@@ -187,7 +193,10 @@ export function RoleTransferManagement() {
       if (data?.member) setSourceMember(data.member);
       if (data?.roles) {
         setRoles(data.roles);
-        const transferable = data.roles.filter((r: RolePreview) => !r.blocked).map((r: RolePreview) => r.id);
+        // Pre-select all transferable roles; deleteOnTransfer are also pre-selected (locked)
+        const transferable = data.roles
+          .filter((r: RolePreview) => !r.blocked)
+          .map((r: RolePreview) => r.id);
         setSelectedRoles(new Set(transferable));
       }
     } catch (error: any) {
@@ -220,6 +229,9 @@ export function RoleTransferManagement() {
   }
 
   function toggleRole(roleId: string) {
+    // deleteOnTransfer roles are always locked — cannot be toggled
+    const role = roles.find(r => r.id === roleId);
+    if (role?.deleteOnTransfer) return;
     setSelectedRoles(prev => {
       const next = new Set(prev);
       if (next.has(roleId)) next.delete(roleId);
@@ -229,12 +241,15 @@ export function RoleTransferManagement() {
   }
 
   function selectAllTransferable() {
+    // Include non-blocked roles; deleteOnTransfer roles are always included via lock
     const transferable = roles.filter(r => !r.blocked).map(r => r.id);
     setSelectedRoles(new Set(transferable));
   }
 
   function deselectAll() {
-    setSelectedRoles(new Set());
+    // Keep deleteOnTransfer roles checked (they are always selected)
+    const alwaysSelected = roles.filter(r => r.deleteOnTransfer && !r.blocked).map(r => r.id);
+    setSelectedRoles(new Set(alwaysSelected));
   }
 
   async function executeTransfer() {
@@ -273,6 +288,36 @@ export function RoleTransferManagement() {
   const deleteOnTransferCount = roles.filter(r => r.deleteOnTransfer).length;
   const selectedCount = selectedRoles.size;
   const progressPercent = transferableCount > 0 ? (selectedCount / transferableCount) * 100 : 0;
+
+  // Derived: filter logs by search query and date range, then paginate
+  const filteredLogs = useMemo(() => {
+    const q = logSearch.toLowerCase().trim();
+    const from = logDateFrom ? new Date(logDateFrom + 'T00:00:00') : null;
+    const to = logDateTo ? new Date(logDateTo + 'T23:59:59') : null;
+    return logs.filter(log => {
+      if (q) {
+        const match =
+          (log.source_username || '').toLowerCase().includes(q) ||
+          log.source_discord_id.includes(q) ||
+          (log.target_username || '').toLowerCase().includes(q) ||
+          log.target_discord_id.includes(q) ||
+          (log.profiles?.username || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (from || to) {
+        const d = new Date(log.created_at);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
+      return true;
+    });
+  }, [logs, logSearch, logDateFrom, logDateTo]);
+
+  const logTotalPages = Math.max(1, Math.ceil(filteredLogs.length / LOG_PAGE_SIZE));
+  const paginatedLogs = filteredLogs.slice((logPage - 1) * LOG_PAGE_SIZE, logPage * LOG_PAGE_SIZE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setLogPage(1); }, [logSearch, logDateFrom, logDateTo]);
 
   function ProfileCombobox({
     value, onSelect, open, setOpen, search, setSearch, filteredProfiles, selectedProfile, placeholder, loading: comboLoading
@@ -489,54 +534,93 @@ export function RoleTransferManagement() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {roles.map(role => {
-                const isBlocked = role.blocked;
-                const isDeleteOnTransfer = role.deleteOnTransfer;
-                const isChecked = selectedRoles.has(role.id);
-                return (
-                  <div
-                    key={role.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                      isBlocked
-                        ? 'bg-warning/5 border-warning/20 opacity-60 cursor-not-allowed'
-                        : isDeleteOnTransfer
-                          ? 'bg-bear-brown/5 border-bear-brown/20'
-                          : isChecked
-                            ? 'bg-honey/10 border-honey/30'
-                            : 'bg-card hover:bg-latte/20 border-border'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={() => toggleRole(role.id)}
-                      disabled={isBlocked}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className="font-medium text-sm truncate"
-                          style={{ color: role.color || undefined }}
-                        >
-                          {role.name}
-                        </span>
-                        {isBlocked && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/50 text-warning shrink-0">
-                            <ShieldBan className="w-3 h-3 mr-0.5" />
-                            {role.blockReason === 'non_transferable' ? 'ห้ามย้าย' : 'Bot'}
-                          </Badge>
-                        )}
-                        {isDeleteOnTransfer && !isBlocked && (
+          <div className="space-y-4">
+            {/* Normal transferable roles */}
+            {roles.filter(r => !r.deleteOnTransfer).length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">ย้ายไปปลายทาง</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {roles.filter(r => !r.deleteOnTransfer).map(role => {
+                    const isBlocked = role.blocked;
+                    const isChecked = selectedRoles.has(role.id);
+                    return (
+                      <div
+                        key={role.id}
+                        onClick={() => !isBlocked && toggleRole(role.id)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                          isBlocked
+                            ? 'bg-warning/5 border-warning/20 opacity-60 cursor-not-allowed'
+                            : isChecked
+                              ? 'bg-honey/10 border-honey/30 cursor-pointer'
+                              : 'bg-card hover:bg-latte/20 border-border cursor-pointer'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => toggleRole(role.id)}
+                          disabled={isBlocked}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="font-medium text-sm truncate"
+                              style={{ color: role.color || undefined }}
+                            >
+                              {role.name}
+                            </span>
+                            {isBlocked && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/50 text-warning shrink-0">
+                                <ShieldBan className="w-3 h-3 mr-0.5" />
+                                {role.blockReason === 'non_transferable' ? 'ห้ามย้าย' : 'Bot'}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Delete-on-transfer roles — always selected, locked */}
+            {roles.filter(r => r.deleteOnTransfer && !r.blocked).length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-destructive/70 mb-2 uppercase tracking-wide flex items-center gap-1">
+                  <Trash2 className="w-3 h-3" />
+                  ลบจากต้นทาง (ไม่ถูกย้ายไปปลายทาง)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {roles.filter(r => r.deleteOnTransfer && !r.blocked).map(role => (
+                    <div
+                      key={role.id}
+                      className="flex items-center gap-3 p-3 rounded-xl border bg-destructive/5 border-destructive/20 cursor-not-allowed"
+                    >
+                      <Checkbox
+                        checked={true}
+                        disabled={true}
+                        className="opacity-60"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className="font-medium text-sm truncate"
+                            style={{ color: role.color || undefined }}
+                          >
+                            {role.name}
+                          </span>
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-destructive/50 text-destructive shrink-0">
+                            <Trash2 className="w-3 h-3 mr-0.5" />
                             ลบจากต้นทาง
                           </Badge>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
             {/* Transfer Result */}
             {transferResult && (
@@ -598,90 +682,184 @@ export function RoleTransferManagement() {
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Filter bar */}
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    className="pl-9 h-9 text-sm"
+                    placeholder="ค้นหาชื่อ, Discord ID, ผู้ดำเนินการ..."
+                    value={logSearch}
+                    onChange={e => setLogSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <Input
+                    type="date"
+                    className="h-9 text-sm w-[140px]"
+                    value={logDateFrom}
+                    onChange={e => setLogDateFrom(e.target.value)}
+                    title="ตั้งแต่วันที่"
+                  />
+                  <span className="text-muted-foreground text-sm">–</span>
+                  <Input
+                    type="date"
+                    className="h-9 text-sm w-[140px]"
+                    value={logDateTo}
+                    onChange={e => setLogDateTo(e.target.value)}
+                    title="ถึงวันที่"
+                  />
+                </div>
+                {(logSearch || logDateFrom || logDateTo) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 text-xs text-muted-foreground"
+                    onClick={() => { setLogSearch(''); setLogDateFrom(''); setLogDateTo(''); }}
+                  >
+                    ล้างตัวกรอง
+                  </Button>
+                )}
+              </div>
+
               {loadingLogs ? (
                 <div className="text-center py-8 text-muted-foreground">กำลังโหลด...</div>
-              ) : logs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">ยังไม่มีประวัติการย้ายบทบาท</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>วันที่</TableHead>
-                        <TableHead>ผู้ดำเนินการ</TableHead>
-                        <TableHead>ต้นทาง</TableHead>
-                        <TableHead></TableHead>
-                        <TableHead>ปลายทาง</TableHead>
-                        <TableHead>ย้ายสำเร็จ</TableHead>
-                        <TableHead>ข้าม</TableHead>
-                        <TableHead>สถานะ</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {logs.map(log => (
-                        <TableRow key={log.id}>
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {new Date(log.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            {' '}
-                            {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                          </TableCell>
-                          <TableCell>
-                            {log.profiles ? (
-                              <div className="flex items-center gap-2">
-                                {log.profiles.avatar_url ? (
-                                  <img src={log.profiles.avatar_url} alt="" className="w-5 h-5 rounded-full shrink-0" />
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] shrink-0">👤</div>
-                                )}
-                                <span className="text-sm font-medium truncate">{log.profiles.username}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <p className="font-medium">{log.source_username || '-'}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{log.source_discord_id}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <p className="font-medium">{log.target_username || '-'}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{log.target_discord_id}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              {log.roles_transferred?.length || 0}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {(log.roles_skipped?.length || 0) > 0 ? (
-                              <Badge variant="outline" className="gap-1 text-warning border-warning/50">
-                                <ShieldBan className="w-3 h-3" />
-                                {log.roles_skipped.length}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={log.status === 'completed' ? 'default' : log.status === 'partial' ? 'secondary' : 'outline'}
-                              className={log.status === 'completed' ? 'bg-success/15 text-success border-0' : ''}>
-                              {log.status === 'completed' ? 'สำเร็จ' : log.status === 'partial' ? 'บางส่วน' : log.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+              ) : filteredLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {logs.length === 0 ? 'ยังไม่มีประวัติการย้ายบทบาท' : 'ไม่พบรายการที่ตรงกับการค้นหา'}
                 </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="whitespace-nowrap">วันที่</TableHead>
+                          <TableHead className="whitespace-nowrap">ผู้ดำเนินการ</TableHead>
+                          <TableHead className="whitespace-nowrap">ต้นทาง</TableHead>
+                          <TableHead></TableHead>
+                          <TableHead className="whitespace-nowrap">ปลายทาง</TableHead>
+                          <TableHead className="whitespace-nowrap">ย้ายสำเร็จ</TableHead>
+                          <TableHead className="whitespace-nowrap">ข้าม</TableHead>
+                          <TableHead className="whitespace-nowrap">สถานะ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedLogs.map(log => (
+                          <TableRow key={log.id}>
+                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {' '}
+                              {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                            </TableCell>
+                            <TableCell>
+                              {log.profiles ? (
+                                <div className="flex items-center gap-2">
+                                  {log.profiles.avatar_url ? (
+                                    <img src={log.profiles.avatar_url} alt="" className="w-5 h-5 rounded-full shrink-0" />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] shrink-0">👤</div>
+                                  )}
+                                  <span className="text-sm font-medium truncate">{log.profiles.username}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <p className="font-medium">{log.source_username || '-'}</p>
+                                <p className="text-xs text-muted-foreground font-mono">{log.source_discord_id}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <p className="font-medium">{log.target_username || '-'}</p>
+                                <p className="text-xs text-muted-foreground font-mono">{log.target_discord_id}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {log.roles_transferred?.length || 0}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {(log.roles_skipped?.length || 0) > 0 ? (
+                                <Badge variant="outline" className="gap-1 text-warning border-warning/50">
+                                  <ShieldBan className="w-3 h-3" />
+                                  {log.roles_skipped.length}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={log.status === 'completed' ? 'default' : log.status === 'partial' ? 'secondary' : 'outline'}
+                                className={log.status === 'completed' ? 'bg-success/15 text-success border-0' : ''}>
+                                {log.status === 'completed' ? 'สำเร็จ' : log.status === 'partial' ? 'บางส่วน' : log.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <p className="text-sm text-muted-foreground">
+                      แสดง {Math.min((logPage - 1) * LOG_PAGE_SIZE + 1, filteredLogs.length)}–{Math.min(logPage * LOG_PAGE_SIZE, filteredLogs.length)} จาก {filteredLogs.length} รายการ
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                        disabled={logPage === 1}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      {Array.from({ length: logTotalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === logTotalPages || Math.abs(p - logPage) <= 1)
+                        .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                          if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, idx) =>
+                          p === '...' ? (
+                            <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-sm">…</span>
+                          ) : (
+                            <Button
+                              key={p}
+                              variant={logPage === p ? 'default' : 'outline'}
+                              size="sm"
+                              className="h-8 w-8 p-0 text-xs"
+                              onClick={() => setLogPage(p as number)}
+                            >
+                              {p}
+                            </Button>
+                          )
+                        )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setLogPage(p => Math.min(logTotalPages, p + 1))}
+                        disabled={logPage === logTotalPages}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </CollapsibleContent>
