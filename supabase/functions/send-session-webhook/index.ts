@@ -83,7 +83,6 @@ function buildComponentV2Payload(params: {
   categoryName: string;
   note?: string;
   voiceStatus: string;
-  sessionActionRow: ReturnType<typeof buildSessionActionRow>;
   ads: SessionAd[];
 }): Record<string, unknown> {
   const {
@@ -94,7 +93,6 @@ function buildComponentV2Payload(params: {
     categoryName,
     note,
     voiceStatus,
-    sessionActionRow,
     ads,
   } = params;
 
@@ -134,24 +132,17 @@ function buildComponentV2Payload(params: {
     },
   });
 
-  // ปุ่มหลัก: "หาเพื่อนลงห้อง" + ปุ่ม session (ทัก/ลงห้อง)
-  const mainButtonRow: unknown[] = [
-    {
-      type: 2,
-      style: 5,
-      url: "https://bearcafe4commu.vercel.app/create-session",
-      label: "หาเพื่อนลงห้อง",
-    },
-  ];
-
-  // เพิ่มปุ่ม session (ทักส่วนตัว / ลงห้องคุย) ถ้ามี
-  if (sessionActionRow && sessionActionRow.components?.[0]) {
-    mainButtonRow.push(sessionActionRow.components[0]);
-  }
-
+  // ปุ่มหลัก: "หาเพื่อนลงห้อง"
   containerChildren.push({
     type: 1,
-    components: mainButtonRow,
+    components: [
+      {
+        type: 2,
+        style: 5,
+        url: "https://bearcafe4commu.vercel.app/create-session",
+        label: "หาเพื่อนลงห้อง",
+      },
+    ],
   });
 
   // Separator
@@ -370,7 +361,6 @@ Deno.serve(async (req): Promise<Response> => {
       categoryName: sessionData.categoryName,
       note: sessionData.note,
       voiceStatus,
-      sessionActionRow: actionRow,
       ads,
     });
 

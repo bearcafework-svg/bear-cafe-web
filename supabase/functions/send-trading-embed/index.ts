@@ -93,9 +93,9 @@ Deno.serve(async (req): Promise<Response> => {
                 },
               ],
             },
-            { type: 14, divider: false, spacing: 2 }, // Separator
+            { type: 14, divider: true, spacing: 2 }, // Separator
             contentComponent,
-            { type: 14, divider: false, spacing: 2 }, // Separator
+            { type: 14, divider: true, spacing: 2 }, // Separator
             {
               type: 1, // Action Row
               components: [
@@ -104,7 +104,7 @@ Deno.serve(async (req): Promise<Response> => {
                   style: 5, // Link
                   label: "︲เช็คยอดโดเนทของคุณ",
                   emoji: { id: "1256669436350562355", name: "bee20000", animated: false },
-                  url: "https://discord.com/channels/1144251788493602848/1144581735665905766",
+                  url: "https://discord.com/channels/1144251788493602848/1508608796967305216",
                 },
               ],
             },
