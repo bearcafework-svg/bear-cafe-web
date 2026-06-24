@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SessionAdsManagement } from '@/components/admin/SessionAdsManagement';
+import { AdPlacementsManagement } from '@/components/admin/AdPlacementsManagement';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -600,6 +601,9 @@ export function CampaignsManagement() {
         </TabsTrigger>
         <TabsTrigger value="session-ads" className="gap-2">
           <Megaphone className="w-4 h-4" />โฆษณาผ่านระบบ
+        </TabsTrigger>
+        <TabsTrigger value="placements" className="gap-2">
+          <Images className="w-4 h-4" />Ad Placements
         </TabsTrigger>
       </TabsList>
 
@@ -1301,6 +1305,11 @@ export function CampaignsManagement() {
       {/* ── Tab: โฆษณาผ่านระบบ ── */}
       <TabsContent value="session-ads" className="mt-0">
         <SessionAdsManagement />
+      </TabsContent>
+
+      {/* ── Tab: Ad Placements ── */}
+      <TabsContent value="placements" className="mt-0">
+        <AdPlacementsManagement />
       </TabsContent>
     </Tabs>
   );

@@ -29,7 +29,6 @@ interface SessionData {
 interface SessionAd {
   image_url: string;
   link_url: string;
-  sort_order: number;
 }
 
 interface SessionComponentValidation {
@@ -302,18 +301,25 @@ Deno.serve(async (req): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ── ดึง profile + ads พร้อมกัน ────────────────────────────────────
-    const [profileRes, adsRes] = await Promise.all([
+    // ── ดึง profile + placement พร้อมกัน ─────────────────────────────
+    const [profileRes, placementRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('username, avatar_url, discord_id')
         .eq('id', guardResult.user.id)
         .maybeSingle(),
       supabase
-        .from('session_ads')
-        .select('image_url, link_url, sort_order')
+        .from('ad_placements')
+        .select(`
+          delivery_mode,
+          ad_placement_items (
+            sort_order,
+            session_ads ( image_url, link_url, is_active )
+          )
+        `)
+        .eq('key', 'session_webhook')
         .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
+        .maybeSingle(),
     ]);
 
     if (profileRes.error || !profileRes.data) {
@@ -324,10 +330,38 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const profile = profileRes.data;
-    const ads: SessionAd[] = adsRes.data ?? [];
 
-    if (adsRes.error) {
-      console.warn('[session-webhook] Failed to fetch ads, continuing without ads', { error: adsRes.error.message });
+    // ── สร้างรายการโฆษณาจาก placement ────────────────────────────────
+    let ads: SessionAd[] = [];
+    let deliveryMode = 'all';
+
+    if (placementRes.error) {
+      console.warn('[session-webhook] Failed to fetch placement, continuing without ads', {
+        error: placementRes.error.message,
+      });
+    } else if (!placementRes.data) {
+      console.warn('[session-webhook] placement session_webhook not found or inactive');
+    } else {
+      deliveryMode = placementRes.data.delivery_mode ?? 'all';
+
+      // กรองเฉพาะโฆษณาที่ is_active แล้วเรียงตาม sort_order
+      const items: Array<{ sort_order: number; session_ads: { image_url: string; link_url: string; is_active: boolean } | null }> =
+        (placementRes.data.ad_placement_items as any) ?? [];
+
+      const sorted = items
+        .filter((item) => item.session_ads?.is_active === true)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item) => ({
+          image_url: item.session_ads!.image_url,
+          link_url: item.session_ads!.link_url,
+        }));
+
+      if (deliveryMode === 'random_one' && sorted.length > 0) {
+        ads = [sorted[Math.floor(Math.random() * sorted.length)]];
+      } else {
+        // 'all' และ 'ordered' → แสดงทุกชิ้นตาม sort_order
+        ads = sorted;
+      }
     }
 
     // ── session action row (ทักส่วนตัว / ลงห้อง) ──────────────────────
@@ -406,6 +440,8 @@ Deno.serve(async (req): Promise<Response> => {
         channel_id: channelId,
         message_id: result.messageId ?? null,
         component_fallback_reason: fallbackReason ?? null,
+        placement_key: 'session_webhook',
+        delivery_mode: deliveryMode,
         ads_count: ads.length,
       },
     });
