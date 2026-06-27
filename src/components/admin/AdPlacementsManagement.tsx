@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type DeliveryMode = 'all' | 'random_one' | 'ordered';
+type DeliveryMode = 'random_one' | 'ordered';
 
 type AdPlacement = {
   id: string;
@@ -74,7 +74,7 @@ const INITIAL_FORM: PlacementFormData = {
   display_name: '',
   key: '',
   description: '',
-  delivery_mode: 'all',
+  delivery_mode: 'random_one',
   is_active: true,
 };
 
@@ -92,9 +92,8 @@ function isValidKey(k: string): boolean {
 }
 
 const DELIVERY_MODE_META: Record<DeliveryMode, { label: string; desc: string; color: string }> = {
-  all:        { label: 'แสดงทั้งหมด',  desc: 'แสดงทุกชิ้นตามลำดับที่กำหนด',          color: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400' },
-  ordered:    { label: 'เรียงลำดับ',   desc: 'แสดงทุกชิ้นตามลำดับ (semantic ชัดเจน)', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400' },
-  random_one: { label: 'สุ่ม 1 ชิ้น',  desc: 'สุ่มแสดง 1 ชิ้นจากรายการที่ assign ไว้', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
+  random_one: { label: 'สุ่ม 1 ชิ้น',  desc: 'สุ่มแสดง 1 ชิ้นจาก session_ads ทั้งหมดที่ active', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
+  ordered:    { label: 'เรียงลำดับ',   desc: 'แสดงชิ้นแรกจากรายการที่ assign ไว้ตาม sort_order',  color: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400' },
 };
 
 // ── DeliveryModeBadge ──────────────────────────────────────────────────────────
@@ -233,7 +232,7 @@ function PlacementItemsPanel({ placement, onItemCountChange }: PlacementItemsPan
     });
   };
 
-  const isOrdered = placement.delivery_mode === 'all' || placement.delivery_mode === 'ordered';
+  const isOrdered = placement.delivery_mode === 'ordered';
 
   return (
     <div className="p-4 bg-muted/30 border-t border-border/50">
@@ -241,10 +240,11 @@ function PlacementItemsPanel({ placement, onItemCountChange }: PlacementItemsPan
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-muted-foreground">
           {isOrdered
-            ? '📋 แสดงตามลำดับด้านล่าง'
-            : '🎲 ลำดับไม่มีผลกับการแสดงผล — สุ่ม 1 ชิ้นต่อครั้ง'}
+            ? '📋 แสดงชิ้นแรกตาม sort_order จากรายการด้านล่าง'
+            : '🎲 สุ่มจาก session_ads ทั้งหมดที่ active — รายการด้านล่างไม่มีผล'}
         </p>
-        <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={openAddDialog}>
+        <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={openAddDialog}
+          disabled={!isOrdered}>
           <Plus className="w-3 h-3" />เพิ่มโฆษณา
         </Button>
       </div>
