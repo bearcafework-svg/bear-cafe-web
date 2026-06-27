@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BearLogo } from "@/components/bear-cafe/BearLogo";
 
-const DISCORD_INVITE_LINK = "https://discord.gg/bearcafe";
+const DISCORD_INVITE_LINK =
+  import.meta.env.VITE_DISCORD_INVITE_LINK || "https://discord.gg/bearcafe";
 const SUPPORT_LINK = "https://discord.com/channels/1144251788493602848/1148595919785300070";
 
 const SUCCESS_REDIRECT_DELAY_MS = 2000;
@@ -155,8 +156,9 @@ export default function AuthCallbackPage() {
 
   const goToLogin = useCallback(() => {
     clearRedirectTimeout();
-    navigate("/login", { replace: true });
-  }, [navigate]);
+    const params = errorType === "not_member" ? "?error=not_member" : "";
+    navigate(`/login${params}`, { replace: true });
+  }, [errorType, navigate]);
 
   const handleError = useCallback(
     ({ type, message, debug }: { type: ErrorType; message?: string; debug?: string }) => {
@@ -349,7 +351,7 @@ export default function AuthCallbackPage() {
                   </Button>
                 );
               }
-              return (
+      return (
                 <Button key={action.label} variant="outline" onClick={goToLogin} className="w-full">
                   {action.label}
                 </Button>
