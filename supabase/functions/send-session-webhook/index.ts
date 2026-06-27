@@ -331,9 +331,9 @@ Deno.serve(async (req): Promise<Response> => {
 
     const profile = profileRes.data;
 
-    // ── สร้างรายการโฆษณาจาก placement ────────────────────────────────
+    // ── สร้างโฆษณา 1 ชิ้นตาม delivery_mode ──────────────────────────
     let ads: SessionAd[] = [];
-    let deliveryMode = 'all';
+    let deliveryMode = 'random_one';
 
     if (placementRes.error) {
       console.warn('[session-webhook] Failed to fetch placement, continuing without ads', {
@@ -342,25 +342,38 @@ Deno.serve(async (req): Promise<Response> => {
     } else if (!placementRes.data) {
       console.warn('[session-webhook] placement session_webhook not found or inactive');
     } else {
-      deliveryMode = placementRes.data.delivery_mode ?? 'all';
+      deliveryMode = placementRes.data.delivery_mode ?? 'random_one';
 
-      // กรองเฉพาะโฆษณาที่ is_active แล้วเรียงตาม sort_order
-      const items: Array<{ sort_order: number; session_ads: { image_url: string; link_url: string; is_active: boolean } | null }> =
-        (placementRes.data.ad_placement_items as any) ?? [];
+      if (deliveryMode === 'random_one') {
+        // สุ่ม 1 ชิ้นจาก session_ads ทั้งหมดที่ is_active = true โดยตรง
+        const { data: allAds, error: allAdsError } = await supabase
+          .from('session_ads')
+          .select('image_url, link_url')
+          .eq('is_active', true);
 
-      const sorted = items
-        .filter((item) => item.session_ads?.is_active === true)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((item) => ({
-          image_url: item.session_ads!.image_url,
-          link_url: item.session_ads!.link_url,
-        }));
+        if (allAdsError) {
+          console.warn('[session-webhook] Failed to fetch session_ads for random_one', {
+            error: allAdsError.message,
+          });
+        } else if (allAds && allAds.length > 0) {
+          ads = [allAds[Math.floor(Math.random() * allAds.length)]];
+        }
+      } else if (deliveryMode === 'ordered') {
+        // เอาอันดับแรกจาก ad_placement_items ตาม sort_order
+        const items: Array<{ sort_order: number; session_ads: { image_url: string; link_url: string; is_active: boolean } | null }> =
+          (placementRes.data.ad_placement_items as any) ?? [];
 
-      if (deliveryMode === 'random_one' && sorted.length > 0) {
-        ads = [sorted[Math.floor(Math.random() * sorted.length)]];
-      } else {
-        // 'all' และ 'ordered' → แสดงทุกชิ้นตาม sort_order
-        ads = sorted;
+        const first = items
+          .filter((item) => item.session_ads?.is_active === true)
+          .sort((a, b) => a.sort_order - b.sort_order)[0];
+
+        if (first) {
+          ads = [{
+            image_url: first.session_ads!.image_url,
+            link_url: first.session_ads!.link_url,
+          }];
+        }
+        // ถ้าไม่มี item → ads = [] ไม่ fallback
       }
     }
 
