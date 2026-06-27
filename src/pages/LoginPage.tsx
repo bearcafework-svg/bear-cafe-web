@@ -1,10 +1,11 @@
 import React, { forwardRef, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BearLogo } from '@/components/bear-cafe/BearLogo';
 import { Footer } from '@/components/bear-cafe/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Users, MessageCircle, Mic } from 'lucide-react';
+import { Shield, Users, MessageCircle, Mic, ExternalLink, UserX } from 'lucide-react';
 import { TurnstileWidget, TurnstileHandle } from '@/components/security/TurnstileWidget';
 import { toast } from 'sonner';
 
@@ -12,9 +13,13 @@ const LoginPage = forwardRef<HTMLDivElement, object>((_, ref) => {
   const { login, isLoading } = useAuth();
   const [isLoginClicked, setIsLoginClicked] = useState(false);
   const turnstileRef = useRef<TurnstileHandle | null>(null);
-  
+  const [searchParams] = useSearchParams();
+
+  const isNotMember = searchParams.get('error') === 'not_member';
+
   // IMPORTANT: Must use VITE_ prefix for client-side env vars in Vite
   const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const discordInviteLink = import.meta.env.VITE_DISCORD_INVITE_LINK || 'https://discord.gg/bearcafe';
 
   // Debug logging (safe - only shows existence and length, not actual key)
   React.useEffect(() => {
@@ -136,6 +141,33 @@ const handleLogin = async () => {
 
             {/* Discord Login Button - More Prominent with animation */}
             <div className="animate-fade-in" style={{ animationDelay: '400ms' }}>
+              {isNotMember && (
+                <div className="mb-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 flex flex-col gap-3 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center">
+                      <UserX className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-amber-800 dark:text-amber-300 leading-snug">
+                        ยังไม่ได้เป็นสมาชิก Discord Server
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-snug">
+                        กรุณา Join Discord Server ของเราก่อนเพื่อเข้าใช้งาน
+                        แล้วกลับมากด Login ใหม่ได้เลย
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    asChild
+                    className="w-full h-10 text-sm font-semibold bg-[#5865F2] hover:bg-[#4752C4] text-white shadow-sm"
+                  >
+                    <a href={discordInviteLink} target="_blank" rel="noopener noreferrer">
+                      Join Server
+                      <ExternalLink className="w-3.5 h-3.5 ml-2" />
+                    </a>
+                  </Button>
+                </div>
+              )}
               <Button
                 onClick={handleLogin}
                 disabled={isLoginClicked}
