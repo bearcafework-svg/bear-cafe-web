@@ -517,7 +517,7 @@ export default function WorkspacePage() {
                             <Badge 
                               key={role.name} 
                               className="px-3 py-1 text-sm bg-white/80 dark:bg-black/50 border border-border/50 backdrop-blur-sm text-foreground hover:bg-white dark:hover:bg-black/70 transition-all"
-                              style={{ borderLeft: `4px solid #${role.color.toString(16)}` }}
+                              style={{ borderLeft: `4px solid #${(role.color ?? 0).toString(16).padStart(6, '0')}` }}
                             >
                               {role.name}
                             </Badge>
@@ -587,7 +587,7 @@ export default function WorkspacePage() {
                              >
                                <Badge 
                                  className="px-4 py-2 text-sm bg-white/80 dark:bg-black/50 border border-border/50 backdrop-blur-sm text-foreground shadow-sm"
-                                 style={{ borderLeft: `4px solid #${role.color.toString(16)}` }}
+                                 style={{ borderLeft: `4px solid #${(role.color ?? 0).toString(16).padStart(6, '0')}` }}
                                >
                                  {role.name}
                                </Badge>
