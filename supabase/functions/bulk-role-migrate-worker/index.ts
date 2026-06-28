@@ -1,17 +1,23 @@
 /**
- * bulk-role-migrate-worker — Internal worker function
+ * bulk-role-migrate-worker — Internal worker (page-per-invocation)
  *
- * Called by bulk-role-migrate via fire-and-forget fetch().
- * Receives its own HTTP request lifecycle, so the full pagination loop
- * runs without being subject to the parent function's CPU time limit.
+ * Each invocation processes exactly ONE page (1,000 Discord members) then
+ * self-invokes for the next page via fire-and-forget fetch().
  *
- * Protected by WORKER_SECRET header — not callable from the public internet.
+ * This sidesteps the 150s wall-clock limit entirely: each invocation only
+ * needs ~2-10s (Discord fetch + up to ~10 PUT role calls × 200ms delay).
+ *
+ * State carried across invocations via request body:
+ *   after        — Discord pagination cursor (user ID)
+ *   total_fetched — cumulative members fetched so far
+ *   global_idx   — cumulative members processed (execute only)
+ *   success_count / skip_count / error_count
+ *
+ * Protected by WORKER_SECRET header.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { discordFetch } from "../_shared/discord-fetch.ts";
-
-declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 // ──────────────────────────────────────────────────────────────────
 // Constants
@@ -57,23 +63,12 @@ function analyseMember(member: any): MemberAnalysis {
   const roles: string[] = member.roles ?? [];
   const userId: string = member.user?.id ?? "unknown";
   const username: string =
-    member.nick ??
-    member.user?.global_name ??
-    member.user?.username ??
-    "Unknown";
+    member.nick ?? member.user?.global_name ?? member.user?.username ?? "Unknown";
 
   const heldOldRoles = OLD_ROLE_PRIORITY.filter((r) => roles.includes(r));
 
   if (heldOldRoles.length === 0) {
-    return {
-      discord_user_id: userId,
-      username,
-      old_role_ids: [],
-      resolved_old_role_id: null,
-      new_role_id: null,
-      result_status: "skipped_no_old_role",
-      error_message: null,
-    };
+    return { discord_user_id: userId, username, old_role_ids: [], resolved_old_role_id: null, new_role_id: null, result_status: "skipped_no_old_role", error_message: null };
   }
 
   const resolvedOldRole = heldOldRoles[0];
@@ -81,407 +76,325 @@ function analyseMember(member: any): MemberAnalysis {
   const isAnomaly = heldOldRoles.length > 1;
 
   if (roles.includes(targetNewRole)) {
-    return {
-      discord_user_id: userId,
-      username,
-      old_role_ids: heldOldRoles,
-      resolved_old_role_id: resolvedOldRole,
-      new_role_id: targetNewRole,
-      result_status: "skipped_already_has",
-      error_message: null,
-    };
+    return { discord_user_id: userId, username, old_role_ids: heldOldRoles, resolved_old_role_id: resolvedOldRole, new_role_id: targetNewRole, result_status: "skipped_already_has", error_message: null };
   }
 
-  return {
-    discord_user_id: userId,
-    username,
-    old_role_ids: heldOldRoles,
-    resolved_old_role_id: resolvedOldRole,
-    new_role_id: targetNewRole,
-    result_status: isAnomaly ? "anomaly_multiple_old" : "will_assign",
-    error_message: null,
-  };
+  return { discord_user_id: userId, username, old_role_ids: heldOldRoles, resolved_old_role_id: resolvedOldRole, new_role_id: targetNewRole, result_status: isAnomaly ? "anomaly_multiple_old" : "will_assign", error_message: null };
+}
+
+function selfInvoke(payload: Record<string, unknown>) {
+  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/bulk-role-migrate-worker`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      "x-worker-secret": Deno.env.get("WORKER_SECRET")!,
+    },
+    body: JSON.stringify(payload),
+  }).catch((e) => console.error("[worker] self-invoke failed:", e));
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Background workers
+// dry_run page handler
 // ──────────────────────────────────────────────────────────────────
 
-async function runDryRun(
+async function runDryRunPage(
   supabase: ReturnType<typeof createClient>,
   jobId: string,
   guildId: string,
   botToken: string,
+  after: string,
+  totalFetched: number,
+  totalProcessed: number,
 ) {
   try {
-    let after = "0";
-    let totalFetched = 0;
-    let totalProcessed = 0;
-    let toAssign = 0;
-    let alreadyHasCount = 0;
-    let noOldRoleCount = 0;
+    const res = await discordFetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`,
+      { headers: { Authorization: `Bot ${botToken}` } },
+    );
 
-    while (true) {
-      const res = await discordFetch(
-        `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`,
-        { headers: { Authorization: `Bot ${botToken}` } },
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Discord members fetch failed (${res.status}): ${text}`);
-      }
-
-      const batch: any[] = await res.json();
-      if (batch.length === 0) break;
-
-      totalFetched += batch.length;
-
-      const analyses = batch
-        .filter((m: any) => !m.user?.bot)
-        .map(analyseMember);
-
-      totalProcessed += analyses.length;
-
-      for (const a of analyses) {
-        if (a.result_status === "will_assign" || a.result_status === "anomaly_multiple_old") toAssign++;
-        if (a.result_status === "skipped_already_has") alreadyHasCount++;
-        if (a.result_status === "skipped_no_old_role") noOldRoleCount++;
-      }
-
-      const logRows = analyses.map((a) => ({
-        job_id: jobId,
-        discord_user_id: a.discord_user_id,
-        username: a.username,
-        old_role_ids: a.old_role_ids,
-        resolved_old_role_id: a.resolved_old_role_id,
-        new_role_id: a.new_role_id,
-        result_status: a.result_status,
-        error_message: a.error_message,
-      }));
-
-      if (logRows.length > 0) {
-        await supabase.from("role_migration_log").insert(logRows);
-      }
-
-      await supabase
-        .from("role_migration_jobs")
-        .update({ processed: totalProcessed })
-        .eq("id", jobId);
-
-      if (batch.length < 1000) break;
-      after = batch[batch.length - 1].user.id;
-
-      // Pace Discord API (5 req/s for this endpoint)
-      await new Promise((r) => setTimeout(r, 250));
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Discord fetch failed (${res.status}): ${text}`);
     }
 
-    await supabase
-      .from("role_migration_jobs")
-      .update({
+    const batch: any[] = await res.json();
+
+    if (batch.length === 0) {
+      // No more members — finalize
+      await supabase.from("role_migration_jobs").update({
         status: "completed",
         total_members: totalFetched,
         processed: totalProcessed,
-        success_count: toAssign,
-        skip_count: alreadyHasCount + noOldRoleCount,
-        error_count: 0,
         completed_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
+      }).eq("id", jobId);
+      console.log(`[worker dry_run] completed jobId=${jobId} total=${totalFetched}`);
+      return;
+    }
 
-    console.log(`[worker dry_run] done jobId=${jobId} total=${totalFetched} toAssign=${toAssign}`);
+    const newTotalFetched = totalFetched + batch.length;
+    const analyses = batch.filter((m: any) => !m.user?.bot).map(analyseMember);
+    const newTotalProcessed = totalProcessed + analyses.length;
+
+    // Update running counters on job
+    let toAssign = 0, alreadyHas = 0, noOldRole = 0;
+    for (const a of analyses) {
+      if (a.result_status === "will_assign" || a.result_status === "anomaly_multiple_old") toAssign++;
+      if (a.result_status === "skipped_already_has") alreadyHas++;
+      if (a.result_status === "skipped_no_old_role") noOldRole++;
+    }
+
+    const logRows = analyses.map((a) => ({
+      job_id: jobId,
+      discord_user_id: a.discord_user_id,
+      username: a.username,
+      old_role_ids: a.old_role_ids,
+      resolved_old_role_id: a.resolved_old_role_id,
+      new_role_id: a.new_role_id,
+      result_status: a.result_status,
+      error_message: a.error_message,
+    }));
+
+    if (logRows.length > 0) {
+      await supabase.from("role_migration_log").insert(logRows);
+    }
+
+    await supabase.from("role_migration_jobs").update({
+      total_members: newTotalFetched,
+      processed: newTotalProcessed,
+    }).eq("id", jobId);
+
+    if (batch.length < 1000) {
+      // Last page — finalize
+      await supabase.from("role_migration_jobs").update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      console.log(`[worker dry_run] completed jobId=${jobId} total=${newTotalFetched}`);
+    } else {
+      // More pages — self-invoke with next cursor
+      const nextAfter = batch[batch.length - 1].user.id;
+      selfInvoke({
+        action: "dry_run",
+        job_id: jobId,
+        guild_id: guildId,
+        bot_token: botToken,
+        after: nextAfter,
+        total_fetched: newTotalFetched,
+        total_processed: newTotalProcessed,
+      });
+    }
   } catch (err) {
     console.error("[worker dry_run error]", err);
-    await supabase
-      .from("role_migration_jobs")
-      .update({ status: "failed" })
-      .eq("id", jobId);
+    await supabase.from("role_migration_jobs").update({ status: "failed" }).eq("id", jobId);
   }
 }
 
-async function runExecute(
+// ──────────────────────────────────────────────────────────────────
+// execute page handler
+// ──────────────────────────────────────────────────────────────────
+
+async function runExecutePage(
   supabase: ReturnType<typeof createClient>,
   jobId: string,
   guildId: string,
   botToken: string,
-  retryErrorsOnly: boolean,
-  sourceJobId: string | null,
+  after: string,
+  totalFetched: number,
+  globalIdx: number,
+  successCount: number,
+  skipCount: number,
+  errorCount: number,
 ) {
   try {
-    if (retryErrorsOnly && sourceJobId) {
-      const { data: errorLogs } = await supabase
-        .from("role_migration_log")
-        .select("discord_user_id, username, old_role_ids, resolved_old_role_id, new_role_id")
-        .eq("job_id", sourceJobId)
-        .eq("result_status", "error");
+    const res = await discordFetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`,
+      { headers: { Authorization: `Bot ${botToken}` } },
+    );
 
-      const membersToProcess: MemberAnalysis[] = (errorLogs ?? []).map((row: any) => ({
-        discord_user_id: row.discord_user_id,
-        username: row.username ?? "Unknown",
-        old_role_ids: row.old_role_ids ?? [],
-        resolved_old_role_id: row.resolved_old_role_id,
-        new_role_id: row.new_role_id,
-        result_status: "will_assign",
-        error_message: null,
-      }));
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Discord fetch failed (${res.status}): ${text}`);
+    }
 
-      await supabase
-        .from("role_migration_jobs")
-        .update({ total_members: membersToProcess.length })
-        .eq("id", jobId);
+    const batch: any[] = await res.json();
+    const newTotalFetched = totalFetched + batch.length;
 
-      await processMembers(supabase, jobId, guildId, botToken, membersToProcess);
-    } else {
-      let after = "0";
-      let totalFetched = 0;
-      let globalIdx = 0;
-      let successCount = 0;
-      let skipCount = 0;
-      let errorCount = 0;
+    if (batch.length === 0) {
+      await supabase.from("role_migration_jobs").update({
+        status: "completed",
+        total_members: totalFetched,
+        processed: globalIdx,
+        success_count: successCount,
+        skip_count: skipCount,
+        error_count: errorCount,
+        completed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      console.log(`[worker execute] completed jobId=${jobId} total=${totalFetched} success=${successCount} error=${errorCount}`);
+      return;
+    }
 
-      while (true) {
-        const res = await discordFetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`,
-          { headers: { Authorization: `Bot ${botToken}` } },
-        );
+    // Update total estimate
+    await supabase.from("role_migration_jobs").update({ total_members: newTotalFetched }).eq("id", jobId);
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Discord members fetch failed (${res.status}): ${text}`);
-        }
+    const toProcess = batch
+      .filter((m: any) => !m.user?.bot)
+      .map(analyseMember)
+      .filter((a) => a.result_status === "will_assign" || a.result_status === "anomaly_multiple_old");
 
-        const batch: any[] = await res.json();
-        if (batch.length === 0) break;
+    const logRows: any[] = [];
+    let newGlobalIdx = globalIdx;
+    let newSuccess = successCount;
+    let newSkip = skipCount;
+    let newError = errorCount;
 
-        totalFetched += batch.length;
+    for (const analysis of toProcess) {
+      newGlobalIdx++;
 
-        await supabase
-          .from("role_migration_jobs")
-          .update({ total_members: totalFetched })
-          .eq("id", jobId);
-
-        const toProcess = batch
-          .filter((m: any) => !m.user?.bot)
-          .map(analyseMember)
-          .filter(
-            (a) =>
-              a.result_status === "will_assign" ||
-              a.result_status === "anomaly_multiple_old",
-          );
-
-        const logRows: any[] = [];
-
-        for (const analysis of toProcess) {
-          globalIdx++;
-          if (!analysis.new_role_id) {
-            skipCount++;
-            logRows.push({
-              job_id: jobId,
-              discord_user_id: analysis.discord_user_id,
-              username: analysis.username,
-              old_role_ids: analysis.old_role_ids,
-              resolved_old_role_id: analysis.resolved_old_role_id,
-              new_role_id: null,
-              result_status: "skipped_no_old_role",
-              error_message: null,
-            });
-            continue;
-          }
-
-          try {
-            const roleRes = await discordFetch(
-              `https://discord.com/api/v10/guilds/${guildId}/members/${analysis.discord_user_id}/roles/${analysis.new_role_id}`,
-              {
-                method: "PUT",
-                headers: {
-                  Authorization: `Bot ${botToken}`,
-                  "Content-Type": "application/json",
-                  "X-Audit-Log-Reason": "Bulk class role migration",
-                },
-              },
-            );
-
-            if (roleRes.ok || roleRes.status === 204) {
-              successCount++;
-              logRows.push({
-                job_id: jobId,
-                discord_user_id: analysis.discord_user_id,
-                username: analysis.username,
-                old_role_ids: analysis.old_role_ids,
-                resolved_old_role_id: analysis.resolved_old_role_id,
-                new_role_id: analysis.new_role_id,
-                result_status: "assigned",
-                error_message: null,
-              });
-            } else {
-              const errText = await roleRes.text();
-              errorCount++;
-              logRows.push({
-                job_id: jobId,
-                discord_user_id: analysis.discord_user_id,
-                username: analysis.username,
-                old_role_ids: analysis.old_role_ids,
-                resolved_old_role_id: analysis.resolved_old_role_id,
-                new_role_id: analysis.new_role_id,
-                result_status: "error",
-                error_message: `HTTP ${roleRes.status}: ${errText.slice(0, 200)}`,
-              });
-            }
-          } catch (memberErr) {
-            errorCount++;
-            logRows.push({
-              job_id: jobId,
-              discord_user_id: analysis.discord_user_id,
-              username: analysis.username,
-              old_role_ids: analysis.old_role_ids,
-              resolved_old_role_id: analysis.resolved_old_role_id,
-              new_role_id: analysis.new_role_id,
-              result_status: "error",
-              error_message: (memberErr as Error).message?.slice(0, 200) ?? "Unknown error",
-            });
-          }
-        }
-
-        if (logRows.length > 0) {
-          await supabase.from("role_migration_log").insert(logRows);
-        }
-        await supabase
-          .from("role_migration_jobs")
-          .update({
-            processed: globalIdx,
-            success_count: successCount,
-            skip_count: skipCount,
-            error_count: errorCount,
-          })
-          .eq("id", jobId);
-
-        if (batch.length < 1000) break;
-        after = batch[batch.length - 1].user.id;
-
-        await new Promise((r) => setTimeout(r, 250));
+      if (!analysis.new_role_id) {
+        newSkip++;
+        logRows.push({ job_id: jobId, discord_user_id: analysis.discord_user_id, username: analysis.username, old_role_ids: analysis.old_role_ids, resolved_old_role_id: analysis.resolved_old_role_id, new_role_id: null, result_status: "skipped_no_old_role", error_message: null });
+        continue;
       }
 
-      await supabase
-        .from("role_migration_jobs")
-        .update({
-          status: "completed",
-          total_members: totalFetched,
-          processed: globalIdx,
-          success_count: successCount,
-          skip_count: skipCount,
-          error_count: errorCount,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", jobId);
+      try {
+        const roleRes = await discordFetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${analysis.discord_user_id}/roles/${analysis.new_role_id}`,
+          { method: "PUT", headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json", "X-Audit-Log-Reason": "Bulk class role migration" } },
+        );
 
-      console.log(`[worker execute] done jobId=${jobId} total=${totalFetched} success=${successCount} error=${errorCount}`);
+        if (roleRes.ok || roleRes.status === 204) {
+          newSuccess++;
+          logRows.push({ job_id: jobId, discord_user_id: analysis.discord_user_id, username: analysis.username, old_role_ids: analysis.old_role_ids, resolved_old_role_id: analysis.resolved_old_role_id, new_role_id: analysis.new_role_id, result_status: "assigned", error_message: null });
+          // Respect Discord rate limit: ~5 PUT role requests/sec per guild
+          await new Promise((r) => setTimeout(r, 200));
+        } else {
+          const errText = await roleRes.text();
+          newError++;
+          logRows.push({ job_id: jobId, discord_user_id: analysis.discord_user_id, username: analysis.username, old_role_ids: analysis.old_role_ids, resolved_old_role_id: analysis.resolved_old_role_id, new_role_id: analysis.new_role_id, result_status: "error", error_message: `HTTP ${roleRes.status}: ${errText.slice(0, 200)}` });
+        }
+      } catch (memberErr) {
+        newError++;
+        logRows.push({ job_id: jobId, discord_user_id: analysis.discord_user_id, username: analysis.username, old_role_ids: analysis.old_role_ids, resolved_old_role_id: analysis.resolved_old_role_id, new_role_id: analysis.new_role_id, result_status: "error", error_message: (memberErr as Error).message?.slice(0, 200) ?? "Unknown error" });
+      }
+    }
+
+    if (logRows.length > 0) {
+      await supabase.from("role_migration_log").insert(logRows);
+    }
+    await supabase.from("role_migration_jobs").update({
+      processed: newGlobalIdx,
+      success_count: newSuccess,
+      skip_count: newSkip,
+      error_count: newError,
+    }).eq("id", jobId);
+
+    if (batch.length < 1000) {
+      // Last page — finalize
+      await supabase.from("role_migration_jobs").update({
+        status: "completed",
+        total_members: newTotalFetched,
+        completed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      console.log(`[worker execute] completed jobId=${jobId} success=${newSuccess} error=${newError}`);
+    } else {
+      // More pages — self-invoke with next cursor + accumulated state
+      const nextAfter = batch[batch.length - 1].user.id;
+      selfInvoke({
+        action: "execute",
+        job_id: jobId,
+        guild_id: guildId,
+        bot_token: botToken,
+        after: nextAfter,
+        total_fetched: newTotalFetched,
+        global_idx: newGlobalIdx,
+        success_count: newSuccess,
+        skip_count: newSkip,
+        error_count: newError,
+      });
     }
   } catch (err) {
     console.error("[worker execute error]", err);
-    await supabase
-      .from("role_migration_jobs")
-      .update({ status: "failed" })
-      .eq("id", jobId);
+    await supabase.from("role_migration_jobs").update({ status: "failed" }).eq("id", jobId);
   }
 }
 
-async function processMembers(
+// ──────────────────────────────────────────────────────────────────
+// retry-errors-only handler (small set, single invocation is fine)
+// ──────────────────────────────────────────────────────────────────
+
+async function runRetryErrors(
   supabase: ReturnType<typeof createClient>,
   jobId: string,
   guildId: string,
   botToken: string,
-  membersToProcess: MemberAnalysis[],
+  sourceJobId: string,
 ) {
-  let successCount = 0;
-  let skipCount = 0;
-  let errorCount = 0;
-  const logRows: any[] = [];
+  try {
+    const { data: errorLogs } = await supabase
+      .from("role_migration_log")
+      .select("discord_user_id, username, old_role_ids, resolved_old_role_id, new_role_id")
+      .eq("job_id", sourceJobId)
+      .eq("result_status", "error");
 
-  for (let idx = 0; idx < membersToProcess.length; idx++) {
-    const analysis = membersToProcess[idx];
+    const members: MemberAnalysis[] = (errorLogs ?? []).map((row: any) => ({
+      discord_user_id: row.discord_user_id,
+      username: row.username ?? "Unknown",
+      old_role_ids: row.old_role_ids ?? [],
+      resolved_old_role_id: row.resolved_old_role_id,
+      new_role_id: row.new_role_id,
+      result_status: "will_assign",
+      error_message: null,
+    }));
 
-    if (!analysis.new_role_id) {
-      skipCount++;
-      logRows.push({
-        job_id: jobId,
-        discord_user_id: analysis.discord_user_id,
-        username: analysis.username,
-        old_role_ids: analysis.old_role_ids,
-        resolved_old_role_id: analysis.resolved_old_role_id,
-        new_role_id: null,
-        result_status: "skipped_no_old_role",
-        error_message: null,
-      });
-      continue;
-    }
+    await supabase.from("role_migration_jobs").update({ total_members: members.length }).eq("id", jobId);
 
-    try {
-      const res = await discordFetch(
-        `https://discord.com/api/v10/guilds/${guildId}/members/${analysis.discord_user_id}/roles/${analysis.new_role_id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            "Content-Type": "application/json",
-            "X-Audit-Log-Reason": "Bulk class role migration",
-          },
-        },
-      );
+    let success = 0, skip = 0, error = 0;
+    const logRows: any[] = [];
 
-      if (res.ok || res.status === 204) {
-        successCount++;
-        logRows.push({
-          job_id: jobId, discord_user_id: analysis.discord_user_id,
-          username: analysis.username, old_role_ids: analysis.old_role_ids,
-          resolved_old_role_id: analysis.resolved_old_role_id,
-          new_role_id: analysis.new_role_id, result_status: "assigned", error_message: null,
-        });
-      } else {
-        const errText = await res.text();
-        errorCount++;
-        logRows.push({
-          job_id: jobId, discord_user_id: analysis.discord_user_id,
-          username: analysis.username, old_role_ids: analysis.old_role_ids,
-          resolved_old_role_id: analysis.resolved_old_role_id,
-          new_role_id: analysis.new_role_id, result_status: "error",
-          error_message: `HTTP ${res.status}: ${errText.slice(0, 200)}`,
-        });
+    for (let idx = 0; idx < members.length; idx++) {
+      const a = members[idx];
+      if (!a.new_role_id) { skip++; logRows.push({ job_id: jobId, discord_user_id: a.discord_user_id, username: a.username, old_role_ids: a.old_role_ids, resolved_old_role_id: a.resolved_old_role_id, new_role_id: null, result_status: "skipped_no_old_role", error_message: null }); continue; }
+
+      try {
+        const res = await discordFetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${a.discord_user_id}/roles/${a.new_role_id}`,
+          { method: "PUT", headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json", "X-Audit-Log-Reason": "Bulk class role migration" } },
+        );
+        if (res.ok || res.status === 204) {
+          success++;
+          logRows.push({ job_id: jobId, discord_user_id: a.discord_user_id, username: a.username, old_role_ids: a.old_role_ids, resolved_old_role_id: a.resolved_old_role_id, new_role_id: a.new_role_id, result_status: "assigned", error_message: null });
+          await new Promise((r) => setTimeout(r, 200));
+        } else {
+          const errText = await res.text();
+          error++;
+          logRows.push({ job_id: jobId, discord_user_id: a.discord_user_id, username: a.username, old_role_ids: a.old_role_ids, resolved_old_role_id: a.resolved_old_role_id, new_role_id: a.new_role_id, result_status: "error", error_message: `HTTP ${res.status}: ${errText.slice(0, 200)}` });
+        }
+      } catch (e) {
+        error++;
+        logRows.push({ job_id: jobId, discord_user_id: a.discord_user_id, username: a.username, old_role_ids: a.old_role_ids, resolved_old_role_id: a.resolved_old_role_id, new_role_id: a.new_role_id, result_status: "error", error_message: (e as Error).message?.slice(0, 200) ?? "Unknown" });
       }
-    } catch (memberErr) {
-      errorCount++;
-      logRows.push({
-        job_id: jobId, discord_user_id: analysis.discord_user_id,
-        username: analysis.username, old_role_ids: analysis.old_role_ids,
-        resolved_old_role_id: analysis.resolved_old_role_id,
-        new_role_id: analysis.new_role_id, result_status: "error",
-        error_message: (memberErr as Error).message?.slice(0, 200) ?? "Unknown error",
-      });
+
+      if (logRows.length >= 100) {
+        await supabase.from("role_migration_log").insert(logRows.splice(0));
+        await supabase.from("role_migration_jobs").update({ processed: idx + 1, success_count: success, skip_count: skip, error_count: error }).eq("id", jobId);
+      }
     }
 
-    if (logRows.length >= 100) {
-      await supabase.from("role_migration_log").insert(logRows.splice(0));
-      await supabase
-        .from("role_migration_jobs")
-        .update({ processed: idx + 1, success_count: successCount, skip_count: skipCount, error_count: errorCount })
-        .eq("id", jobId);
-    }
-  }
+    if (logRows.length > 0) await supabase.from("role_migration_log").insert(logRows);
 
-  if (logRows.length > 0) {
-    await supabase.from("role_migration_log").insert(logRows);
-  }
-
-  await supabase
-    .from("role_migration_jobs")
-    .update({
+    await supabase.from("role_migration_jobs").update({
       status: "completed",
-      processed: membersToProcess.length,
-      success_count: successCount,
-      skip_count: skipCount,
-      error_count: errorCount,
+      processed: members.length,
+      success_count: success,
+      skip_count: skip,
+      error_count: error,
       completed_at: new Date().toISOString(),
-    })
-    .eq("id", jobId);
+    }).eq("id", jobId);
+  } catch (err) {
+    console.error("[worker retry error]", err);
+    await supabase.from("role_migration_jobs").update({ status: "failed" }).eq("id", jobId);
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -489,27 +402,39 @@ async function processMembers(
 // ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req): Promise<Response> => {
-  // Verify internal secret — reject all public calls
   const secret = req.headers.get("x-worker-secret");
   if (secret !== Deno.env.get("WORKER_SECRET")) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { action, job_id, guild_id, bot_token, retry_errors_only, source_job_id } =
-    await req.json();
+  const {
+    action,
+    job_id,
+    guild_id,
+    bot_token,
+    retry_errors_only,
+    source_job_id,
+    after = "0",
+    total_fetched = 0,
+    total_processed = 0,
+    global_idx = 0,
+    success_count = 0,
+    skip_count = 0,
+    error_count = 0,
+  } = await req.json();
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const workPromise = action === "dry_run"
-    ? runDryRun(supabase, job_id, guild_id, bot_token)
-    : runExecute(supabase, job_id, guild_id, bot_token, !!retry_errors_only, source_job_id ?? null);
-
-  // waitUntil keeps the worker alive for the full wall-clock duration
-  // (up to 400s on paid, 150s on free) while the response returns immediately
-  EdgeRuntime.waitUntil(workPromise);
+  if (action === "dry_run") {
+    await runDryRunPage(supabase, job_id, guild_id, bot_token, after, total_fetched, total_processed);
+  } else if (retry_errors_only && source_job_id) {
+    await runRetryErrors(supabase, job_id, guild_id, bot_token, source_job_id);
+  } else {
+    await runExecutePage(supabase, job_id, guild_id, bot_token, after, total_fetched, global_idx, success_count, skip_count, error_count);
+  }
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },
