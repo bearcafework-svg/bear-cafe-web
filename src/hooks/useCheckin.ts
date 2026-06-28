@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { readFunctionsErrorPayload } from '@/lib/function-error';
 import { getCheckinToday, type CheckinDailyReward, type CheckinStatus } from '@/lib/checkin';
 
 async function fetchPublicDailyRewards(): Promise<CheckinDailyReward[]> {
@@ -31,7 +32,7 @@ function publicCheckinStatus(daily_rewards: CheckinDailyReward[]): CheckinStatus
   };
 }
 
-type CheckinActionResult =
+export type CheckinActionResult =
   | { ok: true; reward?: Record<string, unknown>; big_reward_granted?: boolean }
   | { ok: false; error: string };
 
@@ -103,7 +104,10 @@ export function useCheckin(discordId: string | undefined) {
           body: { discord_id: discordId, ...body },
         });
 
-        if (error) throw error;
+        if (error) {
+          const payload = await readFunctionsErrorPayload(error);
+          return { ok: false, error: payload?.error ?? 'action_failed' };
+        }
         if (!data?.ok) return { ok: false, error: data?.error ?? 'action_failed' };
 
         await refresh();

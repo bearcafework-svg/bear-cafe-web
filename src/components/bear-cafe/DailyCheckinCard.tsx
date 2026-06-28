@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
-import { useCheckin } from '@/hooks/useCheckin';
+import { useCheckin, type CheckinActionResult } from '@/hooks/useCheckin';
 import { CheckinRewardModal, type CheckinRewardModalData } from '@/components/bear-cafe/CheckinRewardModal';
+import {
+  CheckinMakeupConfirmModal,
+  type CheckinMakeupConfirmModalData,
+} from '@/components/bear-cafe/CheckinMakeupConfirmModal';
+import {
+  CheckinMakeupSuccessModal,
+  type CheckinMakeupSuccessModalData,
+} from '@/components/bear-cafe/CheckinMakeupSuccessModal';
 import {
   CHECKIN_ERROR_MESSAGES,
   computeCheckinStreak,
@@ -16,6 +24,7 @@ import {
   type CheckinDailyReward,
   type CheckinDayState,
 } from '@/lib/checkin';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import {
   Calendar,
@@ -24,89 +33,157 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CaffeLatteIcon } from '@/icon/outline';
 import {
-  CircleCheckIcon,
-  CircleDotIcon,
-  GiftIcon,
-  LockIcon,
-  StarIcon,
-} from '@/icon/inline';
-import { Button } from '../ui/button';
+  CaffeLatteIcon,
+  StrawberryColorIcon,
+  TearTicketColorIcon,
+  TicketColorIcon,
+} from '@/icon/outline';
 import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
+import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
+import { Button } from '../ui/button';
 
-function rewardToPopup(reward: Record<string, unknown>): CheckinRewardModalData {
-  const rewardType = reward.reward_type as string;
+type RoleMeta = { icon?: string; name?: string };
+
+function rewardToPopup(
+  reward: Record<string, unknown>,
+  fallback?: CheckinDailyReward,
+): CheckinRewardModalData {
+  const rewardType = (reward.reward_type ?? fallback?.reward_type) as CheckinDailyReward['reward_type'];
   if (rewardType === 'role') {
-    return { type: 'role', roleName: 'Discord Role', message: 'ได้รับ Role แล้ว!' };
+    const roleId =
+      (typeof reward.role_id === 'string' ? reward.role_id : null) ??
+      fallback?.role_id ??
+      undefined;
+    return {
+      type: 'role',
+      roleId,
+      roleName: fallback?.role_name ?? undefined,
+      message: 'ได้รับ Role แล้ว!',
+    };
   }
-  const amount = Number(reward.reward_amount ?? 0);
-  const label = REWARD_TYPE_LABELS[rewardType as keyof typeof REWARD_TYPE_LABELS] ?? 'แต้ม';
+  const amount = Number(reward.reward_amount ?? fallback?.reward_amount ?? 0);
+  const label = REWARD_TYPE_LABELS[rewardType] ?? 'แต้ม';
   return {
-    type: 'points',
+    type: rewardType,
     pointsAdded: amount,
     message: `ได้รับ ${amount} ${label}`,
   };
+}
+
+function buildRewardModalData(
+  result: Pick<Extract<CheckinActionResult, { ok: true }>, 'reward'>,
+  selectedReward: CheckinDailyReward | undefined,
+  roleMeta: Record<string, RoleMeta>,
+): CheckinRewardModalData {
+  let modalData: CheckinRewardModalData = result.reward
+    ? rewardToPopup(result.reward, selectedReward)
+    : selectedReward
+      ? dailyRewardToModal(selectedReward)
+      : { type: 'points', pointsAdded: 0, message: 'เช็คอินสำเร็จ!' };
+
+  if (modalData.type === 'role' && modalData.roleId) {
+    const meta = roleMeta[modalData.roleId];
+    if (meta) {
+      modalData = {
+        ...modalData,
+        roleName: modalData.roleName ?? meta.name,
+        roleIcon: meta.icon,
+      };
+    }
+  }
+
+  return modalData;
 }
 
 function dailyRewardToModal(reward: CheckinDailyReward): CheckinRewardModalData {
   if (reward.reward_type === 'role') {
-    return { type: 'role', roleName: 'Discord Role', message: 'ได้รับ Role แล้ว!' };
+    return {
+      type: 'role',
+      roleId: reward.role_id ?? undefined,
+      roleName: reward.role_name ?? undefined,
+      message: 'ได้รับ Role แล้ว!',
+    };
   }
   const amount = reward.reward_amount ?? 0;
-  const label = REWARD_TYPE_LABELS[reward.reward_type as keyof typeof REWARD_TYPE_LABELS] ?? 'แต้ม';
+  const label = REWARD_TYPE_LABELS[reward.reward_type];
   return {
-    type: 'points',
+    type: reward.reward_type,
     pointsAdded: amount,
     message: `ได้รับ ${amount} ${label}`,
   };
 }
 
-function DayStatusIcon({
-  day,
+function DayRewardDisplay({
+  reward,
+  roleIcon,
   state,
-  isToday,
-  size = 20,
 }: {
-  day: number;
+  reward: CheckinDailyReward | undefined;
+  roleIcon?: string | null;
   state: CheckinDayState;
-  isToday: boolean;
-  size?: number;
 }) {
-  if (state === 'completed') {
-    return <CircleCheckIcon size={size} color="#50A582" />;
-  }
+  if (!reward) return null;
 
-  if (day === 28) {
-    return <GiftIcon size={size} color="#9A7331" />;
-  }
+  const iconSize = { mobile: 20, desktop: 24 };
+  const scoreClass = cn(
+    'bear-body-regular-semibold leading-none',
+    state === 'completed' && 'text-[#B2A094] dark:text-[hsl(var(--matcha)/0.7)]',
+    state === 'today' && 'text-[#D7A042] dark:text-[hsl(var(--honey))]',
+    state === 'makeup' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
+    state === 'future' && 'text-[#7C6F65] dark:text-[hsl(var(--muted-foreground)/0.65)]',
+    state === 'missed' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
+  );
 
-  if (isToday && state === 'today') {
-    return <StarIcon size={size} color="#D7A042" />;
-  }
+  const icon = (() => {
+    switch (reward.reward_type) {
+      case 'points':
+        return <StrawberryColorIcon size={iconSize} />;
+      case 'ticket_point':
+        return <TicketColorIcon size={iconSize} />;
+      case 'ticket_piece_point':
+        return <TearTicketColorIcon size={iconSize} />;
+      case 'role':
+        return (
+          <IconDisplay
+            icon={roleIcon}
+            fallback="🎭"
+            size="md"
+            className="h-12 w-12 sm:h-16 sm:w-16 text-3xl sm:text-4xl"
+          />
+        );
+      default:
+        return null;
+    }
+  })();
 
-  if (state === 'future') {
-    return <LockIcon size={size} color="#9A7331" />;
-  }
+  if (!icon) return null;
 
-  if (state === 'makeup' || state === 'missed') {
-    return <CircleDotIcon size={size} color="#D7A042" />;
-  }
+  const amount = reward.reward_amount;
 
-  return null;
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      {icon}
+      {reward.reward_type !== 'role' && amount != null && (
+        <span className={scoreClass}>{amount.toLocaleString()}</span>
+      )}
+    </div>
+  );
 }
 
 function CheckInDayCard({
   day,
   state,
-  isTodayCard,
+  reward,
+  roleIcon,
   isSelected,
   disabled,
   onClick,
 }: {
   day: number;
   state: CheckinDayState;
-  isTodayCard: boolean;
+  reward?: CheckinDailyReward;
+  roleIcon?: string | null;
   isSelected?: boolean;
   disabled?: boolean;
   onClick?: () => void;
@@ -117,19 +194,21 @@ function CheckInDayCard({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex min-w-[2.75rem] flex-1 flex-col items-center justify-center border rounded-xl sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
+        'flex min-w-[5rem] flex-1 flex-col items-center justify-center border rounded-lg sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
         'gap-1 py-2 px-1 sm:gap-2 sm:py-3 sm:px-2 md:gap-3 md:py-4 md:px-3 lg:gap-5 lg:py-5 lg:px-4',
-        state === 'completed' && !isSelected && 'bg-[#FAF2E4] border-[#50A582] dark:bg-[hsl(var(--coffee))] dark:border-[hsl(var(--matcha)/0.45)]',
-        state === 'today' && !isSelected && 'bg-[#F7E6C5] border-[#EACB8F] shadow-[0_0_8px_0px_#D7A042] dark:bg-[hsl(var(--honey)/0.12)] dark:border-[hsl(var(--honey)/0.35)] dark:shadow-[0_0_8px_0px_hsl(var(--honey)/0.2)]',
-        state === 'makeup' && !isSelected && 'bg-[#FAF2E4] border-[#EACB8F] dark:bg-[hsl(var(--coffee))] dark:border-[hsl(var(--border))]',
-        state === 'future' && !isSelected && 'bg-[#FAF2E4] border-[#EACB8F] dark:bg-[hsl(var(--coffee))] dark:border-[hsl(var(--border))]',
-        state === 'missed' && !isSelected && 'bg-[#FAF2E4] border-[#EACB8F] dark:bg-[hsl(var(--coffee))] dark:border-[hsl(var(--border))]',
-        isSelected && 'border-[#D7A042] shadow-[0_0_8px_0px_#D7A042] dark:border-[hsl(var(--honey))] dark:shadow-[0_0_8px_0px_hsl(var(--honey)/0.35)]',
-        isSelected && state === 'completed' && 'bg-[#FAF2E4] dark:bg-[hsl(var(--coffee))]',
-        isSelected && state === 'today' && 'bg-[#F7E6C5] dark:bg-[hsl(var(--honey)/0.12)]',
-        isSelected && (state === 'makeup' || state === 'future' || state === 'missed') && 'bg-[#FAF2E4] dark:bg-[hsl(var(--coffee))]',
         !disabled && 'cursor-pointer hover:scale-[1.01] active:scale-[0.98]',
         disabled && 'cursor-default',
+        "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E]",
+        state === 'completed' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#9CCC9E] dark:border-[#17251F]",
+        state === 'completed' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#50A582] dark:border-[#2D5C48] shadow-[0_0_8px_0px_#186243] dark:shadow-[0_0_8px_0px_#297253]",
+        state === 'today' && "bg-[#F7E6C5] dark:bg-[#241E15] border-[#EACB8F] dark:border-[#47381E]",
+        state === 'today' && isSelected && "bg-[#F7E6C5] dark:bg-[#241E15] border-[#D7A042] dark:border-[#D7A042] shadow-[0_0_8px_0px_#D7A042] dark:shadow-[0_0_8px_0px_#D7A042]",
+        state === 'makeup' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328]",
+        state === 'makeup' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328] shadow-[0_0_8px_0px_#9C4251] dark:shadow-[0_0_8px_0px_#9C4251]",
+        state === 'future' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E]",
+        state === 'future' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E] shadow-[0_0_8px_0px_#D7A042] dark:shadow-[0_0_8px_0px_#D7A042]",
+        state === 'missed' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328]",
+        state === 'missed' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328] shadow-[0_0_8px_0px_#9C4251] dark:shadow-[0_0_8px_0px_#9C4251]",
       )}
     >
       <span
@@ -142,15 +221,10 @@ function CheckInDayCard({
           state === 'missed' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
         )}
       >
-        <span className="sm:hidden">{day}</span>
+        <span className="sm:hidden">DAY {day}</span>
         <span className="hidden sm:inline">DAY {day}</span>
       </span>
-      <div className="md:hidden">
-        <DayStatusIcon day={day} state={state} isToday={isTodayCard} size={14} />
-      </div>
-      <div className="hidden md:block">
-        <DayStatusIcon day={day} state={state} isToday={isTodayCard} size={20} />
-      </div>
+      <DayRewardDisplay reward={reward} roleIcon={roleIcon} state={state} />
     </button>
   );
 }
@@ -162,7 +236,12 @@ export function DailyCheckInCard() {
     user?.discord_id,
   );
   const [rewardModal, setRewardModal] = useState<CheckinRewardModalData | null>(null);
+  const [makeupModal, setMakeupModal] = useState<CheckinMakeupConfirmModalData | null>(null);
+  const [makeupSuccessModal, setMakeupSuccessModal] = useState<CheckinMakeupSuccessModalData | null>(null);
+  const [roleMeta, setRoleMeta] = useState<Record<string, RoleMeta>>({});
   const closeRewardModal = useCallback(() => setRewardModal(null), []);
+  const closeMakeupModal = useCallback(() => setMakeupModal(null), []);
+  const closeMakeupSuccessModal = useCallback(() => setMakeupSuccessModal(null), []);
   const [selectedDay, setSelectedDay] = useState(() => Math.min(getCheckinToday().day, 28));
 
   const { year, month, day: todayDay } = getCheckinToday();
@@ -183,6 +262,48 @@ export function DailyCheckInCard() {
     status?.daily_rewards.forEach((reward) => map.set(reward.day_number, reward));
     return map;
   }, [status]);
+
+  useEffect(() => {
+    const roleIds = [
+      ...new Set(
+        status?.daily_rewards
+          .filter((r) => r.reward_type === 'role' && r.role_id)
+          .map((r) => r.role_id as string),
+      ),
+    ];
+    if (roleIds.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        roleIds.map(async (roleId) => {
+          try {
+            const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
+              body: { role_id: roleId },
+            });
+            if (roleInfo && !roleInfo.error) {
+              const icon = roleInfo.icon || roleInfo.unicode_emoji;
+              return [roleId, { icon: icon || undefined, name: roleInfo.name }] as const;
+            }
+          } catch {
+            /* ignore */
+          }
+          return null;
+        }),
+      );
+
+      if (!cancelled) {
+        setRoleMeta((prev) => ({
+          ...prev,
+          ...Object.fromEntries(entries.filter(Boolean) as [string, RoleMeta][]),
+        }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status?.daily_rewards]);
 
   const visibleDays = getCheckinWeekDays(weekIndex);
   const streak = computeCheckinStreak(completedDays, todayDay);
@@ -205,25 +326,52 @@ export function DailyCheckInCard() {
   const showStrawberry = selectedReward?.reward_type === 'points';
   const isCompleted = selectedState === 'completed';
 
-  const handleActionResult = (result: {
-    ok: boolean;
-    error?: string;
-    reward?: Record<string, unknown>;
-    big_reward_granted?: boolean;
-  }) => {
-    if (!result.ok) {
-      const message = CHECKIN_ERROR_MESSAGES[result.error ?? ''] ?? 'ไม่สามารถเช็คอินได้';
+  const handleActionResult = (result: CheckinActionResult) => {
+    if (result.ok === false) {
+      const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเช็คอินได้';
       toast.error(message);
       return;
     }
 
-    const modalData = result.reward
-      ? rewardToPopup(result.reward)
-      : selectedReward
-        ? dailyRewardToModal(selectedReward)
-        : { type: 'points' as const, pointsAdded: 0, message: 'เช็คอินสำเร็จ!' };
+    setRewardModal(buildRewardModalData(result, selectedReward, roleMeta));
 
-    setRewardModal(modalData);
+    if (result.big_reward_granted) {
+      toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
+    }
+  };
+
+  const openMakeupConfirmModal = () => {
+    if (!selectedReward) return;
+    const modalData: CheckinMakeupConfirmModalData = {
+      type: selectedReward.reward_type,
+      pointsAdded: selectedReward.reward_amount ?? undefined,
+      makeupCost: selectedReward.makeup_cost ?? 50,
+      dayNumber: selectedDay,
+    };
+    if (selectedReward.reward_type === 'role') {
+      modalData.roleId = selectedReward.role_id ?? undefined;
+      modalData.roleName = selectedReward.role_name ?? undefined;
+      const meta = selectedReward.role_id ? roleMeta[selectedReward.role_id] : undefined;
+      if (meta) {
+        modalData.roleName = modalData.roleName ?? meta.name;
+        modalData.roleIcon = meta.icon;
+      }
+    }
+    setMakeupModal(modalData);
+  };
+
+  const handleMakeupConfirm = async () => {
+    if (!makeupModal) return;
+    const { dayNumber, makeupCost } = makeupModal;
+    const result = await performMakeupCheckin(dayNumber, year, month);
+    if (result.ok === false) {
+      const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเติมเช็คอินได้';
+      toast.error(message);
+      return;
+    }
+    setMakeupModal(null);
+    const rewardData = buildRewardModalData(result, selectedReward, roleMeta);
+    setMakeupSuccessModal({ ...rewardData, makeupCost });
 
     if (result.big_reward_granted) {
       toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
@@ -236,11 +384,7 @@ export function DailyCheckInCard() {
       return;
     }
     if (selectedState === 'makeup') {
-      const cost = selectedReward?.makeup_cost ?? 50;
-      const confirmed = window.confirm(`เติมเช็คอินวันที่ ${selectedDay} ใช้ ${cost} แต้ม?`);
-      if (!confirmed) return;
-      const result = await performMakeupCheckin(selectedDay, year, month);
-      handleActionResult(result);
+      openMakeupConfirmModal();
       return;
     }
     if (selectedState === 'today') {
@@ -316,12 +460,14 @@ export function DailyCheckInCard() {
                   status?.makeup_window_open ?? false,
                 );
 
+                const reward = rewardsByDay.get(day);
                 return (
                   <CheckInDayCard
                     key={day}
                     day={day}
                     state={state}
-                    isTodayCard={day === todayDay && todayDay <= 28}
+                    reward={reward}
+                    roleIcon={reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined}
                     isSelected={day === selectedDay}
                     disabled={acting}
                     onClick={() => handleDaySelect(day)}
@@ -346,14 +492,16 @@ export function DailyCheckInCard() {
           </p>
         )}
 
-        <div className="flex flex-col gap-3 rounded-[20px] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-2.5 bg-[#0A0A0A] dark:bg-[hsl(var(--mocha))] border dark:border-[hsl(var(--border))]">
+        <div className="flex flex-col gap-3 rounded-[20px] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-2.5 bg-[#FAF2E4] border-[#F4EEE5] dark:bg-[#0A0A0A] border dark:border-[#0A0A0A]">
           <div className="min-w-0 space-y-0.5">
             <p className="bear-h2-medium">
               <span
                 className={cn(
-                  isCompleted
-                    ? 'text-[#51443A] dark:text-[hsl(var(--muted-foreground))]'
-                    : 'text-[#E9E6E2] dark:text-[hsl(var(--foreground)/0.9)]',
+                  "text-[#89654A] dark:text-[#E9E6E2]",
+                  // TODO - Complete the styles for the different states
+                  // isCompleted
+                  //   ? 'text-[#51443A] dark:text-[#E9E6E2]'
+                  //   : 'text-[#E9E6E2] dark:text-[hsl(var(--foreground)/0.9)]',
                 )}
               >
                 รางวัล
@@ -363,22 +511,25 @@ export function DailyCheckInCard() {
                   {' '}
                   <span
                     className={cn(
-                      isCompleted
-                        ? 'text-[#51443A] dark:text-[hsl(var(--muted-foreground))]'
-                        : 'text-[#D7A042] dark:text-[hsl(var(--honey))]',
+                      "text-[#9A7331] dark:text-[#D7A042]",
                     )}
                   >
                     {rewardDetail}
                   </span>
+                  {' '}
                 </>
               )}
+              <span
+                className={cn(
+                  "text-[#89654A] dark:text-[#E9E6E2]",
+                )}
+              >
+                รับเลย!
+              </span>
             </p>
             <p
               className={cn(
-                'bear-body-small-regular',
-                isCompleted
-                  ? 'text-[#51443A] dark:text-[hsl(var(--muted-foreground)/0.8)]'
-                  : 'text-[#9D8F7B] dark:text-[hsl(var(--muted-foreground))]',
+                'bear-body-small-regular text-[#94735C] dark:text-[#9D8F7B]',
               )}
             >
               {rewardSubtitle}
@@ -398,7 +549,10 @@ export function DailyCheckInCard() {
               type="button"
               disabled={!canClaimSelected || acting || selectedDay > 28}
               onClick={handleClaimSelected}
-              className="bg-[#1E3A2F] border-[#2D5C48] text-[#E9E6E2] bear-body-regular-medium rounded-full px-8 py-2 disabled:bg-[#0C1511] disabled:border-[#1E3A2F] disabled:text-[#214738] transition-all duration-200 hover:bg-[#2D5C48] hover:border-[#2D5C48] hover:text-[#E9E6E2]"
+              className={cn(
+                "bear-body-regular-medium rounded-full px-8 py-2 cursor-pointer border-2",
+                "bg-[#C7EEC8] dark:bg-[#1E3A2F] border-[#9CCC9E] dark:border-[#2D5C48] text-[#89654A] dark:text-[#E9E6E2] disabled:bg-[#bedebf] dark:disabled:bg-[#0C1511] disabled:border-[#88ae89] dark:disabled:border-[#1E3A2F] disabled:text-[#a3c0a4] dark:disabled:text-[#1E3A2F]",
+              )}
             >
               {acting ? (
                 <Loader2 className="mx-auto h-4 w-4 animate-spin" />
@@ -419,9 +573,23 @@ export function DailyCheckInCard() {
           )}
         </div>
       </div>
-      {/* NOTE - Test Reward Modal */}
-      {/* <Button onClick={() => setRewardModal({ type: 'points', pointsAdded: 100, message: 'ได้รับ 100 แต้ม' })}>Test Reward Modal</Button> */}
 
+      {/* dev toggle reward modal */}
+      {/* <Button onClick={() => setRewardModal({ type: 'points', pointsAdded: 100, message: 'ได้รับ 100 แต้ม' })}>Test Reward Modal</Button> */}
+      {/* <Button onClick={() => setRewardModal({ type: 'ticket_point', pointsAdded: 100, message: 'ได้รับ 100 แต้ม' })}>Test Reward Modal</Button> */}
+      {/* <Button onClick={() => setRewardModal({ type: 'ticket_piece_point', pointsAdded: 100, message: 'ได้รับ 100 แต้ม' })}>Test Reward Modal</Button> */}
+      {/* <Button onClick={() => setRewardModal({ type: 'role', roleName: "test" })}>Test Reward Modal</Button> */}
+
+      {/* dev toggle makeup modal */}
+      {/* <Button onClick={openMakeupConfirmModal}>Test Makeup Modal</Button> */}
+
+      {/* <CheckinMakeupConfirmModal
+        data={makeupModal}
+        confirming={acting}
+        onConfirm={handleMakeupConfirm}
+        onClose={closeMakeupModal}
+      /> */}
+      <CheckinMakeupSuccessModal data={makeupSuccessModal} onClose={closeMakeupSuccessModal} />
       <CheckinRewardModal reward={rewardModal} onClose={closeRewardModal} />
     </>
   );

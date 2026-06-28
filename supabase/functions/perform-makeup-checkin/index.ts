@@ -61,8 +61,8 @@ Deno.serve(async (req): Promise<Response> => {
 
     await ensureUserPoints(sb, discord_id);
 
-    // Load cycle
-    const { data: cycle } = await sb
+    // Load or create cycle (users who never daily-checked-in still need a row for makeup)
+    let { data: cycle } = await sb
       .from("checkin_cycles")
       .select("*")
       .eq("discord_id", discord_id)
@@ -71,7 +71,13 @@ Deno.serve(async (req): Promise<Response> => {
       .maybeSingle();
 
     if (!cycle) {
-      return json({ ok: false, error: "cycle_not_found" }, 404);
+      const { data: newCycle, error: insertErr } = await sb
+        .from("checkin_cycles")
+        .insert({ discord_id, year, month })
+        .select()
+        .single();
+      if (insertErr) throw new Error(insertErr.message);
+      cycle = newCycle;
     }
 
     if (cycle.completed_days.includes(day_number) || cycle.makeup_days.includes(day_number)) {

@@ -39,10 +39,42 @@ export const CHECKIN_MONTH_NAMES = [
 
 export const REWARD_TYPE_LABELS: Record<CheckinRewardType, string> = {
   points: 'แต้ม',
-  ticket_point: 'แต้มตั๋ว',
-  ticket_piece_point: 'แต้มชิ้นตั๋ว',
+  ticket_point: 'ตั๋วสุ่ม',
+  ticket_piece_point: 'เศษตั๋วสุ่ม',
   role: 'Role',
 };
+
+export function formatCheckinRewardGranted(type: CheckinRewardType, amount: number): string {
+  const n = amount.toLocaleString();
+  switch (type) {
+    case 'points':
+      return `+ ${n} แต้ม`;
+    case 'ticket_point':
+      return `+ ${n} ตั๋วสุ่ม`;
+    case 'ticket_piece_point':
+      return `+ ${n} เศษตั๋วสุ่ม`;
+    default:
+      return '';
+  }
+}
+
+export function formatCheckinMakeupCost(cost: number): string {
+  return `- ${cost.toLocaleString()} แต้ม`;
+}
+
+export function formatCheckinRewardBalance(type: CheckinRewardType, balance: number): string {
+  const n = balance.toLocaleString();
+  switch (type) {
+    case 'points':
+      return `${n} แต้ม`;
+    case 'ticket_point':
+      return `${n} ตั๋วสุ่ม`;
+    case 'ticket_piece_point':
+      return `${n} เศษตั๋วสุ่ม`;
+    default:
+      return '';
+  }
+}
 
 export const CHECKIN_TIMEZONE = 'Asia/Bangkok';
 
