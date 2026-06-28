@@ -25,6 +25,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'trading-history', label: 'ประวัติการซื้อขาย', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'role-transfer', label: 'ย้ายบทบาท', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'bulk-role-manage', label: 'จัดการยศกลุ่ม', group: 'moderation', groupLabel: 'การดูแล' },
+  { id: 'role-migration', label: 'ย้ายคลาสยศ (Bulk)', group: 'moderation', groupLabel: 'การดูแล', ownerOnly: true },
   { id: 'reports', label: 'รายงาน', group: 'moderation', groupLabel: 'การดูแล', ownerOnly: true },
   { id: 'categories', label: 'หมวดหมู่', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'banners', label: 'แบนเนอร์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
