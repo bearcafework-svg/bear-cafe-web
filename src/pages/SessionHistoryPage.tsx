@@ -72,10 +72,14 @@ export default function SessionHistoryPage() {
         .gte('created_at', sevenDaysAgo)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setSessions(data as Session[]);
+      try {
+        if (error) throw error;
+        setSessions((data as Session[]) || []);
+      } catch (err) {
+        console.error('Error fetching sessions:', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchSessions();

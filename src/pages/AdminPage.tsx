@@ -522,7 +522,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
       return;
     }
     const targetUser = users.find(u => u.id === userId);
-    const targetIsOwner = targetUser?.roles?.some(r => r.role === 'moderator');
+    const targetIsOwner = targetUser?.roles?.some(r => r.role === 'owner');
     if (targetIsOwner && !isOwner) {
       toast({ title: 'ไม่มีสิทธิ์', description: 'คุณไม่สามารถแบน Owner ได้', variant: 'destructive' });
       return;
