@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck,
+  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -47,6 +47,7 @@ import { NonTransferableRolesManagement } from '@/components/admin/NonTransferab
 import { RolesToDeleteManagement } from '@/components/admin/RolesToDeleteManagement';
 import { BulkRoleManagement } from '@/components/admin/BulkRoleManagement';
 import { CheckinRewardsManagement } from '@/components/admin/CheckinRewardsManagement';
+import { RoleMigrationManagement } from '@/components/admin/RoleMigrationManagement';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -95,6 +96,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'trading-history': ShoppingCart,
   'role-transfer': ArrowLeftRight,
   'bulk-role-manage': Users,
+  'role-migration': Layers,
   'reports': Flag,
   'categories': FolderOpen,
   'banners': ImageIcon,
@@ -263,6 +265,7 @@ export default function AdminPage() {
         case 'checkin-rewards': return canAccessPage('checkin-rewards') ? <CheckinRewardsManagement /> : null;
         case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
         case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
+        case 'role-migration': return canAccessPage('role-migration') ? <RoleMigrationManagement /> : null;
         case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
         case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
