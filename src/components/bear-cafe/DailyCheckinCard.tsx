@@ -41,8 +41,6 @@ import {
 } from '@/icon/outline';
 import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
-import { Button } from '../ui/button';
-
 type RoleMeta = { icon?: string; name?: string };
 
 function rewardToPopup(
@@ -370,7 +368,7 @@ export function DailyCheckInCard() {
       return;
     }
     setMakeupModal(null);
-    const rewardData = buildRewardModalData(result, selectedReward, roleMeta);
+    const rewardData = buildRewardModalData(result, rewardsByDay.get(dayNumber), roleMeta);
     setMakeupSuccessModal({ ...rewardData, makeupCost });
 
     if (result.big_reward_granted) {
@@ -388,7 +386,7 @@ export function DailyCheckInCard() {
       return;
     }
     if (selectedState === 'today') {
-      const result = await performCheckin(todayDay);
+      const result = await performCheckin(selectedDay);
       handleActionResult(result);
     }
   };
@@ -583,12 +581,12 @@ export function DailyCheckInCard() {
       {/* dev toggle makeup modal */}
       {/* <Button onClick={openMakeupConfirmModal}>Test Makeup Modal</Button> */}
 
-      {/* <CheckinMakeupConfirmModal
+      <CheckinMakeupConfirmModal
         data={makeupModal}
         confirming={acting}
         onConfirm={handleMakeupConfirm}
         onClose={closeMakeupModal}
-      /> */}
+      />
       <CheckinMakeupSuccessModal data={makeupSuccessModal} onClose={closeMakeupSuccessModal} />
       <CheckinRewardModal reward={rewardModal} onClose={closeRewardModal} />
     </>
