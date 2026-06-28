@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan, Coffee, Send, Layers,
+  Key, ArrowLeftRight, ShieldBan, Coffee, Send,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -46,7 +46,6 @@ import { RoleTransferManagement } from '@/components/admin/RoleTransferManagemen
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
 import { RolesToDeleteManagement } from '@/components/admin/RolesToDeleteManagement';
 import { BulkRoleManagement } from '@/components/admin/BulkRoleManagement';
-import { RoleMigrationManagement } from '@/components/admin/RoleMigrationManagement';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -95,7 +94,6 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'trading-history': ShoppingCart,
   'role-transfer': ArrowLeftRight,
   'bulk-role-manage': Users,
-  'role-migration': Layers,
   'reports': Flag,
   'categories': FolderOpen,
   'banners': ImageIcon,
@@ -261,7 +259,6 @@ export default function AdminPage() {
         case 'roles': return canAccessPage('roles') ? <DiscordRolesManagement /> : null;
         case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
         case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
-        case 'role-migration': return canAccessPage('role-migration') ? <RoleMigrationManagement /> : null;
         case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
         case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
@@ -290,7 +287,7 @@ export default function AdminPage() {
       setActiveTab(section);
       localStorage.setItem('admin_active_tab', section);
     }
-  }, [section]);
+  }, [section, activeTab]);
 
   if (!hasAdminAccess) return null;
 
@@ -517,7 +514,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
       return;
     }
     const targetUser = users.find(u => u.id === userId);
-    const targetIsOwner = targetUser?.roles?.some(r => r.role === 'moderator');
+    const targetIsOwner = targetUser?.roles?.some(r => r.role === 'owner');
     if (targetIsOwner && !isOwner) {
       toast({ title: 'ไม่มีสิทธิ์', description: 'คุณไม่สามารถแบน Owner ได้', variant: 'destructive' });
       return;

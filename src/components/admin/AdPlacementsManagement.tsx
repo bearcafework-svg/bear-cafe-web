@@ -164,18 +164,21 @@ function PlacementItemsPanel({ placement, onItemCountChange }: PlacementItemsPan
     const newIdx = dir === 'up' ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= items.length) return;
     const other = items[newIdx];
+    // swap the actual sort_order values between the two rows
+    const itemSortOrder = item.sort_order;
+    const otherSortOrder = other.sort_order;
     try {
       await Promise.all([
         (supabase as any).from('ad_placement_items')
-          .update({ sort_order: newIdx })
+          .update({ sort_order: otherSortOrder })
           .eq('placement_id', placement.id).eq('ad_id', item.ad_id),
         (supabase as any).from('ad_placement_items')
-          .update({ sort_order: idx })
+          .update({ sort_order: itemSortOrder })
           .eq('placement_id', placement.id).eq('ad_id', other.ad_id),
       ]);
       const updated = [...items];
-      updated[idx] = { ...other, sort_order: idx };
-      updated[newIdx] = { ...item, sort_order: newIdx };
+      updated[idx] = { ...other, sort_order: itemSortOrder };
+      updated[newIdx] = { ...item, sort_order: otherSortOrder };
       setItems(updated);
     } catch {
       toast({ title: 'เรียงลำดับไม่สำเร็จ', variant: 'destructive' });
@@ -206,11 +209,11 @@ function PlacementItemsPanel({ placement, onItemCountChange }: PlacementItemsPan
     if (selectedAdIds.size === 0) return;
     setAdding(true);
     try {
-      const baseOrder = items.length;
+      const maxOrder = items.reduce((max, i) => Math.max(max, i.sort_order), -1);
       const rows = Array.from(selectedAdIds).map((adId, i) => ({
         placement_id: placement.id,
         ad_id: adId,
-        sort_order: baseOrder + i,
+        sort_order: maxOrder + 1 + i,
       }));
       const { error } = await (supabase as any).from('ad_placement_items').insert(rows);
       if (error) throw error;

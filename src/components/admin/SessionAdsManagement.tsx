@@ -134,7 +134,8 @@ function CropModal({ file, onConfirm, onCancel }: CropModalProps) {
     // dim outside
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, 0, disp.w, disp.h);
-    ctx.clearRect(crop.x, crop.y, crop.w, crop.h);
+    // show original image inside crop area (not clearRect which makes it transparent/black)
+    ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, crop.x, crop.y, crop.w, crop.h);
     // border
     ctx.strokeStyle = '#f5c518';
     ctx.lineWidth = 2;

@@ -294,14 +294,12 @@ export function PermissionsManagement() {
         if (error) throw error;
         toast({ title: `เพิ่มสิทธิ์ให้ ${inserts.length} คนแล้ว` });
       } else {
-        for (const uid of bulkSelectedIds) {
-          const { error } = await supabase
-            .from('user_custom_permissions')
-            .delete()
-            .eq('user_id', uid)
-            .eq('permission_id', assignPermission.id);
-          if (error) throw error;
-        }
+        const { error } = await supabase
+          .from('user_custom_permissions')
+          .delete()
+          .in('user_id', [...bulkSelectedIds])
+          .eq('permission_id', assignPermission.id);
+        if (error) throw error;
         toast({ title: `ถอดสิทธิ์จาก ${bulkSelectedIds.size} คนแล้ว` });
       }
       setBulkSelectedIds(new Set());
