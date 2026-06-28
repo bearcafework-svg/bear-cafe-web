@@ -141,6 +141,7 @@ export function RoleMigrationManagement() {
   // dry-run state
   const [dryRunJobId, setDryRunJobId] = useState<string | null>(null);
   const [summary, setSummary] = useState<DryRunSummary | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ processed: number; total: number | null } | null>(null);
 
   // execute state
   const [execJobId, setExecJobId] = useState<string | null>(null);
@@ -159,38 +160,60 @@ export function RoleMigrationManagement() {
   // ── Build DryRunSummary from DB after dry_run job completes ─────
   const buildSummaryFromJob = useCallback(async (jobId: string): Promise<DryRunSummary | null> => {
     try {
-      // Fetch all log rows for this job
-      const { data: rows, error } = await supabase
+      // Count each status in parallel — avoids the 1,000-row default limit
+      const [
+        { count: totalCount },
+        { count: willAssignCount },
+        { count: anomalyCount },
+        { count: alreadyHasCount },
+        { count: noOldRoleCount },
+        { count: class1Count },
+        { count: class2Count },
+        { count: class3Count },
+      ] = await Promise.all([
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).in('result_status', ['will_assign', 'anomaly_multiple_old']),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('result_status', 'anomaly_multiple_old'),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('result_status', 'skipped_already_has'),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('result_status', 'skipped_no_old_role'),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('new_role_id', '1520600682179199116').in('result_status', ['will_assign', 'anomaly_multiple_old']),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('new_role_id', '1520598680690884644').in('result_status', ['will_assign', 'anomaly_multiple_old']),
+        supabase.from('role_migration_log').select('*', { count: 'exact', head: true }).eq('job_id', jobId).eq('new_role_id', '1520607360836435988').in('result_status', ['will_assign', 'anomaly_multiple_old']),
+      ]);
+
+      // Fetch anomaly detail rows (typically small set)
+      const { data: anomalyRows } = await supabase
         .from('role_migration_log')
-        .select('discord_user_id, username, old_role_ids, resolved_old_role_id, new_role_id, result_status')
-        .eq('job_id', jobId);
+        .select('discord_user_id, username, old_role_ids, resolved_old_role_id, new_role_id')
+        .eq('job_id', jobId)
+        .eq('result_status', 'anomaly_multiple_old')
+        .limit(200);
 
-      if (error || !rows) return null;
-
-      const toAssign = rows.filter(
-        (r) => r.result_status === 'will_assign' || r.result_status === 'anomaly_multiple_old',
-      );
-      const anomalies = rows.filter((r) => r.result_status === 'anomaly_multiple_old');
-      const alreadyHas = rows.filter((r) => r.result_status === 'skipped_already_has');
-      const noOldRole = rows.filter((r) => r.result_status === 'skipped_no_old_role');
+      // Fetch already-has rows for display (cap at 500)
+      const { data: alreadyHasRows } = await supabase
+        .from('role_migration_log')
+        .select('discord_user_id, username, new_role_id')
+        .eq('job_id', jobId)
+        .eq('result_status', 'skipped_already_has')
+        .limit(500);
 
       return {
-        total_members: rows.length,
-        to_assign: toAssign.length,
-        class1_count: toAssign.filter((r) => r.new_role_id === '1520600682179199116').length,
-        class2_count: toAssign.filter((r) => r.new_role_id === '1520598680690884644').length,
-        class3_count: toAssign.filter((r) => r.new_role_id === '1520607360836435988').length,
-        anomaly_count: anomalies.length,
-        already_has_count: alreadyHas.length,
-        no_old_role_count: noOldRole.length,
-        anomaly_members: anomalies.map((r) => ({
+        total_members: totalCount ?? 0,
+        to_assign: willAssignCount ?? 0,
+        class1_count: class1Count ?? 0,
+        class2_count: class2Count ?? 0,
+        class3_count: class3Count ?? 0,
+        anomaly_count: anomalyCount ?? 0,
+        already_has_count: alreadyHasCount ?? 0,
+        no_old_role_count: noOldRoleCount ?? 0,
+        anomaly_members: (anomalyRows ?? []).map((r) => ({
           discord_user_id: r.discord_user_id,
           username: r.username ?? 'Unknown',
           old_role_ids: (r.old_role_ids as string[]) ?? [],
           resolved_old_role_id: r.resolved_old_role_id ?? null,
           new_role_id: r.new_role_id ?? null,
         })),
-        already_has_members: alreadyHas.map((r) => ({
+        already_has_members: (alreadyHasRows ?? []).map((r) => ({
           discord_user_id: r.discord_user_id,
           username: r.username ?? 'Unknown',
           new_role_id: r.new_role_id ?? '',
@@ -254,6 +277,7 @@ export function RoleMigrationManagement() {
       startPolling(
         job_id,
         async (job) => {
+          setScanProgress(null);
           if (job.status === 'failed') {
             toast({ title: 'ตรวจสอบล้มเหลว', description: 'Job failed', variant: 'destructive' });
             setStep('idle');
@@ -268,6 +292,7 @@ export function RoleMigrationManagement() {
           setSummary(s);
           setStep('preview');
         },
+        (job) => setScanProgress({ processed: job.processed, total: job.total_members ?? null }),
       );
     } catch (e: any) {
       toast({ title: 'ตรวจสอบล้มเหลว', description: e.message, variant: 'destructive' });
@@ -419,11 +444,29 @@ export function RoleMigrationManagement() {
         <Card>
           <CardContent className="pt-6 flex flex-col items-center gap-4 text-center">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <div>
+            <div className="w-full max-w-sm space-y-2">
               <p className="font-semibold">กำลังตรวจสอบสมาชิกทั้งหมด…</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                กำลัง fetch สมาชิกจาก Discord และวิเคราะห์ role อาจใช้เวลา 1–2 นาที
-              </p>
+              {scanProgress ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    ประมวลผลแล้ว{' '}
+                    <span className="font-semibold text-foreground">
+                      {scanProgress.processed.toLocaleString()}
+                    </span>
+                    {scanProgress.total ? ` / ${scanProgress.total.toLocaleString()}` : ''} คน
+                  </p>
+                  {scanProgress.total && (
+                    <Progress
+                      value={Math.round((scanProgress.processed / scanProgress.total) * 100)}
+                      className="h-2 rounded-full"
+                    />
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  กำลัง fetch สมาชิกจาก Discord และวิเคราะห์ role อาจใช้เวลา 1–2 นาที
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
