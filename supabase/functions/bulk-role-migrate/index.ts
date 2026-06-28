@@ -178,6 +178,7 @@ Deno.serve(async (req): Promise<Response> => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
           "x-worker-secret": Deno.env.get("WORKER_SECRET")!,
         },
         body: JSON.stringify({
@@ -223,6 +224,7 @@ Deno.serve(async (req): Promise<Response> => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
           "x-worker-secret": Deno.env.get("WORKER_SECRET")!,
         },
         body: JSON.stringify({
