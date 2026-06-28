@@ -49,7 +49,11 @@ const POLL_INTERVAL_MS = 2500;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 'idle' | 'scanning' | 'preview' | 'confirming' | 'running' | 'done';
+// scanning = waiting for dry_run job to complete (polling)
+// preview  = dry_run done, summary ready
+// running  = execute job in progress (polling)
+// done     = execute job finished
+type Step = 'idle' | 'scanning' | 'preview' | 'running' | 'done';
 
 interface DryRunSummary {
   total_members: number;
@@ -152,8 +156,58 @@ export function RoleMigrationManagement() {
   // ── Cleanup poll on unmount ─────────────────────────────────────
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-  // ── Poll job progress ───────────────────────────────────────────
-  const startPolling = useCallback((jobId: string) => {
+  // ── Build DryRunSummary from DB after dry_run job completes ─────
+  const buildSummaryFromJob = useCallback(async (jobId: string): Promise<DryRunSummary | null> => {
+    try {
+      // Fetch all log rows for this job
+      const { data: rows, error } = await supabase
+        .from('role_migration_log')
+        .select('discord_user_id, username, old_role_ids, resolved_old_role_id, new_role_id, result_status')
+        .eq('job_id', jobId);
+
+      if (error || !rows) return null;
+
+      const toAssign = rows.filter(
+        (r) => r.result_status === 'will_assign' || r.result_status === 'anomaly_multiple_old',
+      );
+      const anomalies = rows.filter((r) => r.result_status === 'anomaly_multiple_old');
+      const alreadyHas = rows.filter((r) => r.result_status === 'skipped_already_has');
+      const noOldRole = rows.filter((r) => r.result_status === 'skipped_no_old_role');
+
+      return {
+        total_members: rows.length,
+        to_assign: toAssign.length,
+        class1_count: toAssign.filter((r) => r.new_role_id === '1520600682179199116').length,
+        class2_count: toAssign.filter((r) => r.new_role_id === '1520598680690884644').length,
+        class3_count: toAssign.filter((r) => r.new_role_id === '1520607360836435988').length,
+        anomaly_count: anomalies.length,
+        already_has_count: alreadyHas.length,
+        no_old_role_count: noOldRole.length,
+        anomaly_members: anomalies.map((r) => ({
+          discord_user_id: r.discord_user_id,
+          username: r.username ?? 'Unknown',
+          old_role_ids: (r.old_role_ids as string[]) ?? [],
+          resolved_old_role_id: r.resolved_old_role_id ?? null,
+          new_role_id: r.new_role_id ?? null,
+        })),
+        already_has_members: alreadyHas.map((r) => ({
+          discord_user_id: r.discord_user_id,
+          username: r.username ?? 'Unknown',
+          new_role_id: r.new_role_id ?? '',
+        })),
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // ── Generic poll helper ─────────────────────────────────────────
+  // onDone is called with the final JobState when status = completed/failed
+  const startPolling = useCallback((
+    jobId: string,
+    onDone: (job: JobState) => void,
+    onTick?: (job: JobState) => void,
+  ) => {
     if (pollRef.current) clearInterval(pollRef.current);
 
     const poll = async () => {
@@ -162,20 +216,13 @@ export function RoleMigrationManagement() {
           body: { action: 'progress', job_id: jobId },
         });
         if (res.error) throw new Error(res.error.message);
-        const { job } = res.data as { job: JobState; error_count: number };
-        setJobState(job);
+        const { job } = res.data as { job: JobState };
+        onTick?.(job);
 
         if (job.status === 'completed' || job.status === 'failed') {
           clearInterval(pollRef.current!);
           pollRef.current = null;
-          setStep('done');
-          // Fetch error members
-          if (job.error_count > 0) {
-            const errRes = await supabase.functions.invoke('bulk-role-migrate', {
-              body: { action: 'get_error_members', job_id: jobId },
-            });
-            if (!errRes.error) setErrorMembers(errRes.data?.members ?? []);
-          }
+          onDone(job);
         }
       } catch (e) {
         console.error('Polling error', e);
@@ -200,10 +247,28 @@ export function RoleMigrationManagement() {
         body: { action: 'dry_run' },
       });
       if (res.error) throw new Error(res.error.message);
-      const { job_id, summary: s } = res.data as { job_id: string; summary: DryRunSummary };
+      const { job_id } = res.data as { job_id: string };
       setDryRunJobId(job_id);
-      setSummary(s);
-      setStep('preview');
+
+      // Poll until dry_run background job completes, then build summary from DB
+      startPolling(
+        job_id,
+        async (job) => {
+          if (job.status === 'failed') {
+            toast({ title: 'ตรวจสอบล้มเหลว', description: 'Job failed', variant: 'destructive' });
+            setStep('idle');
+            return;
+          }
+          const s = await buildSummaryFromJob(job_id);
+          if (!s) {
+            toast({ title: 'ตรวจสอบล้มเหลว', description: 'ไม่สามารถโหลดผลลัพธ์ได้', variant: 'destructive' });
+            setStep('idle');
+            return;
+          }
+          setSummary(s);
+          setStep('preview');
+        },
+      );
     } catch (e: any) {
       toast({ title: 'ตรวจสอบล้มเหลว', description: e.message, variant: 'destructive' });
       setStep('idle');
@@ -229,7 +294,21 @@ export function RoleMigrationManagement() {
       if (res.error) throw new Error(res.error.message);
       const { job_id } = res.data as { job_id: string };
       setExecJobId(job_id);
-      startPolling(job_id);
+
+      startPolling(
+        job_id,
+        async (job) => {
+          setJobState(job);
+          setStep('done');
+          if (job.error_count > 0) {
+            const errRes = await supabase.functions.invoke('bulk-role-migrate', {
+              body: { action: 'get_error_members', job_id },
+            });
+            if (!errRes.error) setErrorMembers(errRes.data?.members ?? []);
+          }
+        },
+        (job) => setJobState(job),
+      );
     } catch (e: any) {
       toast({ title: 'เริ่มงานล้มเหลว', description: e.message, variant: 'destructive' });
       setStep('preview');
@@ -341,8 +420,10 @@ export function RoleMigrationManagement() {
           <CardContent className="pt-6 flex flex-col items-center gap-4 text-center">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <div>
-              <p className="font-semibold">กำลัง fetch สมาชิกทั้งหมด…</p>
-              <p className="text-sm text-muted-foreground mt-1">อาจใช้เวลาสักครู่ขึ้นอยู่กับจำนวนสมาชิก</p>
+              <p className="font-semibold">กำลังตรวจสอบสมาชิกทั้งหมด…</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                กำลัง fetch สมาชิกจาก Discord และวิเคราะห์ role อาจใช้เวลา 1–2 นาที
+              </p>
             </div>
           </CardContent>
         </Card>
