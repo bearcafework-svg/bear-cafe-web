@@ -23,7 +23,6 @@ import DiscordServersPage from "./pages/DiscordServersPage";
 import HealingMessagePage from "./pages/HealingMessagePage";
 import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
-import BearBobaMergePage from "./pages/BearBobaMergePage";
 import SpinPrizePage from "./pages/SpinPrizePage";
 import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 import InventoryPage from "./pages/InventoryPage";

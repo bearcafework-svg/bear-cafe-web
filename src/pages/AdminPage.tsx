@@ -97,7 +97,6 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'trading-history': ShoppingCart,
   'role-transfer': ArrowLeftRight,
   'bulk-role-manage': Users,
-  'role-migration': Layers,
   'reports': Flag,
   'categories': FolderOpen,
   'banners': ImageIcon,
@@ -267,7 +266,6 @@ export default function AdminPage() {
         case 'checkin-rewards': return canAccessPage('checkin-rewards') ? <CheckinRewardsManagement /> : null;
         case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
         case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
-        case 'role-migration': return canAccessPage('role-migration') ? <RoleMigrationManagement /> : null;
         case 'reports': return canAccessPage('reports') ? <ReportsManagement /> : null;
         case 'redeem-codes': return canAccessPage('redeem-codes') ? <RedeemCodesManagement /> : null;
         case 'non-transferable-roles': return canAccessPage('non-transferable-roles') ? <NonTransferableRolesManagement /> : null;
