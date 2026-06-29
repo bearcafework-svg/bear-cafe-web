@@ -839,7 +839,7 @@ export function ProductCatalogManagement() {
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 border rounded-md">
+            <div className="flex-1 overflow-y-auto min-h-[300px] border rounded-md">
               <div className="p-4 space-y-2">
                 {filteredDiscordRoles.length === 0 ? (
                   <div className="text-center text-sm text-muted-foreground py-8">
@@ -890,7 +890,7 @@ export function ProductCatalogManagement() {
                   ))
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           <DialogFooter className="mt-2">
