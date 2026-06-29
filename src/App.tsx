@@ -79,8 +79,6 @@ function AppRoutes() {
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
-      <Route path="/bear-boba-merge" element={<BearBobaMergePage />} />
-      <Route path="/games/bear-boba" element={<BearBobaMergePage />} />
       <Route path="/gacha" element={<GachaPage />} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
