@@ -16,7 +16,23 @@ async function fetchPublicDailyRewards(): Promise<CheckinDailyReward[]> {
   return (data ?? []) as CheckinDailyReward[];
 }
 
-function publicCheckinStatus(daily_rewards: CheckinDailyReward[]): CheckinStatus {
+async function fetchPublicBigReward(): Promise<CheckinStatus['big_reward']> {
+  const { year, month } = getCheckinToday();
+  const { data, error } = await supabase
+    .from('checkin_big_reward' as never)
+    .select('reward_type, reward_amount, role_id, description')
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data ?? null) as CheckinStatus['big_reward'];
+}
+
+function publicCheckinStatus(
+  daily_rewards: CheckinDailyReward[],
+  big_reward: CheckinStatus['big_reward'],
+): CheckinStatus {
   const { year, month, day: currentDay } = getCheckinToday();
   return {
     cycle: {
@@ -27,7 +43,7 @@ function publicCheckinStatus(daily_rewards: CheckinDailyReward[]): CheckinStatus
       big_reward_claimed: false,
     },
     daily_rewards,
-    big_reward: null,
+    big_reward,
     makeup_window_open: currentDay > 28,
   };
 }
@@ -50,8 +66,11 @@ export function useCheckin(discordId: string | undefined) {
   const refresh = useCallback(async () => {
     if (!discordId) {
       try {
-        const daily_rewards = await fetchPublicDailyRewards();
-        setStatus(publicCheckinStatus(daily_rewards));
+        const [daily_rewards, big_reward] = await Promise.all([
+          fetchPublicDailyRewards(),
+          fetchPublicBigReward(),
+        ]);
+        setStatus(publicCheckinStatus(daily_rewards, big_reward));
       } catch (err) {
         console.error('Failed to fetch check-in rewards:', err);
         setStatus(null);

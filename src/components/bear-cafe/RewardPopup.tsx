@@ -6,6 +6,7 @@ import { CozyModalShell, COZY_MODAL_BUTTON } from '@/components/bear-cafe/CozyMo
 import { StrawberryColorIcon } from '@/icon/outline';
 import { useUserBalances } from '@/hooks/useUserBalances';
 import { getRedeemErrorInfo, isRedeemErrorMessage } from '@/lib/redeem';
+import { formatNumber } from '@/lib/utils';
 import {
   AlertTriangle,
   Ban,
@@ -114,7 +115,7 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
         <div className="flex w-full items-center justify-center gap-3 px-3 py-2">
           <StrawberryColorIcon size={{ mobile: 48, desktop: 64 }} />
           <p className="bear-h1-medium text-[#D7A042] dark:text-[hsl(var(--honey))]">
-            + {reward.pointsAdded.toLocaleString()} สตรอว์เบอร์รี่
+            + {formatNumber(reward.pointsAdded)} สตรอว์เบอร์รี่
           </p>
         </div>
       )}
@@ -139,7 +140,7 @@ export function RewardPopup({ open, onOpenChange, reward }: RewardPopupProps) {
             ยอดสะสมปัจจุบัน
           </p>
           <p className="bear-body-small-medium text-[hsl(var(--mocha))] md:bear-body-regular-medium dark:text-[#E9E6E2]">
-            {loading ? '...' : `${points.toLocaleString()} สตรอว์เบอร์รี่`}
+            {loading ? '...' : `${formatNumber(points)} สตรอว์เบอร์รี่`}
           </p>
         </div>
       )}

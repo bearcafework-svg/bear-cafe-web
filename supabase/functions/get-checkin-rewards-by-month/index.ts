@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrSeedBigReward } from "../_shared/checkin-big-reward.ts";
+import { toErrorMessage } from "../_shared/error-message.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,13 +49,7 @@ Deno.serve(async (req): Promise<Response> => {
 
     if (dailyError) throw dailyError;
 
-    // Fetch big reward (global, not per-month)
-    const { data: bigReward, error: bigError } = await sb
-      .from("checkin_big_reward")
-      .select("*")
-      .maybeSingle();
-
-    if (bigError) throw bigError;
+    const bigReward = await getOrSeedBigReward(sb, year, month);
 
     // If no rewards exist for this month, auto-seed with defaults
     if (!dailyRewards || dailyRewards.length === 0) {
@@ -87,7 +83,7 @@ Deno.serve(async (req): Promise<Response> => {
       big_reward: bigReward,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "internal_error";
-    return json({ ok: false, error: message }, 500);
+    console.error("get-checkin-rewards-by-month error:", err);
+    return json({ ok: false, error: toErrorMessage(err) }, 500);
   }
 });

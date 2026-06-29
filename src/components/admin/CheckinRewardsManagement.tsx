@@ -13,7 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarCheck, Gift, Coins, Edit, Save, X, ChevronLeft, ChevronRight, Calendar, Sparkles, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 
 interface DailyReward {
   id: string;
@@ -190,6 +190,8 @@ export function CheckinRewardsManagement() {
     try {
       const { error } = await supabase.functions.invoke('update-checkin-big-reward', {
         body: {
+          year: selectedYear,
+          month: selectedMonth,
           reward_type: bigRewardForm.reward_type,
           reward_amount: bigRewardForm.reward_type !== 'role' ? bigRewardForm.reward_amount : null,
           role_id: bigRewardForm.reward_type === 'role' ? bigRewardForm.role_id : null,
@@ -199,7 +201,10 @@ export function CheckinRewardsManagement() {
 
       if (error) throw error;
 
-      toast({ title: 'บันทึกสำเร็จ', description: 'อัปเดตรางวัลใหญ่แล้ว' });
+      toast({
+        title: 'บันทึกสำเร็จ',
+        description: `อัปเดตรางวัลใหญ่ (${MONTH_NAMES[selectedMonth - 1]} ${selectedYear + 543}) แล้ว`,
+      });
       setEditingBigReward(false);
       fetchRewards();
     } catch (error) {
@@ -323,10 +328,12 @@ export function CheckinRewardsManagement() {
             </div>
             <div>
               <CardTitle className="text-base font-semibold">รางวัลใหญ่ (28 วัน)</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">รางวัลเมื่อเช็คอินครบทั้งเดือน</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                รางวัลเมื่อเช็คอินครบทั้งเดือน — {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
+              </p>
             </div>
           </div>
-          <Button size="sm" onClick={openEditBigRewardDialog}>
+          <Button size="sm" onClick={openEditBigRewardDialog} disabled={isPastMonth}>
             <Edit className="w-4 h-4 mr-1" />
             แก้ไข
           </Button>
@@ -347,7 +354,7 @@ export function CheckinRewardsManagement() {
                 <p className="text-lg font-bold mt-1">
                   {bigReward.reward_type === 'role'
                     ? bigReward.role_id || '-'
-                    : `${bigReward.reward_amount || 0} ${REWARD_TYPE_LABELS[bigReward.reward_type]}`}
+                    : `${formatNumber(bigReward.reward_amount || 0)} ${REWARD_TYPE_LABELS[bigReward.reward_type]}`}
                 </p>
               </div>
               <div>
@@ -425,11 +432,11 @@ export function CheckinRewardsManagement() {
                         <div className="text-xs font-bold">
                           {reward.reward_type === 'role'
                             ? 'Role'
-                            : reward.reward_amount}
+                            : formatNumber(reward.reward_amount ?? 0)}
                         </div>
                         <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                           <Coins className="w-2.5 h-2.5" />
-                          {reward.makeup_cost}
+                          {formatNumber(reward.makeup_cost)}
                         </div>
                       </>
                     )}

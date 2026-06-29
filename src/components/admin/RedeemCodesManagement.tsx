@@ -28,7 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { formatThaiDate } from '@/lib/thai-date';
@@ -604,7 +604,7 @@ function UserPointsTab() {
       if (error) throw error;
       if (!data) throw new Error('ไม่พบข้อมูล');
 
-      toast({ title: 'อัปเดตแต้มเรียบร้อย', description: `${editUser.discord_id}: ${editUser.points} → ${newPoints}` });
+      toast({ title: 'อัปเดตแต้มเรียบร้อย', description: `${editUser.discord_id}: ${formatNumber(editUser.points)} → ${formatNumber(newPoints)}` });
       setEditUser(null);
       await fetchUsers();
     } catch (e: any) {
@@ -764,9 +764,9 @@ function getStatusBadgeStyles(s: StatusFilter) {
 }
 
 function renderReward(c: RedeemCode) {
-  if (c.reward_type === 'both') return `+${c.points ?? 0} แต้ม + ยศ`;
+  if (c.reward_type === 'both') return `+${formatNumber(c.points ?? 0)} แต้ม + ยศ`;
   if (c.reward_type === 'role') return `ยศ: ${c.role_id ?? '-'}`;
-  return `+${c.points ?? 0} แต้ม`;
+  return `+${formatNumber(c.points ?? 0)} แต้ม`;
 }
 
 function renderDateRange(c: RedeemCode) {

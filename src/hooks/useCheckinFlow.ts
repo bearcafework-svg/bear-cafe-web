@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import { useInvalidateUserBalances } from '@/hooks/useUserBalances';
 
 interface UseCheckinFlowOptions {
-  /** Include big_reward role in meta prefetch (full calendar view). */
+  /** Include big_reward role in meta prefetch. Defaults to true. */
   includeBigRewardRole?: boolean;
 }
 
@@ -29,7 +29,7 @@ export function useCheckinFlow(
   discordId: string | null | undefined,
   options: UseCheckinFlowOptions = {},
 ) {
-  const { includeBigRewardRole = false } = options;
+  const { includeBigRewardRole = true } = options;
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { status, loading, acting, performCheckin, performMakeupCheckin } = useCheckin(discordId);
@@ -187,6 +187,8 @@ export function useCheckinFlow(
     todayDay,
     completedDays,
     rewardsByDay,
+    bigReward: status?.big_reward ?? null,
+    bigRewardClaimed: status?.cycle.big_reward_claimed ?? false,
     roleMeta,
     rewardModal,
     makeupModal,

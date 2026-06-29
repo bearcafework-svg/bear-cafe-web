@@ -7,6 +7,7 @@ import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
 import { CheckinSelectedDayReward } from '@/components/bear-cafe/CheckinSelectedDayReward';
+import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
 import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
 import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
@@ -22,7 +23,7 @@ import {
   getCheckinToday,
 } from '@/lib/checkin';
 import { ChevronLeft, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import { CaffeLatteIcon } from '@/icon/outline';
 import { BrokenHeartIcon, Calendar2Icon, FireIcon } from '@/icon/inline';
 
@@ -51,7 +52,9 @@ export default function FullCheckInCalendar() {
     closeMakeupSuccessModal,
     handleClaimSelected,
     handleMakeupConfirm,
-  } = useCheckinFlow(user?.discord_id, { includeBigRewardRole: true });
+    bigReward,
+    bigRewardClaimed,
+  } = useCheckinFlow(user?.discord_id);
 
   const defaultSelectedDay = Math.min(todayDay, 28);
   const [overrideDay, setOverrideDay] = useState<number | null>(null);
@@ -171,7 +174,7 @@ export default function FullCheckInCalendar() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 min-w-0">
             <div className="bg-[#FDFAF7] dark:bg-[#101010] border-2 border-[#F4EEE5] dark:border-[#101010] rounded-lg p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col gap-3 sm:gap-4 min-w-0">
               <div className="min-w-0">
                 <h2 className="bear-h3-bold md:bear-h2-bold text-[#89654A] dark:text-[#E9E6E2]">
@@ -203,7 +206,7 @@ export default function FullCheckInCalendar() {
               </div>
 
               <p className="bear-body-small-regular-medium sm:bear-body-regular-medium text-[#89654A] dark:text-[#E9E6E2] text-center">
-                ยอดสะสมปัจจุบัน {points.toLocaleString()} แต้ม
+                ยอดสะสมปัจจุบัน {formatNumber(points)} แต้ม
               </p>
 
               {!isAuthenticated ? (
@@ -231,6 +234,16 @@ export default function FullCheckInCalendar() {
                   )}
                 </button>
               )}
+            </div>
+
+            <div className="bg-[#FDFAF7] dark:bg-[#101010] border-2 border-[#F4EEE5] dark:border-[#101010] rounded-lg p-3 sm:p-4 md:p-6 lg:p-8 min-w-0 sm:col-span-2 lg:col-span-1">
+              <CheckinBigRewardPreview
+                bigReward={bigReward}
+                completedDays={totalCheckins}
+                claimed={bigRewardClaimed}
+                roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
+                roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
+              />
             </div>
 
             {/* Monthly streak / total / missed stats */}

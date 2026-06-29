@@ -55,6 +55,8 @@ Deno.serve(async (req): Promise<Response> => {
     const { data: bigReward } = await sb
       .from("checkin_big_reward")
       .select("reward_type, reward_amount, role_id, description")
+      .eq("year", year)
+      .eq("month", month)
       .maybeSingle();
 
     const makeupWindowOpen = currentDay > 28;

@@ -10,7 +10,7 @@ import {
   TicketColorIcon,
   TearTicketColorIcon,
 } from '@/icon/outline';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 
 const NOTION_RULES_URL =
   'https://www.notion.so/2f4fa9ff914e80b29e13e5225887e07d';
@@ -134,9 +134,9 @@ function SidebarBalances() {
           </span>
         </div>
         <p className="text-base font-bold text-foreground tabular-nums">
-          {loading ? '—' : points.toLocaleString()}
+          {loading ? '—' : formatNumber(points)}
           <span className="text-xs font-normal text-muted-foreground">
-            {' '}/ {loading ? '—' : maxCap.toLocaleString()}
+            {' '}/ {loading ? '—' : formatNumber(maxCap)}
           </span>
         </p>
         <div className="mt-2.5 h-1.5 rounded-full bg-[hsl(var(--latte)/0.5)] dark:bg-[hsl(var(--coffee)/0.4)] overflow-hidden">
@@ -154,7 +154,7 @@ function SidebarBalances() {
             <span className="text-sm font-medium text-foreground">เศษตั๋ว</span>
           </div>
           <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
-            {loading ? '—' : ticketPiecePoint.toLocaleString()}
+            {loading ? '—' : formatNumber(ticketPiecePoint)}
           </span>
         </div>
         <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-2.5 shadow-sm">
@@ -163,7 +163,7 @@ function SidebarBalances() {
             <span className="text-sm font-medium text-foreground">ตั๋ว</span>
           </div>
           <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
-            {loading ? '—' : ticketPoint.toLocaleString()}
+            {loading ? '—' : formatNumber(ticketPoint)}
           </span>
         </div>
       </div>

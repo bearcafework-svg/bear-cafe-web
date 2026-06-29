@@ -1,5 +1,6 @@
 import type { CheckinActionResult } from '@/hooks/useCheckin';
 import { REWARD_TYPE_LABELS, type CheckinDailyReward } from '@/lib/checkin';
+import { formatNumber } from '@/lib/utils';
 import type { CheckinRewardModalData } from '@/components/bear-cafe/CheckinRewardModal';
 import type { CheckinMakeupConfirmModalData } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 
@@ -52,7 +53,7 @@ function rewardToPopup(
   return {
     type: rewardType,
     pointsAdded: amount,
-    message: `ได้รับ ${amount} ${label}`,
+    message: `ได้รับ ${formatNumber(amount)} ${label}`,
   };
 }
 
@@ -70,7 +71,7 @@ function dailyRewardToModal(reward: CheckinDailyReward): CheckinRewardModalData 
   return {
     type: reward.reward_type,
     pointsAdded: amount,
-    message: `ได้รับ ${amount} ${label}`,
+    message: `ได้รับ ${formatNumber(amount)} ${label}`,
   };
 }
 

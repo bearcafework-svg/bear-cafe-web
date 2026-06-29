@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { StrawberryColorIcon } from '@/icon/outline';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 
 interface StrawberryJarProps {
   points: number;
@@ -69,10 +69,10 @@ export function StrawberryJar({
               isNegative ? 'text-destructive' : 'text-foreground',
             )}
           >
-            {isLoading ? '—' : points.toLocaleString()}
+            {isLoading ? '—' : formatNumber(points)}
           </span>
           <span className="mb-1 text-sm text-muted-foreground tabular-nums">
-            / {isLoading ? '—' : maxPoints.toLocaleString()}
+            / {isLoading ? '—' : formatNumber(maxPoints)}
           </span>
         </div>
 
@@ -97,7 +97,7 @@ export function StrawberryJar({
               ? 'แต้มติดลบ — รีบเติมสตรอว์เบอร์รี่นะ'
               : percent >= 100
                 ? 'ขวดเต็มแล้ว! เก่งมาก'
-                : `สะสมอีก ${(maxPoints - points).toLocaleString()} แต้มจะเต็มขวด`}
+                : `สะสมอีก ${formatNumber(maxPoints - points)} แต้มจะเต็มขวด`}
         </p>
       </div>
     </div>

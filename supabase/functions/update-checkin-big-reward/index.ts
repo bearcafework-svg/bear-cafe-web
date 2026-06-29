@@ -18,8 +18,14 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const { reward_type, reward_amount, role_id, description } = await req.json();
+    const { year, month, reward_type, reward_amount, role_id, description } = await req.json();
 
+    if (year == null || month == null) {
+      return json({ ok: false, error: "missing_year_month" }, 400);
+    }
+    if (month < 1 || month > 12) {
+      return json({ ok: false, error: "invalid_month" }, 400);
+    }
     if (!reward_type) {
       return json({ ok: false, error: "missing_reward_type" }, 400);
     }
@@ -72,6 +78,8 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const payload: Record<string, unknown> = {
+      year,
+      month,
       reward_type,
       reward_amount: reward_type !== "role" ? reward_amount : null,
       role_id: reward_type === "role" ? role_id : null,
@@ -80,28 +88,11 @@ Deno.serve(async (req): Promise<Response> => {
       updated_by: discordId,
     };
 
-    // checkin_big_reward is a single-row table — upsert by checking existence first
-    const { data: existing } = await sb
+    const { data, error } = await sb
       .from("checkin_big_reward")
-      .select("id")
-      .maybeSingle();
-
-    let data, error;
-
-    if (existing) {
-      ({ data, error } = await sb
-        .from("checkin_big_reward")
-        .update(payload)
-        .eq("id", existing.id)
-        .select()
-        .single());
-    } else {
-      ({ data, error } = await sb
-        .from("checkin_big_reward")
-        .insert(payload)
-        .select()
-        .single());
-    }
+      .upsert(payload, { onConflict: "year,month" })
+      .select()
+      .single();
 
     if (error) throw new Error(error.message);
 

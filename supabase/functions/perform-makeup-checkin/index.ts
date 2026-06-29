@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { discordFetch } from "../_shared/discord-fetch.ts";
 import { ensureUserPoints } from "../_shared/ensure-user-points.ts";
 import { getCheckinToday } from "../_shared/checkin-date.ts";
+import { grantBigReward } from "../_shared/checkin-big-reward.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,70 +216,3 @@ Deno.serve(async (req): Promise<Response> => {
     return json({ ok: false, error: message }, 500);
   }
 });
-
-async function grantBigReward(
-  // deno-lint-ignore no-explicit-any
-  sb: any,
-  discord_id: string,
-  authHeader: string,
-  cycleId: string,
-  year: number,
-  month: number,
-): Promise<boolean> {
-  const { data: bigReward } = await sb
-    .from("checkin_big_reward")
-    .select("*")
-    .maybeSingle();
-
-  if (!bigReward) return false;
-
-  const rewardSnapshot: Record<string, unknown> = { reward_type: bigReward.reward_type };
-
-  try {
-    if (bigReward.reward_type in POINT_COLUMN) {
-      const col = POINT_COLUMN[bigReward.reward_type];
-      const amount: number = bigReward.reward_amount ?? 0;
-      rewardSnapshot.reward_amount = amount;
-
-      const { data: up } = await sb
-        .from("user_points")
-        .select(col)
-        .eq("discord_id", discord_id)
-        .maybeSingle();
-
-      const current = (up as unknown as Record<string, number>)?.[col] ?? 0;
-      await sb
-        .from("user_points")
-        .update({ [col]: current + amount })
-        .eq("discord_id", discord_id);
-    } else if (bigReward.reward_type === "role" && bigReward.role_id) {
-      rewardSnapshot.role_id = bigReward.role_id;
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      await discordFetch(`${supabaseUrl}/functions/v1/grant-discord-role`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": authHeader },
-        body: JSON.stringify({ discordUserId: discord_id, discordRoleId: bigReward.role_id }),
-      });
-    }
-
-    await sb
-      .from("checkin_cycles")
-      .update({ big_reward_claimed: true })
-      .eq("id", cycleId);
-
-    await sb.from("checkin_logs").insert({
-      discord_id,
-      year,
-      month,
-      day_number: 28,
-      action: "big_reward",
-      reward_type: bigReward.reward_type,
-      reward_value: rewardSnapshot,
-    });
-
-    return true;
-  } catch (err) {
-    console.error("grantBigReward error:", err);
-    return false;
-  }
-}

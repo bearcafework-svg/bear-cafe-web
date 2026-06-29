@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import { StrawberryColorIcon, TearTicketColorIcon, TicketColorIcon } from '@/icon/outline';
 import {
   formatCheckinMakeupCost,
@@ -194,7 +194,7 @@ export function CheckinMakeupConfirmModal({
             {confirming ? (
               <Loader2 className="mx-auto h-4 w-4 animate-spin" />
             ) : (
-              `ยืนยันใช้ ${data.makeupCost.toLocaleString()} แต้มรับย้อนหลัง`
+              `ยืนยันใช้ ${formatNumber(data.makeupCost)} แต้มรับย้อนหลัง`
             )}
           </button>
           <button

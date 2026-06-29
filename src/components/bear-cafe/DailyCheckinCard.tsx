@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useCheckinFlow } from '@/hooks/useCheckinFlow';
 import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
+import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
 import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
 import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
@@ -43,6 +44,8 @@ export function DailyCheckInCard() {
     closeMakeupSuccessModal,
     handleClaimSelected,
     handleMakeupConfirm,
+    bigReward,
+    bigRewardClaimed,
   } = useCheckinFlow(user?.discord_id);
 
   const [selectedDay, setSelectedDay] = useState(() => Math.min(getCheckinToday().day, 28));
@@ -209,6 +212,16 @@ export function DailyCheckInCard() {
             ช่วงเติมเช็คอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
           </p>
         )}
+
+        <CheckinBigRewardPreview
+          className="mb-3"
+          compact
+          bigReward={bigReward}
+          completedDays={completedDays.size}
+          claimed={bigRewardClaimed}
+          roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
+          roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
+        />
 
         <div className="flex flex-col gap-3 rounded-[20px] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-2.5 bg-[#FAF2E4] border-[#F4EEE5] dark:bg-[#0A0A0A] border dark:border-[#0A0A0A]">
           <div className="min-w-0 space-y-0.5">

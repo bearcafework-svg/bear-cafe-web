@@ -1,4 +1,5 @@
 import type { RewardPopupData } from '@/components/bear-cafe/RewardPopup';
+import { formatNumber } from '@/lib/utils';
 
 export const REDEEM_ERROR_MESSAGES: Record<string, string> = {
   code_used: 'โค้ดนี้ถูกใช้ไปแล้ว',
@@ -43,7 +44,7 @@ export function buildRewardMessage(granted?: { pointsAdded?: number; roleGranted
   if (!granted) return 'รับรางวัลสำเร็จ';
 
   const pointsText = granted.pointsAdded
-    ? `ได้รับ +${granted.pointsAdded.toLocaleString()} 🍓`
+    ? `ได้รับ +${formatNumber(granted.pointsAdded)} 🍓`
     : '';
   const roleText = granted.roleGranted ? 'ได้รับยศใหม่' : '';
 

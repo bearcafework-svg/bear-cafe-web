@@ -1,3 +1,5 @@
+import { formatNumber } from '@/lib/utils';
+
 export type CheckinRewardType = 'points' | 'ticket_point' | 'ticket_piece_point' | 'role';
 
 export interface CheckinDailyReward {
@@ -45,7 +47,7 @@ export const REWARD_TYPE_LABELS: Record<CheckinRewardType, string> = {
 };
 
 export function formatCheckinRewardGranted(type: CheckinRewardType, amount: number): string {
-  const n = amount.toLocaleString();
+  const n = formatNumber(amount);
   switch (type) {
     case 'points':
       return `+ ${n} แต้ม`;
@@ -59,11 +61,11 @@ export function formatCheckinRewardGranted(type: CheckinRewardType, amount: numb
 }
 
 export function formatCheckinMakeupCost(cost: number): string {
-  return `- ${cost.toLocaleString()} แต้ม`;
+  return `- ${formatNumber(cost)} แต้ม`;
 }
 
 export function formatCheckinRewardBalance(type: CheckinRewardType, balance: number): string {
-  const n = balance.toLocaleString();
+  const n = formatNumber(balance);
   switch (type) {
     case 'points':
       return `${n} แต้ม`;
@@ -139,12 +141,12 @@ export function isCheckinMilestoneDay(day: number) {
 export function formatCheckinReward(reward: CheckinDailyReward | undefined) {
   if (!reward) return null;
   if (reward.reward_type === 'role') return 'Role';
-  return `${reward.reward_amount ?? 0} ${REWARD_TYPE_LABELS[reward.reward_type]}`;
+  return `${formatNumber(reward.reward_amount ?? 0)} ${REWARD_TYPE_LABELS[reward.reward_type]}`;
 }
 
 export function formatSelectedDayRewardDetail(reward: CheckinDailyReward | undefined) {
   if (!reward) return null;
-  const amount = reward.reward_amount ?? 0;
+  const amount = formatNumber(reward.reward_amount ?? 0);
   switch (reward.reward_type) {
     case 'points':
       return `สตรอว์เบอร์รี ${amount} แต้ม`;
@@ -161,7 +163,7 @@ export function formatSelectedDayRewardDetail(reward: CheckinDailyReward | undef
 
 export function formatSelectedDayRewardTitle(reward: CheckinDailyReward | undefined) {
   if (!reward) return 'รางวัล';
-  const amount = reward.reward_amount ?? 0;
+  const amount = formatNumber(reward.reward_amount ?? 0);
   switch (reward.reward_type) {
     case 'points':
       return `รางวัล สตรอว์เบอร์รี ${amount} แต้ม`;
@@ -173,6 +175,27 @@ export function formatSelectedDayRewardTitle(reward: CheckinDailyReward | undefi
       return `รางวัล บทบาท ${reward.role_name ?? reward.role_id ?? 'Role'}`;
     default:
       return 'รางวัล';
+  }
+}
+
+export function formatBigRewardDetail(
+  bigReward: CheckinBigReward | null | undefined,
+  roleName?: string | null,
+) {
+  if (!bigReward) return null;
+  if (bigReward.reward_type === 'role') {
+    return `บทบาท ${roleName ?? bigReward.role_id ?? 'Role'}`;
+  }
+  const amount = formatNumber(bigReward.reward_amount ?? 0);
+  switch (bigReward.reward_type) {
+    case 'points':
+      return `สตรอว์เบอร์รี ${amount} แต้ม`;
+    case 'ticket_piece_point':
+      return `เศษตั๋วสุ่ม ${amount} ตั๋ว`;
+    case 'ticket_point':
+      return `ตั๋วสุ่ม ${amount} ตั๋ว`;
+    default:
+      return null;
   }
 }
 

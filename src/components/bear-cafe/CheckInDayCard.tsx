@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import {
   StrawberryColorIcon,
   TearTicketColorIcon,
@@ -58,7 +58,7 @@ export function DayRewardDisplay({
     <div className="flex flex-col items-center gap-0.5">
       {icon}
       {reward.reward_type !== 'role' && amount != null && (
-        <span className={scoreClass}>{amount.toLocaleString()}</span>
+        <span className={scoreClass}>{formatNumber(amount)}</span>
       )}
     </div>
   );
