@@ -1,0 +1,2382 @@
+{
+  "/Users/svacmai/Developer/bear-cafe/.vscode/extensions.json": {
+    "mtime": 1781448385.0615597,
+    "ast_hash": "4ae972c7f82bc588281dd2ada293ea8f",
+    "semantic_hash": "4ae972c7f82bc588281dd2ada293ea8f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/components.json": {
+    "mtime": 1781430108.562703,
+    "ast_hash": "a547944ace00dc5d5373aaca70a40bc4",
+    "semantic_hash": "a547944ace00dc5d5373aaca70a40bc4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/eslint.config.js": {
+    "mtime": 1781448385.0618005,
+    "ast_hash": "d1c3949f5b8503ea110e60bda405d6a2",
+    "semantic_hash": "d1c3949f5b8503ea110e60bda405d6a2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/package.json": {
+    "mtime": 1782705119.2696886,
+    "ast_hash": "79d57e07242fbe811b799d2428b2792f",
+    "semantic_hash": "79d57e07242fbe811b799d2428b2792f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/postcss.config.js": {
+    "mtime": 1781430108.563516,
+    "ast_hash": "c735540bb63936a123bc867d950c9f69",
+    "semantic_hash": "c735540bb63936a123bc867d950c9f69"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/App.tsx": {
+    "mtime": 1782720911.6497152,
+    "ast_hash": "a8d3a304cb45539ed30afb03cf4bf770",
+    "semantic_hash": "a8d3a304cb45539ed30afb03cf4bf770"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/NavLink.tsx": {
+    "mtime": 1781430108.6013606,
+    "ast_hash": "8f7c178b4776787e58e1011855ca28f6",
+    "semantic_hash": "8f7c178b4776787e58e1011855ca28f6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/AdPlacementsManagement.tsx": {
+    "mtime": 1782706081.43263,
+    "ast_hash": "f5f6b889576c9b001506bdfca7594374",
+    "semantic_hash": "f5f6b889576c9b001506bdfca7594374"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/AdminCardGrid.tsx": {
+    "mtime": 1781430108.6014414,
+    "ast_hash": "d3e0af7a8d19f7b33556f3edaf986f5c",
+    "semantic_hash": "d3e0af7a8d19f7b33556f3edaf986f5c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/AdminEmptyState.tsx": {
+    "mtime": 1781430108.6014957,
+    "ast_hash": "f4bfc0426866a92620e7ce726418e27e",
+    "semantic_hash": "f4bfc0426866a92620e7ce726418e27e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/AdminSkeletonCards.tsx": {
+    "mtime": 1781430108.601541,
+    "ast_hash": "fe39bae6b7f72dc5717fb04a4cbc0f22",
+    "semantic_hash": "fe39bae6b7f72dc5717fb04a4cbc0f22"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/BannedRolesManagement.tsx": {
+    "mtime": 1781430109.601605,
+    "ast_hash": "c0a5c6c1caaf51befe7d41fec3be52eb",
+    "semantic_hash": "c0a5c6c1caaf51befe7d41fec3be52eb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/BannedWordsManagement.tsx": {
+    "mtime": 1781430109.601686,
+    "ast_hash": "0be81ef29215c60c3b8973d637057d8e",
+    "semantic_hash": "0be81ef29215c60c3b8973d637057d8e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/BannerManagement.tsx": {
+    "mtime": 1781430109.601773,
+    "ast_hash": "65b1405529e743ac1afb8b2284c21003",
+    "semantic_hash": "65b1405529e743ac1afb8b2284c21003"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/BulkDeleteToolbar.tsx": {
+    "mtime": 1781430108.6018474,
+    "ast_hash": "b5dc79b1df0d1ccbd7cf4b0da3cbb3f0",
+    "semantic_hash": "b5dc79b1df0d1ccbd7cf4b0da3cbb3f0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/BulkRoleManagement.tsx": {
+    "mtime": 1781430108.6019185,
+    "ast_hash": "bf9b5da7acd7e17dc7695e6f7f17af2b",
+    "semantic_hash": "bf9b5da7acd7e17dc7695e6f7f17af2b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/CampaignsManagement.tsx": {
+    "mtime": 1782704916.0037935,
+    "ast_hash": "8e2fcbf8a33be1429d25c51fe6d071fc",
+    "semantic_hash": "8e2fcbf8a33be1429d25c51fe6d071fc"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/CategoriesManagement.tsx": {
+    "mtime": 1781430109.602128,
+    "ast_hash": "cca71d5ddd3aeabfd2682a95a6e84e38",
+    "semantic_hash": "cca71d5ddd3aeabfd2682a95a6e84e38"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/CheckinRewardsManagement.tsx": {
+    "mtime": 1782705119.272709,
+    "ast_hash": "58827bc0602433cfef499193734ecabd",
+    "semantic_hash": "58827bc0602433cfef499193734ecabd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/ContractsManagement.tsx": {
+    "mtime": 1782669695.6793091,
+    "ast_hash": "a2d3d3389c66fde373a1f5e9c64decf0",
+    "semantic_hash": "a2d3d3389c66fde373a1f5e9c64decf0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/DiscordRolesManagement.tsx": {
+    "mtime": 1781430109.602349,
+    "ast_hash": "5c50e55c1317c73991d86d443913f278",
+    "semantic_hash": "5c50e55c1317c73991d86d443913f278"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/DiscordServersManagement.tsx": {
+    "mtime": 1781430108.6024535,
+    "ast_hash": "e4498f1a0111778f16d7b34eda137d6f",
+    "semantic_hash": "e4498f1a0111778f16d7b34eda137d6f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/DraggableRulesList.tsx": {
+    "mtime": 1781430108.6025548,
+    "ast_hash": "e307c8651ba5b3522d4a81dfeea11099",
+    "semantic_hash": "e307c8651ba5b3522d4a81dfeea11099"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/HealingMessagesManagement.tsx": {
+    "mtime": 1781430108.6026845,
+    "ast_hash": "78da1d0f2ea8fb1bfd4e6ee5bcb8c302",
+    "semantic_hash": "78da1d0f2ea8fb1bfd4e6ee5bcb8c302"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/MaintenanceToggle.tsx": {
+    "mtime": 1781430109.60277,
+    "ast_hash": "a91827246085212d65942e8bc5ada174",
+    "semantic_hash": "a91827246085212d65942e8bc5ada174"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/NonTransferableRolesManagement.tsx": {
+    "mtime": 1781430109.602835,
+    "ast_hash": "1d1e499deec0a57a9699ef3358c27a28",
+    "semantic_hash": "1d1e499deec0a57a9699ef3358c27a28"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/PermissionsManagement.tsx": {
+    "mtime": 1782706081.432883,
+    "ast_hash": "4985ba0dce2cc860ff9ba29c953ae47c",
+    "semantic_hash": "4985ba0dce2cc860ff9ba29c953ae47c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/ProductCatalogManagement.tsx": {
+    "mtime": 1782706147.1885846,
+    "ast_hash": "187c4870dba7a13843b6079415936879",
+    "semantic_hash": "187c4870dba7a13843b6079415936879"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/RedeemCodesManagement.tsx": {
+    "mtime": 1781430109.603024,
+    "ast_hash": "4bdfd86743dc98a3bf861307e37346b4",
+    "semantic_hash": "4bdfd86743dc98a3bf861307e37346b4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/RoleMigrationManagement.tsx": {
+    "mtime": 1782706121.2493377,
+    "ast_hash": "a1c466320ee4c080b703da19fe9856e0",
+    "semantic_hash": "a1c466320ee4c080b703da19fe9856e0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/RoleTransferManagement.tsx": {
+    "mtime": 1782669695.7259486,
+    "ast_hash": "4bd612fc8938a3c3f44b0a1320a165ce",
+    "semantic_hash": "4bd612fc8938a3c3f44b0a1320a165ce"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/RolesToDeleteManagement.tsx": {
+    "mtime": 1781430109.603188,
+    "ast_hash": "e9a9c8585bc7a2261a6cc6046326641e",
+    "semantic_hash": "e9a9c8585bc7a2261a6cc6046326641e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/SearchBar.tsx": {
+    "mtime": 1781430108.6032414,
+    "ast_hash": "f9bd1205bcfd3762d6a5b43a6f62b543",
+    "semantic_hash": "f9bd1205bcfd3762d6a5b43a6f62b543"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/SessionAdsManagement.tsx": {
+    "mtime": 1782706081.43312,
+    "ast_hash": "faf6a7fe4a91789efb36d5e87c66967c",
+    "semantic_hash": "faf6a7fe4a91789efb36d5e87c66967c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/TagWarnLogsManagement.tsx": {
+    "mtime": 1782706191.3276274,
+    "ast_hash": "6bf1aa0468a18f1b2a91f824073d87e5",
+    "semantic_hash": "6bf1aa0468a18f1b2a91f824073d87e5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/admin/TradingHistoryManagement.tsx": {
+    "mtime": 1782706147.1948164,
+    "ast_hash": "79aeff481894e4642af5e48884c9899d",
+    "semantic_hash": "79aeff481894e4642af5e48884c9899d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ActiveSessionCard.tsx": {
+    "mtime": 1781430109.603626,
+    "ast_hash": "3b83ec57cb807c2dbde350e140bbc540",
+    "semantic_hash": "3b83ec57cb807c2dbde350e140bbc540"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/AllCategoriesModal.tsx": {
+    "mtime": 1781430108.603678,
+    "ast_hash": "16f5979ce9a47ee28b7b00720f29e90e",
+    "semantic_hash": "16f5979ce9a47ee28b7b00720f29e90e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/BannerCarousel.tsx": {
+    "mtime": 1781430108.6037836,
+    "ast_hash": "799023d65adb3b7fa7a548a3e47c7924",
+    "semantic_hash": "799023d65adb3b7fa7a548a3e47c7924"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/BearLogo.tsx": {
+    "mtime": 1781430108.6038277,
+    "ast_hash": "22480a15b2b4800cffd5f1914c120dba",
+    "semantic_hash": "22480a15b2b4800cffd5f1914c120dba"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CategoryCard.tsx": {
+    "mtime": 1781430108.6038787,
+    "ast_hash": "61d386464a80e355641ef362edd62582",
+    "semantic_hash": "61d386464a80e355641ef362edd62582"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CategoryCarousel.tsx": {
+    "mtime": 1781430108.6039693,
+    "ast_hash": "e6a27e18085d30b3257703381b404f95",
+    "semantic_hash": "e6a27e18085d30b3257703381b404f95"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CategoryGrid.tsx": {
+    "mtime": 1781430108.60406,
+    "ast_hash": "0a67c8467a6f530b7d1ea59b94cbae65",
+    "semantic_hash": "0a67c8467a6f530b7d1ea59b94cbae65"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CategoryGuidance.tsx": {
+    "mtime": 1781430108.6041472,
+    "ast_hash": "0ed894c77c160b3b9cb21f3fccfbcb46",
+    "semantic_hash": "0ed894c77c160b3b9cb21f3fccfbcb46"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CategoryThumbnails.tsx": {
+    "mtime": 1781430108.6042018,
+    "ast_hash": "d0d4401a80e936ea74e59218de9f19b4",
+    "semantic_hash": "d0d4401a80e936ea74e59218de9f19b4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckInDayCard.tsx": {
+    "mtime": 1782709189.2120953,
+    "ast_hash": "075ae2f10477f8c6753e0eb7cc704510",
+    "semantic_hash": "075ae2f10477f8c6753e0eb7cc704510"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckinMakeupConfirmModal.tsx": {
+    "mtime": 1782706182.483731,
+    "ast_hash": "b448ccf401980b1ff3e6638528196d94",
+    "semantic_hash": "b448ccf401980b1ff3e6638528196d94"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckinMakeupSuccessModal.tsx": {
+    "mtime": 1782706182.4838839,
+    "ast_hash": "5b696e905bfd69f7ff260a2e5e5366c0",
+    "semantic_hash": "5b696e905bfd69f7ff260a2e5e5366c0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckinRewardModal.tsx": {
+    "mtime": 1782706182.4840324,
+    "ast_hash": "6cab8b9a14fb91c4657b766ee2ffeb22",
+    "semantic_hash": "6cab8b9a14fb91c4657b766ee2ffeb22"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckinRoleIcon.tsx": {
+    "mtime": 1782705235.096937,
+    "ast_hash": "b445bac7021a623acccb2c24a822d1eb",
+    "semantic_hash": "b445bac7021a623acccb2c24a822d1eb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CheckinSelectedDayReward.tsx": {
+    "mtime": 1782705235.0971959,
+    "ast_hash": "70f2f5229682067afbcb2a6c56e9edb0",
+    "semantic_hash": "70f2f5229682067afbcb2a6c56e9edb0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CommunityCarousel.tsx": {
+    "mtime": 1782705119.2735243,
+    "ast_hash": "33b6c09e9a04ed3bc0b3425f120636e9",
+    "semantic_hash": "33b6c09e9a04ed3bc0b3425f120636e9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CooldownBox.tsx": {
+    "mtime": 1781430108.604337,
+    "ast_hash": "84034f1eaa51ea4d63af98436b4ce9be",
+    "semantic_hash": "84034f1eaa51ea4d63af98436b4ce9be"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CozyFeatureCards.tsx": {
+    "mtime": 1782705119.2737992,
+    "ast_hash": "49a39c8890e7a986ebb37684d1ff5fe0",
+    "semantic_hash": "49a39c8890e7a986ebb37684d1ff5fe0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CozyRightPanel.tsx": {
+    "mtime": 1781430108.60449,
+    "ast_hash": "bd495b2d35b2fe0aa8eec23ebac7fd6b",
+    "semantic_hash": "bd495b2d35b2fe0aa8eec23ebac7fd6b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/CozySidebar.tsx": {
+    "mtime": 1782724340.2281487,
+    "ast_hash": "7d6f255c5ccfffa60da5338e92b9f7f1",
+    "semantic_hash": "7d6f255c5ccfffa60da5338e92b9f7f1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/DailyCheckinCard.tsx": {
+    "mtime": 1782709786.2597177,
+    "ast_hash": "7704a55f88095cd4d1ccbd43baa81273",
+    "semantic_hash": "7704a55f88095cd4d1ccbd43baa81273"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/DiscordMessagePreview.tsx": {
+    "mtime": 1781430108.6046555,
+    "ast_hash": "b3d008bee298deda435571325d195e8c",
+    "semantic_hash": "b3d008bee298deda435571325d195e8c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ExpandableRoleCard.tsx": {
+    "mtime": 1781430108.6047318,
+    "ast_hash": "82b77892235d6ca9027ab98d151ae33d",
+    "semantic_hash": "82b77892235d6ca9027ab98d151ae33d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/FeatureCardFrame.tsx": {
+    "mtime": 1782705119.2742708,
+    "ast_hash": "a1c798e210975c8af2ed30ec01c4fceb",
+    "semantic_hash": "a1c798e210975c8af2ed30ec01c4fceb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/FeatureIntro.tsx": {
+    "mtime": 1781430108.6048086,
+    "ast_hash": "c8e435fa7c8d58f42b11596d5295382a",
+    "semantic_hash": "c8e435fa7c8d58f42b11596d5295382a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/FloatingMiniPlayer.tsx": {
+    "mtime": 1782706142.3517735,
+    "ast_hash": "0f1b55aaa12d49d8c25dff0ccfeb9985",
+    "semantic_hash": "0f1b55aaa12d49d8c25dff0ccfeb9985"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/Footer.tsx": {
+    "mtime": 1781430108.604939,
+    "ast_hash": "9b29c4c2019b875ac9ab06f5d0fee394",
+    "semantic_hash": "9b29c4c2019b875ac9ab06f5d0fee394"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/GreenTeaWarningPopup.tsx": {
+    "mtime": 1781430109.60502,
+    "ast_hash": "6e2989acaebd6694e6964ada383d5924",
+    "semantic_hash": "6e2989acaebd6694e6964ada383d5924"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/HomeCategoryCard.tsx": {
+    "mtime": 1781430108.6050985,
+    "ast_hash": "7f70cb01e1e73a5b482df11dc401f800",
+    "semantic_hash": "7f70cb01e1e73a5b482df11dc401f800"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/HomeNavigationCard.tsx": {
+    "mtime": 1781430108.6051462,
+    "ast_hash": "b6b2ac6ae4b1b2e2b977be8b9d193287",
+    "semantic_hash": "b6b2ac6ae4b1b2e2b977be8b9d193287"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/HomeSidebar.tsx": {
+    "mtime": 1781430108.60521,
+    "ast_hash": "17028e1a4ed8418b0fea7c82578dbf47",
+    "semantic_hash": "17028e1a4ed8418b0fea7c82578dbf47"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/IconDisplay.tsx": {
+    "mtime": 1781430108.6052651,
+    "ast_hash": "2f5c2cb441209f2240dce5c4594b9a56",
+    "semantic_hash": "2f5c2cb441209f2240dce5c4594b9a56"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/IconUpload.tsx": {
+    "mtime": 1781430109.605345,
+    "ast_hash": "b91b007781321658ced2d08134c100df",
+    "semantic_hash": "b91b007781321658ced2d08134c100df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/LoadingBear.tsx": {
+    "mtime": 1781430108.6053903,
+    "ast_hash": "2953d328a4efc4fea3b2e35df4343178",
+    "semantic_hash": "2953d328a4efc4fea3b2e35df4343178"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/MacaroonCarousel.tsx": {
+    "mtime": 1781430108.6054676,
+    "ast_hash": "0345ed92e7653f37976b704d88baaa34",
+    "semantic_hash": "0345ed92e7653f37976b704d88baaa34"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/MascotMessage.tsx": {
+    "mtime": 1781430109.605552,
+    "ast_hash": "cb5af1a41a43a394ee11e04c677bf43b",
+    "semantic_hash": "cb5af1a41a43a394ee11e04c677bf43b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ModeDetailsPanel.tsx": {
+    "mtime": 1781430108.6056323,
+    "ast_hash": "b7a60e5e1241f3ca8b02975bb8b222de",
+    "semantic_hash": "b7a60e5e1241f3ca8b02975bb8b222de"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/NotificationToggle.tsx": {
+    "mtime": 1781430108.605679,
+    "ast_hash": "3e7280f32ea547c9333a00679b6d99fe",
+    "semantic_hash": "3e7280f32ea547c9333a00679b6d99fe"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/PageHeader.tsx": {
+    "mtime": 1781430108.6057231,
+    "ast_hash": "c590657d9fa6aafab2a5dd16346950dd",
+    "semantic_hash": "c590657d9fa6aafab2a5dd16346950dd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ParticleEffect.tsx": {
+    "mtime": 1781430108.6057687,
+    "ast_hash": "251dff3b076dcd800172a87718219606",
+    "semantic_hash": "251dff3b076dcd800172a87718219606"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/RewardPopup.tsx": {
+    "mtime": 1782721321.1365027,
+    "ast_hash": "13fed3156ea4e0dc238b77ddb72b2293",
+    "semantic_hash": "13fed3156ea4e0dc238b77ddb72b2293"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/RoleChip.tsx": {
+    "mtime": 1781430108.6058896,
+    "ast_hash": "5409a81a300cfadecd113808ba0d7c4c",
+    "semantic_hash": "5409a81a300cfadecd113808ba0d7c4c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/RulesSection.tsx": {
+    "mtime": 1781430108.6059334,
+    "ast_hash": "32bba9bfad358abe65760fe86b392349",
+    "semantic_hash": "32bba9bfad358abe65760fe86b392349"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ServerAnalyticsDashboard.tsx": {
+    "mtime": 1781430108.6059902,
+    "ast_hash": "d59efb2b9bf08f6f98c17b399f0647ab",
+    "semantic_hash": "d59efb2b9bf08f6f98c17b399f0647ab"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/SessionTimer.tsx": {
+    "mtime": 1781430108.6060317,
+    "ast_hash": "bdd7853484b0cf77d459234d90c80c9e",
+    "semantic_hash": "bdd7853484b0cf77d459234d90c80c9e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/StepIndicator.tsx": {
+    "mtime": 1781430108.6060808,
+    "ast_hash": "9f4fc12cfd4d76188caacfebcb3656a3",
+    "semantic_hash": "9f4fc12cfd4d76188caacfebcb3656a3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/StrawberryJar.tsx": {
+    "mtime": 1782720091.7429736,
+    "ast_hash": "f4dec35396d7cc9d998cd98f972d6c85",
+    "semantic_hash": "f4dec35396d7cc9d998cd98f972d6c85"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/bear-cafe/ThemeToggle.tsx": {
+    "mtime": 1781430108.6062217,
+    "ast_hash": "88719de2d9904c70885c2708e385b7d0",
+    "semantic_hash": "88719de2d9904c70885c2708e385b7d0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/discord/EditLinkDialog.tsx": {
+    "mtime": 1781430108.606333,
+    "ast_hash": "7e88e06175a0d307f5fc7ed56165275c",
+    "semantic_hash": "7e88e06175a0d307f5fc7ed56165275c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/discord/ExpiredServerCard.tsx": {
+    "mtime": 1781430108.6063824,
+    "ast_hash": "37300951c639e9728156506cb75fa67c",
+    "semantic_hash": "37300951c639e9728156506cb75fa67c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/games/BearBobaMerge.tsx": {
+    "mtime": 1782706142.351933,
+    "ast_hash": "8463f5d8bfc82307c3ed1d8ad0392277",
+    "semantic_hash": "8463f5d8bfc82307c3ed1d8ad0392277"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/lottery/PrizePoolDisplay.tsx": {
+    "mtime": 1781430108.6066415,
+    "ast_hash": "12848a40fc7597628543e237020aa3c5",
+    "semantic_hash": "12848a40fc7597628543e237020aa3c5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/security/TurnstileWidget.tsx": {
+    "mtime": 1781448386.06253,
+    "ast_hash": "ac208ea646c8cc967a44bd5c1db55861",
+    "semantic_hash": "ac208ea646c8cc967a44bd5c1db55861"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/accordion.tsx": {
+    "mtime": 1781430108.6068213,
+    "ast_hash": "f9ebb6ee913b44e5f3e06fe1d9679784",
+    "semantic_hash": "f9ebb6ee913b44e5f3e06fe1d9679784"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/alert-dialog.tsx": {
+    "mtime": 1781430108.6069038,
+    "ast_hash": "2ee6c5e5e070315114319bc060d17a52",
+    "semantic_hash": "2ee6c5e5e070315114319bc060d17a52"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/alert.tsx": {
+    "mtime": 1781430108.6069448,
+    "ast_hash": "354d0206f924d48bcebbb023c3940a6b",
+    "semantic_hash": "354d0206f924d48bcebbb023c3940a6b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/aspect-ratio.tsx": {
+    "mtime": 1781430108.6069818,
+    "ast_hash": "c5c364545e1b25a94e9e752cd67ad048",
+    "semantic_hash": "c5c364545e1b25a94e9e752cd67ad048"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/avatar.tsx": {
+    "mtime": 1781430108.6070218,
+    "ast_hash": "53921dca0903c74cd72fada89388d9f8",
+    "semantic_hash": "53921dca0903c74cd72fada89388d9f8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/badge.tsx": {
+    "mtime": 1781430108.607065,
+    "ast_hash": "8db4e6d330f88f4041f81e7cde43782b",
+    "semantic_hash": "8db4e6d330f88f4041f81e7cde43782b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/breadcrumb.tsx": {
+    "mtime": 1781430108.6071272,
+    "ast_hash": "c200fc41e9b214ebb6ccd19a300c42c5",
+    "semantic_hash": "c200fc41e9b214ebb6ccd19a300c42c5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/button.tsx": {
+    "mtime": 1781430108.6071818,
+    "ast_hash": "b59f5a3c54b63cf3ea4eb2523151f617",
+    "semantic_hash": "b59f5a3c54b63cf3ea4eb2523151f617"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/calendar.tsx": {
+    "mtime": 1781430108.6072283,
+    "ast_hash": "5d9c299086b53c392cc0f190b302afc7",
+    "semantic_hash": "5d9c299086b53c392cc0f190b302afc7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/card.tsx": {
+    "mtime": 1781430108.60727,
+    "ast_hash": "202402023747c80d975f48b906e6eb1b",
+    "semantic_hash": "202402023747c80d975f48b906e6eb1b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/carousel.tsx": {
+    "mtime": 1781430108.607342,
+    "ast_hash": "63a7442a3088b58113c8a8cfc1defe26",
+    "semantic_hash": "63a7442a3088b58113c8a8cfc1defe26"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/chart.tsx": {
+    "mtime": 1781430108.6074216,
+    "ast_hash": "29cfd7470f3197deccd58b2b4f00fbae",
+    "semantic_hash": "29cfd7470f3197deccd58b2b4f00fbae"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/checkbox.tsx": {
+    "mtime": 1781430108.607467,
+    "ast_hash": "cb12d2f3410761f7a678add95c90ac5d",
+    "semantic_hash": "cb12d2f3410761f7a678add95c90ac5d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/collapsible.tsx": {
+    "mtime": 1781430108.6075194,
+    "ast_hash": "934b00582dae08af749fb55469081de6",
+    "semantic_hash": "934b00582dae08af749fb55469081de6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/command.tsx": {
+    "mtime": 1781430108.6075978,
+    "ast_hash": "72a32e9f3ca381338da82bbbc823fc22",
+    "semantic_hash": "72a32e9f3ca381338da82bbbc823fc22"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/context-menu.tsx": {
+    "mtime": 1781430108.6076849,
+    "ast_hash": "9b8e8efdf0456cd542e32d341b071cac",
+    "semantic_hash": "9b8e8efdf0456cd542e32d341b071cac"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/dialog.tsx": {
+    "mtime": 1781430108.607738,
+    "ast_hash": "fc3a9626ba52435552c93ac3a74374ec",
+    "semantic_hash": "fc3a9626ba52435552c93ac3a74374ec"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/drawer.tsx": {
+    "mtime": 1781430108.6077847,
+    "ast_hash": "05e2b536fe11649e9b4c6e73678e32a6",
+    "semantic_hash": "05e2b536fe11649e9b4c6e73678e32a6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/dropdown-menu.tsx": {
+    "mtime": 1781430108.6078808,
+    "ast_hash": "f308eb98a2e21bf8bd1e30dbcb741dc0",
+    "semantic_hash": "f308eb98a2e21bf8bd1e30dbcb741dc0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/form.tsx": {
+    "mtime": 1781430108.6079283,
+    "ast_hash": "4bb820d59aad3ee5bc78097596298ace",
+    "semantic_hash": "4bb820d59aad3ee5bc78097596298ace"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/hover-card.tsx": {
+    "mtime": 1781430108.6079814,
+    "ast_hash": "f77f80ed64ff8f3549e5d7e9d837e08e",
+    "semantic_hash": "f77f80ed64ff8f3549e5d7e9d837e08e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/input-otp.tsx": {
+    "mtime": 1781430108.6080248,
+    "ast_hash": "3fb5994635434d5168bee869689fc2aa",
+    "semantic_hash": "3fb5994635434d5168bee869689fc2aa"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/input.tsx": {
+    "mtime": 1781430108.608064,
+    "ast_hash": "b8279d768c2a1ce78a05a369a0502877",
+    "semantic_hash": "b8279d768c2a1ce78a05a369a0502877"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/label.tsx": {
+    "mtime": 1781430108.608103,
+    "ast_hash": "cd2b2255bbe519cb0865dfeaa6615797",
+    "semantic_hash": "cd2b2255bbe519cb0865dfeaa6615797"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/menubar.tsx": {
+    "mtime": 1781430108.6081796,
+    "ast_hash": "163c3fa58a2b4ea2caa00166f4d862c7",
+    "semantic_hash": "163c3fa58a2b4ea2caa00166f4d862c7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/navigation-menu.tsx": {
+    "mtime": 1781430108.608259,
+    "ast_hash": "77e94b0c299d10c3763d2755bf556916",
+    "semantic_hash": "77e94b0c299d10c3763d2755bf556916"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/pagination.tsx": {
+    "mtime": 1781430108.6083102,
+    "ast_hash": "a3ced9f9b19826b467d788b1bf01746f",
+    "semantic_hash": "a3ced9f9b19826b467d788b1bf01746f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/popover.tsx": {
+    "mtime": 1781430108.6083534,
+    "ast_hash": "c056d22288a642b756b77c7691ad4532",
+    "semantic_hash": "c056d22288a642b756b77c7691ad4532"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/progress.tsx": {
+    "mtime": 1781430108.6083913,
+    "ast_hash": "9a8b05beca19e008a562a10e489f5968",
+    "semantic_hash": "9a8b05beca19e008a562a10e489f5968"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/radio-group.tsx": {
+    "mtime": 1781430108.6084297,
+    "ast_hash": "3773798b5b2f334a5db0dc9c8d06f1b8",
+    "semantic_hash": "3773798b5b2f334a5db0dc9c8d06f1b8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/resizable.tsx": {
+    "mtime": 1781430108.6084785,
+    "ast_hash": "ec681e92cbe705b5571ded11b5227a2a",
+    "semantic_hash": "ec681e92cbe705b5571ded11b5227a2a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/scroll-area.tsx": {
+    "mtime": 1781430108.6085315,
+    "ast_hash": "cfbc224001af0e6daba676de225a2a47",
+    "semantic_hash": "cfbc224001af0e6daba676de225a2a47"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/select.tsx": {
+    "mtime": 1781430108.6086137,
+    "ast_hash": "25de64d0126624cbd8efa50cfb64bd21",
+    "semantic_hash": "25de64d0126624cbd8efa50cfb64bd21"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/separator.tsx": {
+    "mtime": 1781430108.6086557,
+    "ast_hash": "ed1101f185e9dc801712593e3330a75d",
+    "semantic_hash": "ed1101f185e9dc801712593e3330a75d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/sheet.tsx": {
+    "mtime": 1781430108.608728,
+    "ast_hash": "3660be09e2e40467a22fd46b354c1b50",
+    "semantic_hash": "3660be09e2e40467a22fd46b354c1b50"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/sidebar.tsx": {
+    "mtime": 1781430108.6087928,
+    "ast_hash": "9eab1256b1ffe3f1336eebfd07b319c9",
+    "semantic_hash": "9eab1256b1ffe3f1336eebfd07b319c9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/skeleton.tsx": {
+    "mtime": 1781430108.608856,
+    "ast_hash": "a182bac9c8b725874600cb889a0edfaf",
+    "semantic_hash": "a182bac9c8b725874600cb889a0edfaf"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/slider.tsx": {
+    "mtime": 1781430108.608905,
+    "ast_hash": "e3bf7b6116ddbdbe8c7b3597d07daee0",
+    "semantic_hash": "e3bf7b6116ddbdbe8c7b3597d07daee0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/sonner.tsx": {
+    "mtime": 1781430108.6089485,
+    "ast_hash": "88644703cc00886c56e0e3b7df0e21d8",
+    "semantic_hash": "88644703cc00886c56e0e3b7df0e21d8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/switch.tsx": {
+    "mtime": 1781430108.6090004,
+    "ast_hash": "eccd8c41c46e782eaaa1f8be0111e089",
+    "semantic_hash": "eccd8c41c46e782eaaa1f8be0111e089"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/table.tsx": {
+    "mtime": 1781430108.6090493,
+    "ast_hash": "d0ff87c4734c23839337811378ad07df",
+    "semantic_hash": "d0ff87c4734c23839337811378ad07df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/tabs.tsx": {
+    "mtime": 1781430108.609089,
+    "ast_hash": "26b15e1ffce0f831be4da95b8f8a43df",
+    "semantic_hash": "26b15e1ffce0f831be4da95b8f8a43df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/textarea.tsx": {
+    "mtime": 1781430108.6091354,
+    "ast_hash": "497a6ff07a577eb952f51d775c99c2da",
+    "semantic_hash": "497a6ff07a577eb952f51d775c99c2da"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/toast.tsx": {
+    "mtime": 1781430108.6092167,
+    "ast_hash": "7c08b5cb6026058514672a4ebc53847e",
+    "semantic_hash": "7c08b5cb6026058514672a4ebc53847e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/toaster.tsx": {
+    "mtime": 1781430108.609267,
+    "ast_hash": "1903846ab268620de6356ef667e3fa21",
+    "semantic_hash": "1903846ab268620de6356ef667e3fa21"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/toggle-group.tsx": {
+    "mtime": 1781430108.6093068,
+    "ast_hash": "e82bf234e3877ad708ea3d1dba614def",
+    "semantic_hash": "e82bf234e3877ad708ea3d1dba614def"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/toggle.tsx": {
+    "mtime": 1781430108.6093452,
+    "ast_hash": "ff7a7deebff23c3488e79ad72ee47e4b",
+    "semantic_hash": "ff7a7deebff23c3488e79ad72ee47e4b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/tooltip.tsx": {
+    "mtime": 1781430108.609394,
+    "ast_hash": "d7e923341b9e91d77db45ba5f2fa0cf9",
+    "semantic_hash": "d7e923341b9e91d77db45ba5f2fa0cf9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/components/ui/use-toast.ts": {
+    "mtime": 1781430108.6094394,
+    "ast_hash": "4f094014a1315ca1081cbdc7f78d55cc",
+    "semantic_hash": "4f094014a1315ca1081cbdc7f78d55cc"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/use-mobile.tsx": {
+    "mtime": 1781430108.6095238,
+    "ast_hash": "c0a0bdd4638c391a1dd06ac82074e60b",
+    "semantic_hash": "c0a0bdd4638c391a1dd06ac82074e60b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/use-toast.ts": {
+    "mtime": 1781430108.6095722,
+    "ast_hash": "e706bc004c87e17db559a113637eddea",
+    "semantic_hash": "e706bc004c87e17db559a113637eddea"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useActiveVoiceCount.ts": {
+    "mtime": 1782705119.2744553,
+    "ast_hash": "f40ba8457d9a18de532e74e5ac8f156b",
+    "semantic_hash": "f40ba8457d9a18de532e74e5ac8f156b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useBulkSelection.ts": {
+    "mtime": 1781430108.6096172,
+    "ast_hash": "38c45e593d9778ec42ae6739af46237d",
+    "semantic_hash": "38c45e593d9778ec42ae6739af46237d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useCheckin.ts": {
+    "mtime": 1782706163.2375665,
+    "ast_hash": "8de735d220be2ebe294c91c2a7e0a0f9",
+    "semantic_hash": "8de735d220be2ebe294c91c2a7e0a0f9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useCooldown.ts": {
+    "mtime": 1782669695.7105525,
+    "ast_hash": "6193e40043d73f8a23b7d4b9bf84995d",
+    "semantic_hash": "6193e40043d73f8a23b7d4b9bf84995d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useMaintenanceMode.ts": {
+    "mtime": 1781430109.609716,
+    "ast_hash": "c1e3834a1d7e4a7a68fa22e42ca138c4",
+    "semantic_hash": "c1e3834a1d7e4a7a68fa22e42ca138c4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useNotifications.ts": {
+    "mtime": 1781430109.609772,
+    "ast_hash": "a0cfab3b719190a104786309d94841b8",
+    "semantic_hash": "a0cfab3b719190a104786309d94841b8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useUserBalances.ts": {
+    "mtime": 1782717184.1254134,
+    "ast_hash": "3c2e4953c8be40e8bec69bcf82af2b14",
+    "semantic_hash": "3c2e4953c8be40e8bec69bcf82af2b14"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/hooks/useVoiceState.ts": {
+    "mtime": 1781430109.609833,
+    "ast_hash": "538dabbc15dc0edc66a58de4f026a2c8",
+    "semantic_hash": "538dabbc15dc0edc66a58de4f026a2c8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/IconShell.tsx": {
+    "mtime": 1782705119.2749426,
+    "ast_hash": "a6bc8dbe2ca1e9e745959099486689e1",
+    "semantic_hash": "a6bc8dbe2ca1e9e745959099486689e1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/constants.ts": {
+    "mtime": 1782705119.275128,
+    "ast_hash": "d0a0ff91e120cf7354ab53545a484098",
+    "semantic_hash": "d0a0ff91e120cf7354ab53545a484098"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/BrokenHeartIcon.tsx": {
+    "mtime": 1782705235.097742,
+    "ast_hash": "2805b344b4549c38cbfbc2a6efd319df",
+    "semantic_hash": "2805b344b4549c38cbfbc2a6efd319df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/Calendar2Icon.tsx": {
+    "mtime": 1782705235.0978498,
+    "ast_hash": "573570e7bb36bcd2ba24799338148e28",
+    "semantic_hash": "573570e7bb36bcd2ba24799338148e28"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/CalendarIcon.tsx": {
+    "mtime": 1782705119.2753427,
+    "ast_hash": "afaa058f2ccc28fdfca811220b0ac85c",
+    "semantic_hash": "afaa058f2ccc28fdfca811220b0ac85c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/CircleCheckIcon.tsx": {
+    "mtime": 1782705119.2754824,
+    "ast_hash": "8b0bed094badfe6257ca535fde4b2f8a",
+    "semantic_hash": "8b0bed094badfe6257ca535fde4b2f8a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/CircleDotIcon.tsx": {
+    "mtime": 1782705119.2756221,
+    "ast_hash": "ee5ec7192b5395c71b90deb8cb9f6432",
+    "semantic_hash": "ee5ec7192b5395c71b90deb8cb9f6432"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/FireIcon.tsx": {
+    "mtime": 1782705235.097955,
+    "ast_hash": "e7b889b8567f98a47149ff5d159db0ff",
+    "semantic_hash": "e7b889b8567f98a47149ff5d159db0ff"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/GiftIcon.tsx": {
+    "mtime": 1782705119.2757635,
+    "ast_hash": "068be7eb313f8a12053c90880f063dd4",
+    "semantic_hash": "068be7eb313f8a12053c90880f063dd4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/LockIcon.tsx": {
+    "mtime": 1782705119.275954,
+    "ast_hash": "c79a0a75a5b53d915d89f79392bbc0b3",
+    "semantic_hash": "c79a0a75a5b53d915d89f79392bbc0b3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/OpenMicIcon.tsx": {
+    "mtime": 1782705119.2761137,
+    "ast_hash": "774a0ce86052eaa4502c0f7e18f1cb93",
+    "semantic_hash": "774a0ce86052eaa4502c0f7e18f1cb93"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/StarIcon.tsx": {
+    "mtime": 1782705119.2762449,
+    "ast_hash": "4ddd95767eb02206f2de8c39e202e56b",
+    "semantic_hash": "4ddd95767eb02206f2de8c39e202e56b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/StrawberryIcon.tsx": {
+    "mtime": 1782705119.2763531,
+    "ast_hash": "57fb4010e8ebd36559defc47c67dec8c",
+    "semantic_hash": "57fb4010e8ebd36559defc47c67dec8c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/createInlineIcon.tsx": {
+    "mtime": 1782705119.2765465,
+    "ast_hash": "d217bb8bba1ec7b7d4ad66d0a1d1a49b",
+    "semantic_hash": "d217bb8bba1ec7b7d4ad66d0a1d1a49b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/inline/index.ts": {
+    "mtime": 1782706163.237694,
+    "ast_hash": "514eba1ce00dd3131fa24ea2bcc35800",
+    "semantic_hash": "514eba1ce00dd3131fa24ea2bcc35800"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/BeeIcon.tsx": {
+    "mtime": 1782705119.276987,
+    "ast_hash": "936349fdafa35ed33c53678ab3682286",
+    "semantic_hash": "936349fdafa35ed33c53678ab3682286"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/CaffeLatteIcon.tsx": {
+    "mtime": 1782705119.277213,
+    "ast_hash": "696e07172bec548d09d26b0a795f5a80",
+    "semantic_hash": "696e07172bec548d09d26b0a795f5a80"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/StrawberryColorIcon.tsx": {
+    "mtime": 1782705119.2773862,
+    "ast_hash": "99cf56d6513a19d1efa5128674b39186",
+    "semantic_hash": "99cf56d6513a19d1efa5128674b39186"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/TeaBagColorIcon.tsx": {
+    "mtime": 1782705135.4377735,
+    "ast_hash": "3ad6db3e9acdf1570ddd2ec0e52a9b20",
+    "semantic_hash": "3ad6db3e9acdf1570ddd2ec0e52a9b20"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/TearTicketColorIcon.tsx": {
+    "mtime": 1782705135.43798,
+    "ast_hash": "11e5508af48f20a2bc6a7bcc4103961e",
+    "semantic_hash": "11e5508af48f20a2bc6a7bcc4103961e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/TicketColorIcon.tsx": {
+    "mtime": 1782705135.4381597,
+    "ast_hash": "f9f2edcb739efdb1c8c3e42b3e72bc7b",
+    "semantic_hash": "f9f2edcb739efdb1c8c3e42b3e72bc7b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/createOutlineIcon.tsx": {
+    "mtime": 1782705119.277559,
+    "ast_hash": "086e11d9b76f83ad8d0babed52341b30",
+    "semantic_hash": "086e11d9b76f83ad8d0babed52341b30"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/outline/index.ts": {
+    "mtime": 1782706163.2378092,
+    "ast_hash": "6b4dc531ed2071ae93b0dfa165574c76",
+    "semantic_hash": "6b4dc531ed2071ae93b0dfa165574c76"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/types.ts": {
+    "mtime": 1782705119.2779083,
+    "ast_hash": "e2020231ef42bb4c6417efae411fdabe",
+    "semantic_hash": "e2020231ef42bb4c6417efae411fdabe"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/icon/utils.ts": {
+    "mtime": 1782705119.2780633,
+    "ast_hash": "133a370b5d1e8c55ea7910984ee433fc",
+    "semantic_hash": "133a370b5d1e8c55ea7910984ee433fc"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/integrations/supabase/client.ts": {
+    "mtime": 1781430109.610023,
+    "ast_hash": "5ff9155c5fc71a2f70b7e842e6a676df",
+    "semantic_hash": "5ff9155c5fc71a2f70b7e842e6a676df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/integrations/supabase/types.ts": {
+    "mtime": 1782715515.4412239,
+    "ast_hash": "4b6343258d48f46b3225aab1c4dd2a3e",
+    "semantic_hash": "4b6343258d48f46b3225aab1c4dd2a3e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/admin-pages.ts": {
+    "mtime": 1782706147.1673574,
+    "ast_hash": "dc5d9cf3a7bb4edddadfbac23868cc1e",
+    "semantic_hash": "dc5d9cf3a7bb4edddadfbac23868cc1e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/auth-context.tsx": {
+    "mtime": 1782669695.7109056,
+    "ast_hash": "81a29a14f24926f49ddeff74730d05c0",
+    "semantic_hash": "81a29a14f24926f49ddeff74730d05c0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/checkin-modal-data.ts": {
+    "mtime": 1782705235.0983741,
+    "ast_hash": "ddcfb26cb50bcd771c500fb5bf5e2a62",
+    "semantic_hash": "ddcfb26cb50bcd771c500fb5bf5e2a62"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/checkin.ts": {
+    "mtime": 1782709173.3186333,
+    "ast_hash": "acb6ab5c66f4fdeec50637f350463988",
+    "semantic_hash": "acb6ab5c66f4fdeec50637f350463988"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/discord-server-refresh.ts": {
+    "mtime": 1781430108.6103575,
+    "ast_hash": "0ac1f3fae6c3d721f661e25884a4940c",
+    "semantic_hash": "0ac1f3fae6c3d721f661e25884a4940c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/function-error.ts": {
+    "mtime": 1781430109.610404,
+    "ast_hash": "c7cbdeaca2b37f53aa70b062abfe8a01",
+    "semantic_hash": "c7cbdeaca2b37f53aa70b062abfe8a01"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/image-compress.ts": {
+    "mtime": 1781430108.6104605,
+    "ast_hash": "8a5b927ca9a64ffcfcb4a3598020fdbb",
+    "semantic_hash": "8a5b927ca9a64ffcfcb4a3598020fdbb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/music-context.tsx": {
+    "mtime": 1782706142.3520513,
+    "ast_hash": "fde1e8bbaeca7dd552caaf836c1b87f8",
+    "semantic_hash": "fde1e8bbaeca7dd552caaf836c1b87f8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/points-cap.ts": {
+    "mtime": 1782717175.9024885,
+    "ast_hash": "4b7c4bb026ad6a55d6dace767f3c6cbe",
+    "semantic_hash": "4b7c4bb026ad6a55d6dace767f3c6cbe"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/retry.ts": {
+    "mtime": 1781430109.610632,
+    "ast_hash": "2ad66a247a6541f967d42457936e6ed7",
+    "semantic_hash": "2ad66a247a6541f967d42457936e6ed7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/role-ban.ts": {
+    "mtime": 1781430109.610697,
+    "ast_hash": "1afd7495c7f600c6d453883024a0fcd4",
+    "semantic_hash": "1afd7495c7f600c6d453883024a0fcd4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/salmonPoint.ts": {
+    "mtime": 1781430108.610749,
+    "ast_hash": "5a6bb95f3bc60c556c9f16a1e280fbd5",
+    "semantic_hash": "5a6bb95f3bc60c556c9f16a1e280fbd5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/thai-date.ts": {
+    "mtime": 1781430108.6108007,
+    "ast_hash": "fb6a9eea0116db31ec2c9d70c0834aca",
+    "semantic_hash": "fb6a9eea0116db31ec2c9d70c0834aca"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/lib/utils.ts": {
+    "mtime": 1781430108.6108582,
+    "ast_hash": "d9837f38cc05303254571985e3164050",
+    "semantic_hash": "d9837f38cc05303254571985e3164050"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/main.tsx": {
+    "mtime": 1781430108.6109076,
+    "ast_hash": "092c6937f28c1dff19a7d561f5f98360",
+    "semantic_hash": "092c6937f28c1dff19a7d561f5f98360"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/AdminLottery.tsx": {
+    "mtime": 1781430108.6110373,
+    "ast_hash": "25004c137e6bfe8f46c6b2d3859db5ff",
+    "semantic_hash": "25004c137e6bfe8f46c6b2d3859db5ff"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/AdminPage.tsx": {
+    "mtime": 1782706163.247092,
+    "ast_hash": "396307c8abd4a6a0506e320a947a523d",
+    "semantic_hash": "396307c8abd4a6a0506e320a947a523d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/AuthCallbackPage.tsx": {
+    "mtime": 1782669728.351274,
+    "ast_hash": "605cce58dbdd5b1445e4b5b62f1d61c6",
+    "semantic_hash": "605cce58dbdd5b1445e4b5b62f1d61c6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/BannedPage.tsx": {
+    "mtime": 1781430108.6113575,
+    "ast_hash": "a6594bafa09d63c1eeb3e9c8a999d983",
+    "semantic_hash": "a6594bafa09d63c1eeb3e9c8a999d983"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/BearBobaMergePage.tsx": {
+    "mtime": 1782706142.3521142,
+    "ast_hash": "7a385716501aacd60a16b3b2540cbf4a",
+    "semantic_hash": "7a385716501aacd60a16b3b2540cbf4a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/CreateSessionPage.tsx": {
+    "mtime": 1782669695.684511,
+    "ast_hash": "4c69b6a6b5dd43cd18ffd130a09384e6",
+    "semantic_hash": "4c69b6a6b5dd43cd18ffd130a09384e6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/DiscordServersPage.tsx": {
+    "mtime": 1781430109.611634,
+    "ast_hash": "1b8cdfb140b6e8cfd83fc4615a852fdc",
+    "semantic_hash": "1b8cdfb140b6e8cfd83fc4615a852fdc"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/ForStaffPage.tsx": {
+    "mtime": 1781430109.611714,
+    "ast_hash": "9f2ab3426f74cf0c1bc2c096ba3cd810",
+    "semantic_hash": "9f2ab3426f74cf0c1bc2c096ba3cd810"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/ForStaffReportPage.tsx": {
+    "mtime": 1781430109.611819,
+    "ast_hash": "451b9898c33be31528c84ce5eded9ffb",
+    "semantic_hash": "451b9898c33be31528c84ce5eded9ffb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/FullCheckInCalendar.tsx": {
+    "mtime": 1782715602.7483394,
+    "ast_hash": "ec542c9d5e9c2db6bc1d0d29470c985d",
+    "semantic_hash": "ec542c9d5e9c2db6bc1d0d29470c985d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/GachaPage.tsx": {
+    "mtime": 1782720964.9562619,
+    "ast_hash": "3e11f9ab513f9fbc2eb214588dd728cd",
+    "semantic_hash": "3e11f9ab513f9fbc2eb214588dd728cd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/HealingMessagePage.tsx": {
+    "mtime": 1781430108.6119285,
+    "ast_hash": "fa229f6c218e846fbbac0b29b38932c4",
+    "semantic_hash": "fa229f6c218e846fbbac0b29b38932c4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/Index.tsx": {
+    "mtime": 1782715592.7331767,
+    "ast_hash": "211fa3346123378474e3d9ea34299431",
+    "semantic_hash": "211fa3346123378474e3d9ea34299431"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/InventoryPage.tsx": {
+    "mtime": 1782715575.2326128,
+    "ast_hash": "7b7ff45840dc63f472a43ac813757993",
+    "semantic_hash": "7b7ff45840dc63f472a43ac813757993"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/LandingPage.tsx": {
+    "mtime": 1781430108.6121175,
+    "ast_hash": "fe49661ffcea3f788d16d3636d7f8b5c",
+    "semantic_hash": "fe49661ffcea3f788d16d3636d7f8b5c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/LoginPage.tsx": {
+    "mtime": 1782669728.3515317,
+    "ast_hash": "be3e1eee46cfed6ca0f925f2d1a1c50c",
+    "semantic_hash": "be3e1eee46cfed6ca0f925f2d1a1c50c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/LotteryPage.tsx": {
+    "mtime": 1781430108.612336,
+    "ast_hash": "1e70d659d1372d0de78f144892150f59",
+    "semantic_hash": "1e70d659d1372d0de78f144892150f59"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/MaintenancePage.tsx": {
+    "mtime": 1781430108.6123998,
+    "ast_hash": "867b43dc8da2b1f2f4351ac338e097bf",
+    "semantic_hash": "867b43dc8da2b1f2f4351ac338e097bf"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/NotFound.tsx": {
+    "mtime": 1781430109.612457,
+    "ast_hash": "9c5badd101f57abe7483336a64a52ce5",
+    "semantic_hash": "9c5badd101f57abe7483336a64a52ce5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/PointsPage.tsx": {
+    "mtime": 1782719035.504223,
+    "ast_hash": "ae270579ec7ed5950309d2e757bf67ca",
+    "semantic_hash": "ae270579ec7ed5950309d2e757bf67ca"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/RoleBannedPage.tsx": {
+    "mtime": 1781430108.6126015,
+    "ast_hash": "d7059bb4391fa33a477a0d14bf7d22b7",
+    "semantic_hash": "d7059bb4391fa33a477a0d14bf7d22b7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/SessionHistoryPage.tsx": {
+    "mtime": 1782706081.4338686,
+    "ast_hash": "0580ed801a75cc4cb46058291cb60edd",
+    "semantic_hash": "0580ed801a75cc4cb46058291cb60edd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/SpinPrizePage.tsx": {
+    "mtime": 1782715594.3442898,
+    "ast_hash": "483526221e2a85d4d5f494dcfdecf882",
+    "semantic_hash": "483526221e2a85d4d5f494dcfdecf882"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/TagWarnLogsPage.tsx": {
+    "mtime": 1781430109.612936,
+    "ast_hash": "2c9f8274bf97f823aa95aef80cee467d",
+    "semantic_hash": "2c9f8274bf97f823aa95aef80cee467d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/pages/WorkspacePage.tsx": {
+    "mtime": 1782669695.7610602,
+    "ast_hash": "c3992be1bd96c6a1e4a27e5566b218c9",
+    "semantic_hash": "c3992be1bd96c6a1e4a27e5566b218c9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/shared/sessionDiscordMessage.ts": {
+    "mtime": 1781430108.613128,
+    "ast_hash": "e89d74881010c44d2b077975ea3b93f3",
+    "semantic_hash": "e89d74881010c44d2b077975ea3b93f3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/test/setup.ts": {
+    "mtime": 1781430108.6132128,
+    "ast_hash": "166a26ce4265ed1175aab3efd38ff02b",
+    "semantic_hash": "166a26ce4265ed1175aab3efd38ff02b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/vite-env.d.ts": {
+    "mtime": 1781430108.6132653,
+    "ast_hash": "e67f153d6c20c48953081282696004ac",
+    "semantic_hash": "e67f153d6c20c48953081282696004ac"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/.temp/linked-project.json": {
+    "mtime": 1781430108.6135662,
+    "ast_hash": "654ee9589a9568bbcdf7b796aeeec677",
+    "semantic_hash": "654ee9589a9568bbcdf7b796aeeec677"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/bootstrap_schema_and_rls.sql": {
+    "mtime": 1781430108.613902,
+    "ast_hash": "4156ef853e764bdc3a66b94f4ba9e363",
+    "semantic_hash": "4156ef853e764bdc3a66b94f4ba9e363"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/dev/grant_all_table_permissions.sql": {
+    "mtime": 1782705119.2792892,
+    "ast_hash": "32ed2f6d27085949f42635bf76d9579b",
+    "semantic_hash": "32ed2f6d27085949f42635bf76d9579b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/checkin-date.ts": {
+    "mtime": 1782705119.2794592,
+    "ast_hash": "6ea5823632d6dcedb2b346a5aa58a7e4",
+    "semantic_hash": "6ea5823632d6dcedb2b346a5aa58a7e4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/discord-fetch.ts": {
+    "mtime": 1781430109.614166,
+    "ast_hash": "6005cae8c2e135c20c8c0d7b9e11cd8c",
+    "semantic_hash": "6005cae8c2e135c20c8c0d7b9e11cd8c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/discord-webhook.ts": {
+    "mtime": 1781430109.614256,
+    "ast_hash": "dabcf3bed51159ed737f2649b2d0d401",
+    "semantic_hash": "dabcf3bed51159ed737f2649b2d0d401"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/ensure-user-points.ts": {
+    "mtime": 1782705119.2796068,
+    "ast_hash": "b421d97f2d1b28c15b4a1cff1d2fc07c",
+    "semantic_hash": "b421d97f2d1b28c15b4a1cff1d2fc07c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/guild-roles-cache.ts": {
+    "mtime": 1781430109.614305,
+    "ast_hash": "fd1ee49c043185b97d2d89a129137d06",
+    "semantic_hash": "fd1ee49c043185b97d2d89a129137d06"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/rate-limit.ts": {
+    "mtime": 1781430108.6143565,
+    "ast_hash": "3fb08ce5fb2b6546eff1ef7747e6899f",
+    "semantic_hash": "3fb08ce5fb2b6546eff1ef7747e6899f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/role-ban.ts": {
+    "mtime": 1781430109.614439,
+    "ast_hash": "596186b86fd89d975bd4f397d1f300b1",
+    "semantic_hash": "596186b86fd89d975bd4f397d1f300b1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/sessionDiscordMessage.ts": {
+    "mtime": 1781430108.6144998,
+    "ast_hash": "e89d74881010c44d2b077975ea3b93f3",
+    "semantic_hash": "e89d74881010c44d2b077975ea3b93f3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/_shared/turnstile.ts": {
+    "mtime": 1781430109.614552,
+    "ast_hash": "9ddab9e5afb5165e196ffc60d58f7377",
+    "semantic_hash": "9ddab9e5afb5165e196ffc60d58f7377"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/bdfd-api/index.ts": {
+    "mtime": 1781430108.6146755,
+    "ast_hash": "0b5c803647d467ab6a24f9dc23d79778",
+    "semantic_hash": "0b5c803647d467ab6a24f9dc23d79778"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/bulk-role-manage/index.ts": {
+    "mtime": 1781430109.614804,
+    "ast_hash": "ff1a7329b48e998eaf2fe5565c962ada",
+    "semantic_hash": "ff1a7329b48e998eaf2fe5565c962ada"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/bulk-role-migrate-worker/index.ts": {
+    "mtime": 1782706121.2515278,
+    "ast_hash": "db62a71320cdda6273fff02bdb925e9e",
+    "semantic_hash": "db62a71320cdda6273fff02bdb925e9e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/bulk-role-migrate/index.ts": {
+    "mtime": 1782706121.251661,
+    "ast_hash": "e9a0c4ce98215bb7379121d674e551c9",
+    "semantic_hash": "e9a0c4ce98215bb7379121d674e551c9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/check-user-warn-role/index.ts": {
+    "mtime": 1781430109.614917,
+    "ast_hash": "de6343a9958ed6ce528d0878ef695b48",
+    "semantic_hash": "de6343a9958ed6ce528d0878ef695b48"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/cleanup-discord-servers/index.ts": {
+    "mtime": 1781430109.615002,
+    "ast_hash": "75e19650e5c36594fe12449115482cbd",
+    "semantic_hash": "75e19650e5c36594fe12449115482cbd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/cleanup-sessions/index.ts": {
+    "mtime": 1781430109.615092,
+    "ast_hash": "d4711c5230fb32e4c42afdfce862e6bb",
+    "semantic_hash": "d4711c5230fb32e4c42afdfce862e6bb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/cleanup-voice-states/index.ts": {
+    "mtime": 1781430109.615179,
+    "ast_hash": "f0afe472bbd970686df7232a4b4b75ec",
+    "semantic_hash": "f0afe472bbd970686df7232a4b4b75ec"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/complete-expired-sessions/index.ts": {
+    "mtime": 1781430109.615247,
+    "ast_hash": "09c20cffad746ab4c0c7d6720e03e320",
+    "semantic_hash": "09c20cffad746ab4c0c7d6720e03e320"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/deno.json": {
+    "mtime": 1781448385.0628278,
+    "ast_hash": "18b1844a0e1df4f49ee3638f91459570",
+    "semantic_hash": "18b1844a0e1df4f49ee3638f91459570"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-auth/index.ts": {
+    "mtime": 1781448386.063071,
+    "ast_hash": "4644a05c2aa7b8abd3dea3774c1e431b",
+    "semantic_hash": "4644a05c2aa7b8abd3dea3774c1e431b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-callback/index.ts": {
+    "mtime": 1781430108.615594,
+    "ast_hash": "8ecc55f7a98d8f35e062d865d2971844",
+    "semantic_hash": "8ecc55f7a98d8f35e062d865d2971844"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-member-count/index.ts": {
+    "mtime": 1781430109.615677,
+    "ast_hash": "41c4a68e84c849e3de975fbd45be4e5b",
+    "semantic_hash": "41c4a68e84c849e3de975fbd45be4e5b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-roles/index.ts": {
+    "mtime": 1781430109.615814,
+    "ast_hash": "39dff2c912496ddbef2a3e58037a5f89",
+    "semantic_hash": "39dff2c912496ddbef2a3e58037a5f89"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-user-guilds/index.ts": {
+    "mtime": 1781430109.615942,
+    "ast_hash": "1123c7c1206c05b0817233de624690b1",
+    "semantic_hash": "1123c7c1206c05b0817233de624690b1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-users/index.ts": {
+    "mtime": 1781430109.616065,
+    "ast_hash": "3b17a9e0a220b857506be2affca39814",
+    "semantic_hash": "3b17a9e0a220b857506be2affca39814"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-voice-state/index.ts": {
+    "mtime": 1781430109.616142,
+    "ast_hash": "55e8e86989c65f0ce3efc45537243492",
+    "semantic_hash": "55e8e86989c65f0ce3efc45537243492"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-voice-webhook/index.ts": {
+    "mtime": 1781430109.616245,
+    "ast_hash": "8a86fdead1650357bead4315c96e951e",
+    "semantic_hash": "8a86fdead1650357bead4315c96e951e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/discord-webhook/index.ts": {
+    "mtime": 1781430109.616334,
+    "ast_hash": "9c7bb480ddeaba0f63da320e17486752",
+    "semantic_hash": "9c7bb480ddeaba0f63da320e17486752"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/esm-sh.d.ts": {
+    "mtime": 1781448385.063138,
+    "ast_hash": "e1c5027db767dc48286e9d862bcaf5e1",
+    "semantic_hash": "e1c5027db767dc48286e9d862bcaf5e1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-checkin-rewards-by-month/index.ts": {
+    "mtime": 1782705119.2798097,
+    "ast_hash": "f8cf8a2ae43cd1895f20556bd7a405f8",
+    "semantic_hash": "f8cf8a2ae43cd1895f20556bd7a405f8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-checkin-status/index.ts": {
+    "mtime": 1782705119.2800043,
+    "ast_hash": "69a664c2a978ad386f6e0ab8f124bfec",
+    "semantic_hash": "69a664c2a978ad386f6e0ab8f124bfec"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-random-healing/index.ts": {
+    "mtime": 1781430109.616512,
+    "ast_hash": "84ff2eb46b3050412f7a4c54e0ef31e4",
+    "semantic_hash": "84ff2eb46b3050412f7a4c54e0ef31e4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-role-info/index.ts": {
+    "mtime": 1781430109.616616,
+    "ast_hash": "455ef638328c27906de21e84aee8f91e",
+    "semantic_hash": "455ef638328c27906de21e84aee8f91e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-role-members/index.ts": {
+    "mtime": 1781430109.616719,
+    "ast_hash": "a206674d4613de757f0ffadda094e389",
+    "semantic_hash": "a206674d4613de757f0ffadda094e389"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/get-user-discord-roles/index.ts": {
+    "mtime": 1781430109.616852,
+    "ast_hash": "43c2727965ce2e52011cc29157bd7110",
+    "semantic_hash": "43c2727965ce2e52011cc29157bd7110"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/grant-discord-role/index.ts": {
+    "mtime": 1781430109.616966,
+    "ast_hash": "9f401d275c6c8078def88f9388f3f25b",
+    "semantic_hash": "9f401d275c6c8078def88f9388f3f25b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/migrate-drive-images/index.ts": {
+    "mtime": 1781430108.6171,
+    "ast_hash": "de6ae23b3293f0e9845e8e0b66a0e060",
+    "semantic_hash": "de6ae23b3293f0e9845e8e0b66a0e060"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/migrate-slip-images/index.ts": {
+    "mtime": 1781430108.6171913,
+    "ast_hash": "d1e773d5b781d9197ed37ca245cd776b",
+    "semantic_hash": "d1e773d5b781d9197ed37ca245cd776b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/perform-checkin/index.ts": {
+    "mtime": 1782705119.2802098,
+    "ast_hash": "858ece38e0510edbb86c5958fbca8590",
+    "semantic_hash": "858ece38e0510edbb86c5958fbca8590"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/perform-makeup-checkin/index.ts": {
+    "mtime": 1782706163.239078,
+    "ast_hash": "0099005d33243ff6cd9b283ebcb5bb97",
+    "semantic_hash": "0099005d33243ff6cd9b283ebcb5bb97"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/redeem-code/index.ts": {
+    "mtime": 1781430108.617268,
+    "ast_hash": "027bc99a332e969397ca197ad13d3bc0",
+    "semantic_hash": "027bc99a332e969397ca197ad13d3bc0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/resolve-discord-invite/index.ts": {
+    "mtime": 1781430109.617372,
+    "ast_hash": "51c0bdc99442acc9d19f6f58c0bda85f",
+    "semantic_hash": "51c0bdc99442acc9d19f6f58c0bda85f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/seed-checkin-daily-rewards/index.ts": {
+    "mtime": 1782705119.2516322,
+    "ast_hash": "02b16b288af55547e965ddfb983040b1",
+    "semantic_hash": "02b16b288af55547e965ddfb983040b1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/send-contract-notify/index.ts": {
+    "mtime": 1782704585.1307073,
+    "ast_hash": "e02be0fd7f7d713b692340c206d1a083",
+    "semantic_hash": "e02be0fd7f7d713b692340c206d1a083"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/send-session-webhook/index.ts": {
+    "mtime": 1782706147.1553216,
+    "ast_hash": "39bd73ec419869292bbf60e8aa0bc8af",
+    "semantic_hash": "39bd73ec419869292bbf60e8aa0bc8af"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/send-tag-warn-embed/index.ts": {
+    "mtime": 1782706199.812859,
+    "ast_hash": "178c214c391b6c5d87c1b5d41b272f25",
+    "semantic_hash": "178c214c391b6c5d87c1b5d41b272f25"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/send-trading-embed/index.ts": {
+    "mtime": 1782669695.7265074,
+    "ast_hash": "5f382a2ba0939a258ff977b331d9f9ff",
+    "semantic_hash": "5f382a2ba0939a258ff977b331d9f9ff"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/session-cancel/index.ts": {
+    "mtime": 1781430109.617756,
+    "ast_hash": "56fe7cdadbb58eeee04caa799cd3df13",
+    "semantic_hash": "56fe7cdadbb58eeee04caa799cd3df13"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/session-create/index.ts": {
+    "mtime": 1781430109.617871,
+    "ast_hash": "63ad18db6e37fb922095bda5cf1cfdc2",
+    "semantic_hash": "63ad18db6e37fb922095bda5cf1cfdc2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/sync-discord-profile/index.ts": {
+    "mtime": 1781430109.617969,
+    "ast_hash": "ee1732a829ca60a38b7ea3e33b859966",
+    "semantic_hash": "ee1732a829ca60a38b7ea3e33b859966"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/sync-product-catalog/index.ts": {
+    "mtime": 1782706147.2010255,
+    "ast_hash": "7b9e3b8b2160e342b38d2f986ae49605",
+    "semantic_hash": "7b9e3b8b2160e342b38d2f986ae49605"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/tag-warn-cancel-sync/index.ts": {
+    "mtime": 1781430109.618072,
+    "ast_hash": "9de96d0405288510e77598e8bd84f6dd",
+    "semantic_hash": "9de96d0405288510e77598e8bd84f6dd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/tag-warn-ingest/index.ts": {
+    "mtime": 1781430109.618155,
+    "ast_hash": "098975b9d3eec92f1c2705b9bf344c34",
+    "semantic_hash": "098975b9d3eec92f1c2705b9bf344c34"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/tag-warn-logs/index.ts": {
+    "mtime": 1781430109.618237,
+    "ast_hash": "dadd9e1ae2d8a5ed403f2ab54e9ff999",
+    "semantic_hash": "dadd9e1ae2d8a5ed403f2ab54e9ff999"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/trading-history-ingest/deno.json": {
+    "mtime": 1781430108.6183589,
+    "ast_hash": "50e79223b7557cf97d1ae662cf360e49",
+    "semantic_hash": "50e79223b7557cf97d1ae662cf360e49"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/trading-history-ingest/index.ts": {
+    "mtime": 1781430109.618447,
+    "ast_hash": "8e7a1e8cc20a2d2f230ef7c42b400e1e",
+    "semantic_hash": "8e7a1e8cc20a2d2f230ef7c42b400e1e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/trading-history-slip-update/index.ts": {
+    "mtime": 1781430108.6185281,
+    "ast_hash": "99774186ee81eb7ecbb46c18e10cd7c3",
+    "semantic_hash": "99774186ee81eb7ecbb46c18e10cd7c3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/transfer-roles/index.ts": {
+    "mtime": 1782669695.7267687,
+    "ast_hash": "ed97fe9fbdb92a57a13f398ff9025640",
+    "semantic_hash": "ed97fe9fbdb92a57a13f398ff9025640"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/update-checkin-big-reward/index.ts": {
+    "mtime": 1782705119.2806482,
+    "ast_hash": "10de1a9dfb4fb576635571e4f17154ec",
+    "semantic_hash": "10de1a9dfb4fb576635571e4f17154ec"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/update-checkin-daily-reward/index.ts": {
+    "mtime": 1782705119.280862,
+    "ast_hash": "a9135d642b9d18f074caaaca2f91e422",
+    "semantic_hash": "a9135d642b9d18f074caaaca2f91e422"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/upload-slip-image/index.ts": {
+    "mtime": 1781430108.6186836,
+    "ast_hash": "fa626422b17664608eda7ab663fdbc9b",
+    "semantic_hash": "fa626422b17664608eda7ab663fdbc9b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/validate-invite-link/index.ts": {
+    "mtime": 1782706142.3522408,
+    "ast_hash": "d22f0ced05f1b1f41b7f2a9bd5dc5b2b",
+    "semantic_hash": "d22f0ced05f1b1f41b7f2a9bd5dc5b2b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/voice-activity-points/index.ts": {
+    "mtime": 1781430109.618906,
+    "ast_hash": "b071516552b70e6e940caa829326e836",
+    "semantic_hash": "b071516552b70e6e940caa829326e836"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102110535_fe0d51b2-a6a9-4da4-a43a-7a343e995c95.sql": {
+    "mtime": 1781448385.063254,
+    "ast_hash": "9034a807dc81ed408cfe2bf175fadc20",
+    "semantic_hash": "9034a807dc81ed408cfe2bf175fadc20"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102110541_c352d069-8c9a-4b41-9b46-05f4a71a7da4.sql": {
+    "mtime": 1781430108.6190443,
+    "ast_hash": "5eb3b3b8a908cec5d903e9ce2b741cc4",
+    "semantic_hash": "5eb3b3b8a908cec5d903e9ce2b741cc4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102121401_28431c2b-a463-4aa5-9aee-8790f7421719.sql": {
+    "mtime": 1781430108.6191034,
+    "ast_hash": "27294a5110e18c580f61e1c3ea7ecbeb",
+    "semantic_hash": "27294a5110e18c580f61e1c3ea7ecbeb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102124446_490c703d-c035-47bb-8289-6700e71e99e3.sql": {
+    "mtime": 1781430108.6191442,
+    "ast_hash": "f4933b484ac9170026c0fd412eee5bde",
+    "semantic_hash": "f4933b484ac9170026c0fd412eee5bde"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102124901_065143e8-b9fa-4173-b634-3ada1017c581.sql": {
+    "mtime": 1781430108.6191885,
+    "ast_hash": "66a362dbba8048f20fbfc25b40647f04",
+    "semantic_hash": "66a362dbba8048f20fbfc25b40647f04"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260102133101_5f137adc-5b45-41a9-b688-24b6dfcce1ce.sql": {
+    "mtime": 1781430108.6192322,
+    "ast_hash": "8a9647b913d202fadd942ef0494be96e",
+    "semantic_hash": "8a9647b913d202fadd942ef0494be96e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260106060040_c85b5879-cb8a-4eb7-92dd-6e955d859fbc.sql": {
+    "mtime": 1781430108.6192825,
+    "ast_hash": "e08f86ae14ddd9ad85a9b5dfe8ec805a",
+    "semantic_hash": "e08f86ae14ddd9ad85a9b5dfe8ec805a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260108010049_dae3b24d-567d-457c-959c-4427f56bb8eb.sql": {
+    "mtime": 1781430108.6193273,
+    "ast_hash": "efcca7d8dc1f1720ce70d8a39850a5c7",
+    "semantic_hash": "efcca7d8dc1f1720ce70d8a39850a5c7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260110100507_8e5a5f81-2050-4d11-b5f9-6750c397e6c5.sql": {
+    "mtime": 1781430108.619373,
+    "ast_hash": "5679bbec768b08f5a61b0eeda960417a",
+    "semantic_hash": "5679bbec768b08f5a61b0eeda960417a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260111131119_afdd98a3-c9d0-4950-8dfb-3e109d4b3b0b.sql": {
+    "mtime": 1781430108.6194158,
+    "ast_hash": "7b8eef084768d81d5aafadf159fdb374",
+    "semantic_hash": "7b8eef084768d81d5aafadf159fdb374"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260120012118_5cf74299-1c27-4af0-a918-6f5e46a6f0fb.sql": {
+    "mtime": 1781430108.6194603,
+    "ast_hash": "9332e059253d4086c3ef0239ce757b5f",
+    "semantic_hash": "9332e059253d4086c3ef0239ce757b5f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260120020000_5b6a5f0a0e7b_restrict_voice_states_read.sql": {
+    "mtime": 1781430108.6195078,
+    "ast_hash": "1c9d1a8e1fbff29fc95e8dcb75c3ff40",
+    "semantic_hash": "1c9d1a8e1fbff29fc95e8dcb75c3ff40"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260121093000_add_match_queue_and_matched_user.sql": {
+    "mtime": 1781430108.619557,
+    "ast_hash": "6453c9f354f76fff47ef2eaffc210ae1",
+    "semantic_hash": "6453c9f354f76fff47ef2eaffc210ae1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260121100000_allow_match_queue_read.sql": {
+    "mtime": 1781430108.6196,
+    "ast_hash": "8ca5b49a47f0761b75c3456ef7ec4c8b",
+    "semantic_hash": "8ca5b49a47f0761b75c3456ef7ec4c8b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260123125235_f568e57e-7c4e-4931-b8e3-6ad667a921b1.sql": {
+    "mtime": 1781430108.6196477,
+    "ast_hash": "79478906f3cbd8ed0d89b0d0fddd6797",
+    "semantic_hash": "79478906f3cbd8ed0d89b0d0fddd6797"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260124154831_59b5344a-b73b-4e31-9e4b-d91425dc953f.sql": {
+    "mtime": 1781430108.619695,
+    "ast_hash": "e8357bf0cd21730635a2c9319b421ca8",
+    "semantic_hash": "e8357bf0cd21730635a2c9319b421ca8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260124161805_7c800423-aa05-4605-932a-a0e3cec34c96.sql": {
+    "mtime": 1781430108.6197455,
+    "ast_hash": "b576c3f057d96545321ab3d18de0b1db",
+    "semantic_hash": "b576c3f057d96545321ab3d18de0b1db"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260126024929_3575004d-fc17-4c60-8885-cf422a0be03c.sql": {
+    "mtime": 1781430108.6197999,
+    "ast_hash": "24f37dbff76e3dea06fc3b88e1f3092c",
+    "semantic_hash": "24f37dbff76e3dea06fc3b88e1f3092c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260126042358_878edce3-cd24-49f0-bf25-fde41a8204e8.sql": {
+    "mtime": 1781430108.6198537,
+    "ast_hash": "7e24be96ca2619ca85ef0486dc5de960",
+    "semantic_hash": "7e24be96ca2619ca85ef0486dc5de960"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260126065321_8f6ab676-d3ed-4156-93a2-614a30bfbe47.sql": {
+    "mtime": 1781430108.619896,
+    "ast_hash": "c19b983c00007bb13dd795c2bdd0ec63",
+    "semantic_hash": "c19b983c00007bb13dd795c2bdd0ec63"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260126073556_dc22af1a-36be-4301-bb5a-2089c0c4e7b5.sql": {
+    "mtime": 1781430108.6199381,
+    "ast_hash": "8fcbc82fb136d6149f28bdd322d97466",
+    "semantic_hash": "8fcbc82fb136d6149f28bdd322d97466"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260128082152_f0f30021-cbf1-4136-89bc-ca6eeb4d77cb.sql": {
+    "mtime": 1781430108.6199858,
+    "ast_hash": "3d79fb351bb50d80828f509cbd21c092",
+    "semantic_hash": "3d79fb351bb50d80828f509cbd21c092"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260128084149_add_admin_update_profiles_policy.sql": {
+    "mtime": 1781430108.620032,
+    "ast_hash": "d1ac9bbf33d3275285e0fc47cbddb7a4",
+    "semantic_hash": "d1ac9bbf33d3275285e0fc47cbddb7a4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260128085323_block_banned_users_sessions.sql": {
+    "mtime": 1781430108.620076,
+    "ast_hash": "90c55e3bc60f6632f6ed98b9584fc065",
+    "semantic_hash": "90c55e3bc60f6632f6ed98b9584fc065"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260129071345_7c97957d-6bbb-486b-aed0-4c6e4d18ca94.sql": {
+    "mtime": 1781430108.6201215,
+    "ast_hash": "f284bca26c00376e1ffe1f041ef47084",
+    "semantic_hash": "f284bca26c00376e1ffe1f041ef47084"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260129090000_add_rules_presets.sql": {
+    "mtime": 1781430108.620168,
+    "ast_hash": "0739a33cb783bfc43f973a1e566bab0b",
+    "semantic_hash": "0739a33cb783bfc43f973a1e566bab0b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260130090000_fix_rules_presets_policy.sql": {
+    "mtime": 1781430108.6202102,
+    "ast_hash": "6a5b8b6ff7c5f304acf23fe2409ac786",
+    "semantic_hash": "6a5b8b6ff7c5f304acf23fe2409ac786"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260130093000_update_rules_presets_policy_to_use_jwt_metadata.sql": {
+    "mtime": 1781430108.6202586,
+    "ast_hash": "e4d5a8767e9fca6f074111be279c35b5",
+    "semantic_hash": "e4d5a8767e9fca6f074111be279c35b5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260130100000_fix_rules_presets_policy_and_jwt_function.sql": {
+    "mtime": 1781430108.620302,
+    "ast_hash": "8ea94d0ae59d358ae1b8bbda991187a0",
+    "semantic_hash": "8ea94d0ae59d358ae1b8bbda991187a0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260131124013_4138ffa2-a621-4967-85e4-f60505265853.sql": {
+    "mtime": 1781430108.6203518,
+    "ast_hash": "30a3f5d78014e38125d24ec4cf3e50a2",
+    "semantic_hash": "30a3f5d78014e38125d24ec4cf3e50a2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260131153453_a9a39eac-beb3-47a2-b51d-7a824f7828b0.sql": {
+    "mtime": 1781430108.620401,
+    "ast_hash": "11925b9de0659ca2f0d839fc92b80a82",
+    "semantic_hash": "11925b9de0659ca2f0d839fc92b80a82"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260131222514_cf20da17-2675-41ee-a13a-6a22bf865b4d.sql": {
+    "mtime": 1781430108.620444,
+    "ast_hash": "7a9d79b24747b2e34610eff86239ac42",
+    "semantic_hash": "7a9d79b24747b2e34610eff86239ac42"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260204102847_705e79cc-9fbc-4571-9402-c2e18c91a19f.sql": {
+    "mtime": 1781430108.62049,
+    "ast_hash": "0dc81cb0a8264f1590c51080c083ca59",
+    "semantic_hash": "0dc81cb0a8264f1590c51080c083ca59"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260213102010_72d8a631-9f39-44b6-98c7-edfe56ed06a5.sql": {
+    "mtime": 1781430108.620549,
+    "ast_hash": "252af5ce626a306f491ec60fbcccb857",
+    "semantic_hash": "252af5ce626a306f491ec60fbcccb857"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260214100558_84bee4ad-f527-49a0-8367-8f1a359c572b.sql": {
+    "mtime": 1781430108.6205955,
+    "ast_hash": "3a2230f0500d57b98b73774221d9550c",
+    "semantic_hash": "3a2230f0500d57b98b73774221d9550c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260214120000_add_description_to_discord_roles.sql": {
+    "mtime": 1781430108.6206422,
+    "ast_hash": "8c13f72f92c9b3c31e1032d363240c11",
+    "semantic_hash": "8c13f72f92c9b3c31e1032d363240c11"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260214123000_add_discord_roles_constraints.sql": {
+    "mtime": 1781430108.6206965,
+    "ast_hash": "443cd4186536e840992eb40a599bbac6",
+    "semantic_hash": "443cd4186536e840992eb40a599bbac6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260215090000_add_discord_user_cache.sql": {
+    "mtime": 1781430108.620744,
+    "ast_hash": "c80129977991463da46690907dfe11e3",
+    "semantic_hash": "c80129977991463da46690907dfe11e3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260215132718_21a6bd68-6bd4-4b8e-8418-276636b9e036.sql": {
+    "mtime": 1781430108.6207943,
+    "ast_hash": "9a31270ec6fb656ebd170c2b1165c91d",
+    "semantic_hash": "9a31270ec6fb656ebd170c2b1165c91d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260216093000_add_tag_warn_cancel_requests.sql": {
+    "mtime": 1781448385.063341,
+    "ast_hash": "09b04970befe25ac6cad0d825b543449",
+    "semantic_hash": "09b04970befe25ac6cad0d825b543449"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260217090000_add_tag_warn_cancel_sync_audit_and_function.sql": {
+    "mtime": 1781430108.620898,
+    "ast_hash": "63b2d35e87d2411b20c40c6c1bece10c",
+    "semantic_hash": "63b2d35e87d2411b20c40c6c1bece10c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260217102319_6e1b16c5-5e34-4d7d-8dab-113530e03083.sql": {
+    "mtime": 1781430108.6209412,
+    "ast_hash": "9921ae66ba75a97c1e974b25ac4ccbe6",
+    "semantic_hash": "9921ae66ba75a97c1e974b25ac4ccbe6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260218092040_4a87f45b-5b66-421f-88a6-d133a10cb811.sql": {
+    "mtime": 1781430108.6209846,
+    "ast_hash": "83f231c1f9bc3dc53512afc266d11229",
+    "semantic_hash": "83f231c1f9bc3dc53512afc266d11229"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260220115926_80975d18-902a-4fd7-b5cb-e99db3301c51.sql": {
+    "mtime": 1781430108.621038,
+    "ast_hash": "c716d5546a99526836b459ff058bd483",
+    "semantic_hash": "c716d5546a99526836b459ff058bd483"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260224194057_8ab207cb-05b1-4c34-ae8e-b2d82b34355f.sql": {
+    "mtime": 1781430108.6210825,
+    "ast_hash": "c262079e68105a1c87e9db472d33a60e",
+    "semantic_hash": "c262079e68105a1c87e9db472d33a60e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260224234015_30b0c180-d28f-4b8e-92a1-cb67ad017619.sql": {
+    "mtime": 1781430108.6211338,
+    "ast_hash": "cec6cd2184583ad75ce341bdc5e5ff57",
+    "semantic_hash": "cec6cd2184583ad75ce341bdc5e5ff57"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260225004243_754327f7-6e95-47a9-bcb8-8f7a02b6394a.sql": {
+    "mtime": 1781430108.6212027,
+    "ast_hash": "101449279647c1b6887b1ab33f191700",
+    "semantic_hash": "101449279647c1b6887b1ab33f191700"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260225004642_5e0ebdde-e79a-4816-a3d8-be045cf7eb73.sql": {
+    "mtime": 1781430108.6212492,
+    "ast_hash": "e63d25a2b6da781cf2a1bc79fa5e3882",
+    "semantic_hash": "e63d25a2b6da781cf2a1bc79fa5e3882"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260225004731_adb7512c-275f-4daa-a79d-4e6abffd74dc.sql": {
+    "mtime": 1781430108.6213257,
+    "ast_hash": "27404353629f196c59b21a0b0b06bd76",
+    "semantic_hash": "27404353629f196c59b21a0b0b06bd76"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260227090000_add_lottery_tables.sql": {
+    "mtime": 1781430108.6213734,
+    "ast_hash": "bb78176530a92b466183755518d81a00",
+    "semantic_hash": "bb78176530a92b466183755518d81a00"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260227233059_e7f867f8-f0ec-48c7-9954-296cfc4a7f04.sql": {
+    "mtime": 1781430108.621416,
+    "ast_hash": "6d3460519b7688fac55705d1749964dd",
+    "semantic_hash": "6d3460519b7688fac55705d1749964dd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260304003418_871f27be-88bd-4b6d-9f0b-d6d0b9b37ac9.sql": {
+    "mtime": 1781448385.0634358,
+    "ast_hash": "24f7e6ba5f65175c114e49827068409b",
+    "semantic_hash": "24f7e6ba5f65175c114e49827068409b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260304011101_465b597d-4583-4fcb-96aa-3360a8e3b183.sql": {
+    "mtime": 1781430108.6215112,
+    "ast_hash": "819ba21687eae4f98933fdf19d4ada36",
+    "semantic_hash": "819ba21687eae4f98933fdf19d4ada36"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260305120000_add_warn_images_bucket.sql": {
+    "mtime": 1781430108.6215556,
+    "ast_hash": "8052895e29cd10b2458ece49eb57f69b",
+    "semantic_hash": "8052895e29cd10b2458ece49eb57f69b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260305123000_fix_tag_warn_logs_rls.sql": {
+    "mtime": 1781448385.063533,
+    "ast_hash": "adfddf92a3b175dc4d3917657f8f3e92",
+    "semantic_hash": "adfddf92a3b175dc4d3917657f8f3e92"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260305130000_fix_tag_warn_logs_sequence.sql": {
+    "mtime": 1781448385.0636258,
+    "ast_hash": "5e6974ce083274572e4c02d3793dac25",
+    "semantic_hash": "5e6974ce083274572e4c02d3793dac25"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260309120000_add_slip_images_bucket.sql": {
+    "mtime": 1781448385.0637057,
+    "ast_hash": "6305375fab681f057e3b48eb1f3312bb",
+    "semantic_hash": "6305375fab681f057e3b48eb1f3312bb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260309123000_fix_trading_permissions_owner_only.sql": {
+    "mtime": 1781430108.6217687,
+    "ast_hash": "4b373484ce67ee3e30d994dad5fa27da",
+    "semantic_hash": "4b373484ce67ee3e30d994dad5fa27da"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260309130000_fix_transaction_date_format.sql": {
+    "mtime": 1781430108.621809,
+    "ast_hash": "e61ca8d6b779643976636ba5b53cb615",
+    "semantic_hash": "e61ca8d6b779643976636ba5b53cb615"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260309133000_fix_settings_policy.sql": {
+    "mtime": 1781430108.6218495,
+    "ast_hash": "c431bb356056bb2de4abbf57b22af8e2",
+    "semantic_hash": "c431bb356056bb2de4abbf57b22af8e2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260310162151_f6b994bb-4cbb-48de-a0e9-f31e12a8ab6a.sql": {
+    "mtime": 1781430108.6218927,
+    "ast_hash": "22bd2425f938a34c573acb9440b9abd9",
+    "semantic_hash": "22bd2425f938a34c573acb9440b9abd9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260311000000_add_gacha_system.sql": {
+    "mtime": 1781430108.6219375,
+    "ast_hash": "a5b14b5d288a8ba641f3b3f6b97f5d5a",
+    "semantic_hash": "a5b14b5d288a8ba641f3b3f6b97f5d5a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260312000000_add_discord_server_listing.sql": {
+    "mtime": 1781430108.6219802,
+    "ast_hash": "ecef47fe89201b0c1068e85f362b1a79",
+    "semantic_hash": "ecef47fe89201b0c1068e85f362b1a79"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260401051905_d6663b82-52e3-446a-9bed-6f900b5cb4aa.sql": {
+    "mtime": 1781430108.622022,
+    "ast_hash": "7fbacae43b218e032cd5fc36f8226099",
+    "semantic_hash": "7fbacae43b218e032cd5fc36f8226099"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260402095755_b8316d75-6e9a-4616-943e-d3310e5c8816.sql": {
+    "mtime": 1781430108.6220675,
+    "ast_hash": "bcc470d781228dbacc3d3f497b337015",
+    "semantic_hash": "bcc470d781228dbacc3d3f497b337015"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260405020310_a7d09a4a-b5d6-46c4-823f-bcf3de53e6ad.sql": {
+    "mtime": 1781430108.6221042,
+    "ast_hash": "1ad1dedc01f9983f5ab08e158f95c694",
+    "semantic_hash": "1ad1dedc01f9983f5ab08e158f95c694"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260407034236_f234e739-073a-4bd9-a4ba-f985aabe267a.sql": {
+    "mtime": 1781430108.6221457,
+    "ast_hash": "ea55b5a57d63c8ee0c93492629685dbe",
+    "semantic_hash": "ea55b5a57d63c8ee0c93492629685dbe"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260409090000_add_healing_messages_feature.sql": {
+    "mtime": 1781430108.6221926,
+    "ast_hash": "18085314c205c40a25ee7e68272a1bed",
+    "semantic_hash": "18085314c205c40a25ee7e68272a1bed"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260415000000_add_server_featured_fields.sql": {
+    "mtime": 1781430108.622236,
+    "ast_hash": "6ce7906b851473c350ee3829279e1331",
+    "semantic_hash": "6ce7906b851473c350ee3829279e1331"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260415000001_add_server_ratings.sql": {
+    "mtime": 1781430108.6222806,
+    "ast_hash": "eb640eb757ec6334de073dd2ead9ba99",
+    "semantic_hash": "eb640eb757ec6334de073dd2ead9ba99"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260415000002_add_server_click_stats.sql": {
+    "mtime": 1781430108.622328,
+    "ast_hash": "bbe52460b4be0c31432827a30e331158",
+    "semantic_hash": "bbe52460b4be0c31432827a30e331158"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260415000003_add_notify_channel_to_servers.sql": {
+    "mtime": 1781430108.6223686,
+    "ast_hash": "3bbd3266df89c6aa5caa4ac696cd53b2",
+    "semantic_hash": "3bbd3266df89c6aa5caa4ac696cd53b2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260419000000_fix_discord_servers_admin_rls.sql": {
+    "mtime": 1781430108.622411,
+    "ast_hash": "16e29d031cd72fe22f5a24f69d83f7c4",
+    "semantic_hash": "16e29d031cd72fe22f5a24f69d83f7c4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260419000001_add_impression_count.sql": {
+    "mtime": 1781430108.6224585,
+    "ast_hash": "999a992c1245ec05377c6594973a54a7",
+    "semantic_hash": "999a992c1245ec05377c6594973a54a7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260419000002_fix_discord_servers_delete_rls.sql": {
+    "mtime": 1781430108.62251,
+    "ast_hash": "1cbe6e7e6ed422ab7b0856ef7ae381e0",
+    "semantic_hash": "1cbe6e7e6ed422ab7b0856ef7ae381e0"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260420000000_fix_discord_roles_access_and_user_points_read.sql": {
+    "mtime": 1781430108.6225622,
+    "ast_hash": "c25a078695f4799840fa08b6450cdc29",
+    "semantic_hash": "c25a078695f4799840fa08b6450cdc29"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260421000000_add_voice_activity_tables.sql": {
+    "mtime": 1781430108.6226294,
+    "ast_hash": "91fb1e4982c9c17ff8e43e9098b51ac4",
+    "semantic_hash": "91fb1e4982c9c17ff8e43e9098b51ac4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000000_add_secret_table_feature.sql": {
+    "mtime": 1781430108.6227286,
+    "ast_hash": "fc19c049201e7c96ca373f55a563c065",
+    "semantic_hash": "fc19c049201e7c96ca373f55a563c065"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000001_secret_table_additions.sql": {
+    "mtime": 1781430108.6228259,
+    "ast_hash": "031cd120c67cba126e06b723b0c05542",
+    "semantic_hash": "031cd120c67cba126e06b723b0c05542"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000002_add_chat_mood_config.sql": {
+    "mtime": 1781430108.6228817,
+    "ast_hash": "e532476e3ec57c4e32c481854c8c61c1",
+    "semantic_hash": "e532476e3ec57c4e32c481854c8c61c1"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000003_add_chat_role_system.sql": {
+    "mtime": 1781430108.6229298,
+    "ast_hash": "ce96a2df2104bf421dc2b933f811764a",
+    "semantic_hash": "ce96a2df2104bf421dc2b933f811764a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000004_add_chat_roles_table.sql": {
+    "mtime": 1781430108.622977,
+    "ast_hash": "324e34260be7c258830842d5e48e37ae",
+    "semantic_hash": "324e34260be7c258830842d5e48e37ae"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000005_add_chat_role_images_bucket.sql": {
+    "mtime": 1781430108.623024,
+    "ast_hash": "92e7c7fb1ff26e8b7ff6b39f96e5d4f8",
+    "semantic_hash": "92e7c7fb1ff26e8b7ff6b39f96e5d4f8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000006_add_chat_music_tables.sql": {
+    "mtime": 1782706142.3523123,
+    "ast_hash": "69b9e0adceb00925dd2e092a23e017ec",
+    "semantic_hash": "69b9e0adceb00925dd2e092a23e017ec"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000007_add_chat_music_storage.sql": {
+    "mtime": 1782706142.3523622,
+    "ast_hash": "2278b2f7dbfc8d7d22837cbeb80dd34a",
+    "semantic_hash": "2278b2f7dbfc8d7d22837cbeb80dd34a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260428000008_add_track_image_url.sql": {
+    "mtime": 1782706142.3524044,
+    "ast_hash": "a67bd98e9a3ccf4976b54246825a0a51",
+    "semantic_hash": "a67bd98e9a3ccf4976b54246825a0a51"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260501000000_add_webm_to_chat_music_bucket.sql": {
+    "mtime": 1781430108.6231997,
+    "ast_hash": "024339460e6ea00927831eb82151a6c9",
+    "semantic_hash": "024339460e6ea00927831eb82151a6c9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260501000001_add_artist_to_chat_music_tracks.sql": {
+    "mtime": 1781430108.6232426,
+    "ast_hash": "e92eba044f0180f174170ada4f82fee5",
+    "semantic_hash": "e92eba044f0180f174170ada4f82fee5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000000_add_ai_categories_to_violations.sql": {
+    "mtime": 1781430108.6232898,
+    "ast_hash": "f4a6b107eb303a71c3d1b4dd13084cfb",
+    "semantic_hash": "f4a6b107eb303a71c3d1b4dd13084cfb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000001_add_system_message_to_chat.sql": {
+    "mtime": 1781430108.6233325,
+    "ast_hash": "2864436708e61491d48957e8bb8077f3",
+    "semantic_hash": "2864436708e61491d48957e8bb8077f3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000002_fix_moderation_rls.sql": {
+    "mtime": 1781430108.6233745,
+    "ast_hash": "752541256e84ede630e3a3fa3ae5af00",
+    "semantic_hash": "752541256e84ede630e3a3fa3ae5af00"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000003_chat_sessions_started_at_and_music_rls.sql": {
+    "mtime": 1781430108.623422,
+    "ast_hash": "3662457639aa80a38e40706021f43782",
+    "semantic_hash": "3662457639aa80a38e40706021f43782"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000004_allow_system_sender.sql": {
+    "mtime": 1781430108.6234639,
+    "ast_hash": "918b1f21320765003d7adaa64accf054",
+    "semantic_hash": "918b1f21320765003d7adaa64accf054"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000005_cohort_and_profile_frames.sql": {
+    "mtime": 1781430108.6235168,
+    "ast_hash": "c69ccf90cd5553e18e543f5451737130",
+    "semantic_hash": "c69ccf90cd5553e18e543f5451737130"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260503000006_chat_queue_performance.sql": {
+    "mtime": 1781448385.0637836,
+    "ast_hash": "0986f74881c3f4ea6c38c77e7973addf",
+    "semantic_hash": "0986f74881c3f4ea6c38c77e7973addf"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000000_add_campaign_messages.sql": {
+    "mtime": 1781430108.6236475,
+    "ast_hash": "632f60ab17125c85a655c51a2d2815b4",
+    "semantic_hash": "632f60ab17125c85a655c51a2d2815b4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000001_add_campaign_schedule_config.sql": {
+    "mtime": 1781430108.623708,
+    "ast_hash": "aeb2723ead290bf41c9bfc7e595b6139",
+    "semantic_hash": "aeb2723ead290bf41c9bfc7e595b6139"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000002_update_campaign_schedule_interval.sql": {
+    "mtime": 1781430108.62377,
+    "ast_hash": "190594937e4b348fe1324129fb80acd3",
+    "semantic_hash": "190594937e4b348fe1324129fb80acd3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000003_campaign_schedule_add_minutes.sql": {
+    "mtime": 1781430108.623812,
+    "ast_hash": "118ed7711cc24a6fffd2b55ede122588",
+    "semantic_hash": "118ed7711cc24a6fffd2b55ede122588"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000004_add_channel_activity_stats.sql": {
+    "mtime": 1781430108.623862,
+    "ast_hash": "0bf2760e69d9257e80b37ffce675b061",
+    "semantic_hash": "0bf2760e69d9257e80b37ffce675b061"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000005_add_next_send_at.sql": {
+    "mtime": 1781430108.6239076,
+    "ast_hash": "d012beb650adfe069c945cb44135ffca",
+    "semantic_hash": "d012beb650adfe069c945cb44135ffca"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260511000006_campaign_add_image2_button2.sql": {
+    "mtime": 1781430108.6239505,
+    "ast_hash": "6ab6b14c33de74d4a89b595ead9f3254",
+    "semantic_hash": "6ab6b14c33de74d4a89b595ead9f3254"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519090000_add_bartender_mode.sql": {
+    "mtime": 1781430108.6239963,
+    "ast_hash": "1b0f9f306105665d6a031f34ef6be323",
+    "semantic_hash": "1b0f9f306105665d6a031f34ef6be323"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519093000_bartender_atomic_matching.sql": {
+    "mtime": 1781448385.063891,
+    "ast_hash": "f134902c7d817e101df5e8bae347b3ad",
+    "semantic_hash": "f134902c7d817e101df5e8bae347b3ad"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519094500_prevent_bartender_to_bartender_matches.sql": {
+    "mtime": 1781448385.0639694,
+    "ast_hash": "cf35a94f624daa97f8767c0ea333c078",
+    "semantic_hash": "cf35a94f624daa97f8767c0ea333c078"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519100000_chat_queue_fast_stale_cleanup.sql": {
+    "mtime": 1781430108.624149,
+    "ast_hash": "35b53cbf7678163bac396c8caf70ba16",
+    "semantic_hash": "35b53cbf7678163bac396c8caf70ba16"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519102000_switch_bartender_to_user.sql": {
+    "mtime": 1781448385.0640972,
+    "ast_hash": "15d3f354218a26798e8517cff398b0ce",
+    "semantic_hash": "15d3f354218a26798e8517cff398b0ce"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260519103000_harden_bartender_matching.sql": {
+    "mtime": 1781448385.064204,
+    "ast_hash": "5fe690c8bdaec442518abfe377138dff",
+    "semantic_hash": "5fe690c8bdaec442518abfe377138dff"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260520173000_unified_secret_chat_matching.sql": {
+    "mtime": 1781448385.0642865,
+    "ast_hash": "607e2eff80b967cb2bf8d0e10054a058",
+    "semantic_hash": "607e2eff80b967cb2bf8d0e10054a058"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260520200500_fix_secret_chat_advisory_lock.sql": {
+    "mtime": 1781430108.6243262,
+    "ast_hash": "c89d0c60adef591146532ca3c6a11d90",
+    "semantic_hash": "c89d0c60adef591146532ca3c6a11d90"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260520200501_fix_match_cleanup_ended_sessions.sql": {
+    "mtime": 1781430108.6243968,
+    "ast_hash": "743c75a9a5db14a43cdca5e830c328d4",
+    "semantic_hash": "743c75a9a5db14a43cdca5e830c328d4"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260521000000_add_discord_secret_chat_tables.sql": {
+    "mtime": 1781430108.6244757,
+    "ast_hash": "2150ec6a6fbcffc465275c639376e958",
+    "semantic_hash": "2150ec6a6fbcffc465275c639376e958"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260601000000_add_invite_status_columns.sql": {
+    "mtime": 1781430108.6245222,
+    "ast_hash": "190c0a20f72d344d1dcef43d0763744d",
+    "semantic_hash": "190c0a20f72d344d1dcef43d0763744d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260602000000_add_salmon_point_feature.sql": {
+    "mtime": 1781430108.6246061,
+    "ast_hash": "97b62b309ad1c319c5b633ea024d4b4f",
+    "semantic_hash": "97b62b309ad1c319c5b633ea024d4b4f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260603000000_add_roles_to_delete_on_transfer.sql": {
+    "mtime": 1781430108.624656,
+    "ast_hash": "8e2354f4b62ab6c4c26ea347020f4f64",
+    "semantic_hash": "8e2354f4b62ab6c4c26ea347020f4f64"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260603000001_fix_roles_to_delete_rls.sql": {
+    "mtime": 1781430108.624707,
+    "ast_hash": "1e4a35d784571f84483df169d196c09b",
+    "semantic_hash": "1e4a35d784571f84483df169d196c09b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260605000000_add_inventory_system.sql": {
+    "mtime": 1782705119.251886,
+    "ast_hash": "36a2433434d85c04e50f6b846e15ad75",
+    "semantic_hash": "36a2433434d85c04e50f6b846e15ad75"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000000_add_checkin_reward_type_enum.sql": {
+    "mtime": 1782705119.2519333,
+    "ast_hash": "13e018294bbfff3ce2e47cb63980fb5e",
+    "semantic_hash": "13e018294bbfff3ce2e47cb63980fb5e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000001_add_checkin_tables.sql": {
+    "mtime": 1782705119.252,
+    "ast_hash": "61b761cf15590e8c0588b665d848356e",
+    "semantic_hash": "61b761cf15590e8c0588b665d848356e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000002_add_checkin_rls.sql": {
+    "mtime": 1782705119.252124,
+    "ast_hash": "f70cd8e12235408a027a92ab7652810e",
+    "semantic_hash": "f70cd8e12235408a027a92ab7652810e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000003_add_checkin_indexes.sql": {
+    "mtime": 1782705119.2521691,
+    "ast_hash": "93a80a3789be8473abf6781872735828",
+    "semantic_hash": "93a80a3789be8473abf6781872735828"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000004_add_ticket_points_to_user_points.sql": {
+    "mtime": 1782705119.2522123,
+    "ast_hash": "0cb92ab9173bd5192f332de96978cd33",
+    "semantic_hash": "0cb92ab9173bd5192f332de96978cd33"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260606000005_seed_checkin_defaults.sql": {
+    "mtime": 1782705119.2810502,
+    "ast_hash": "60862689c366b3df14a5b52596787776",
+    "semantic_hash": "60862689c366b3df14a5b52596787776"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260615000000_add_makeup_cost_per_day.sql": {
+    "mtime": 1782705119.2812235,
+    "ast_hash": "0493caee28ddc1f9f453cf21cccae2a5",
+    "semantic_hash": "0493caee28ddc1f9f453cf21cccae2a5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260615000001_remove_global_makeup_cost.sql": {
+    "mtime": 1782705119.2814107,
+    "ast_hash": "f921b651404ce95c9288c24395d8d40f",
+    "semantic_hash": "f921b651404ce95c9288c24395d8d40f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260615000002_add_year_month_to_checkin_rewards.sql": {
+    "mtime": 1782705119.2815814,
+    "ast_hash": "68f0d8c4f6e2cc62c549ffeb43f8adf3",
+    "semantic_hash": "68f0d8c4f6e2cc62c549ffeb43f8adf3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260615000003_seed_next_months_rewards.sql": {
+    "mtime": 1782705119.2817037,
+    "ast_hash": "ae16839c2c3a5834f37d6ec7c5fda266",
+    "semantic_hash": "ae16839c2c3a5834f37d6ec7c5fda266"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260617000000_add_reports_table.sql": {
+    "mtime": 1782669642.5229924,
+    "ast_hash": "1ca769b39c85ee51245ba41fbae2c7e8",
+    "semantic_hash": "1ca769b39c85ee51245ba41fbae2c7e8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260617000001_tag_warn_add_image2_remove_punish_link.sql": {
+    "mtime": 1782669642.5230844,
+    "ast_hash": "0645810bf7119af46b2e2cfc3bb63ff5",
+    "semantic_hash": "0645810bf7119af46b2e2cfc3bb63ff5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260617000002_tag_warn_add_is_spoiler.sql": {
+    "mtime": 1782669642.5350258,
+    "ast_hash": "b1df4f96a908f7805c1ea83db8a86d47",
+    "semantic_hash": "b1df4f96a908f7805c1ea83db8a86d47"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260617000003_tag_warn_add_is_spoiler_2.sql": {
+    "mtime": 1782669695.672807,
+    "ast_hash": "2eecd88137f5616d4ddd2332264b7ef9",
+    "semantic_hash": "2eecd88137f5616d4ddd2332264b7ef9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260621000000_add_session_ads_table.sql": {
+    "mtime": 1782669695.7021065,
+    "ast_hash": "bdfc099352d0a8a7e1137f1e9c683e5b",
+    "semantic_hash": "bdfc099352d0a8a7e1137f1e9c683e5b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260621000001_add_session_ads_bucket.sql": {
+    "mtime": 1782669695.702251,
+    "ast_hash": "1a84c795d49176ffd5d5bdeaa670726d",
+    "semantic_hash": "1a84c795d49176ffd5d5bdeaa670726d"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260625000000_add_ad_placement_system.sql": {
+    "mtime": 1782669695.7379532,
+    "ast_hash": "05bb8ab900eed2770edb7915abca1f4f",
+    "semantic_hash": "05bb8ab900eed2770edb7915abca1f4f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260625000001_refactor_delivery_mode.sql": {
+    "mtime": 1782669695.7481263,
+    "ast_hash": "2e22f9e8bd322fe9d14069b44cc2d2ea",
+    "semantic_hash": "2e22f9e8bd322fe9d14069b44cc2d2ea"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260628000000_add_role_migration_log.sql": {
+    "mtime": 1782706121.2517679,
+    "ast_hash": "6fbfca6d0949d08d28048cee29bf3965",
+    "semantic_hash": "6fbfca6d0949d08d28048cee29bf3965"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260629000000_seed_global_cta_buttons.sql": {
+    "mtime": 1782706147.1555204,
+    "ast_hash": "f09660c951e0a7c45bb77911a94cccb7",
+    "semantic_hash": "f09660c951e0a7c45bb77911a94cccb7"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260629000001_new_billing_system.sql": {
+    "mtime": 1782706147.1740797,
+    "ast_hash": "f8397b5d312592890941a7e8d46aefe9",
+    "semantic_hash": "f8397b5d312592890941a7e8d46aefe9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations/20260629000002_fix_trading_history_rls.sql": {
+    "mtime": 1782706147.1826792,
+    "ast_hash": "5be5a07ccfcbd829cebbef78d5159513",
+    "semantic_hash": "5be5a07ccfcbd829cebbef78d5159513"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations_bootstrap/20260416230000_01_extensions_enums_functions.sql": {
+    "mtime": 1781430108.624781,
+    "ast_hash": "aca430b7c78af57d7782a62c9bbeab9b",
+    "semantic_hash": "aca430b7c78af57d7782a62c9bbeab9b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations_bootstrap/20260416230010_02_tables_indexes_triggers.sql": {
+    "mtime": 1781430108.6248453,
+    "ast_hash": "5953c86c6d698b88388521844f3d1905",
+    "semantic_hash": "5953c86c6d698b88388521844f3d1905"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations_bootstrap/20260416230020_03_rls_policies.sql": {
+    "mtime": 1781430108.6249251,
+    "ast_hash": "ed1a747c7491046d6df3cf27f25d4064",
+    "semantic_hash": "ed1a747c7491046d6df3cf27f25d4064"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/migrations_bootstrap/20260416230030_04_storage_and_seed.sql": {
+    "mtime": 1781430108.624978,
+    "ast_hash": "d46368d263b42b34889163ef7e9784d3",
+    "semantic_hash": "d46368d263b42b34889163ef7e9784d3"
+  },
+  "/Users/svacmai/Developer/bear-cafe/tailwind.config.ts": {
+    "mtime": 1782705119.2820237,
+    "ast_hash": "013c3b4c82a42cbe75f494caf1cb8d7e",
+    "semantic_hash": "013c3b4c82a42cbe75f494caf1cb8d7e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/tsconfig.app.json": {
+    "mtime": 1781430108.625107,
+    "ast_hash": "8712c60b1f86eac1daa91619eb776efd",
+    "semantic_hash": "8712c60b1f86eac1daa91619eb776efd"
+  },
+  "/Users/svacmai/Developer/bear-cafe/tsconfig.json": {
+    "mtime": 1781448385.064383,
+    "ast_hash": "fdd9326ac868427a6ddb438ba40a2e3b",
+    "semantic_hash": "fdd9326ac868427a6ddb438ba40a2e3b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/tsconfig.node.json": {
+    "mtime": 1781430108.625205,
+    "ast_hash": "1417fb05378a1d1102f085e60b20db0e",
+    "semantic_hash": "1417fb05378a1d1102f085e60b20db0e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/vercel.json": {
+    "mtime": 1781448385.064466,
+    "ast_hash": "5d1ebde9b3e192b5436d24369985fb4e",
+    "semantic_hash": "5d1ebde9b3e192b5436d24369985fb4e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/vite.config.ts": {
+    "mtime": 1781430108.625292,
+    "ast_hash": "671a987174797dbeee50c18970779839",
+    "semantic_hash": "671a987174797dbeee50c18970779839"
+  },
+  "/Users/svacmai/Developer/bear-cafe/.github/workflows/deploy-functions.yml": {
+    "mtime": 1781448385.0612729,
+    "ast_hash": "b939a0707bfe67c2d463417d9802e335",
+    "semantic_hash": "b939a0707bfe67c2d463417d9802e335"
+  },
+  "/Users/svacmai/Developer/bear-cafe/.github/workflows/deploy-vercel.yml": {
+    "mtime": 1781448385.0613887,
+    "ast_hash": "e5df6782b3688baa98ae18ff63322bdb",
+    "semantic_hash": "e5df6782b3688baa98ae18ff63322bdb"
+  },
+  "/Users/svacmai/Developer/bear-cafe/DEPLOY_INSTRUCTIONS.md": {
+    "mtime": 1781430108.560945,
+    "ast_hash": "bfd89d0ca993c11f046016a30a1c9aad",
+    "semantic_hash": "bfd89d0ca993c11f046016a30a1c9aad"
+  },
+  "/Users/svacmai/Developer/bear-cafe/README.md": {
+    "mtime": 1781450552.4159143,
+    "ast_hash": "179b8f7acc9b1db7a66362c8fe939c2c",
+    "semantic_hash": "179b8f7acc9b1db7a66362c8fe939c2c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/design-system.md": {
+    "mtime": 1781430108.562889,
+    "ast_hash": "9973450786ee3804831b2d1db0410699",
+    "semantic_hash": "9973450786ee3804831b2d1db0410699"
+  },
+  "/Users/svacmai/Developer/bear-cafe/index.html": {
+    "mtime": 1781430111.562996,
+    "ast_hash": "4e9d068088447eac04b43752186531df",
+    "semantic_hash": "4e9d068088447eac04b43752186531df"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/robots.txt": {
+    "mtime": 1781430108.5881903,
+    "ast_hash": "f9dff89adf98833e676de2205921996a",
+    "semantic_hash": "f9dff89adf98833e676de2205921996a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/supabase/functions/README.md": {
+    "mtime": 1781450552.4173262,
+    "ast_hash": "3f0a6cf4e6710826717634a6cd458e4b",
+    "semantic_hash": "3f0a6cf4e6710826717634a6cd458e4b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/ux-ui-handoff.md": {
+    "mtime": 1782669642.5232615,
+    "ast_hash": "a64b469ade5ca8a281fdb4a890800366",
+    "semantic_hash": "a64b469ade5ca8a281fdb4a890800366"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/banner/welcome_banner.jpg": {
+    "mtime": 1782705119.2721963,
+    "ast_hash": "80431296db6f8d67ce1d62b2ec9630af",
+    "semantic_hash": "80431296db6f8d67ce1d62b2ec9630af"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG1.svg": {
+    "mtime": 1782706142.34937,
+    "ast_hash": "c355d950daf972a451a29b9088983b42",
+    "semantic_hash": "c355d950daf972a451a29b9088983b42"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG2.svg": {
+    "mtime": 1782706142.3496168,
+    "ast_hash": "c17da62a1aa836a95c21de01ac5735dc",
+    "semantic_hash": "c17da62a1aa836a95c21de01ac5735dc"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG3.svg": {
+    "mtime": 1782706142.3499901,
+    "ast_hash": "abfe305fbabde7f2af2912f22c1887d2",
+    "semantic_hash": "abfe305fbabde7f2af2912f22c1887d2"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG4.svg": {
+    "mtime": 1782706142.3502192,
+    "ast_hash": "2ae9131d9a9c5149360966530b88c67e",
+    "semantic_hash": "2ae9131d9a9c5149360966530b88c67e"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG5.svg": {
+    "mtime": 1782706142.3504503,
+    "ast_hash": "1b0c6368ee176ebb2696e24696ec6380",
+    "semantic_hash": "1b0c6368ee176ebb2696e24696ec6380"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/game1/bearG6.svg": {
+    "mtime": 1782706142.350922,
+    "ast_hash": "2b6fc773286d65d22158fb144255b80b",
+    "semantic_hash": "2b6fc773286d65d22158fb144255b80b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/icons/SecretCafe-1.png": {
+    "mtime": 1781430108.583708,
+    "ast_hash": "ff3c6e6e6b0e09df7343823d21a00046",
+    "semantic_hash": "ff3c6e6e6b0e09df7343823d21a00046"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/icons/SecretCafe-2.png": {
+    "mtime": 1781430108.5844407,
+    "ast_hash": "320d9007314452af45239429d6ddcd63",
+    "semantic_hash": "320d9007314452af45239429d6ddcd63"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/icons/SecretCafe-3.png": {
+    "mtime": 1781430108.5853393,
+    "ast_hash": "eb3dbe444caea396092225d5fe431da5",
+    "semantic_hash": "eb3dbe444caea396092225d5fe431da5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/icons/cat-icon.svg": {
+    "mtime": 1781430108.5864067,
+    "ast_hash": "f9aad39a6d7949da41618ca3f09fa6b5",
+    "semantic_hash": "f9aad39a6d7949da41618ca3f09fa6b5"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/logo.png": {
+    "mtime": 1781430108.586643,
+    "ast_hash": "6fedd43a93322352494b01f95821ac3b",
+    "semantic_hash": "6fedd43a93322352494b01f95821ac3b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/og-preview.png": {
+    "mtime": 1781430108.588063,
+    "ast_hash": "201c300365082a160a2e5556228fde29",
+    "semantic_hash": "201c300365082a160a2e5556228fde29"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/placeholder.svg": {
+    "mtime": 1781430108.588141,
+    "ast_hash": "35707bd9960ba5281c72af927b79291f",
+    "semantic_hash": "35707bd9960ba5281c72af927b79291f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/HoneyJarIcon.png": {
+    "mtime": 1782706142.3514893,
+    "ast_hash": "b21c6bc940baccac3ef129aaef216510",
+    "semantic_hash": "b21c6bc940baccac3ef129aaef216510"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/bear-cafe-logo.png": {
+    "mtime": 1781430108.5929246,
+    "ast_hash": "f55944bea69f189b170b3fe06eb9519c",
+    "semantic_hash": "f55944bea69f189b170b3fe06eb9519c"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/bear-mascot.png": {
+    "mtime": 1781430108.5931022,
+    "ast_hash": "6fedd43a93322352494b01f95821ac3b",
+    "semantic_hash": "6fedd43a93322352494b01f95821ac3b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/bg-landscape.jpg": {
+    "mtime": 1781430108.5945802,
+    "ast_hash": "a4a9789cf63e291087a007a9e133b525",
+    "semantic_hash": "a4a9789cf63e291087a007a9e133b525"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/bg-portrait.jpg": {
+    "mtime": 1781430108.5958345,
+    "ast_hash": "11e8250aac45308fb35e8be39fc61f2b",
+    "semantic_hash": "11e8250aac45308fb35e8be39fc61f2b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/char.png": {
+    "mtime": 1781430108.596371,
+    "ast_hash": "5ca863e0be5ddaed3d5b65500130b5ad",
+    "semantic_hash": "5ca863e0be5ddaed3d5b65500130b5ad"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/darkmode-icon.png": {
+    "mtime": 1781430108.59673,
+    "ast_hash": "2fd17afd40bc78b52329cc44709fde1f",
+    "semantic_hash": "2fd17afd40bc78b52329cc44709fde1f"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/history-icon.png": {
+    "mtime": 1781430108.5971305,
+    "ast_hash": "5f2a4f18277876d068d1655fc417898b",
+    "semantic_hash": "5f2a4f18277876d068d1655fc417898b"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/lightmode-icon.png": {
+    "mtime": 1781430108.5975358,
+    "ast_hash": "39b916cf9b8b285ce235fc0e8a7ae6f9",
+    "semantic_hash": "39b916cf9b8b285ce235fc0e8a7ae6f9"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/lottery-icon.png": {
+    "mtime": 1781430108.5980635,
+    "ast_hash": "35be36839337ccf985031acbfa446fdf",
+    "semantic_hash": "35be36839337ccf985031acbfa446fdf"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/pixel-coffee.gif": {
+    "mtime": 1782706142.3516731,
+    "ast_hash": "f3745a5ed97ddba3658fc203dfe0f265",
+    "semantic_hash": "f3745a5ed97ddba3658fc203dfe0f265"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/point-icon.png": {
+    "mtime": 1781430108.5986075,
+    "ast_hash": "be130109437bc990539538e212b42271",
+    "semantic_hash": "be130109437bc990539538e212b42271"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/prize-shadow-dark.png": {
+    "mtime": 1781430108.5987482,
+    "ast_hash": "f69c2d98e4784ebc43ab29346f17c78a",
+    "semantic_hash": "f69c2d98e4784ebc43ab29346f17c78a"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/prize-shadow-light.png": {
+    "mtime": 1781430108.5988748,
+    "ast_hash": "403c572079be6a2134cda1c5342d00b6",
+    "semantic_hash": "403c572079be6a2134cda1c5342d00b6"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/rule-icon.png": {
+    "mtime": 1781430108.59933,
+    "ast_hash": "2728a2eb633f95dd3358fb23079067b8",
+    "semantic_hash": "2728a2eb633f95dd3358fb23079067b8"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/setting-icon.png": {
+    "mtime": 1781430108.5997238,
+    "ast_hash": "e500fa343ecfdb427f0331d2d264baef",
+    "semantic_hash": "e500fa343ecfdb427f0331d2d264baef"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/strawberry-icon.png": {
+    "mtime": 1781430108.5998359,
+    "ast_hash": "99de7db237d04a4ffdd70f87d6462d87",
+    "semantic_hash": "99de7db237d04a4ffdd70f87d6462d87"
+  },
+  "/Users/svacmai/Developer/bear-cafe/public/RainSounds.mp3": {
+    "mtime": 1782706142.3489666,
+    "ast_hash": "94e62d34008968674944aaba3e39a858",
+    "semantic_hash": "94e62d34008968674944aaba3e39a858"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/strawberry-jar-light.mp4": {
+    "mtime": 1781430108.6007574,
+    "ast_hash": "01a2cafb0e129589269c44c28a4ef957",
+    "semantic_hash": "01a2cafb0e129589269c44c28a4ef957"
+  },
+  "/Users/svacmai/Developer/bear-cafe/src/assets/strawberry-jar.mp4": {
+    "mtime": 1781430108.6012611,
+    "ast_hash": "ae8b3a4943b18ba5d9cf49f923dbdf22",
+    "semantic_hash": "ae8b3a4943b18ba5d9cf49f923dbdf22"
+  }
+}

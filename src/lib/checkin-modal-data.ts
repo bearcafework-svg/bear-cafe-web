@@ -1,8 +1,34 @@
 import type { CheckinActionResult } from '@/hooks/useCheckin';
 import { REWARD_TYPE_LABELS, type CheckinDailyReward } from '@/lib/checkin';
 import type { CheckinRewardModalData } from '@/components/bear-cafe/CheckinRewardModal';
+import type { CheckinMakeupConfirmModalData } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 
 export type RoleMeta = { icon?: string; name?: string };
+
+export function buildMakeupModalData(
+  selectedReward: CheckinDailyReward,
+  selectedDay: number,
+  roleMeta: Record<string, RoleMeta>,
+): CheckinMakeupConfirmModalData {
+  const modalData: CheckinMakeupConfirmModalData = {
+    type: selectedReward.reward_type,
+    pointsAdded: selectedReward.reward_amount ?? undefined,
+    makeupCost: selectedReward.makeup_cost ?? 50,
+    dayNumber: selectedDay,
+  };
+
+  if (selectedReward.reward_type === 'role') {
+    modalData.roleId = selectedReward.role_id ?? undefined;
+    modalData.roleName = selectedReward.role_name ?? undefined;
+    const meta = selectedReward.role_id ? roleMeta[selectedReward.role_id] : undefined;
+    if (meta) {
+      modalData.roleName = modalData.roleName ?? meta.name;
+      modalData.roleIcon = meta.icon;
+    }
+  }
+
+  return modalData;
+}
 
 function rewardToPopup(
   reward: Record<string, unknown>,

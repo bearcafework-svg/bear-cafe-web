@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Menu, X, Settings, RotateCcw, ChevronLeft } from 'lucide-react';
-import { CozySidebar } from '@/components/bear-cafe/CozySidebar';
+import { CozySidebar, COZY_SIDEBAR_WIDTH } from '@/components/bear-cafe/CozySidebar';
 import { CozyRightPanel } from '@/components/bear-cafe/CozyRightPanel';
 import { Footer } from '@/components/bear-cafe/Footer';
 
@@ -170,7 +170,7 @@ export default function SpinPrizePage() {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 w-[220px] h-full">
+          <div className="relative z-50 h-full max-w-[85vw]" style={{ width: COZY_SIDEBAR_WIDTH }}>
             <CozySidebar />
           </div>
         </div>

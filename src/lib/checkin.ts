@@ -215,6 +215,22 @@ export function getCheckinDayState(
   return 'future';
 }
 
+/** Claim button label based on day state and action progress. */
+export function getCheckinClaimButtonLabel(
+  acting: boolean,
+  selectedCheckedIn: boolean,
+  selectedDay: number,
+  selectedState: CheckinDayState,
+): string {
+  if (acting) return '';
+  if (selectedCheckedIn) return 'รับรางวัลแล้ว';
+  if (selectedDay > 28) return 'หมดรอบเช็คอิน';
+  if (selectedState === 'makeup') return 'เติมเช็คอิน';
+  if (selectedState === 'future') return 'ยังรับรางวัลไม่ได้';
+  if (selectedState === 'missed') return 'พลาดเช็คอินแล้ว';
+  return 'รับรางวัลวันนี้';
+}
+
 export const CHECKIN_ERROR_MESSAGES: Record<string, string> = {
   missing_discord_id: 'ไม่พบข้อมูล Discord',
   missing_auth: 'กรุณาเข้าสู่ระบบก่อน',

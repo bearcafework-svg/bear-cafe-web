@@ -1,56 +1,49 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from 'next-themes';
-import { LogOut, LogIn } from 'lucide-react';
+import { LogIn, Settings } from 'lucide-react';
 import { BearLogo } from './BearLogo';
-import { MascotMessage } from './MascotMessage';
+import { useUserBalances } from '@/hooks/useUserBalances';
+import {
+  CaffeLatteIcon,
+  StrawberryColorIcon,
+  TicketColorIcon,
+  TearTicketColorIcon,
+} from '@/icon/outline';
+import { cn } from '@/lib/utils';
 
-import pointIcon from '@/assets/point-icon.png';
-import lightmodeIcon from '@/assets/lightmode-icon.png';
-import darkmodeIcon from '@/assets/darkmode-icon.png';
-import historyIcon from '@/assets/history-icon.png';
-import ruleIcon from '@/assets/rule-icon.png';
-import settingIcon from '@/assets/setting-icon.png';
+const NOTION_RULES_URL =
+  'https://www.notion.so/2f4fa9ff914e80b29e13e5225887e07d';
 
-const DiscordIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-  </svg>
-);
+export const COZY_SIDEBAR_WIDTH = 272;
 
-
-
-interface NavItemProps {
-  icon: string | React.ReactNode;
+interface NavItemConfig {
   label: string;
-  onClick?: () => void;
   href?: string;
   external?: boolean;
-  danger?: boolean;
-  accent?: boolean;
+  onClick?: () => void;
+  matchPath?: string;
+  requireAuth?: boolean;
 }
 
-function NavItem({ icon, label, onClick, href, external, danger, accent }: NavItemProps) {
-  const base =
-    'group flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ' +
-    (danger
-      ? 'text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/10'
-      : accent
-      ? 'text-[hsl(var(--primary))] hover:bg-[hsl(var(--accent)/0.12)]'
-      : 'text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]');
+interface NavItemProps extends NavItemConfig {
+  isActive?: boolean;
+  icon?: React.ReactNode;
+}
 
-  const iconEl =
-    typeof icon === 'string' ? (
-      <img
-        src={icon}
-        alt=""
-        className="w-5 h-5 object-contain shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:-translate-y-0.5"
-      />
-    ) : (
-      <span className="w-5 h-5 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:-translate-y-0.5">
-        {icon}
-      </span>
-    );
+function NavItem({ label, href, external, onClick, isActive, icon }: NavItemProps) {
+  const base = cn(
+    'group flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
+    isActive
+      ? 'bg-[hsl(var(--honey)/0.18)] text-[hsl(var(--bear-brown))] dark:bg-[hsl(var(--honey)/0.12)] dark:text-[hsl(var(--honey))]'
+      : 'text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]',
+  );
+
+  const iconEl = (
+    <span className="w-5 h-5 flex items-center justify-center shrink-0">
+      {icon ?? <CaffeLatteIcon size={20} />}
+    </span>
+  );
 
   if (href && external) {
     return (
@@ -60,6 +53,7 @@ function NavItem({ icon, label, onClick, href, external, danger, accent }: NavIt
       </a>
     );
   }
+
   if (href) {
     return (
       <Link to={href} className={base}>
@@ -68,122 +62,214 @@ function NavItem({ icon, label, onClick, href, external, danger, accent }: NavIt
       </Link>
     );
   }
+
   return (
-    <button onClick={onClick} className={base}>
+    <button type="button" onClick={onClick} className={base}>
       {iconEl}
       <span>{label}</span>
     </button>
   );
 }
 
+function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+        {title}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function SidebarProfile() {
+  const { user, isAuthenticated } = useAuth();
+
+  return (
+    <div className="px-4 py-3 flex items-center gap-3 shrink-0">
+      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-[hsl(var(--honey)/0.6)] shadow-sm shrink-0">
+        {isAuthenticated && user?.avatar_url ? (
+          <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-peach to-blush flex items-center justify-center text-xl">
+            🐻
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        {isAuthenticated && user ? (
+          <>
+            <p className="font-bold text-sm text-foreground truncate">
+              {user.discord_username ?? user.username}
+            </p>
+            {user.discord_username && user.discord_username !== user.username && (
+              <p className="text-xs text-muted-foreground truncate">{user.username}</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm font-medium text-muted-foreground">ยังไม่ได้เข้าสู่ระบบ</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SidebarBalances() {
+  const { user, isAuthenticated } = useAuth();
+  const { points, maxCap, ticketPoint, ticketPiecePoint, loading } = useUserBalances(
+    isAuthenticated ? user?.discord_id : null,
+  );
+
+  if (!isAuthenticated) return null;
+
+  const pct = maxCap > 0 ? Math.min((points / maxCap) * 100, 100) : 0;
+
+  return (
+    <div className="px-3 pb-2 space-y-2 shrink-0">
+      <div className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-3 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <StrawberryColorIcon size={18} />
+          <span className="text-[11px] font-medium text-muted-foreground leading-tight">
+            แต้มสตรอว์เบอร์รี่สะสม
+          </span>
+        </div>
+        <p className="text-base font-bold text-foreground tabular-nums">
+          {loading ? '—' : points.toLocaleString()}
+          <span className="text-xs font-normal text-muted-foreground">
+            {' '}/ {loading ? '—' : maxCap.toLocaleString()}
+          </span>
+        </p>
+        <div className="mt-2.5 h-1.5 rounded-full bg-[hsl(var(--latte)/0.5)] dark:bg-[hsl(var(--coffee)/0.4)] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-honey to-peach transition-all duration-500"
+            style={{ width: loading ? '0%' : `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2">
+        <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-2.5 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <TearTicketColorIcon size={20} />
+            <span className="text-sm font-medium text-foreground">เศษตั๋ว</span>
+          </div>
+          <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
+            {loading ? '—' : ticketPiecePoint.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-2.5 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <TicketColorIcon size={20} />
+            <span className="text-sm font-medium text-foreground">ตั๋ว</span>
+          </div>
+          <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
+            {loading ? '—' : ticketPoint.toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CozySidebar() {
   const { user, logout, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
+  const location = useLocation();
+
+  const hasAdminAccess =
+    user?.is_admin ||
+    user?.is_owner ||
+    (user?.allowed_pages?.length ?? 0) > 0;
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
+  // Unauthenticated users are sent to login for protected routes
+  const authHref = (path: string) => (isAuthenticated ? path : '/login');
+
+  const serviceItems: NavItemConfig[] = [
+    { label: 'หน้าหลัก', href: '/', matchPath: '/' },
+    { label: 'กาชา', href: '/gacha', matchPath: '/gacha' },
+    { label: 'กรอกโค้ด', href: authHref('/points'), matchPath: '/points', requireAuth: true },
+  ];
+
+  const usageItems: NavItemConfig[] = [
+    { label: 'กระเป๋าเก็บของ', href: authHref('/inventory'), matchPath: '/inventory', requireAuth: true },
+    { label: 'ข้อตกลง', href: NOTION_RULES_URL, external: true },
+  ];
 
   return (
     <aside
-      className="
-        w-[220px] shrink-0 flex flex-col h-[100dvh] overflow-hidden
-        bg-[hsl(var(--sidebar-background))]
-        border-r border-[hsl(var(--sidebar-border))]
-        relative
-      "
+      style={{ width: COZY_SIDEBAR_WIDTH }}
+      className={cn(
+        'shrink-0 flex flex-col h-[100dvh] overflow-hidden',
+        'bg-[hsl(var(--sidebar-background))]',
+        'border-r border-[hsl(var(--sidebar-border))]',
+      )}
     >
-      {/* Subtle paper texture overlay */}
-      <div className="absolute inset-0 bg-pattern-dots opacity-[0.04] pointer-events-none" />
-
-      {/* Tiny star decorations */}
-      <span className="absolute top-3 right-4 text-[10px] text-[hsl(var(--honey))] opacity-40 select-none pointer-events-none">✦</span>
-      <span className="absolute top-16 right-6 text-[8px] text-[hsl(var(--honey))] opacity-25 select-none pointer-events-none">✧</span>
-      <span className="absolute top-28 left-3 text-[8px] text-[hsl(var(--honey))] opacity-20 select-none pointer-events-none">✦</span>
-
-      {/* Logo */}
-      <div className="relative px-4 pt-5 pb-3 flex justify-center shrink-0">
-        <BearLogo size="md" noFloat />
+      <div className="px-4 pt-4 pb-2 flex items-center gap-2.5 shrink-0">
+        <BearLogo size="sm" noFloat />
+        <span className="bear-h2-bold text-mocha dark:text-[#FFFFFF]">Bear Cafe</span>
       </div>
 
-      {/* Divider */}
-      <div className="mx-4 h-px bg-[hsl(var(--sidebar-border))] shrink-0" />
+      <SidebarProfile />
+      <SidebarBalances />
 
-      {/* Nav */}
-      <nav className="relative flex-1 overflow-y-auto px-3 py-3 space-y-0.5 min-h-0">
-        <NavItem
-          icon={theme === 'dark' ? lightmodeIcon : darkmodeIcon}
-          label="สลับโหมด"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        />
-        {isAuthenticated && (
-          <NavItem icon={historyIcon} label="ประวัติการใช้งาน" href="/history" />
-        )}
-        {!isAuthenticated && (
-          <NavItem icon={historyIcon} label="ประวัติการใช้งาน" href="/login" />
-        )}
-        <NavItem
-          icon={ruleIcon}
-          label="ข้อตกลงและกติกา"
-          href="https://www.notion.so/2f4fa9ff914e80b29e13e5225887e07d"
-          external
-        />
-        {(user?.is_admin || user?.is_owner || (user?.allowed_pages && user.allowed_pages.length > 0)) && (
-          <NavItem icon={settingIcon} label="จัดการระบบ" href="/admin" />
-        )}
+      <nav className="flex-1 overflow-y-auto px-2 py-1 min-h-0 space-y-1">
+        <NavSection title="บริการของเรา">
+          {serviceItems.map((item) => (
+            <NavItem
+              key={item.label}
+              {...item}
+              isActive={item.matchPath ? isActive(item.matchPath) : false}
+            />
+          ))}
+        </NavSection>
 
-        {/* Divider before logout */}
-        <div className="mx-1 my-2 h-px bg-[hsl(var(--sidebar-border))]" />
-
-        {isAuthenticated ? (
+        <NavSection title="ข้อมูลการใช้งาน">
+          {usageItems.map((item) => (
+            <NavItem
+              key={item.label}
+              {...item}
+              isActive={item.matchPath ? isActive(item.matchPath) : false}
+            />
+          ))}
           <NavItem
-            icon={<LogOut className="w-4 h-4" />}
-            label="ออกจากระบบ"
-            onClick={logout}
-            danger
+            label="สลับธีม"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           />
-        ) : (
-          <NavItem
-            icon={<LogIn className="w-4 h-4" />}
-            label="เข้าสู่ระบบ"
-            href="/login"
-            accent
-          />
-        )}
+        </NavSection>
       </nav>
 
-      {/* MascotMessage — healing bubble with animated bear */}
-      <div className="relative shrink-0 [@media(max-height:680px)]:hidden">
-        <MascotMessage />
-      </div>
-
-      {/* Separator */}
-      <div className="mx-4 h-px bg-[hsl(var(--sidebar-border))] shrink-0" />
-
-      {/* Social links only */}
-      <div className="relative shrink-0 px-3 pb-4 pt-3 flex flex-col items-center gap-2">
-        {/* Tiny doodle coffee cup — removed */}
-
-        <div className="flex items-center gap-3">
-          {/* Discord — warm desaturated indigo, softer than brand blue */}
-          <a href="https://discord.gg/bearcafe" target="_blank" rel="noopener noreferrer"
-            className="w-9 h-9 rounded-full bg-[hsl(230,38%,52%)] text-[hsl(var(--cream))] flex items-center justify-center hover:scale-110 transition-transform shadow-sm hover:shadow-md"
-            aria-label="Discord">
-            <DiscordIcon />
-          </a>
-          {/* TikTok — warm mocha dark instead of harsh foreground/background flip */}
-          <a href="https://www.tiktok.com/@bearcafe.official" target="_blank" rel="noopener noreferrer"
-            className="w-9 h-9 rounded-full bg-[hsl(var(--mocha))] text-[hsl(var(--cream))] flex items-center justify-center hover:scale-110 transition-transform shadow-sm hover:shadow-md"
-            aria-label="TikTok">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
-            </svg>
-          </a>
-          {/* YouTube — brand red via destructive token */}
-          <a href="https://www.youtube.com/@Bearcafe" target="_blank" rel="noopener noreferrer"
-            className="w-9 h-9 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:scale-110 transition-transform shadow-sm hover:shadow-md"
-            aria-label="YouTube">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-            </svg>
-          </a>
-        </div>
+      <div className="shrink-0 px-2 pb-4 pt-1">
+        <div className="mx-1 mb-2 h-px bg-[hsl(var(--sidebar-border))]" />
+        {/* Admin panel visible to owners, admins, or users with any allowed page */}
+        {hasAdminAccess && (
+          <NavItem
+            label="จัดการระบบ"
+            href="/admin"
+            isActive={isActive('/admin')}
+            icon={<Settings className="w-4 h-4" />}
+          />
+        )}
+        {isAuthenticated ? (
+          <NavItem
+            label="ออกจากระบบ"
+            onClick={logout}
+          />
+        ) : (
+          <Link
+            to="/login"
+            className="group flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--accent)/0.12)] transition-all duration-200"
+          >
+            <span className="w-5 h-5 flex items-center justify-center shrink-0">
+              <LogIn className="w-4 h-4" />
+            </span>
+            <span>เข้าสู่ระบบ</span>
+          </Link>
+        )}
       </div>
     </aside>
   );
