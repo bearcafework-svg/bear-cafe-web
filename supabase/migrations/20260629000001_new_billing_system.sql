@@ -299,18 +299,20 @@ CREATE TRIGGER trg_sync_salmon_point_orders
 -- ============================================================
 CREATE OR REPLACE VIEW public.v_all_bills AS
   -- บิลเก่าจาก trading_history
+  -- log_timestamp ใน trading_history เป็น text → cast เป็น timestamptz
+  -- created_at ใน trading_history อาจเป็น text ด้วย → cast เหมือนกัน
   SELECT
     id,
     member_id,
-    service_id    AS staff_id,
-    transaction   AS transaction_date_str,
-    amount        AS total_amount,
+    service_id                              AS staff_id,
+    transaction                             AS transaction_date_str,
+    amount                                  AS total_amount,
     type_bill,
     slip_url,
     slip_url_2,
-    log_timestamp,
-    created_at,
-    'legacy'      AS bill_source
+    log_timestamp::timestamptz              AS log_timestamp,
+    created_at::timestamptz                 AS created_at,
+    'legacy'::text                          AS bill_source
   FROM public.trading_history
 
   UNION ALL
@@ -320,14 +322,14 @@ CREATE OR REPLACE VIEW public.v_all_bills AS
     id,
     member_id,
     staff_id,
-    transaction_date::text AS transaction_date_str,
+    transaction_date::text                  AS transaction_date_str,
     total_amount,
     type_bill,
     slip_url,
     slip_url_2,
     log_timestamp,
     created_at,
-    'new'         AS bill_source
+    'new'::text                             AS bill_source
   FROM public.orders;
 
 -- ============================================================
