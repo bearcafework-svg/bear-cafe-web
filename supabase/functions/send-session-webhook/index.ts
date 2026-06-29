@@ -31,6 +31,18 @@ interface SessionAd {
   link_url: string;
 }
 
+// ── Global CTA Button (จาก site_settings key: global_cta_buttons) ─────────────
+interface GlobalCtaButton {
+  id: string;
+  type: number;
+  style: number;
+  url: string;
+  label: string;
+  emoji?: { name: string; id?: string; animated?: boolean };
+  is_active: boolean;
+  placement: string[];
+}
+
 interface SessionComponentValidation {
   actionRow: ReturnType<typeof buildSessionActionRow>;
   fallbackReason?: 'missing_guild_id' | 'missing_discord_id' | 'missing_voice_channel_id';
@@ -83,6 +95,7 @@ function buildComponentV2Payload(params: {
   note?: string;
   voiceStatus: string;
   ads: SessionAd[];
+  ctaButtons: GlobalCtaButton[];
 }): Record<string, unknown> {
   const {
     discordId,
@@ -93,6 +106,7 @@ function buildComponentV2Payload(params: {
     note,
     voiceStatus,
     ads,
+    ctaButtons,
   } = params;
 
   // ── Section text ───────────────────────────────────────────────────────
@@ -163,41 +177,40 @@ function buildComponentV2Payload(params: {
     // Separator บาง
     containerChildren.push({ type: 14, divider: false });
 
-    // ปุ่มดูรายละเอียด + ปุ่มลงโฆษณา
+    // ปุ่มดูรายละเอียด + CTA จาก site_settings
+    const adRowComponents: unknown[] = [
+      {
+        type: 2,
+        style: 5,
+        label: "ดูรายละเอียด",
+        emoji: { name: "🔎" },
+        url: ad.link_url,
+      },
+      ...ctaButtons.map((b) => ({
+        type: b.type,
+        style: b.style,
+        url: b.url,
+        label: b.label,
+        ...(b.emoji ? { emoji: b.emoji } : {}),
+      })),
+    ];
     containerChildren.push({
       type: 1,
-      components: [
-        {
-          type: 2,
-          style: 5,
-          label: "ดูรายละเอียด",
-          emoji: { name: "🔎" },
-          url: ad.link_url,
-        },
-        {
-          type: 2,
-          style: 5,
-          url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
-          label: "ลงโฆษณากับเรา",
-          emoji: { name: "🫂" },
-        },
-      ],
+      components: adRowComponents,
     });
   }
 
-  // ถ้าไม่มีโฆษณาเลย ยังแสดงปุ่มลงโฆษณาตัวเดียว
-  if (ads.length === 0) {
+  // ถ้าไม่มีโฆษณาเลย แสดง CTA จาก site_settings แถวเดียว (ถ้ามี)
+  if (ads.length === 0 && ctaButtons.length > 0) {
     containerChildren.push({
       type: 1,
-      components: [
-        {
-          type: 2,
-          style: 5,
-          url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
-          label: "ลงโฆษณากับเรา",
-          emoji: { name: "🫂" },
-        },
-      ],
+      components: ctaButtons.map((b) => ({
+        type: b.type,
+        style: b.style,
+        url: b.url,
+        label: b.label,
+        ...(b.emoji ? { emoji: b.emoji } : {}),
+      })),
     });
   }
 
@@ -301,8 +314,8 @@ Deno.serve(async (req): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ── ดึง profile + placement พร้อมกัน ─────────────────────────────
-    const [profileRes, placementRes] = await Promise.all([
+    // ── ดึง profile + placement + global CTA พร้อมกัน ────────────────
+    const [profileRes, placementRes, ctaRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('username, avatar_url, discord_id')
@@ -320,6 +333,11 @@ Deno.serve(async (req): Promise<Response> => {
         .eq('key', 'session_webhook')
         .eq('is_active', true)
         .maybeSingle(),
+      supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'global_cta_buttons')
+        .maybeSingle(),
     ]);
 
     if (profileRes.error || !profileRes.data) {
@@ -330,6 +348,20 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const profile = profileRes.data;
+
+    // ── parse global CTA buttons ──────────────────────────────────────
+    const allCtaButtons: GlobalCtaButton[] = Array.isArray(ctaRes.data?.value)
+      ? (ctaRes.data!.value as GlobalCtaButton[])
+      : [];
+    // กรองเฉพาะปุ่มที่ active และ placement ครอบคลุม session_webhook
+    const ctaButtons = allCtaButtons.filter(
+      (b) => b.is_active && Array.isArray(b.placement) && b.placement.includes('session_webhook'),
+    );
+    if (ctaRes.error) {
+      console.warn('[session-webhook] Failed to fetch global_cta_buttons, continuing without CTA', {
+        error: ctaRes.error.message,
+      });
+    }
 
     // ── สร้างโฆษณา 1 ชิ้นตาม delivery_mode ──────────────────────────
     let ads: SessionAd[] = [];
@@ -409,6 +441,7 @@ Deno.serve(async (req): Promise<Response> => {
       note: sessionData.note,
       voiceStatus,
       ads,
+      ctaButtons,
     });
 
     // ── ส่งผ่าน Bot API ────────────────────────────────────────────────
