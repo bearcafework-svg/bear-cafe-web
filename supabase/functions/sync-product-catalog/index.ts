@@ -43,12 +43,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { data: { user }, error: authError } = await supabaseAnon.auth.getUser(token);
     if (authError || !user) return respond({ error: "Invalid token" }, 401);
 
-    // Check permission (has_page_access uses auth.uid() so we must use user-scoped client)
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: hasAccess, error: accessError } = await supabaseUser.rpc("has_page_access", {
-      page_id: "trading-history",
+    // Get user profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .single();
+    if (profileError || !profile) return respond({ error: "Profile not found" }, 404);
+
+    // Check permission
+    const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc("has_page_access", {
+      _user_id: profile.id,
+      _page: "trading-history",
     });
     if (accessError || !hasAccess) {
       return respond({ error: "Access denied" }, 403);
