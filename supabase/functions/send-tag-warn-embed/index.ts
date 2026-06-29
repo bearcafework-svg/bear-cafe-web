@@ -49,12 +49,8 @@ Deno.serve(async (req): Promise<Response> => {
     const punish: string = String(body.punish ?? "").trim();
     const imageUrl1: string = String(body.image_url_1 ?? "").trim();
     const imageUrl2: string | null = body.image_url_2 ? String(body.image_url_2).trim() || null : null;
-<<<<<<< HEAD
     const isSpoiler1: boolean = Boolean(body.is_spoiler_1 ?? body.is_spoiler ?? false);
     const isSpoiler2: boolean = Boolean(body.is_spoiler_2 ?? body.is_spoiler ?? false);
-=======
-    const isSpoiler: boolean = Boolean(body.is_spoiler ?? false);
->>>>>>> b11284a (fix: Barista v2)
     const channelId: string = String(body.channel_id ?? TAG_WARN_CHANNEL_ID).trim();
 
     if (!memberId || !message || !punish || !imageUrl1) {
