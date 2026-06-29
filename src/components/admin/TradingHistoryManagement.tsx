@@ -40,7 +40,6 @@ import {
   Package,
   Calendar,
   Clock,
-  XCircle,
   TrendingUp,
   BarChart3,
   DollarSign,
@@ -56,6 +55,7 @@ import {
   Trash2,
   Pencil,
   Mail,
+  Tag,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -73,65 +73,52 @@ import { computeSalmonPreview, computeSalmonDelta } from '@/lib/salmonPoint';
 
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
-
-// Edge Function URL สำหรับส่ง Components V2 embed ผ่าน Bot API
-// Bot Token เก็บไว้ใน Edge Function เท่านั้น ไม่ expose ใน frontend
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const EDGE_SEND_TRADING_EMBED = `${SUPABASE_URL}/functions/v1/send-trading-embed`;
 
-const PRODUCT_LIST = [
- "ヽ 𝐂𝐨𝐨𝐤𝐢𝐞 (ยศพรีเมี่ยม 𝐒) 𓂃 🍪",
- "ヽ 𝐌𝐚𝐜𝐚𝐫𝐨𝐧 (ยศพรีเมี่ยม 𝐀) 𓂃 🥯",
- "ヽ 𝐂𝐡𝐨𝐜 𝐓𝐫𝐮𝐟𝐟𝐥𝐞 (ยศพรีเมี่ยม 𝐁) 𓂃 🍫",
- "ヽ 𝐂𝐡𝐞𝐞𝐬𝐞𝐜𝐚𝐤𝐞 (ยศพรีเมี่ยม 𝐂) 𓂃 🍰",
- "ヽ 𝐃𝐨𝐧𝐮𝐭 (ยศพรีเมี่ยม 𝐃) 𓂃 🍩",
- "ヽ 𝐈𝐜𝐞 𝐜𝐫𝐞𝐚𝐦 (ยศพรีเมี่ยม 𝐄) 𓂃 🍦",
- "⊹ ꒰ Raineybee ꒱ 🐝 . ✦",
- "หมีอ้วง",
- "ซูชิแมว",
- "อรุ่มเจ๊าะ",
- "เด็กขี้เซา",
- "หมีสายรุ้ง",
- "เด็กขี้อ้อน",
- "ต้าวนุ่มนิ่ม",
- "ไอเด็กเป็ด",
- "อัศวินนมผง",
- "ไอ แฮฟ สติ",
- "I love u 3000 ❤",
- "รับผมไปเลี้ยงมั้ยฮับ",
- "ฉลามนั้นชอบงับคุณ",
- "กินทำไมเค้ก กินเราดีกว่า",
- "เราเป็นอินโทรไมโครซอฟต์เวิร์ด",
- "UwU",
- "นอยด์อ่า",
- "เจ้าเขี้ยวกุด",
- "ขอบคุณที่แจ้งให้ทราบน้า",
- "อาาาาาาาาาาาาห์",
- "ติดเจ้าหมีงอมแงมเลยค้าบ",
- "เด็กดื้อ",
- "เจ้าหมีปุกปุย",
- "น้ำแข็งนุ่มฟู",
- "ไม่อยากถูกรัก แต่อยากถูกหวย",
- "คุณหมีสายลับ",
- "แบ๊ะ แบ๊ะ !",
- "เมลโล่บันนี่",
- "𝑴𝒐𝒐𝒏𝒊𝒆 ˚ ♡ ⋆",
- "𓆩⠀𝘉𝘪𝘵𝘦 𝘰𝘧 𝘉𝘭𝘢𝘤𝘬⠀𓆪"
-];
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-interface TradingRecord {
+type ProductType = 'class_role' | 'decoration_role' | 'rental' | 'promo_package' | 'other';
+
+/** Unified record shown in the card grid — covers both legacy & new bills */
+interface UnifiedRecord {
   id: string;
-  log_timestamp: string;
-  service_id: string | null;
-  transaction: string | null;
+  source: 'legacy' | 'new';          // 'legacy' = trading_history, 'new' = orders
   member_id: string;
-  amount: number | null;
+  staff_id: string | null;
+  transaction_date: string | null;    // YYYY-MM-DD (legacy uses transaction field)
+  total_amount: number;
   type_bill: string | null;
-  item: string | null;
   slip_url: string | null;
   slip_url_2: string | null;
+  log_timestamp: string;
   created_at: string;
+  // legacy-only
+  item?: string | null;
+  // new-only: fetched separately
+  purchase_items?: PurchaseItemDetail[];
+}
+
+interface PurchaseItemDetail {
+  id: string;
+  product_id: string;
+  price_paid: number;
+  original_price: number | null;
+  is_promotion: boolean;
+  product_display_name: string;
+  product_type: ProductType;
+}
+
+interface ProductCatalogRow {
+  id: string;
+  role_id: string | null;
+  display_name: string;
+  product_type: ProductType;
+  current_price: number | null;
+  is_purchasable: boolean;
+  is_active: boolean;
+  sort_order: number;
 }
 
 interface DiscordProfile {
@@ -141,15 +128,24 @@ interface DiscordProfile {
   avatar_url: string | null;
 }
 
-/** แปลงตัวเลขเป็น Unicode Mathematical Digits (𝟢𝟣𝟤...) พร้อม comma separator เมื่อ >= 1000 */
+// ─── Selected item for create-bill form ──────────────────────────────────────
+interface SelectedItem {
+  product_id: string;
+  display_name: string;
+  product_type: ProductType;
+  price_paid: string;          // editable string
+  original_price: string;      // editable string (promotion only)
+  is_promotion: boolean;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function toUnicodeNumber(n: number): string {
   const unicodeDigits = ['𝟢','𝟣','𝟤','𝟥','𝟦','𝟧','𝟨','𝟩','𝟪','𝟫'];
-  // Format with comma for thousands
   const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return formatted.replace(/[0-9]/g, (d) => unicodeDigits[parseInt(d)]);
 }
 
-/** Parse the `transaction` field which may be "DD/MM/YYYY" (พ.ศ. or ค.ศ.) */
 function parseTransactionDate(raw: string | null): Date | null {
   if (!raw) return null;
   const slashMatch = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
@@ -168,58 +164,250 @@ function formatTransactionDate(raw: string | null): string {
   if (!raw) return '-';
   const d = parseTransactionDate(raw);
   if (!d) return raw;
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export function TradingHistoryManagement() {
-  const [records, setRecords] = useState<TradingRecord[]>([]);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Records (merged legacy + new)
+  const [records, setRecords] = useState<UnifiedRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Product catalog
+  const [catalog, setCatalog] = useState<ProductCatalogRow[]>([]);
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Profile / salmon maps
   const [profileMap, setProfileMap] = useState<Map<string, DiscordProfile>>(new Map());
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('data');
-  const [deleteTarget, setDeleteTarget] = useState<TradingRecord | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Edit state
-  const [editTarget, setEditTarget] = useState<TradingRecord | null>(null);
-  const [editForm, setEditForm] = useState({ amount: '', transaction: '', type_bill: '', item: '' });
-  const [editLoading, setEditLoading] = useState(false);
-
-  // Send embed state
-  const [embedTarget, setEmbedTarget] = useState<TradingRecord | null>(null);
-  const [isSendingEmbed, setIsSendingEmbed] = useState(false);
-  // salmon_point map: member_id -> salmon_point
   const [salmonPointMap, setSalmonPointMap] = useState<Map<string, number>>(new Map());
 
-  // Auto update - moved after fetchData declaration via separate useEffect below
+  // Image preview
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const scanQRCode = async (file: File) => {
-    return new Promise<string | null>((resolve) => {
+  // Active tab
+  const [activeTab, setActiveTab] = useState('data');
+
+  // Delete / edit / embed targets
+  const [deleteTarget, setDeleteTarget] = useState<UnifiedRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editTarget, setEditTarget] = useState<UnifiedRecord | null>(null);
+  const [editForm, setEditForm] = useState({ amount: '', transaction: '', type_bill: '' });
+  const [editLoading, setEditLoading] = useState(false);
+  const [embedTarget, setEmbedTarget] = useState<UnifiedRecord | null>(null);
+  const [isSendingEmbed, setIsSendingEmbed] = useState(false);
+
+  // Webhook toggle
+  const [webhookEnabled, setWebhookEnabled] = useState(true);
+
+  // ── Create Bill state ──
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [newBill, setNewBill] = useState({
+    memberId: '',
+    transactionDate: '',
+    billType: 'ธนาคารทั่วไป',
+  });
+  // 2 separate item lists: class_role (max 1) and others (multi)
+  const [selectedClassItem, setSelectedClassItem] = useState<SelectedItem | null>(null);
+  const [selectedOtherItems, setSelectedOtherItems] = useState<SelectedItem[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const previewUrls = useMemo(() => selectedFiles.map(f => URL.createObjectURL(f)), [selectedFiles]);
+  useEffect(() => () => { previewUrls.forEach(URL.revokeObjectURL); }, [previewUrls]);
+
+  // ── Filters ──
+  const [serviceQuery, setServiceQuery] = useState('');
+  const [memberQuery, setMemberQuery] = useState('');
+  const [dateQuery, setDateQuery] = useState('');
+  const [billTypeQuery, setBillTypeQuery] = useState('');
+  const [periodMode, setPeriodMode] = useState<'day' | 'month' | 'year'>('day');
+  const [selectedPeriod, setSelectedPeriod] = useState('');
+
+  // ── Load webhook setting ──
+  useEffect(() => {
+    supabase.from('site_settings').select('value').eq('key', 'trading_webhook_enabled').single()
+      .then(({ data }) => {
+        if (data) setWebhookEnabled(data.value === true || data.value === 'true');
+      });
+  }, []);
+
+  const toggleWebhook = async (enabled: boolean) => {
+    if (!user?.is_owner) return;
+    setWebhookEnabled(enabled);
+    const { error } = await supabase.from('site_settings').upsert({ key: 'trading_webhook_enabled', value: enabled });
+    if (error) toast({ title: 'บันทึกการตั้งค่าไม่สำเร็จ', variant: 'destructive' });
+    else toast({ title: enabled ? 'เปิดการแจ้งเตือน Discord แล้ว' : 'ปิดการแจ้งเตือน Discord แล้ว' });
+  };
+
+  // ── Fetch product catalog ──
+  const fetchCatalog = useCallback(async () => {
+    const { data } = await (supabase as any)
+      .from('product_catalog')
+      .select('id, role_id, display_name, product_type, current_price, is_purchasable, is_active, sort_order')
+      .eq('is_active', true)
+      .eq('is_purchasable', true)
+      .order('sort_order', { ascending: true })
+      .order('display_name', { ascending: true });
+    if (data) setCatalog(data as ProductCatalogRow[]);
+  }, []);
+
+  useEffect(() => { fetchCatalog(); }, [fetchCatalog]);
+
+  // ── Fetch profiles / salmon ──
+  const fetchProfiles = useCallback(async (ids: string[]) => {
+    const uniqueIds = [...new Set(ids.filter(Boolean))];
+    if (!uniqueIds.length) return;
+    const { data } = await supabase.from('profiles').select('discord_id, username, discord_username, avatar_url').in('discord_id', uniqueIds);
+    if (data) {
+      const map = new Map<string, DiscordProfile>();
+      data.forEach(p => map.set(p.discord_id, p));
+      setProfileMap(map);
+    }
+  }, []);
+
+  const fetchSalmonPoints = useCallback(async (ids: string[]) => {
+    const uniqueIds = [...new Set(ids.filter(Boolean))];
+    if (!uniqueIds.length) return;
+    const { data } = await supabase.from('user_points').select('discord_id, salmon_point').in('discord_id', uniqueIds);
+    if (data) {
+      const map = new Map<string, number>();
+      data.forEach(p => map.set(p.discord_id, p.salmon_point ?? 0));
+      setSalmonPointMap(map);
+    }
+  }, []);
+
+  // ── Fetch purchase_items for new orders ──
+  const fetchPurchaseItems = useCallback(async (orderIds: string[]): Promise<Map<string, PurchaseItemDetail[]>> => {
+    if (!orderIds.length) return new Map();
+    const { data } = await (supabase as any)
+      .from('purchase_items')
+      .select(`
+        id, order_id, product_id, price_paid, original_price, is_promotion,
+        product_catalog!inner(display_name, product_type)
+      `)
+      .in('order_id', orderIds);
+    const map = new Map<string, PurchaseItemDetail[]>();
+    if (data) {
+      for (const row of data as any[]) {
+        const item: PurchaseItemDetail = {
+          id: row.id,
+          product_id: row.product_id,
+          price_paid: row.price_paid,
+          original_price: row.original_price,
+          is_promotion: row.is_promotion,
+          product_display_name: row.product_catalog?.display_name ?? '?',
+          product_type: row.product_catalog?.product_type ?? 'other',
+        };
+        const arr = map.get(row.order_id) ?? [];
+        arr.push(item);
+        map.set(row.order_id, arr);
+      }
+    }
+    return map;
+  }, []);
+
+  // ── Main fetch ──
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Legacy records from trading_history
+      const { data: legacyData, error: legacyErr } = await supabase
+        .from('trading_history')
+        .select('*')
+        .order('transaction', { ascending: false, nullsFirst: false })
+        .order('log_timestamp', { ascending: false });
+      if (legacyErr) throw new Error(legacyErr.message);
+
+      const legacyRecords: UnifiedRecord[] = (legacyData ?? []).map(r => ({
+        id: r.id,
+        source: 'legacy',
+        member_id: r.member_id,
+        staff_id: r.service_id ?? null,
+        transaction_date: r.transaction ?? null,
+        total_amount: r.amount ?? 0,
+        type_bill: r.type_bill ?? null,
+        slip_url: r.slip_url ?? null,
+        slip_url_2: r.slip_url_2 ?? null,
+        log_timestamp: r.log_timestamp,
+        created_at: r.created_at,
+        item: r.item ?? null,
+      }));
+
+      // 2. New orders
+      const { data: ordersData, error: ordersErr } = await (supabase as any)
+        .from('orders')
+        .select('*')
+        .order('transaction_date', { ascending: false, nullsFirst: false })
+        .order('log_timestamp', { ascending: false });
+      if (ordersErr) throw new Error(ordersErr.message);
+
+      const newOrders: UnifiedRecord[] = (ordersData ?? []).map((r: any) => ({
+        id: r.id,
+        source: 'new',
+        member_id: r.member_id,
+        staff_id: r.staff_id ?? null,
+        transaction_date: r.transaction_date ?? null,
+        total_amount: r.total_amount ?? 0,
+        type_bill: r.type_bill ?? null,
+        slip_url: r.slip_url ?? null,
+        slip_url_2: r.slip_url_2 ?? null,
+        log_timestamp: r.log_timestamp,
+        created_at: r.created_at,
+      }));
+
+      // 3. Fetch purchase_items for new orders
+      const orderIds = newOrders.map(r => r.id);
+      const itemsMap = await fetchPurchaseItems(orderIds);
+      for (const r of newOrders) {
+        r.purchase_items = itemsMap.get(r.id) ?? [];
+      }
+
+      // 4. Merge and sort by transaction_date desc, then log_timestamp desc
+      const merged = [...legacyRecords, ...newOrders].sort((a, b) => {
+        const da = parseTransactionDate(a.transaction_date);
+        const db = parseTransactionDate(b.transaction_date);
+        if (da && db) { const diff = db.getTime() - da.getTime(); if (diff !== 0) return diff; }
+        if (da && !db) return -1;
+        if (!da && db) return 1;
+        return new Date(b.log_timestamp).getTime() - new Date(a.log_timestamp).getTime();
+      });
+
+      const allIds = merged.flatMap(r => [r.staff_id, r.member_id].filter(Boolean) as string[]);
+      fetchProfiles(allIds);
+      fetchSalmonPoints([...new Set(merged.map(r => r.member_id).filter(Boolean))]);
+      setRecords(merged);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProfiles, fetchSalmonPoints, fetchPurchaseItems]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { const t = setInterval(fetchData, 30000); return () => clearInterval(t); }, [fetchData]);
+
+  // ── QR scan ──
+  const scanQRCode = async (file: File): Promise<string | null> => {
+    return new Promise(resolve => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          if (!context) {
-            resolve(null);
-            return;
-          }
-          canvas.width = img.width;
-          canvas.height = img.height;
-          context.drawImage(img, 0, 0);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code) {
-            resolve(code.data);
-          } else {
-            resolve(null);
-          }
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          canvas.width = img.width; canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(data.data, data.width, data.height);
+          resolve(code ? code.data : null);
         };
         img.src = e.target?.result as string;
       };
@@ -227,586 +415,282 @@ export function TradingHistoryManagement() {
     });
   };
 
-  // Add Bill State
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
-  const [webhookEnabled, setWebhookEnabled] = useState(true);
-  const [newBill, setNewBill] = useState({
-    memberId: '',
-    transactionDate: '',
-    amount: '',
-    billType: 'ธนาคารทั่วไป',
-    customProduct: '',
-  });
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  // สร้าง object URL สำหรับ preview รูปภาพ และ revoke อัตโนมัติเมื่อ selectedFiles เปลี่ยน
-  const previewUrls = useMemo(() => {
-    const urls = selectedFiles.map(f => URL.createObjectURL(f));
-    return urls;
-  }, [selectedFiles]);
-  useEffect(() => {
-    return () => { previewUrls.forEach(url => URL.revokeObjectURL(url)); };
-  }, [previewUrls]);
-
-  // Load webhook setting
-  useEffect(() => {
-    const loadSettings = async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'trading_webhook_enabled')
-        .single();
-      if (data) {
-        // data.value is JSONB — could be boolean true/false or string "true"/"false"
-        const val = data.value;
-        setWebhookEnabled(val === true || val === 'true');
-      }
-    };
-    loadSettings();
-  }, []);
-
-  const toggleWebhook = async (enabled: boolean) => {
-    if (!user?.is_owner) return;
-    setWebhookEnabled(enabled);
-    const { error } = await supabase
-      .from('site_settings')
-      .upsert({ key: 'trading_webhook_enabled', value: enabled });
-    
-    if (error) {
-      console.error('Failed to save setting', error);
-      toast({ title: 'บันทึกการตั้งค่าไม่สำเร็จ', variant: 'destructive' });
-    } else {
-      toast({ title: enabled ? 'เปิดการแจ้งเตือน Discord แล้ว' : 'ปิดการแจ้งเตือน Discord แล้ว' });
-    }
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      if (files.length + selectedFiles.length > 2) {
-        toast({ title: 'อัปโหลดได้สูงสุด 2 รูป', variant: 'destructive' });
-        return;
-      }
-      
-      const newFiles = [...selectedFiles, ...files].slice(0, 2);
-      setSelectedFiles(newFiles);
-
-      // Scan first file for QR
-      if (files.length > 0) {
-        try {
-          const qrData = await scanQRCode(files[0]);
-          if (qrData) {
-            // Check for TrueMoney logic: contains '140' or 'truemoney'
-            if (qrData.includes('140') || qrData.toLowerCase().includes('truemoney')) {
-              setNewBill(prev => ({ ...prev, billType: 'ทรูมันนี่' }));
-              toast({ title: 'ตรวจพบสลิป TrueMoney', description: 'เลือกประเภทบิลอัตโนมัติ' });
-            } else {
-              setNewBill(prev => ({ ...prev, billType: 'ธนาคารทั่วไป' }));
-              toast({ title: 'ตรวจพบสลิปธนาคาร', description: 'เลือกประเภทบิลอัตโนมัติ' });
-            }
-          }
-        } catch (err) {
-          console.error("QR Scan failed", err);
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    if (files.length + selectedFiles.length > 2) {
+      toast({ title: 'อัปโหลดได้สูงสุด 2 รูป', variant: 'destructive' }); return;
+    }
+    const newFiles = [...selectedFiles, ...files].slice(0, 2);
+    setSelectedFiles(newFiles);
+    if (files.length > 0) {
+      try {
+        const qr = await scanQRCode(files[0]);
+        if (qr) {
+          const isTrueMoney = qr.includes('140') || qr.toLowerCase().includes('truemoney');
+          setNewBill(p => ({ ...p, billType: isTrueMoney ? 'ทรูมันนี่' : 'ธนาคารทั่วไป' }));
+          toast({ title: `ตรวจพบสลิป${isTrueMoney ? ' TrueMoney' : 'ธนาคาร'}`, description: 'เลือกประเภทบิลอัตโนมัติ' });
         }
-      }
+      } catch { /* ignore */ }
     }
   };
 
-  const removeFile = (index: number) => {
-    setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
+  // ── Class item select ──
+  const handleSelectClassItem = (productId: string) => {
+    const p = catalog.find(c => c.id === productId);
+    if (!p) return;
+    setSelectedClassItem({
+      product_id: p.id,
+      display_name: p.display_name,
+      product_type: p.product_type,
+      price_paid: p.current_price != null ? String(p.current_price) : '',
+      original_price: '',
+      is_promotion: false,
+    });
   };
 
-  const handleAddProduct = (product: string) => {
-    if (!product.trim()) return;
-    if (!selectedProducts.includes(product)) {
-      setSelectedProducts([...selectedProducts, product]);
+  // ── Other item add ──
+  const handleAddOtherItem = (productId: string) => {
+    const p = catalog.find(c => c.id === productId);
+    if (!p) return;
+    if (selectedOtherItems.find(i => i.product_id === p.id)) return; // already added
+    setSelectedOtherItems(prev => [...prev, {
+      product_id: p.id,
+      display_name: p.display_name,
+      product_type: p.product_type,
+      price_paid: p.current_price != null ? String(p.current_price) : '',
+      original_price: '',
+      is_promotion: false,
+    }]);
+  };
+
+  const handleRemoveOtherItem = (productId: string) => {
+    setSelectedOtherItems(prev => prev.filter(i => i.product_id !== productId));
+  };
+
+  const updateItem = (
+    which: 'class' | 'other',
+    productId: string,
+    field: keyof SelectedItem,
+    value: string | boolean,
+  ) => {
+    if (which === 'class') {
+      setSelectedClassItem(prev => prev ? { ...prev, [field]: value } : prev);
+    } else {
+      setSelectedOtherItems(prev =>
+        prev.map(i => i.product_id === productId ? { ...i, [field]: value } : i)
+      );
     }
-    setNewBill({ ...newBill, customProduct: '' });
   };
 
-  const handleRemoveProduct = (product: string) => {
-    setSelectedProducts(selectedProducts.filter(p => p !== product));
-  };
+  // Derived: all selected items
+  const allSelectedItems = useMemo(() => {
+    const items: SelectedItem[] = [];
+    if (selectedClassItem) items.push(selectedClassItem);
+    items.push(...selectedOtherItems);
+    return items;
+  }, [selectedClassItem, selectedOtherItems]);
 
+  // Derived: total amount from selected items
+  const computedTotalAmount = useMemo(() =>
+    allSelectedItems.reduce((sum, i) => sum + (parseFloat(i.price_paid) || 0), 0),
+    [allSelectedItems],
+  );
+
+  const salmonPointPreview = useMemo(() => computeSalmonPreview(String(computedTotalAmount)), [computedTotalAmount]);
+
+  // ── Create bill (new system → orders + purchase_items) ──
   const handleAddBill = async () => {
-    if (!newBill.memberId || !newBill.transactionDate || !newBill.amount || selectedProducts.length === 0 || selectedFiles.length === 0) {
-      toast({ title: 'กรุณากรอกข้อมูลให้ครบถ้วน', description: 'รวมถึงสินค้าและรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
+    if (!newBill.memberId || !newBill.transactionDate || allSelectedItems.length === 0 || selectedFiles.length === 0) {
+      toast({ title: 'กรุณากรอกข้อมูลให้ครบ', description: 'ต้องมีสินค้าอย่างน้อย 1 รายการ และรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
       return;
     }
-
-    // ใช้ค่าที่ผู้ใช้เลือกเองเป็นหลัก และ fallback เป็นธนาคารทั่วไป
-    const selectedBillType = newBill.billType || 'ธนาคารทั่วไป';
+    // Validate prices
+    for (const item of allSelectedItems) {
+      if (!item.price_paid || parseFloat(item.price_paid) < 0) {
+        toast({ title: `กรุณากรอกราคาสำหรับ "${item.display_name}"`, variant: 'destructive' });
+        return;
+      }
+      if (item.is_promotion && (!item.original_price || parseFloat(item.original_price) <= 0)) {
+        toast({ title: `กรุณากรอกราคาเต็มสำหรับ "${item.display_name}" (โปรโมชัน)`, variant: 'destructive' });
+        return;
+      }
+    }
 
     setAddLoading(true);
     try {
+      // 1. Upload slip images
       const imageUrls: string[] = [];
-
-      // 1. Compress and Upload Images
       for (const file of selectedFiles) {
-        const options = {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        };
-        
-        try {
-          const compressedFile = await imageCompression(file, options);
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${compressedFile.type.split('/')[1]}`;
-          
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('slip-images')
-            .upload(fileName, compressedFile, { cacheControl: '86400' });
-
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('slip-images')
-            .getPublicUrl(fileName);
-            
-          imageUrls.push(publicUrl);
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          throw new Error('Upload failed');
-        }
+        const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true });
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${compressed.type.split('/')[1]}`;
+        const { error: uploadError } = await supabase.storage.from('slip-images').upload(fileName, compressed, { cacheControl: '86400' });
+        if (uploadError) throw uploadError;
+        imageUrls.push(supabase.storage.from('slip-images').getPublicUrl(fileName).data.publicUrl);
       }
 
-      // 2. Insert to Database
-      // Convert YYYY-MM-DD to proper Date object then save as ISO string for sorting
-      // Or just save as YYYY-MM-DD string (ISO 8601) which sorts correctly as text
-      const [y, m, d] = newBill.transactionDate.split('-');
-      const formattedDate = `${y}-${m}-${d}`; // YYYY-MM-DD
-
-      const { error: insertError } = await supabase.from('trading_history').insert({
-        member_id: newBill.memberId,
-        service_id: user?.discord_id,
-        transaction: formattedDate,
-        amount: parseFloat(newBill.amount),
-        type_bill: selectedBillType,
-        item: selectedProducts.join(', '),
-        slip_url: imageUrls[0],
-        slip_url_2: imageUrls[1] || null,
+      // 2. Insert order (total_amount will be set by trigger after purchase_items insert)
+      const { data: orderData, error: orderError } = await (supabase as any).from('orders').insert({
+        member_id: newBill.memberId.trim(),
+        staff_id: user?.discord_id ?? null,
+        transaction_date: newBill.transactionDate,
+        total_amount: 0, // trigger will update this
+        type_bill: newBill.billType,
+        slip_url: imageUrls[0] ?? null,
+        slip_url_2: imageUrls[1] ?? null,
         log_timestamp: new Date().toISOString(),
-      });
+      }).select('id').single();
+      if (orderError) throw orderError;
 
-      if (insertError) throw insertError;
+      const orderId = (orderData as any).id as string;
 
-      // 3. Send Discord Webhook
+      // 3. Insert purchase_items
+      const itemsPayload = allSelectedItems.map(i => ({
+        order_id: orderId,
+        product_id: i.product_id,
+        price_paid: parseFloat(i.price_paid) || 0,
+        original_price: i.is_promotion ? (parseFloat(i.original_price) || null) : null,
+        is_promotion: i.is_promotion,
+      }));
+      const { error: itemsError } = await (supabase as any).from('purchase_items').insert(itemsPayload);
+      if (itemsError) throw itemsError;
+
+      // 4. Discord webhook notification
       if (webhookEnabled && DISCORD_WEBHOOK_URL) {
         const unixTime = Math.floor(Date.now() / 1000);
         const discordTimestamp = `<t:${unixTime}:F> (<t:${unixTime}:R>)`;
-        
-        const billType = selectedBillType;
-        const buyerId = user?.discord_id || 'Unknown';
-        const sellerId = newBill.memberId;
-        const count = newBill.amount;
-        const productList = selectedProducts.join(', ');
-        const imageUrl = imageUrls[0];
+        const buyerId = user?.discord_id ?? 'Unknown';
+        const productList = allSelectedItems.map(i => i.is_promotion ? `${i.display_name} (โปรโมชัน ฿${i.price_paid})` : `${i.display_name} (฿${i.price_paid})`).join(', ');
+        const billType = newBill.billType;
+        let thumbnailUrl = '';
+        if (billType === 'ธนาคารทั่วไป') thumbnailUrl = 'https://cdn.discordapp.com/attachments/1144675871798591569/1410542166232531024/bank.png';
+        else if (billType === 'ทรูมันนี่') thumbnailUrl = 'https://cdn.discordapp.com/attachments/1144675871798591569/1410542166664806510/truemoney.png';
 
-        let thumbnailUrl = "";
-        if (billType === "ธนาคารทั่วไป" || billType === "ธนาคาร") {
-          thumbnailUrl = "https://cdn.discordapp.com/attachments/1144675871798591569/1410542166232531024/bank.png"; 
-        } else if (billType === "ทรูมันนี่") {
-          thumbnailUrl = "https://cdn.discordapp.com/attachments/1144675871798591569/1410542166664806510/truemoney.png"; 
-        }
-
-        const description = `## <:Service:1395695113258274887>︲__\` มีการส่งบิลใหม่! \`__ 
-<:line:1144701793989840997>
-- __\`ผู้ดำเนินการ\`__: <@${buyerId}> 
-- __\`ผู้ซื้อ\`__: <@${sellerId}> - \`${sellerId}\`
-- __\`เวลา\`__: ${discordTimestamp} 
-- __\`ยอดสั่งซื้อ\`__: ${count} บาท
-- __\`ประเภทบิล\`__: ${billType} 
-- __\`สินค้า\`__: ${productList} 
-`.trim();
-
-        const payload = {
-          username: "⊹ ꒰ แจ้งเตือนบิลใหม่ ꒱ 💸",
-          content: `<@${buyerId}> <@${sellerId}>`,
-          embeds: [{
-            description: description,
-            color: 0xffdf8f,
-            thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined,
-            image: imageUrl ? { url: imageUrl } : undefined,
-          }]
-        };
+        const description = `## <:Service:1395695113258274887>︲__\` มีการส่งบิลใหม่! \`__\n<:line:1144701793989840997>\n- __\`ผู้ดำเนินการ\`__: <@${buyerId}>\n- __\`ผู้ซื้อ\`__: <@${newBill.memberId}> - \`${newBill.memberId}\`\n- __\`เวลา\`__: ${discordTimestamp}\n- __\`ยอดรวม\`__: ${computedTotalAmount} บาท\n- __\`ประเภทบิล\`__: ${billType}\n- __\`สินค้า\`__: ${productList}`.trim();
 
         await fetch(DISCORD_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            username: '⊹ ꒰ แจ้งเตือนบิลใหม่ ꒱ 💸',
+            content: `<@${buyerId}> <@${newBill.memberId}>`,
+            embeds: [{ description, color: 0xffdf8f, thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined, image: imageUrls[0] ? { url: imageUrls[0] } : undefined }],
+          }),
         });
       }
 
       toast({ title: 'สร้างบิลสำเร็จ', className: 'bg-success text-success-foreground' });
       setIsAddDialogOpen(false);
-      setNewBill({ memberId: '', transactionDate: '', amount: '', billType: 'ธนาคารทั่วไป', customProduct: '' });
-      setSelectedProducts([]);
+      setNewBill({ memberId: '', transactionDate: '', billType: 'ธนาคารทั่วไป' });
+      setSelectedClassItem(null);
+      setSelectedOtherItems([]);
       setSelectedFiles([]);
       fetchData();
-
     } catch (err: any) {
-      console.error('Create bill failed:', err);
       toast({ title: 'เกิดข้อผิดพลาด', description: err.message, variant: 'destructive' });
     } finally {
       setAddLoading(false);
     }
   };
 
+  // ── Delete ──
   const handleDelete = async () => {
     if (!deleteTarget || !user?.is_owner) return;
     setIsDeleting(true);
-
     try {
-      // 1. Delete images from storage (if any)
       const imagesToDelete = [deleteTarget.slip_url, deleteTarget.slip_url_2].filter(Boolean) as string[];
-      const supabaseImagePaths: string[] = [];
-
+      const paths: string[] = [];
       for (const url of imagesToDelete) {
         if (url.includes('/storage/v1/object/public/slip-images/')) {
           const parts = url.split('/slip-images/');
-          if (parts.length > 1) {
-            supabaseImagePaths.push(decodeURIComponent(parts[1]));
-          }
+          if (parts.length > 1) paths.push(decodeURIComponent(parts[1]));
         }
       }
+      if (paths.length > 0) await supabase.storage.from('slip-images').remove(paths);
 
-      if (supabaseImagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from('slip-images')
-          .remove(supabaseImagePaths);
-        
-        if (storageError) {
-          console.error('Failed to delete images:', storageError);
-        }
+      if (deleteTarget.source === 'legacy') {
+        const { error } = await supabase.from('trading_history').delete().eq('id', deleteTarget.id);
+        if (error) throw error;
+      } else {
+        // purchase_items will cascade, trigger updates salmon_point
+        const { error } = await (supabase as any).from('orders').delete().eq('id', deleteTarget.id);
+        if (error) throw error;
       }
-
-      // 2. Delete record from database
-      const { error: deleteError } = await supabase
-        .from('trading_history')
-        .delete()
-        .eq('id', deleteTarget.id);
-
-      if (deleteError) throw deleteError;
 
       toast({ title: 'ลบข้อมูลเรียบร้อยแล้ว', className: 'bg-success text-success-foreground' });
       setDeleteTarget(null);
-      fetchData(); // Reload data
-
+      fetchData();
     } catch (err: any) {
-      console.error('Delete failed:', err);
       toast({ title: 'เกิดข้อผิดพลาดในการลบ', description: err.message, variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Filters
-  const [serviceQuery, setServiceQuery] = useState('');
-  const [memberQuery, setMemberQuery] = useState('');
-  const [dateQuery, setDateQuery] = useState('');
-  const [billTypeQuery, setBillTypeQuery] = useState('');
-
-  // Period filter
-  const [periodMode, setPeriodMode] = useState<'day' | 'month' | 'year'>('day');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('');
-
-  const fetchProfiles = useCallback(async (discordIds: string[]) => {
-    const uniqueIds = [...new Set(discordIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return;
+  // ── Edit ──
+  const handleEditSave = async () => {
+    if (!editTarget) return;
+    setEditLoading(true);
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('discord_id, username, discord_username, avatar_url')
-        .in('discord_id', uniqueIds);
-      if (data) {
-        const map = new Map<string, DiscordProfile>();
-        data.forEach((p) => map.set(p.discord_id, p));
-        setProfileMap(map);
+      if (editTarget.source === 'legacy') {
+        const { error } = await supabase.from('trading_history').update({
+          amount: parseFloat(editForm.amount) || 0,
+          transaction: editForm.transaction,
+          type_bill: editForm.type_bill,
+        }).eq('id', editTarget.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('orders').update({
+          transaction_date: editForm.transaction,
+          type_bill: editForm.type_bill,
+        }).eq('id', editTarget.id);
+        if (error) throw error;
       }
-    } catch (err) {
-      console.error('Failed to fetch profiles', err);
-    }
-  }, []);
-
-  const fetchSalmonPoints = useCallback(async (discordIds: string[]) => {
-    const uniqueIds = [...new Set(discordIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return;
-    try {
-      const { data } = await supabase
-        .from('user_points')
-        .select('discord_id, salmon_point')
-        .in('discord_id', uniqueIds);
-      if (data) {
-        const map = new Map<string, number>();
-        data.forEach((p) => map.set(p.discord_id, p.salmon_point ?? 0));
-        setSalmonPointMap(map);
-      }
-    } catch (err) {
-      console.error('Failed to fetch salmon points', err);
-    }
-  }, []);
-
-  const resolveDisplayName = useCallback(
-    (id: string): { name: string; discord_username: string | null; avatar: string | null } => {
-      if (!id) return { name: '-', discord_username: null, avatar: null };
-      const profile = profileMap.get(id);
-      if (profile) return { name: profile.username, discord_username: (profile as any).discord_username || null, avatar: profile.avatar_url };
-      return { name: id, discord_username: null, avatar: null };
-    },
-    [profileMap],
-  );
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: dbError } = await supabase
-        .from('trading_history')
-        .select('*')
-        .order('transaction', { ascending: false, nullsFirst: false })
-        .order('log_timestamp', { ascending: false });
-
-      if (dbError) throw new Error(dbError.message);
-      if (!data) throw new Error('ไม่พบข้อมูล');
-
-      const allIds = data.flatMap((r) => [r.service_id, r.member_id].filter(Boolean) as string[]);
-      fetchProfiles(allIds);
-      fetchSalmonPoints([...new Set(data.map((r) => r.member_id).filter(Boolean))]);
-      setRecords(data);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchProfiles, fetchSalmonPoints]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Auto update every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
+      toast({ title: 'บันทึกเรียบร้อย', className: 'bg-success text-success-foreground' });
+      setEditTarget(null);
       fetchData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      const serviceResolved = resolveDisplayName(r.service_id || '');
-      const serviceMatched =
-        !serviceQuery.trim() ||
-        (r.service_id || '').toLowerCase().includes(serviceQuery.trim().toLowerCase()) ||
-        serviceResolved.name.toLowerCase().includes(serviceQuery.trim().toLowerCase()) ||
-        (serviceResolved.discord_username || '').toLowerCase().includes(serviceQuery.trim().toLowerCase());
-      const memberResolved = resolveDisplayName(r.member_id);
-      const memberMatched =
-        !memberQuery.trim() ||
-        r.member_id.toLowerCase().includes(memberQuery.trim().toLowerCase()) ||
-        memberResolved.name.toLowerCase().includes(memberQuery.trim().toLowerCase()) ||
-        (memberResolved.discord_username || '').toLowerCase().includes(memberQuery.trim().toLowerCase());
-      const billTypeMatched =
-        !billTypeQuery.trim() ||
-        (r.type_bill || '').toLowerCase().includes(billTypeQuery.trim().toLowerCase());
-      const dateMatched = !dateQuery || (() => {
-        const d = parseTransactionDate(r.transaction);
-        if (!d) return false;
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}` === dateQuery;
-      })();
-      const periodMatched = !selectedPeriod || selectedPeriod === 'all' || (() => {
-        const d = parseTransactionDate(r.transaction);
-        if (!d) return false;
-        const yyyy = String(d.getFullYear());
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        if (periodMode === 'day') return `${yyyy}-${mm}-${dd}` === selectedPeriod;
-        if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
-        return yyyy === selectedPeriod;
-      })();
-      return serviceMatched && memberMatched && billTypeMatched && dateMatched && periodMatched;
-    });
-  }, [records, serviceQuery, memberQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
-
-  // Salmon point preview for create-bill form (Requirements 8.1, 8.2, 8.3)
-  const salmonPointPreview = useMemo(() => computeSalmonPreview(newBill.amount), [newBill.amount]);
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRecords.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredRecords, currentPage]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [totalPages, currentPage]);
-
-  const UserBadge = ({ id }: { id: string }) => {
-    const { name, discord_username, avatar } = resolveDisplayName(id);
-    return (
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Avatar className="w-5 h-5 shrink-0">
-          <AvatarImage src={avatar ?? undefined} />
-          <AvatarFallback className="text-[10px] bg-muted">
-            <User className="w-3 h-3" />
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          {discord_username ? (
-            <>
-              <span className="text-xs font-semibold truncate block">{discord_username}</span>
-              <span className="text-[10px] text-muted-foreground truncate block">{name}</span>
-            </>
-          ) : (
-            <span className="text-xs font-medium truncate block">{name}</span>
-          )}
-        </div>
-      </div>
-    );
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: err.message, variant: 'destructive' });
+    } finally {
+      setEditLoading(false);
+    }
   };
 
-  // ========== Summary computations ==========
-  const periodOptions = useMemo(() => {
-    const days = new Set<string>();
-    const months = new Set<string>();
-    const years = new Set<string>();
-    records.forEach((r) => {
-      const d = parseTransactionDate(r.transaction);
-      if (!d) return;
-      const yyyy = String(d.getFullYear());
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      days.add(`${yyyy}-${mm}-${dd}`);
-      months.add(`${yyyy}-${mm}`);
-      years.add(yyyy);
-    });
-    return {
-      days: [...days].sort().reverse(),
-      months: [...months].sort().reverse(),
-      years: [...years].sort().reverse(),
-    };
-  }, [records]);
+  // ── Display helpers ──
+  const resolveDisplayName = useCallback((id: string) => {
+    if (!id) return { name: '-', discord_username: null, avatar: null };
+    const p = profileMap.get(id);
+    return p ? { name: p.username, discord_username: p.discord_username ?? null, avatar: p.avatar_url } : { name: id, discord_username: null, avatar: null };
+  }, [profileMap]);
 
-  const periodFilteredRecords = useMemo(() => {
-    if (!selectedPeriod || selectedPeriod === 'all') return records;
-    return records.filter((r) => {
-      const d = parseTransactionDate(r.transaction);
-      if (!d) return false;
-      const yyyy = String(d.getFullYear());
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      if (periodMode === 'day') return `${yyyy}-${mm}-${dd}` === selectedPeriod;
-      if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
-      return yyyy === selectedPeriod;
-    });
-  }, [records, periodMode, selectedPeriod]);
+  const formatCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-  const periodSummary = useMemo(() => {
-    const totalAmount = periodFilteredRecords.reduce((s, r) => s + (r.amount || 0), 0);
-    const totalBills = periodFilteredRecords.length;
-    return { totalAmount, totalBills };
-  }, [periodFilteredRecords]);
-
-  const summaryStats = useMemo(() => {
-    const totalAmount = records.reduce((s, r) => s + (r.amount || 0), 0);
-    const totalBills = records.length;
-
-    const dailyMap = new Map<string, { amount: number; count: number }>();
-    const monthlyMap = new Map<string, { amount: number; count: number }>();
-
-    records.forEach((r) => {
-      const d = parseTransactionDate(r.transaction);
-      if (!d) return;
-      const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const amt = r.amount || 0;
-
-      const prevD = dailyMap.get(dayKey) ?? { amount: 0, count: 0 };
-      dailyMap.set(dayKey, { amount: prevD.amount + amt, count: prevD.count + 1 });
-
-      const prevM = monthlyMap.get(monthKey) ?? { amount: 0, count: 0 };
-      monthlyMap.set(monthKey, { amount: prevM.amount + amt, count: prevM.count + 1 });
-    });
-
-    const dailyData = [...dailyMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date: date.slice(5), amount: v.amount, count: v.count }));
-
-    const monthlyData = [...monthlyMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, v]) => ({ month, amount: v.amount, count: v.count }));
-
-    const today = new Date();
-    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const todayStats = dailyMap.get(todayKey) ?? { amount: 0, count: 0 };
-
-    const thisMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    const thisMonthStats = monthlyMap.get(thisMonthKey) ?? { amount: 0, count: 0 };
-
-    return { totalAmount, totalBills, dailyData, monthlyData, todayStats, thisMonthStats };
-  }, [records]);
-
-  const formatCurrency = (n: number) =>
-    n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-
-  // คำนวณยอดรวม amount ต่อ member_id จากทุก records
   const totalAmountByMember = useMemo(() => {
     const map = new Map<string, number>();
-    records.forEach((r) => {
-      const prev = map.get(r.member_id) ?? 0;
-      map.set(r.member_id, prev + (r.amount || 0));
-    });
+    records.forEach(r => map.set(r.member_id, (map.get(r.member_id) ?? 0) + r.total_amount));
     return map;
   }, [records]);
 
-  const handleSendEmbed = async (r: TradingRecord) => {
+  // ── Send embed ──
+  const handleSendEmbed = async (r: UnifiedRecord) => {
     setIsSendingEmbed(true);
     try {
-      const memberId = r.member_id;
-      const latestAmount = r.amount || 0;
-      const totalAmount = totalAmountByMember.get(memberId) ?? latestAmount;
-      const profile = profileMap.get(memberId);
-      const avatarUrl = profile?.avatar_url ?? '';
-
-      // ส่งผ่าน Edge Function แทน Webhook โดยตรง
-      // เพราะ Components V2 (flags: 32768) ไม่รองรับบน Webhook endpoint — error 400
-      // Bot Token เก็บไว้ใน Edge Function เท่านั้น
       const res = await fetch(EDGE_SEND_TRADING_EMBED, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({
-          member_id: memberId,
-          latest_amount: latestAmount,
-          total_amount: totalAmount,
-          avatar_url: avatarUrl,
+          member_id: r.member_id,
+          latest_amount: r.total_amount,
+          total_amount: totalAmountByMember.get(r.member_id) ?? r.total_amount,
+          avatar_url: profileMap.get(r.member_id)?.avatar_url ?? '',
         }),
       });
-
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const detail = [
-          (errData as any).details,
-          (errData as any).errorCode,
-          (errData as any).errorCategory,
-          (errData as any).discordErrorCode ? `Discord code: ${(errData as any).discordErrorCode}` : null,
-          (errData as any).discordStatus ? `HTTP: ${(errData as any).discordStatus}` : null,
-        ].filter(Boolean).join(' | ');
-        throw new Error(detail || (errData as any).error || `Edge Function error: ${res.status}`);
+        const e = await res.json().catch(() => ({}));
+        throw new Error((e as any).details || (e as any).error || `HTTP ${res.status}`);
       }
-
       toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
     } catch (err: any) {
-      console.error('Send embed failed:', err);
       toast({ title: 'ส่ง embed ไม่สำเร็จ', description: err.message, variant: 'destructive' });
     } finally {
       setIsSendingEmbed(false);
@@ -814,16 +698,98 @@ export function TradingHistoryManagement() {
     }
   };
 
+  // ── Filters / pagination ──
+  const filteredRecords = useMemo(() => records.filter(r => {
+    const svcResolved = resolveDisplayName(r.staff_id ?? '');
+    const svcMatch = !serviceQuery.trim() ||
+      (r.staff_id ?? '').toLowerCase().includes(serviceQuery.toLowerCase()) ||
+      svcResolved.name.toLowerCase().includes(serviceQuery.toLowerCase()) ||
+      (svcResolved.discord_username ?? '').toLowerCase().includes(serviceQuery.toLowerCase());
+    const memResolved = resolveDisplayName(r.member_id);
+    const memMatch = !memberQuery.trim() ||
+      r.member_id.toLowerCase().includes(memberQuery.toLowerCase()) ||
+      memResolved.name.toLowerCase().includes(memberQuery.toLowerCase()) ||
+      (memResolved.discord_username ?? '').toLowerCase().includes(memberQuery.toLowerCase());
+    const typeMatch = !billTypeQuery.trim() || (r.type_bill ?? '').toLowerCase().includes(billTypeQuery.toLowerCase());
+    const dateMatch = !dateQuery || (() => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return false;
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` === dateQuery;
+    })();
+    const periodMatch = !selectedPeriod || selectedPeriod === 'all' || (() => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return false;
+      const yyyy = String(d.getFullYear());
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      if (periodMode === 'day') return `${yyyy}-${mm}-${dd}` === selectedPeriod;
+      if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
+      return yyyy === selectedPeriod;
+    })();
+    return svcMatch && memMatch && typeMatch && dateMatch && periodMatch;
+  }), [records, serviceQuery, memberQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredRecords.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredRecords, currentPage]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [totalPages, currentPage]);
+
+  // ── Stats ──
+  const periodOptions = useMemo(() => {
+    const days = new Set<string>(), months = new Set<string>(), years = new Set<string>();
+    records.forEach(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return;
+      const yyyy = String(d.getFullYear()), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+      days.add(`${yyyy}-${mm}-${dd}`); months.add(`${yyyy}-${mm}`); years.add(yyyy);
+    });
+    return { days: [...days].sort().reverse(), months: [...months].sort().reverse(), years: [...years].sort().reverse() };
+  }, [records]);
+
+  const periodFilteredRecords = useMemo(() => {
+    if (!selectedPeriod || selectedPeriod === 'all') return records;
+    return records.filter(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return false;
+      const yyyy = String(d.getFullYear()), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+      if (periodMode === 'day') return `${yyyy}-${mm}-${dd}` === selectedPeriod;
+      if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
+      return yyyy === selectedPeriod;
+    });
+  }, [records, periodMode, selectedPeriod]);
+
+  const summaryStats = useMemo(() => {
+    const totalAmount = records.reduce((s, r) => s + r.total_amount, 0);
+    const totalBills = records.length;
+    const dailyMap = new Map<string, { amount: number; count: number }>();
+    const monthlyMap = new Map<string, { amount: number; count: number }>();
+    records.forEach(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return;
+      const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const a = r.total_amount;
+      const pd = dailyMap.get(dk) ?? { amount: 0, count: 0 }; dailyMap.set(dk, { amount: pd.amount+a, count: pd.count+1 });
+      const pm = monthlyMap.get(mk) ?? { amount: 0, count: 0 }; monthlyMap.set(mk, { amount: pm.amount+a, count: pm.count+1 });
+    });
+    const dailyData = [...dailyMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,v])=>({ date: date.slice(5), ...v }));
+    const monthlyData = [...monthlyMap.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([month,v])=>({ month, ...v }));
+    const today = new Date();
+    const tk = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const thisMonthKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+    return { totalAmount, totalBills, dailyData, monthlyData, todayStats: dailyMap.get(tk) ?? { amount:0,count:0 }, thisMonthStats: monthlyMap.get(thisMonthKey) ?? { amount:0,count:0 } };
+  }, [records]);
+
+  const periodSummary = useMemo(() => ({
+    totalAmount: periodFilteredRecords.reduce((s, r) => s + r.total_amount, 0),
+    totalBills: periodFilteredRecords.length,
+  }), [periodFilteredRecords]);
+
   const formatPeriodLabel = (val: string) => {
-    if (periodMode === 'day') {
-      const parts = val.split('-');
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    if (periodMode === 'month') {
-      const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      const parts = val.split('-');
-      return `${thMonths[parseInt(parts[1]) - 1]} ${parts[0]}`;
-    }
+    if (periodMode === 'day') { const p = val.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; }
+    if (periodMode === 'month') { const th = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; const p = val.split('-'); return `${th[parseInt(p[1])-1]} ${p[0]}`; }
     return `ปี ${val}`;
   };
 
@@ -834,50 +800,57 @@ export function TradingHistoryManagement() {
     return (
       <div className="rounded-lg border bg-background px-3 py-2 text-xs shadow-lg">
         <p className="font-medium mb-1">{l}</p>
-        {p.map((entry: any) => (
-          <p key={entry.dataKey} style={{ color: entry.color }}>
-            {entry.dataKey === 'amount' ? `฿${formatCurrency(entry.value)}` : `${entry.value} บิล`}
-          </p>
-        ))}
+        {p.map((e: any) => <p key={e.dataKey} style={{ color: e.color }}>{e.dataKey === 'amount' ? `฿${formatCurrency(e.value)}` : `${e.value} บิล`}</p>)}
       </div>
     );
   };
 
-  // Loading
+  const UserBadge = ({ id }: { id: string }) => {
+    const { name, discord_username, avatar } = resolveDisplayName(id);
+    return (
+      <div className="flex items-center gap-1.5 min-w-0">
+        <Avatar className="w-5 h-5 shrink-0">
+          <AvatarImage src={avatar ?? undefined} />
+          <AvatarFallback className="text-[10px] bg-muted"><User className="w-3 h-3" /></AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          {discord_username ? (<><span className="text-xs font-semibold truncate block">{discord_username}</span><span className="text-[10px] text-muted-foreground truncate block">{name}</span></>) : <span className="text-xs font-medium truncate block">{name}</span>}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Catalog split ──
+  const classItems = useMemo(() => catalog.filter(c => c.product_type === 'class_role'), [catalog]);
+  const otherItems = useMemo(() => catalog.filter(c => c.product_type !== 'class_role'), [catalog]);
+
+  // ── Loading / Error states ──
   if (loading && records.length === 0) {
     return (
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">ประวัติการซื้อขาย</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4 space-y-3">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-8 w-24" />
-              </CardContent>
-            </Card>
+            <Card key={i}><CardContent className="p-4 space-y-3">
+              <Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-full" /><Skeleton className="h-8 w-24" />
+            </CardContent></Card>
           ))}
         </div>
       </div>
     );
   }
-
-  // Error
   if (error && records.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive" />
         <p className="text-lg font-medium">ไม่สามารถโหลดข้อมูลได้</p>
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button onClick={fetchData} variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" /> ลองใหม่
-        </Button>
+        <Button onClick={fetchData} variant="outline" className="gap-2"><RefreshCw className="h-4 w-4" /> ลองใหม่</Button>
       </div>
     );
   }
 
+  // ── JSX ──
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -885,143 +858,175 @@ export function TradingHistoryManagement() {
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold">ประวัติการซื้อขาย</h2>
           <Badge variant="secondary" className="gap-1.5 font-normal text-xs h-6">
-            <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
-            อัปเดตอัตโนมัติ
+            <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" /> อัปเดตอัตโนมัติ
           </Badge>
         </div>
-        
         <div className="flex items-center gap-2">
-          <div className="text-xs text-muted-foreground mr-2 hidden sm:block">
-            {filteredRecords.length} รายการ
-          </div>
-          
-          {/* Toggle Webhook (Owner only) */}
+          <div className="text-xs text-muted-foreground mr-2 hidden sm:block">{filteredRecords.length} รายการ</div>
           {user?.is_owner && (
             <div className="flex items-center gap-2 mr-2 border-r pr-4">
               <Switch checked={webhookEnabled} onCheckedChange={toggleWebhook} id="webhook-toggle" />
               <Label htmlFor="webhook-toggle" className="text-xs flex items-center gap-1 cursor-pointer select-none">
-                {webhookEnabled ? <Bell className="h-3 w-3 text-success" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
-                แจ้งเตือน Discord
+                {webhookEnabled ? <Bell className="h-3 w-3 text-success" /> : <BellOff className="h-3 w-3 text-muted-foreground" />} แจ้งเตือน Discord
               </Label>
             </div>
           )}
-
           {/* Create Bill Dialog */}
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90">
-                <Plus className="h-4 w-4" /> สร้างบิลใหม่
-              </Button>
+              <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" /> สร้างบิลใหม่</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>สร้างบิลใหม่</DialogTitle>
-                <DialogDescription>กรอกข้อมูลการซื้อขายเพื่อบันทึกและแจ้งเตือน</DialogDescription>
+                <DialogDescription>บันทึกการขายเข้าระบบใหม่ (orders + purchase_items)</DialogDescription>
               </DialogHeader>
-              
-              <div className="space-y-4 py-2">
+              <div className="space-y-5 py-2">
+                {/* Member / date / bill type */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="memberId">Member ID (ผู้ซื้อ)</Label>
-                    <Input id="memberId" value={newBill.memberId} onChange={(e) => setNewBill({...newBill, memberId: e.target.value})} placeholder="ระบุไอดีผู้ซื้อ" />
+                    <Label htmlFor="memberId">Member ID (ผู้ซื้อ) *</Label>
+                    <Input id="memberId" value={newBill.memberId} onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))} placeholder="Discord ID" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="transactionDate">วันทำรายการ</Label>
-                    <Input type="date" id="transactionDate" value={newBill.transactionDate} onChange={(e) => setNewBill({...newBill, transactionDate: e.target.value})} />
+                    <Label htmlFor="txDate">วันทำรายการ *</Label>
+                    <Input type="date" id="txDate" value={newBill.transactionDate} onChange={e => setNewBill(p => ({ ...p, transactionDate: e.target.value }))} />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">ยอดการสั่งซื้อ (บาท)</Label>
-                    <Input type="number" id="amount" value={newBill.amount} onChange={(e) => setNewBill({...newBill, amount: e.target.value})} placeholder="0.00" />
-                    {salmonPointPreview !== null && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        🐟 Salmon Point ที่จะได้รับ: <span className="font-semibold text-foreground">{salmonPointPreview}</span> แต้ม
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>ประเภทของบิล</Label>
-                    <Select value={newBill.billType} onValueChange={(v) => setNewBill({ ...newBill, billType: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="เลือกประเภท" />
-                      </SelectTrigger>
+                    <Label>ประเภทบิล</Label>
+                    <Select value={newBill.billType} onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
                         <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
+                        <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">ระบบจะเดาประเภทจาก QR ให้ แต่คุณสามารถเลือกแก้เองได้ตลอด</p>
+                    <p className="text-xs text-muted-foreground">ระบบเดา QR ให้ แต่แก้เองได้</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ยอดรวม (คำนวณจากสินค้า)</Label>
+                    <div className="h-10 flex items-center px-3 rounded-md border bg-muted/40 text-sm font-semibold text-primary">
+                      ฿{computedTotalAmount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </div>
+                    {salmonPointPreview !== null && (
+                      <p className="text-xs text-muted-foreground">🐟 Salmon Point ที่จะได้รับ: <span className="font-semibold text-foreground">{salmonPointPreview}</span> แต้ม</p>
+                    )}
                   </div>
                 </div>
 
+                {/* Dropdown 1: เลือกคลาส (class_role, max 1) */}
                 <div className="space-y-2">
-                  <Label>สินค้า (เลือกได้หลายรายการ)</Label>
-                  <Select onValueChange={handleAddProduct}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกสินค้า..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {PRODUCT_LIST.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <Label className="font-semibold">เลือกคลาสที่ซื้อ <span className="text-muted-foreground font-normal text-xs">(เลือกได้ 0 หรือ 1 รายการ)</span></Label>
+                  {classItems.length === 0
+                    ? <p className="text-xs text-muted-foreground">ไม่มีสินค้าประเภท class_role ที่เปิดขายอยู่</p>
+                    : (
+                      <Select onValueChange={handleSelectClassItem} value={selectedClassItem?.product_id ?? ''}>
+                        <SelectTrigger><SelectValue placeholder="เลือกคลาส..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">-- ไม่เลือกคลาส --</SelectItem>
+                          {classItems.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.display_name}{p.current_price != null ? ` (฿${p.current_price.toLocaleString()})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  {selectedClassItem && (
+                    <div className="rounded-md border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{selectedClassItem.display_name}</span>
+                        <button onClick={() => { setSelectedClassItem(null); }} className="text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">ราคาที่จ่ายจริง (บาท) *</Label>
+                          <Input type="number" min="0" value={selectedClassItem.price_paid} onChange={e => updateItem('class', selectedClassItem.product_id, 'price_paid', e.target.value)} />
+                        </div>
+                        <div className="flex items-end pb-1 gap-2">
+                          <input type="checkbox" id="class-promo" checked={selectedClassItem.is_promotion}
+                            onChange={e => updateItem('class', selectedClassItem.product_id, 'is_promotion', e.target.checked)} className="w-4 h-4" />
+                          <Label htmlFor="class-promo" className="text-xs cursor-pointer">เป็นโปรโมชัน / ลดราคา</Label>
+                        </div>
+                      </div>
+                      {selectedClassItem.is_promotion && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">ราคาเต็มก่อนลด (original_price) *</Label>
+                          <Input type="number" min="0" value={selectedClassItem.original_price} onChange={e => updateItem('class', selectedClassItem.product_id, 'original_price', e.target.value)} placeholder="ราคาปกติก่อนโปรโมชัน" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dropdown 2: ของแถม / บริการอื่นๆ (multi) */}
+                <div className="space-y-2">
+                  <Label className="font-semibold">ของแถม / บริการอื่นๆ <span className="text-muted-foreground font-normal text-xs">(เลือกได้หลายรายการ)</span></Label>
+                  {otherItems.length === 0
+                    ? <p className="text-xs text-muted-foreground">ไม่มีสินค้าอื่นที่เปิดขายอยู่</p>
+                    : (
+                      <Select onValueChange={handleAddOtherItem} value="">
+                        <SelectTrigger><SelectValue placeholder="เพิ่มสินค้า / บริการ..." /></SelectTrigger>
+                        <SelectContent>
+                          {otherItems.map(p => (
+                            <SelectItem key={p.id} value={p.id} disabled={!!selectedOtherItems.find(i => i.product_id === p.id)}>
+                              {p.display_name}{p.current_price != null ? ` (฿${p.current_price.toLocaleString()})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  {selectedOtherItems.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedOtherItems.map(item => (
+                        <div key={item.product_id} className="rounded-md border p-3 space-y-2 bg-muted/30">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{item.display_name}</span>
+                            <button onClick={() => handleRemoveOtherItem(item.product_id)} className="text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">ราคาที่จ่ายจริง (บาท) *</Label>
+                              <Input type="number" min="0" value={item.price_paid} onChange={e => updateItem('other', item.product_id, 'price_paid', e.target.value)} />
+                            </div>
+                            <div className="flex items-end pb-1 gap-2">
+                              <input type="checkbox" id={`other-promo-${item.product_id}`} checked={item.is_promotion}
+                                onChange={e => updateItem('other', item.product_id, 'is_promotion', e.target.checked)} className="w-4 h-4" />
+                              <Label htmlFor={`other-promo-${item.product_id}`} className="text-xs cursor-pointer">เป็นโปรโมชัน</Label>
+                            </div>
+                          </div>
+                          {item.is_promotion && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">ราคาเต็มก่อนลด *</Label>
+                              <Input type="number" min="0" value={item.original_price} onChange={e => updateItem('other', item.product_id, 'original_price', e.target.value)} />
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <div className="flex gap-2 mt-2">
-                    <Input 
-                      placeholder="พิมพ์ชื่อสินค้าอื่นๆ..." 
-                      value={newBill.customProduct} 
-                      onChange={(e) => setNewBill({...newBill, customProduct: e.target.value})}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddProduct(newBill.customProduct);
-                        }
-                      }}
-                    />
-                    <Button type="button" variant="outline" onClick={() => handleAddProduct(newBill.customProduct)}>เพิ่ม</Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mt-2 min-h-[40px] p-2 border rounded-md bg-muted/20">
-                    {selectedProducts.length === 0 && <span className="text-xs text-muted-foreground self-center">ยังไม่ได้เลือกสินค้า</span>}
-                    {selectedProducts.map((p) => (
-                      <Badge key={p} variant="secondary" className="gap-1 pr-1">
-                        {p}
-                        <button onClick={() => handleRemoveProduct(p)} className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
+                {/* Slip upload */}
                 <div className="space-y-2">
-                  <Label>หลักฐานการโอน (1-2 รูป)</Label>
+                  <Label>หลักฐานการโอน (1-2 รูป) *</Label>
                   <Input type="file" multiple accept="image/*" onChange={handleFileChange} className="cursor-pointer" />
                   {selectedFiles.length > 0 && (
                     <div className="flex gap-2 mt-2">
                       {selectedFiles.map((f, i) => (
                         <div key={i} className="relative group">
-                          <img 
-                            src={previewUrls[i]} 
-                            alt={f.name}
-                            className="w-20 h-20 object-cover rounded-lg border border-border"
-                          />
-                          <button 
-                            onClick={() => removeFile(i)}
-                            className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                          <img src={previewUrls[i]} alt={f.name} className="w-20 h-20 object-cover rounded-lg border border-border" />
+                          <button onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md"><X className="h-3 w-3" /></button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               </div>
-
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading}>ยกเลิก</Button>
                 <Button onClick={handleAddBill} disabled={addLoading} className="gap-2">
@@ -1035,405 +1040,279 @@ export function TradingHistoryManagement() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:w-[400px] mb-4">
-            <TabsTrigger value="data" className="gap-2"><List className="h-4 w-4"/> ข้อมูลบิล</TabsTrigger>
-            <TabsTrigger value="stats" className="gap-2"><PieChart className="h-4 w-4"/> สถิติ</TabsTrigger>
+          <TabsTrigger value="data" className="gap-2"><List className="h-4 w-4" /> ข้อมูลบิล</TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2"><PieChart className="h-4 w-4" /> สถิติ</TabsTrigger>
         </TabsList>
 
+        {/* ── Stats Tab ── */}
         <TabsContent value="stats" className="space-y-4 mt-0">
-            {/* Period Filter */}
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4 text-primary" /> ดูสรุปตามช่วงเวลา
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Tabs value={periodMode} onValueChange={(v) => { setPeriodMode(v as any); setSelectedPeriod(''); }} className="w-auto">
-                    <TabsList className="h-8">
-                      <TabsTrigger value="day" className="text-xs px-3 h-7">วัน</TabsTrigger>
-                      <TabsTrigger value="month" className="text-xs px-3 h-7">เดือน</TabsTrigger>
-                      <TabsTrigger value="year" className="text-xs px-3 h-7">ปี</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger className="w-[200px] h-8 text-xs">
-                      <SelectValue placeholder={`เลือก${periodMode === 'day' ? 'วัน' : periodMode === 'month' ? 'เดือน' : 'ปี'}...`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-xs">ทั้งหมด</SelectItem>
-                      {currentPeriodOptions.map((opt) => (
-                        <SelectItem key={opt} value={opt} className="text-xs">
-                          {formatPeriodLabel(opt)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedPeriod && selectedPeriod !== 'all' && (
-                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedPeriod('')}>
-                      ล้าง
-                    </Button>
-                  )}
-                </div>
-
-                {/* Period Summary */}
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-sm font-semibold flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> ดูสรุปตามช่วงเวลา</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Tabs value={periodMode} onValueChange={v => { setPeriodMode(v as any); setSelectedPeriod(''); }} className="w-auto">
+                  <TabsList className="h-8">
+                    <TabsTrigger value="day" className="text-xs px-3 h-7">วัน</TabsTrigger>
+                    <TabsTrigger value="month" className="text-xs px-3 h-7">เดือน</TabsTrigger>
+                    <TabsTrigger value="year" className="text-xs px-3 h-7">ปี</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder={`เลือก${periodMode === 'day' ? 'วัน' : periodMode === 'month' ? 'เดือน' : 'ปี'}...`} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">ทั้งหมด</SelectItem>
+                    {currentPeriodOptions.map(opt => <SelectItem key={opt} value={opt} className="text-xs">{formatPeriodLabel(opt)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 {selectedPeriod && selectedPeriod !== 'all' && (
-                  <div className="grid gap-3 grid-cols-2 pt-1">
-                    <div className="rounded-lg border bg-primary/5 p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดรวม</p>
-                      <p className="text-lg font-bold text-primary">฿{formatCurrency(periodSummary.totalAmount)}</p>
-                    </div>
-                    <div className="rounded-lg border bg-chart-2/10 p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">จำนวนบิล</p>
-                      <p className="text-lg font-bold">{periodSummary.totalBills}</p>
-                    </div>
-                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedPeriod('')}>ล้าง</Button>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Summary Cards */}
-            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/10 p-2.5">
-                    <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+              {selectedPeriod && selectedPeriod !== 'all' && (
+                <div className="grid gap-3 grid-cols-2 pt-1">
+                  <div className="rounded-lg border bg-primary/5 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดรวม</p>
+                    <p className="text-lg font-bold text-primary">฿{formatCurrency(periodSummary.totalAmount)}</p>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดวันนี้</p>
-                    <p className="text-lg font-bold truncate">฿{formatCurrency(summaryStats.todayStats.amount)}</p>
-                    <p className="text-[10px] text-muted-foreground">{summaryStats.todayStats.count} บิล</p>
+                  <div className="rounded-lg border bg-chart-2/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">จำนวนบิล</p>
+                    <p className="text-lg font-bold">{periodSummary.totalBills}</p>
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-chart-2/20 p-2.5">
-                    <TrendingUp className="h-5 w-5 text-chart-2" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: DollarSign, label: 'ยอดวันนี้', amount: summaryStats.todayStats.amount, count: summaryStats.todayStats.count, color: 'bg-primary/10', iconColor: 'text-primary' },
+              { icon: TrendingUp, label: 'ยอดเดือนนี้', amount: summaryStats.thisMonthStats.amount, count: summaryStats.thisMonthStats.count, color: 'bg-chart-2/20', iconColor: 'text-chart-2' },
+              { icon: Receipt, label: 'ยอดทั้งหมด', amount: summaryStats.totalAmount, count: summaryStats.totalBills, color: 'bg-chart-3/20', iconColor: 'text-chart-3' },
+              { icon: BarChart3, label: 'ทั้งหมด', amount: null, count: records.length, color: 'bg-accent/20', iconColor: 'text-accent-foreground' },
+            ].map(({ icon: Icon, label, amount, count, color, iconColor }) => (
+              <Card key={label}><CardContent className="p-4 flex items-center gap-3">
+                <div className={`rounded-lg ${color} p-2.5`}><Icon className={`h-5 w-5 ${iconColor}`} /></div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
+                  {amount != null && <p className="text-lg font-bold truncate">฿{formatCurrency(amount)}</p>}
+                  <p className="text-[10px] text-muted-foreground">{count} {amount != null ? 'บิล' : 'รายการ'}</p>
+                </div>
+              </CardContent></Card>
+            ))}
+          </div>
+          {records.length > 0 && (
+            <Tabs defaultValue="daily" className="w-full">
+              <TabsList className="w-full max-w-xs">
+                <TabsTrigger value="daily" className="flex-1 gap-1.5 text-xs"><BarChart3 className="h-3.5 w-3.5" /> รายวัน</TabsTrigger>
+                <TabsTrigger value="monthly" className="flex-1 gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> รายเดือน</TabsTrigger>
+              </TabsList>
+              <TabsContent value="daily">
+                <Card><CardContent className="p-4">
+                  <p className="text-sm font-medium mb-3">ยอดซื้อขายรายวัน (บาท)</p>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={summaryStats.dailyData.slice(-30)}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                        <Tooltip content={<CustomTooltipContent />} />
+                        <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดเดือนนี้</p>
-                    <p className="text-lg font-bold truncate">฿{formatCurrency(summaryStats.thisMonthStats.amount)}</p>
-                    <p className="text-[10px] text-muted-foreground">{summaryStats.thisMonthStats.count} บิล</p>
+                </CardContent></Card>
+              </TabsContent>
+              <TabsContent value="monthly">
+                <Card><CardContent className="p-4">
+                  <p className="text-sm font-medium mb-3">แนวโน้มยอดซื้อขายรายเดือน (บาท)</p>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={summaryStats.monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+                        <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                        <Tooltip content={<CustomTooltipContent />} />
+                        <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--primary))' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-chart-3/20 p-2.5">
-                    <Receipt className="h-5 w-5 text-chart-3" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดทั้งหมด</p>
-                    <p className="text-lg font-bold truncate">฿{formatCurrency(summaryStats.totalAmount)}</p>
-                    <p className="text-[10px] text-muted-foreground">{summaryStats.totalBills} บิล</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-accent/20 p-2.5">
-                    <BarChart3 className="h-5 w-5 text-accent-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ทั้งหมด</p>
-                    <p className="text-lg font-bold truncate">{records.length}</p>
-                    <p className="text-[10px] text-muted-foreground">รายการ</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Charts */}
-            {records.length > 0 && (
-              <Tabs defaultValue="daily" className="w-full">
-                <TabsList className="w-full max-w-xs">
-                  <TabsTrigger value="daily" className="flex-1 gap-1.5 text-xs">
-                    <BarChart3 className="h-3.5 w-3.5" /> รายวัน
-                  </TabsTrigger>
-                  <TabsTrigger value="monthly" className="flex-1 gap-1.5 text-xs">
-                    <TrendingUp className="h-3.5 w-3.5" /> รายเดือน
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="daily">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm font-medium mb-3">ยอดซื้อขายรายวัน (บาท)</p>
-                      <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={summaryStats.dailyData.slice(-30)}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                            <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                            <Tooltip content={<CustomTooltipContent />} />
-                            <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="monthly">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm font-medium mb-3">แนวโน้มยอดซื้อขายรายเดือน (บาท)</p>
-                      <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={summaryStats.monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                            <XAxis dataKey="month" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                            <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                            <Tooltip content={<CustomTooltipContent />} />
-                            <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--primary))' }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            )}
+                </CardContent></Card>
+              </TabsContent>
+            </Tabs>
+          )}
         </TabsContent>
 
+        {/* ── Data Tab ── */}
         <TabsContent value="data" className="space-y-4 mt-0">
-            {/* Filters */}
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Input
-                value={serviceQuery}
-                onChange={(e) => { setServiceQuery(e.target.value); setCurrentPage(1); }}
-                placeholder="ค้นหาผู้ดำเนินการ"
-              />
-              <Input
-                value={memberQuery}
-                onChange={(e) => { setMemberQuery(e.target.value); setCurrentPage(1); }}
-                placeholder="ค้นหาผู้ซื้อ"
-              />
-              <Input
-                value={billTypeQuery}
-                onChange={(e) => { setBillTypeQuery(e.target.value); setCurrentPage(1); }}
-                placeholder="ค้นหาประเภทบิล"
-              />
-              <Input
-                type="date"
-                value={dateQuery}
-                onChange={(e) => { setDateQuery(e.target.value); setCurrentPage(1); }}
-              />
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Input value={serviceQuery} onChange={e => { setServiceQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาผู้ดำเนินการ" />
+            <Input value={memberQuery} onChange={e => { setMemberQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาผู้ซื้อ" />
+            <Input value={billTypeQuery} onChange={e => { setBillTypeQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาประเภทบิล" />
+            <Input type="date" value={dateQuery} onChange={e => { setDateQuery(e.target.value); setCurrentPage(1); }} />
+          </div>
+
+          {filteredRecords.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">ไม่พบรายการ</p>
             </div>
-
-            {/* Records grid */}
-            {filteredRecords.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-40" />
-                <p className="font-medium">ไม่พบรายการ</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {paginatedRecords.map((r) => (
-                    <Card
-                      key={r.id}
-                      className="relative overflow-hidden transition-all duration-200 hover:shadow-md"
-                    >
-                      <CardContent className="p-4 space-y-3">
-                        {/* Transaction date and action buttons */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{formatTransactionDate(r.transaction)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEmbedTarget(r);
-                              }}
-                              title="ส่ง Thank you embed"
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditTarget(r);
-                                setEditForm({
-                                  amount: String(r.amount || ''),
-                                  transaction: r.transaction || '',
-                                  type_bill: r.type_bill || 'ธนาคารทั่วไป',
-                                  item: r.item || '',
-                                });
-                              }}
-                              title="แก้ไขข้อมูล"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            {user?.is_owner && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget(r);
-                                }}
-                                title="ลบข้อมูล"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {paginatedRecords.map(r => (
+                  <Card key={r.id} className={`relative overflow-hidden transition-all duration-200 hover:shadow-md ${r.source === 'new' ? 'border-primary/20' : ''}`}>
+                    <CardContent className="p-4 space-y-3">
+                      {/* Date row + source badge + actions */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>{formatTransactionDate(r.transaction_date)}</span>
+                          {r.source === 'new'
+                            ? <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/40 text-primary">ใหม่</Badge>
+                            : <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground">เก่า</Badge>}
                         </div>
-
-                        {/* Service (ผู้ดำเนินการ) */}
-                        {r.service_id && (
-                          <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              ผู้ดำเนินการ
-                            </span>
-                            <UserBadge id={r.service_id} />
-                          </div>
-                        )}
-
-                        {/* Member (ผู้ซื้อ) */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                            ผู้ซื้อ
-                          </span>
-                          <UserBadge id={r.member_id} />
-                        </div>
-
-                        {/* Amount & Bill type & Salmon point */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <CreditCard className="w-3.5 h-3.5 text-primary" />
-                            <span className="text-sm font-bold text-primary">{formatCurrency(r.amount || 0)} บาท</span>
-                          </div>
-                          {r.type_bill && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {r.type_bill}
-                            </Badge>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
+                            onClick={e => { e.stopPropagation(); setEmbedTarget(r); }} title="ส่ง Thank you embed">
+                            <Mail className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            onClick={e => { e.stopPropagation(); setEditTarget(r); setEditForm({ amount: String(r.total_amount), transaction: r.transaction_date ?? '', type_bill: r.type_bill ?? 'ธนาคารทั่วไป' }); }} title="แก้ไขข้อมูล">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          {user?.is_owner && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={e => { e.stopPropagation(); setDeleteTarget(r); }} title="ลบข้อมูล">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           )}
-                          <div className="flex items-center gap-1 text-xs text-honey font-semibold">
-                            <span>🐟</span>
-                            <span>{computeSalmonDelta(r.amount)}</span>
-                          </div>
                         </div>
+                      </div>
 
-                        {/* Item */}
-                        {r.item && (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              <Package className="w-3 h-3" /> สินค้า
-                            </div>
-                            <p className="text-xs text-foreground break-words">{r.item}</p>
+                      {/* Staff */}
+                      {r.staff_id && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ดำเนินการ</span>
+                          <UserBadge id={r.staff_id} />
+                        </div>
+                      )}
+
+                      {/* Member */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ซื้อ</span>
+                        <UserBadge id={r.member_id} />
+                      </div>
+
+                      {/* Amount / bill type / salmon */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard className="w-3.5 h-3.5 text-primary" />
+                          <span className="text-sm font-bold text-primary">{formatCurrency(r.total_amount)} บาท</span>
+                        </div>
+                        {r.type_bill && <Badge variant="secondary" className="text-[10px]">{r.type_bill}</Badge>}
+                        <div className="flex items-center gap-1 text-xs text-honey font-semibold">
+                          <span>🐟</span><span>{computeSalmonDelta(r.total_amount)}</span>
+                        </div>
+                      </div>
+
+                      {/* ── Item list ── */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                          <Package className="w-3 h-3" /> สินค้า
+                        </div>
+                        {r.source === 'legacy' && r.item && (
+                          <p className="text-xs text-foreground break-words">{r.item}</p>
+                        )}
+                        {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
+                          <div className="space-y-1.5">
+                            {r.purchase_items.map(item => (
+                              <div key={item.id} className="text-xs">
+                                {item.is_promotion ? (
+                                  <div className="rounded-md border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 space-y-0.5">
+                                    <div className="flex items-center gap-1 font-medium">
+                                      <Tag className="h-3 w-3 text-amber-600" />
+                                      <span>{item.product_display_name}</span>
+                                      <Badge className="text-[9px] h-4 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-0 ml-1">โปรโมชัน</Badge>
+                                    </div>
+                                    {item.original_price != null && (
+                                      <div className="text-muted-foreground">
+                                        ราคาเต็ม <span className="line-through">฿{formatCurrency(item.original_price)}</span>
+                                        {' → '}
+                                        <span className="font-semibold text-foreground">จ่ายจริง ฿{formatCurrency(item.price_paid)}</span>
+                                        {' '}
+                                        <span className="text-success">
+                                          (ลด {Math.round((1 - item.price_paid / item.original_price) * 100)}%)
+                                        </span>
+                                      </div>
+                                    )}
+                                    {item.original_price == null && (
+                                      <div className="text-foreground font-semibold">฿{formatCurrency(item.price_paid)}</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-foreground">{item.product_display_name}</span>
+                                    <span className="font-medium text-primary">฿{formatCurrency(item.price_paid)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
-
-                        {/* Timestamp */}
-                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                          <Clock className="w-3 h-3" />
-                          <span>เวลาที่ทำรายการ: {formatThaiDate(r.log_timestamp)}</span>
-                        </div>
-
-                        {/* Slip images */}
-                        {(r.slip_url || r.slip_url_2) && (
-                          <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 && r.slip_url.trim() !== '' && r.slip_url_2.trim() !== '' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                            {r.slip_url && r.slip_url.trim() !== '' && (
-                              <button
-                                onClick={() => setPreviewImage(r.slip_url)}
-                                className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer"
-                              >
-                                <img
-                                  src={r.slip_url}
-                                  alt="บิล 1"
-                                  className="w-full h-32 object-cover"
-                                  loading="lazy"
-                                />
-                              </button>
-                            )}
-                            {r.slip_url_2 && r.slip_url_2.trim() !== '' && (
-                              <button
-                                onClick={() => setPreviewImage(r.slip_url_2)}
-                                className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer"
-                              >
-                                <img
-                                  src={r.slip_url_2}
-                                  alt="บิล 2"
-                                  className="w-full h-32 object-cover"
-                                  loading="lazy"
-                                />
-                              </button>
-                            )}
-                          </div>
+                        {r.source === 'new' && (!r.purchase_items || r.purchase_items.length === 0) && (
+                          <p className="text-xs text-muted-foreground">ยังไม่มีรายการสินค้า</p>
                         )}
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </div>
+
+                      {/* Timestamp */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                        <Clock className="w-3 h-3" />
+                        <span>เวลาที่ทำรายการ: {formatThaiDate(r.log_timestamp)}</span>
+                      </div>
+
+                      {/* Slips */}
+                      {(r.slip_url || r.slip_url_2) && (
+                        <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => (
+                            <button key={i} onClick={() => setPreviewImage(url!)} className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer">
+                              <img src={url!} alt={`บิล ${i+1}`} className="w-full h-32 object-cover" loading="lazy" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p-1))}><ChevronLeft className="h-4 w-4" /></Button>
+                  <span className="text-sm text-muted-foreground">{currentPage} / {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage <= 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {currentPage} / {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage >= totalPages}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
-      {/* Image preview dialog */}
+      {/* Image preview */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl w-full p-0 bg-black/80 border-none overflow-hidden flex items-center justify-center focus:outline-none">
           <div className="relative w-full h-[80vh] flex items-center justify-center">
-            <button 
-                onClick={() => setPreviewImage(null)} 
-                className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
-            >
-                <X className="w-5 h-5" />
-            </button>
-            {previewImage && (
-            <img
-                src={previewImage}
-                alt="ภาพบิล"
-                className="max-w-full max-h-full object-contain"
-            />
-            )}
+            <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><X className="w-5 h-5" /></button>
+            {previewImage && <img src={previewImage} alt="ภาพบิล" className="max-w-full max-h-full object-contain" />}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      {/* Delete confirm */}
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="h-5 w-5" /> ยืนยันการลบข้อมูลถาวร</DialogTitle>
             <DialogDescription>
-              คุณต้องการลบประวัติการซื้อขายของ <strong>{resolveDisplayName(deleteTarget?.member_id ?? '').name}</strong> ยอด <strong>{deleteTarget?.amount ? formatCurrency(deleteTarget.amount) : '0'}</strong> บาท ใช่หรือไม่?
-              <br /><span className="text-destructive font-semibold">การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลและรูปสลิปจะถูกลบออกจากระบบทันที</span>
+              คุณต้องการลบบิลของ <strong>{resolveDisplayName(deleteTarget?.member_id ?? '').name}</strong> ยอด <strong>{deleteTarget ? formatCurrency(deleteTarget.total_amount) : '0'}</strong> บาท ใช่หรือไม่?
+              <br /><span className="text-destructive font-semibold">การกระทำนี้ไม่สามารถย้อนกลับได้</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1445,112 +1324,67 @@ export function TradingHistoryManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Trading Record Dialog */}
-      <Dialog open={Boolean(editTarget)} onOpenChange={(o) => !o && setEditTarget(null)}>
+      {/* Edit dialog */}
+      <Dialog open={Boolean(editTarget)} onOpenChange={o => !o && setEditTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5" /> แก้ไขข้อมูลบิล</DialogTitle>
-            <DialogDescription>แก้ไขยอดเงิน วันที่ ประเภทบิล หรือสินค้า</DialogDescription>
+            <DialogDescription>
+              {editTarget?.source === 'legacy' ? 'แก้ไขได้: ยอดเงิน วันที่ ประเภทบิล' : 'แก้ไขได้: วันที่ ประเภทบิล (ยอดเงินคำนวณจาก purchase_items อัตโนมัติ)'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
+            {editTarget?.source === 'legacy' && (
               <div className="space-y-2">
                 <Label>ยอดเงิน (บาท)</Label>
                 <Input type="number" value={editForm.amount} onChange={e => setEditForm(p => ({ ...p, amount: e.target.value }))} />
               </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>วันทำรายการ</Label>
                 <Input type="date" value={editForm.transaction} onChange={e => setEditForm(p => ({ ...p, transaction: e.target.value }))} />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>ประเภทบิล</Label>
-              <Select value={editForm.type_bill} onValueChange={v => setEditForm(p => ({ ...p, type_bill: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
-                  <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>สินค้า</Label>
-              <Input value={editForm.item} onChange={e => setEditForm(p => ({ ...p, item: e.target.value }))} />
+              <div className="space-y-2">
+                <Label>ประเภทบิล</Label>
+                <Select value={editForm.type_bill} onValueChange={v => setEditForm(p => ({ ...p, type_bill: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
+                    <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)} disabled={editLoading}>ยกเลิก</Button>
-            <Button onClick={async () => {
-              if (!editTarget) return;
-              setEditLoading(true);
-              try {
-                const { error } = await supabase.from('trading_history').update({
-                  amount: parseFloat(editForm.amount) || 0,
-                  transaction: editForm.transaction,
-                  type_bill: editForm.type_bill,
-                  item: editForm.item,
-                }).eq('id', editTarget.id);
-                if (error) throw error;
-                toast({ title: 'บันทึกเรียบร้อย', className: 'bg-success text-success-foreground' });
-                setEditTarget(null);
-                fetchData();
-              } catch (err: any) {
-                toast({ title: 'เกิดข้อผิดพลาด', description: err.message, variant: 'destructive' });
-              } finally {
-                setEditLoading(false);
-              }
-            }} disabled={editLoading} className="gap-2">
+            <Button onClick={handleEditSave} disabled={editLoading} className="gap-2">
               {editLoading && <Loader2 className="h-4 w-4 animate-spin" />} บันทึก
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Send Embed Confirm Dialog */}
-      <Dialog open={Boolean(embedTarget)} onOpenChange={(o) => !o && setEmbedTarget(null)}>
+      {/* Send embed confirm */}
+      <Dialog open={Boolean(embedTarget)} onOpenChange={o => !o && setEmbedTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-blue-500" /> ยืนยันการส่ง Thank you embed
-            </DialogTitle>
-            <DialogDescription>
-              ระบบจะส่ง embed ขอบคุณไปยัง Discord สำหรับ{' '}
-              <strong>{resolveDisplayName(embedTarget?.member_id ?? '').name}</strong>
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><Mail className="h-5 w-5 text-blue-500" /> ยืนยันการส่ง Thank you embed</DialogTitle>
+            <DialogDescription>ระบบจะส่ง embed ขอบคุณไปยัง Discord สำหรับ <strong>{resolveDisplayName(embedTarget?.member_id ?? '').name}</strong></DialogDescription>
           </DialogHeader>
-
           {embedTarget && (
             <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ผู้ซื้อ</span>
-                <span className="font-medium">{resolveDisplayName(embedTarget.member_id).name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ยอดบิลนี้</span>
-                <span className="font-bold text-primary">{formatCurrency(embedTarget.amount || 0)} บาท</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ยอดรวมทั้งหมด</span>
-                <span className="font-bold">{formatCurrency(totalAmountByMember.get(embedTarget.member_id) ?? 0)} บาท</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">🐟 Salmon Point</span>
-                <span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span>
-              </div>
+              <div className="flex justify-between"><span className="text-muted-foreground">ผู้ซื้อ</span><span className="font-medium">{resolveDisplayName(embedTarget.member_id).name}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">ยอดบิลนี้</span><span className="font-bold text-primary">{formatCurrency(embedTarget.total_amount)} บาท</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">ยอดรวมทั้งหมด</span><span className="font-bold">{formatCurrency(totalAmountByMember.get(embedTarget.member_id) ?? 0)} บาท</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">🐟 Salmon Point</span><span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span></div>
             </div>
           )}
-
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setEmbedTarget(null)} disabled={isSendingEmbed}>
-              ยกเลิก
-            </Button>
-            <Button
-              onClick={() => embedTarget && handleSendEmbed(embedTarget)}
-              disabled={isSendingEmbed}
-              className="gap-2 bg-honey hover:bg-honey/90 text-accent-foreground"
-            >
-              {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              ส่ง embed
+            <Button variant="outline" onClick={() => setEmbedTarget(null)} disabled={isSendingEmbed}>ยกเลิก</Button>
+            <Button onClick={() => embedTarget && handleSendEmbed(embedTarget)} disabled={isSendingEmbed} className="gap-2 bg-honey hover:bg-honey/90 text-accent-foreground">
+              {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} ส่ง embed
             </Button>
           </DialogFooter>
         </DialogContent>
