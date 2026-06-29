@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
+import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -102,6 +103,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'non-transferable-roles': ShieldBan,
   'discord-servers': Settings,
   'campaigns': Send,
+  'product-catalog': ShoppingCart,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -266,6 +268,7 @@ export default function AdminPage() {
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'campaigns': return isOwner ? <CampaignsManagement /> : null;
+        case 'product-catalog': return isOwner ? <ProductCatalogManagement /> : null;
         default: return null;
       }
     } catch (error) {
