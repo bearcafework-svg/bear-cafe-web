@@ -437,6 +437,10 @@ export function TradingHistoryManagement() {
 
   // ── Class item select ──
   const handleSelectClassItem = (productId: string) => {
+    if (productId === 'none' || !productId) {
+      setSelectedClassItem(null);
+      return;
+    }
     const p = catalog.find(c => c.id === productId);
     if (!p) return;
     setSelectedClassItem({
@@ -922,10 +926,10 @@ export function TradingHistoryManagement() {
                   {classItems.length === 0
                     ? <p className="text-xs text-muted-foreground">ไม่มีสินค้าประเภท class_role ที่เปิดขายอยู่</p>
                     : (
-                      <Select onValueChange={handleSelectClassItem} value={selectedClassItem?.product_id ?? ''}>
+                      <Select onValueChange={handleSelectClassItem} value={selectedClassItem?.product_id ?? 'none'}>
                         <SelectTrigger><SelectValue placeholder="เลือกคลาส..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- ไม่เลือกคลาส --</SelectItem>
+                          <SelectItem value="none">-- ไม่เลือกคลาส --</SelectItem>
                           {classItems.map(p => (
                             <SelectItem key={p.id} value={p.id}>
                               {p.display_name}{p.current_price != null ? ` (฿${p.current_price.toLocaleString()})` : ''}
