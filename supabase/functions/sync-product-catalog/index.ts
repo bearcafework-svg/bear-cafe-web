@@ -60,6 +60,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return respond({ error: "Access denied" }, 403);
     }
 
+    let body: any = {};
+    if (req.headers.get("content-type")?.includes("application/json")) {
+      try {
+        body = await req.json();
+      } catch (e) {
+        // ignore
+      }
+    }
+    const action = body.action || "sync_all"; // 'fetch', 'sync', or 'sync_all'
+    const selectedRoleIds: string[] = body.selectedRoleIds || [];
+
     const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
     const guildId = Deno.env.get("DISCORD_GUILD_ID");
     if (!botToken || !guildId) {
@@ -71,11 +82,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Filter out system roles
     const relevantRoles = guildRoles.filter(
-      (r) => !SKIP_ROLE_NAMES.has(r.name) && !r.managed
+      (r: any) => !SKIP_ROLE_NAMES.has(r.name) && !r.managed
     );
 
     // Build a map: discord role_id → display_name
-    const discordRoleMap = new Map(relevantRoles.map((r) => [r.id, r.name]));
+    const discordRoleMap = new Map(relevantRoles.map((r: any) => [r.id, r.name]));
 
     // ---- 2. Fetch current product_catalog rows that have a role_id ----
     const { data: existingRows, error: fetchError } = await supabaseAdmin
@@ -89,6 +100,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       (existingRows ?? []).map((r) => [r.role_id as string, r])
     );
 
+    // If action is fetch, just return the list of roles to the frontend
+    if (action === "fetch") {
+      const roles = relevantRoles.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        inDb: existingByRoleId.has(r.id),
+      }));
+      return respond({ ok: true, roles });
+    }
+
     const inserted: string[] = [];
     const deactivated: string[] = [];
     const renamed: string[] = [];
@@ -96,6 +117,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ---- 3. Insert new roles (not in product_catalog yet) ----
     for (const [roleId, roleName] of discordRoleMap) {
       if (!existingByRoleId.has(roleId)) {
+        // If action is sync, only insert selected roles
+        if (action === "sync" && !selectedRoleIds.includes(roleId)) {
+          continue;
+        }
+
         const { error: insertError } = await supabaseAdmin.from("product_catalog").insert({
           role_id: roleId,
           display_name: roleName,
