@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -103,6 +105,12 @@ export function ProductCatalogManagement() {
   const [syncResult, setSyncResult] = useState<{
     inserted: number; deactivated: number; renamed: number;
   } | null>(null);
+  
+  // Sync Dialog
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [discordRoles, setDiscordRoles] = useState<{id: string, name: string, inDb: boolean}[]>([]);
+  const [syncSearchQuery, setSyncSearchQuery] = useState('');
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
 
   // ── fetch ──
   const fetchProducts = useCallback(async () => {
@@ -301,6 +309,40 @@ export function ProductCatalogManagement() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ action: 'fetch' }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'เกิดข้อผิดพลาด');
+
+      setDiscordRoles(json.roles || []);
+      setSyncSearchQuery('');
+      setSelectedRoleIds(new Set());
+      setSyncDialogOpen(true);
+    } catch (err: any) {
+      toast({ title: 'ดึงข้อมูลไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleConfirmSync() {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('ไม่พบ session กรุณา login ใหม่');
+
+      const supabaseUrl = (supabase as any).supabaseUrl as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/sync-product-catalog`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'sync',
+          selectedRoleIds: Array.from(selectedRoleIds),
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'เกิดข้อผิดพลาด');
@@ -315,6 +357,7 @@ export function ProductCatalogManagement() {
         title: 'ซิงค์สำเร็จ',
         description: `เพิ่ม ${summary.inserted} | ปิด ${summary.deactivated} | เปลี่ยนชื่อ ${summary.renamed}`,
       });
+      setSyncDialogOpen(false);
       fetchProducts();
     } catch (err: any) {
       toast({ title: 'ซิงค์ไม่สำเร็จ', description: err.message, variant: 'destructive' });
@@ -322,6 +365,11 @@ export function ProductCatalogManagement() {
       setSyncing(false);
     }
   }
+
+  const filteredDiscordRoles = discordRoles.filter(r => 
+    r.name.toLowerCase().includes(syncSearchQuery.toLowerCase()) || 
+    r.id.toLowerCase().includes(syncSearchQuery.toLowerCase())
+  );
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -742,6 +790,116 @@ export function ProductCatalogManagement() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               ลบ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Sync Discord Dialog ── */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>ซิงค์ Role จาก Discord</DialogTitle>
+            <DialogDescription>
+              เลือก Role ที่ต้องการเพิ่มเข้าคลังสินค้า (Role ที่มีอยู่ในระบบแล้วจะไม่สามารถเลือกได้)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 flex-1 overflow-hidden py-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="ค้นหา Role..."
+                className="pl-8"
+                value={syncSearchQuery}
+                onChange={(e) => setSyncSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-sm px-1">
+              <span className="text-muted-foreground">
+                เลือกแล้ว: {selectedRoleIds.size} / {filteredDiscordRoles.filter(r => !r.inDb).length}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const newSet = new Set(selectedRoleIds);
+                  const available = filteredDiscordRoles.filter(r => !r.inDb);
+                  if (available.every(r => selectedRoleIds.has(r.id))) {
+                    available.forEach(r => newSet.delete(r.id));
+                  } else {
+                    available.forEach(r => newSet.add(r.id));
+                  }
+                  setSelectedRoleIds(newSet);
+                }}
+              >
+                เลือกทั้งหมดที่แสดง
+              </Button>
+            </div>
+
+            <ScrollArea className="flex-1 border rounded-md">
+              <div className="p-4 space-y-2">
+                {filteredDiscordRoles.length === 0 ? (
+                  <div className="text-center text-sm text-muted-foreground py-8">
+                    ไม่พบ Role ที่ตรงกับการค้นหา
+                  </div>
+                ) : (
+                  filteredDiscordRoles.map(role => (
+                    <div 
+                      key={role.id} 
+                      className={`flex items-center space-x-3 p-2 rounded-lg border transition-colors ${role.inDb ? 'bg-muted/50 border-transparent opacity-60' : 'hover:bg-muted/30 cursor-pointer'}`}
+                      onClick={() => {
+                        if (role.inDb) return;
+                        const newSet = new Set(selectedRoleIds);
+                        if (newSet.has(role.id)) newSet.delete(role.id);
+                        else newSet.add(role.id);
+                        setSelectedRoleIds(newSet);
+                      }}
+                    >
+                      <Checkbox 
+                        id={`role-${role.id}`} 
+                        checked={role.inDb || selectedRoleIds.has(role.id)}
+                        disabled={role.inDb}
+                        onCheckedChange={(checked) => {
+                          if (role.inDb) return;
+                          const newSet = new Set(selectedRoleIds);
+                          if (checked) newSet.add(role.id);
+                          else newSet.delete(role.id);
+                          setSelectedRoleIds(newSet);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label
+                          htmlFor={`role-${role.id}`}
+                          className={`text-sm font-medium ${role.inDb ? '' : 'cursor-pointer'} truncate block`}
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          {role.name}
+                        </Label>
+                        <p className="text-xs text-muted-foreground truncate">
+                          ID: {role.id}
+                        </p>
+                      </div>
+                      {role.inDb && (
+                        <Badge variant="secondary" className="text-[10px]">มีในระบบแล้ว</Badge>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setSyncDialogOpen(false)} disabled={syncing}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleConfirmSync} disabled={syncing || selectedRoleIds.size === 0}>
+              {syncing && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              ยืนยันการซิงค์ ({selectedRoleIds.size})
             </Button>
           </DialogFooter>
         </DialogContent>
