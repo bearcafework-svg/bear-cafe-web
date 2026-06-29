@@ -446,7 +446,8 @@ export function ProductCatalogManagement() {
                 description="ไม่พบสินค้าที่ตรงกับการค้นหาหรือตัวกรองของคุณ"
               />
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
