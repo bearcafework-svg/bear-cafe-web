@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import {
   Package, RefreshCw, Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShoppingBag,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Search, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
@@ -83,6 +83,10 @@ export function ProductCatalogManagement() {
   // Filters
   const [filterType, setFilterType] = useState<'all' | ProductType>('all');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('active');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSetupNeeded, setFilterSetupNeeded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   // Add / Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -127,8 +131,26 @@ export function ProductCatalogManagement() {
       filterActive === 'all' ||
       (filterActive === 'active' && p.is_active) ||
       (filterActive === 'inactive' && !p.is_active);
-    return typeOk && activeOk;
+    const searchOk = !searchQuery.trim() ||
+      p.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.role_id ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+    const setupOk = !filterSetupNeeded || (p.current_price === null || p.product_type === 'other' || !p.is_purchasable);
+    return typeOk && activeOk && searchOk && setupOk;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const isSortingAllowed = filterType === 'all' && filterActive === 'all' && !searchQuery.trim() && !filterSetupNeeded;
 
   // ── open dialogs ──
   function openAdd() {
@@ -227,19 +249,23 @@ export function ProductCatalogManagement() {
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= products.length) return;
 
-    const current = products[idx];
-    const target = products[targetIdx];
     const next = [...products];
-    next[idx] = { ...target, sort_order: current.sort_order };
-    next[targetIdx] = { ...current, sort_order: target.sort_order };
-    setProducts(next);
+    const [movedItem] = next.splice(idx, 1);
+    next.splice(targetIdx, 0, movedItem);
+
+    // Re-index all sort_orders to be clean sequential integers to prevent duplicate issues
+    const updatedProducts = next.map((p, i) => ({ ...p, sort_order: i }));
+    setProducts(updatedProducts);
 
     try {
-      await Promise.all([
-        supabase.from('product_catalog' as any).update({ sort_order: target.sort_order }).eq('id', current.id),
-        supabase.from('product_catalog' as any).update({ sort_order: current.sort_order }).eq('id', target.id),
-      ]);
-    } catch {
+      const upsertData = updatedProducts.map(p => ({
+        id: p.id,
+        sort_order: p.sort_order
+      }));
+      const { error } = await supabase.from('product_catalog' as any).upsert(upsertData);
+      if (error) throw error;
+    } catch (err: any) {
+      toast({ title: 'จัดเรียงไม่สำเร็จ', description: err.message, variant: 'destructive' });
       fetchProducts(); // revert on error
     }
   }
@@ -349,45 +375,75 @@ export function ProductCatalogManagement() {
             )}
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-2">
-              <Select
-                value={filterType}
-                onValueChange={(v) => setFilterType(v as typeof filterType)}
-              >
-                <SelectTrigger className="w-40 h-8 text-xs">
-                  <SelectValue placeholder="ประเภทสินค้า" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทุกประเภท</SelectItem>
-                  {ALL_PRODUCT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{PRODUCT_TYPE_LABELS[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/20 p-3 rounded-lg border border-border/60">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="ค้นหาตามชื่อสินค้า หรือ Discord Role ID..."
+                    className="pl-8 h-9 text-sm text-foreground bg-background"
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  />
+                </div>
+                
+                <Select
+                  value={filterType}
+                  onValueChange={(v) => { setFilterType(v as typeof filterType); setCurrentPage(1); }}
+                >
+                  <SelectTrigger className="w-40 h-9 text-sm">
+                    <SelectValue placeholder="ประเภทสินค้า" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทุกประเภท</SelectItem>
+                    {ALL_PRODUCT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>{PRODUCT_TYPE_LABELS[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select
-                value={filterActive}
-                onValueChange={(v) => setFilterActive(v as typeof filterActive)}
-              >
-                <SelectTrigger className="w-36 h-8 text-xs">
-                  <SelectValue placeholder="สถานะ" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทุกสถานะ</SelectItem>
-                  <SelectItem value="active">ใช้งาน</SelectItem>
-                  <SelectItem value="inactive">ปิดใช้งาน</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select
+                  value={filterActive}
+                  onValueChange={(v) => { setFilterActive(v as typeof filterActive); setCurrentPage(1); }}
+                >
+                  <SelectTrigger className="w-36 h-9 text-sm">
+                    <SelectValue placeholder="สถานะ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทุกสถานะ</SelectItem>
+                    <SelectItem value="active">ใช้งาน</SelectItem>
+                    <SelectItem value="inactive">ปิดใช้งาน</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 border-l pl-3 dark:border-border/60">
+                <Switch
+                  id="filter-setup-needed"
+                  checked={filterSetupNeeded}
+                  onCheckedChange={(v) => { setFilterSetupNeeded(v); setCurrentPage(1); }}
+                />
+                <Label htmlFor="filter-setup-needed" className="text-sm font-medium cursor-pointer select-none whitespace-nowrap text-muted-foreground hover:text-foreground">
+                  ต้องตั้งค่า (ไม่มีราคา/อื่นๆ)
+                </Label>
+              </div>
             </div>
 
             {/* Table */}
             {loading ? (
               <AdminSkeletonRows count={6} />
-            ) : filtered.length === 0 ? (
+            ) : products.length === 0 ? (
               <AdminEmptyState
                 icon={ShoppingBag}
                 title="ยังไม่มีสินค้า"
                 description="กด 'ซิงค์จาก Discord' เพื่อดึง role หรือเพิ่มสินค้าด้วยตนเอง"
+              />
+            ) : filtered.length === 0 ? (
+              <AdminEmptyState
+                icon={Search}
+                title="ไม่พบสินค้า"
+                description="ไม่พบสินค้าที่ตรงกับการค้นหาหรือตัวกรองของคุณ"
               />
             ) : (
               <div className="overflow-x-auto">
@@ -404,113 +460,145 @@ export function ProductCatalogManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">{product.display_name}</p>
-                            {product.role_id && (
-                              <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                                {product.role_id}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${PRODUCT_TYPE_COLORS[product.product_type]}`}
-                          >
-                            {PRODUCT_TYPE_LABELS[product.product_type]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {product.current_price != null
-                            ? product.current_price.toLocaleString('th-TH')
-                            : <span className="text-muted-foreground">-</span>}
-                        </TableCell>
-                        <TableCell>
-                          {product.is_purchasable ? (
-                            <Badge variant="outline" className="text-success border-success gap-1 text-xs">
-                              <CheckCircle className="w-3 h-3" />
-                              ขายได้
+                    {paginated.map((product) => {
+                      const idx = products.findIndex((p) => p.id === product.id);
+                      return (
+                        <TableRow key={product.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm text-foreground">{product.display_name}</p>
+                              {product.role_id && (
+                                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                                  {product.role_id}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${PRODUCT_TYPE_COLORS[product.product_type]}`}
+                            >
+                              {PRODUCT_TYPE_LABELS[product.product_type]}
                             </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1 text-xs">
-                              <XCircle className="w-3 h-3" />
-                              ปิดขาย
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            onClick={() => toggleActive(product)}
-                            className="focus:outline-none"
-                            title="คลิกเพื่อสลับสถานะ"
-                          >
-                            {product.is_active ? (
-                              <Badge variant="outline" className="text-success border-success gap-1 text-xs cursor-pointer hover:opacity-80">
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {product.current_price != null
+                              ? product.current_price.toLocaleString('th-TH')
+                              : <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell>
+                            {product.is_purchasable ? (
+                              <Badge variant="outline" className="text-success border-success gap-1 text-xs">
                                 <CheckCircle className="w-3 h-3" />
-                                ใช้งาน
+                                ขายได้
                               </Badge>
                             ) : (
-                              <Badge variant="secondary" className="gap-1 text-xs cursor-pointer hover:opacity-80">
+                              <Badge variant="secondary" className="gap-1 text-xs">
                                 <XCircle className="w-3 h-3" />
-                                ปิด
+                                ปิดขาย
                               </Badge>
                             )}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveProduct(product.id, 'up')}
-                              disabled={products[0]?.id === product.id}
-                              aria-label="เลื่อนขึ้น"
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() => toggleActive(product)}
+                              className="focus:outline-none"
+                              title="คลิกเพื่อสลับสถานะ"
                             >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveProduct(product.id, 'down')}
-                              disabled={products[products.length - 1]?.id === product.id}
-                              aria-label="เลื่อนลง"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEdit(product)}
-                              aria-label="แก้ไข"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteTarget(product)}
-                              aria-label="ลบ"
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              {product.is_active ? (
+                                <Badge variant="outline" className="text-success border-success gap-1 text-xs cursor-pointer hover:opacity-80">
+                                  <CheckCircle className="w-3 h-3" />
+                                  ใช้งาน
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="gap-1 text-xs cursor-pointer hover:opacity-80">
+                                  <XCircle className="w-3 h-3" />
+                                  ปิด
+                                </Badge>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => moveProduct(product.id, 'up')}
+                                disabled={!isSortingAllowed || idx === 0}
+                                aria-label="เลื่อนขึ้น"
+                                title={!isSortingAllowed ? "กรุณาล้างตัวกรองและการค้นหาก่อนจัดเรียง" : "เลื่อนขึ้น"}
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => moveProduct(product.id, 'down')}
+                                disabled={!isSortingAllowed || idx === products.length - 1}
+                                aria-label="เลื่อนลง"
+                                title={!isSortingAllowed ? "กรุณาล้างตัวกรองและการค้นหาก่อนจัดเรียง" : "เลื่อนลง"}
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEdit(product)}
+                                aria-label="แก้ไข"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteTarget(product)}
+                                aria-label="ลบ"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
-            )}
+              
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-4 border-t border-border/40 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground font-medium px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
           </CardContent>
         </Card>
       </div>
@@ -567,9 +655,16 @@ export function ProductCatalogManagement() {
                 value={form.role_id}
                 onChange={(e) => setForm({ ...form, role_id: e.target.value })}
                 placeholder="เช่น 1234567890123456789"
-                className="font-mono text-sm"
+                className="font-mono text-sm bg-background text-foreground"
               />
             </div>
+            
+            {form.role_id && (
+              <div className="rounded-md bg-muted/40 p-2.5 text-xs text-muted-foreground flex items-center justify-between border border-border/40 mt-1">
+                <span>สินค้านี้เชื่อมโยงกับ Discord Role ID แล้ว</span>
+                <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">เชื่อมโยงแล้ว</Badge>
+              </div>
+            )}
 
             {/* price */}
             <div className="space-y-1.5">

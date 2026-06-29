@@ -1176,7 +1176,22 @@ export function TradingHistoryManagement() {
                             <Mail className="h-3.5 w-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                            onClick={e => { e.stopPropagation(); setEditTarget(r); setEditForm({ amount: String(r.total_amount), transaction: r.transaction_date ?? '', type_bill: r.type_bill ?? 'ธนาคารทั่วไป' }); }} title="แก้ไขข้อมูล">
+                            onClick={e => {
+                              e.stopPropagation();
+                              setEditTarget(r);
+                              let formattedDate = '';
+                              if (r.transaction_date) {
+                                const parsed = parseTransactionDate(r.transaction_date);
+                                if (parsed) {
+                                  formattedDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+                                }
+                              }
+                              setEditForm({
+                                amount: String(r.total_amount),
+                                transaction: formattedDate,
+                                type_bill: r.type_bill ?? 'ธนาคารทั่วไป'
+                              });
+                            }} title="แก้ไขข้อมูล">
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           {user?.is_owner && (
