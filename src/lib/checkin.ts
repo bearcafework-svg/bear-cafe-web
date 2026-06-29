@@ -102,6 +102,18 @@ export function computeCheckinStreak(completedDays: Set<number>, todayDay: numbe
   return streak;
 }
 
+/** Days in the current cycle (1–28) that have passed without a check-in. */
+export function computeMissedCheckinDays(completedDays: Set<number>, todayDay: number): number {
+  const cap = Math.min(todayDay, 28);
+  let count = 0;
+  for (let day = 1; day <= cap; day++) {
+    if (completedDays.has(day)) continue;
+    if (day === todayDay && todayDay <= 28) continue;
+    count++;
+  }
+  return count;
+}
+
 export function getCheckinWeekIndex(day: number) {
   return Math.min(3, Math.floor((Math.min(day, 28) - 1) / 7));
 }

@@ -25,6 +25,7 @@ import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
 import BearBobaMergePage from "./pages/BearBobaMergePage";
 import SpinPrizePage from "./pages/SpinPrizePage";
+import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/" element={<Index />} />
+      <Route path="/full-checkin-calendar" element={<FullCheckInCalendar />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/banned-role" element={<RoleBannedPage />} />

@@ -11,6 +11,7 @@ import {
   CheckinMakeupSuccessModal,
   type CheckinMakeupSuccessModalData,
 } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
+import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
 import {
   CHECKIN_ERROR_MESSAGES,
   computeCheckinStreak,
@@ -20,10 +21,9 @@ import {
   getCheckinWeekDays,
   getCheckinWeekIndex,
   getCheckinToday,
-  REWARD_TYPE_LABELS,
   type CheckinDailyReward,
-  type CheckinDayState,
 } from '@/lib/checkin';
+import { buildRewardModalData, type RoleMeta } from '@/lib/checkin-modal-data';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import {
@@ -33,199 +33,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  CaffeLatteIcon,
-  StrawberryColorIcon,
-  TearTicketColorIcon,
-  TicketColorIcon,
-} from '@/icon/outline';
+import { CaffeLatteIcon } from '@/icon/outline';
 import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
-import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
-type RoleMeta = { icon?: string; name?: string };
-
-function rewardToPopup(
-  reward: Record<string, unknown>,
-  fallback?: CheckinDailyReward,
-): CheckinRewardModalData {
-  const rewardType = (reward.reward_type ?? fallback?.reward_type) as CheckinDailyReward['reward_type'];
-  if (rewardType === 'role') {
-    const roleId =
-      (typeof reward.role_id === 'string' ? reward.role_id : null) ??
-      fallback?.role_id ??
-      undefined;
-    return {
-      type: 'role',
-      roleId,
-      roleName: fallback?.role_name ?? undefined,
-      message: 'ได้รับ Role แล้ว!',
-    };
-  }
-  const amount = Number(reward.reward_amount ?? fallback?.reward_amount ?? 0);
-  const label = REWARD_TYPE_LABELS[rewardType] ?? 'แต้ม';
-  return {
-    type: rewardType,
-    pointsAdded: amount,
-    message: `ได้รับ ${amount} ${label}`,
-  };
-}
-
-function buildRewardModalData(
-  result: Pick<Extract<CheckinActionResult, { ok: true }>, 'reward'>,
-  selectedReward: CheckinDailyReward | undefined,
-  roleMeta: Record<string, RoleMeta>,
-): CheckinRewardModalData {
-  let modalData: CheckinRewardModalData = result.reward
-    ? rewardToPopup(result.reward, selectedReward)
-    : selectedReward
-      ? dailyRewardToModal(selectedReward)
-      : { type: 'points', pointsAdded: 0, message: 'เช็คอินสำเร็จ!' };
-
-  if (modalData.type === 'role' && modalData.roleId) {
-    const meta = roleMeta[modalData.roleId];
-    if (meta) {
-      modalData = {
-        ...modalData,
-        roleName: modalData.roleName ?? meta.name,
-        roleIcon: meta.icon,
-      };
-    }
-  }
-
-  return modalData;
-}
-
-function dailyRewardToModal(reward: CheckinDailyReward): CheckinRewardModalData {
-  if (reward.reward_type === 'role') {
-    return {
-      type: 'role',
-      roleId: reward.role_id ?? undefined,
-      roleName: reward.role_name ?? undefined,
-      message: 'ได้รับ Role แล้ว!',
-    };
-  }
-  const amount = reward.reward_amount ?? 0;
-  const label = REWARD_TYPE_LABELS[reward.reward_type];
-  return {
-    type: reward.reward_type,
-    pointsAdded: amount,
-    message: `ได้รับ ${amount} ${label}`,
-  };
-}
-
-function DayRewardDisplay({
-  reward,
-  roleIcon,
-  state,
-}: {
-  reward: CheckinDailyReward | undefined;
-  roleIcon?: string | null;
-  state: CheckinDayState;
-}) {
-  if (!reward) return null;
-
-  const iconSize = { mobile: 20, desktop: 24 };
-  const scoreClass = cn(
-    'bear-body-regular-semibold leading-none',
-    state === 'completed' && 'text-[#B2A094] dark:text-[hsl(var(--matcha)/0.7)]',
-    state === 'today' && 'text-[#D7A042] dark:text-[hsl(var(--honey))]',
-    state === 'makeup' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
-    state === 'future' && 'text-[#7C6F65] dark:text-[hsl(var(--muted-foreground)/0.65)]',
-    state === 'missed' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
-  );
-
-  const icon = (() => {
-    switch (reward.reward_type) {
-      case 'points':
-        return <StrawberryColorIcon size={iconSize} />;
-      case 'ticket_point':
-        return <TicketColorIcon size={iconSize} />;
-      case 'ticket_piece_point':
-        return <TearTicketColorIcon size={iconSize} />;
-      case 'role':
-        return (
-          <IconDisplay
-            icon={roleIcon}
-            fallback="🎭"
-            size="md"
-            className="h-12 w-12 sm:h-16 sm:w-16 text-3xl sm:text-4xl"
-          />
-        );
-      default:
-        return null;
-    }
-  })();
-
-  if (!icon) return null;
-
-  const amount = reward.reward_amount;
-
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      {icon}
-      {reward.reward_type !== 'role' && amount != null && (
-        <span className={scoreClass}>{amount.toLocaleString()}</span>
-      )}
-    </div>
-  );
-}
-
-function CheckInDayCard({
-  day,
-  state,
-  reward,
-  roleIcon,
-  isSelected,
-  disabled,
-  onClick,
-}: {
-  day: number;
-  state: CheckinDayState;
-  reward?: CheckinDailyReward;
-  roleIcon?: string | null;
-  isSelected?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'flex min-w-[5rem] flex-1 flex-col items-center justify-center border rounded-lg sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
-        'gap-1 py-2 px-1 sm:gap-2 sm:py-3 sm:px-2 md:gap-3 md:py-4 md:px-3 lg:gap-5 lg:py-5 lg:px-4',
-        !disabled && 'cursor-pointer hover:scale-[1.01] active:scale-[0.98]',
-        disabled && 'cursor-default',
-        "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E]",
-        state === 'completed' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#9CCC9E] dark:border-[#17251F]",
-        state === 'completed' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#50A582] dark:border-[#2D5C48] shadow-[0_0_8px_0px_#186243] dark:shadow-[0_0_8px_0px_#297253]",
-        state === 'today' && "bg-[#F7E6C5] dark:bg-[#241E15] border-[#EACB8F] dark:border-[#47381E]",
-        state === 'today' && isSelected && "bg-[#F7E6C5] dark:bg-[#241E15] border-[#D7A042] dark:border-[#D7A042] shadow-[0_0_8px_0px_#D7A042] dark:shadow-[0_0_8px_0px_#D7A042]",
-        state === 'makeup' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328]",
-        state === 'makeup' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328] shadow-[0_0_8px_0px_#9C4251] dark:shadow-[0_0_8px_0px_#9C4251]",
-        state === 'future' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E]",
-        state === 'future' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#EACB8F] dark:border-[#47381E] shadow-[0_0_8px_0px_#D7A042] dark:shadow-[0_0_8px_0px_#D7A042]",
-        state === 'missed' && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328]",
-        state === 'missed' && isSelected && "bg-[#FAF2E4] dark:bg-[#0A0A0A] border-[#E98C8C] dark:border-[#402328] shadow-[0_0_8px_0px_#9C4251] dark:shadow-[0_0_8px_0px_#9C4251]",
-      )}
-    >
-      <span
-        className={cn(
-          'bear-body-xsmall-medium leading-none md:bear-body-small-medium',
-          state === 'completed' && 'text-[#B2A094] dark:text-[hsl(var(--matcha)/0.7)]',
-          state === 'today' && 'text-[#D7A042] dark:text-[hsl(var(--honey))]',
-          state === 'makeup' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
-          state === 'future' && 'text-[#7C6F65] dark:text-[hsl(var(--muted-foreground)/0.65)]',
-          state === 'missed' && 'text-[#B2A094] dark:text-[hsl(var(--muted-foreground))]',
-        )}
-      >
-        <span className="sm:hidden">DAY {day}</span>
-        <span className="hidden sm:inline">DAY {day}</span>
-      </span>
-      <DayRewardDisplay reward={reward} roleIcon={roleIcon} state={state} />
-    </button>
-  );
-}
 
 export function DailyCheckInCard() {
   const navigate = useNavigate();
@@ -319,7 +128,10 @@ export function DailyCheckInCard() {
     !selectedCheckedIn &&
     selectedReward?.is_active &&
     (selectedState === 'today' || selectedState === 'makeup');
-  const rewardDetail = formatSelectedDayRewardDetail(selectedReward);
+  const rewardDetail =
+    selectedReward?.reward_type === 'role' && selectedReward.role_id
+      ? `บทบาท ${roleMeta[selectedReward.role_id]?.name ?? selectedReward.role_id}`
+      : formatSelectedDayRewardDetail(selectedReward);
   const rewardSubtitle = formatSelectedDayRewardSubtitle(selectedState, selectedDay, todayDay);
   const showStrawberry = selectedReward?.reward_type === 'points';
   const isCompleted = selectedState === 'completed';
@@ -332,6 +144,10 @@ export function DailyCheckInCard() {
     }
 
     setRewardModal(buildRewardModalData(result, selectedReward, roleMeta));
+
+    if (result.reward && 'role_grant_error' in result.reward) {
+      toast.error('เช็คอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
+    }
 
     if (result.big_reward_granted) {
       toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
@@ -370,6 +186,10 @@ export function DailyCheckInCard() {
     setMakeupModal(null);
     const rewardData = buildRewardModalData(result, rewardsByDay.get(dayNumber), roleMeta);
     setMakeupSuccessModal({ ...rewardData, makeupCost });
+
+    if (result.reward && 'role_grant_error' in result.reward) {
+      toast.error('เติมเช็คอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
+    }
 
     if (result.big_reward_granted) {
       toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
@@ -428,7 +248,9 @@ export function DailyCheckInCard() {
               เช็คอินรายวันเพื่อรับของขวัญมากมาย ชวนเพื่อนมารับรางวัลกันด้วยน้า
             </p>
           </div>
-          <Calendar className="h-4 w-4 shrink-0 text-[hsl(var(--bear-brown)/0.45)] dark:text-[hsl(var(--muted-foreground))] sm:h-5 sm:w-5" />
+          <button type="button" onClick={() => navigate('/full-checkin-calendar')}>
+            <Calendar className="h-4 w-4 shrink-0 text-[hsl(var(--bear-brown)/0.45)] dark:text-[hsl(var(--muted-foreground))] sm:h-5 sm:w-5" />
+          </button>
         </div>
 
         <div className="mb-3 flex items-center gap-1 sm:mb-4 sm:gap-1.5 md:gap-2">

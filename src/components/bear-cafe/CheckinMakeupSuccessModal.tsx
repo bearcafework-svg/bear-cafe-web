@@ -10,8 +10,8 @@ import {
   formatCheckinRewardGranted,
   type CheckinRewardType,
 } from '@/lib/checkin';
+import { CheckinRoleIcon } from '@/components/bear-cafe/CheckinRoleIcon';
 import { MaskingTape } from './FeatureCardFrame';
-import { TeaBagColorIcon } from '@/icon/outline/TeaBagColorIcon';
 
 export type CheckinMakeupSuccessModalData = {
   type: CheckinRewardType;
@@ -37,7 +37,13 @@ function RewardIcon({ type, roleIcon }: { type: CheckinRewardType; roleIcon?: st
     case 'ticket_piece_point':
       return <TearTicketColorIcon size={{ mobile: 48, desktop: 64 }} />;
     case 'role':
-      return <TeaBagColorIcon size={{ mobile: 48, desktop: 64 }} />;
+      return (
+        <CheckinRoleIcon
+          roleIcon={roleIcon}
+          size={{ mobile: 48, desktop: 64 }}
+          className="h-12 w-12 sm:h-16 sm:w-16"
+        />
+      );
     default:
       return null;
   }
