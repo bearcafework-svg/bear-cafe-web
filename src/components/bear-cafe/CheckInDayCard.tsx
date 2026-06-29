@@ -87,7 +87,7 @@ export function CheckInDayCard({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex min-w-[4rem] flex-1 flex-col items-center justify-center border rounded-lg sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
+        'flex flex-1 flex-col items-center justify-center border rounded-lg sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
         'gap-1 py-2 px-1 sm:gap-2 sm:py-3 sm:px-2 md:gap-3 md:py-4 md:px-3 lg:gap-5 lg:py-5 lg:px-4',
         !disabled && 'cursor-pointer hover:scale-[1.01] active:scale-[0.98]',
         disabled && 'cursor-default',

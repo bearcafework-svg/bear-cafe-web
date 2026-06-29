@@ -123,6 +123,15 @@ export function getCheckinWeekDays(weekIndex: number) {
   return Array.from({ length: 7 }, (_, i) => start + i).filter((d) => d <= 28);
 }
 
+export function getCheckinMobilePageIndex(day: number) {
+  return Math.min(6, Math.floor((Math.min(day, 28) - 1) / 4));
+}
+
+export function getCheckinMobilePageDays(pageIndex: number) {
+  const start = pageIndex * 4 + 1;
+  return Array.from({ length: 4 }, (_, i) => start + i).filter((d) => d <= 28);
+}
+
 export function isCheckinMilestoneDay(day: number) {
   return day === 7 || day === 14 || day === 21 || day === 28;
 }

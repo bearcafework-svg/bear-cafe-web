@@ -18,6 +18,8 @@ import {
   formatSelectedDayRewardDetail,
   formatSelectedDayRewardSubtitle,
   getCheckinDayState,
+  getCheckinMobilePageDays,
+  getCheckinMobilePageIndex,
   getCheckinWeekDays,
   getCheckinWeekIndex,
   getCheckinToday,
@@ -53,9 +55,11 @@ export function DailyCheckInCard() {
 
   const { year, month, day: todayDay } = getCheckinToday();
   const [weekIndex, setWeekIndex] = useState(() => getCheckinWeekIndex(todayDay));
+  const [mobilePageIndex, setMobilePageIndex] = useState(() => getCheckinMobilePageIndex(todayDay));
 
   useEffect(() => {
     setWeekIndex(getCheckinWeekIndex(todayDay));
+    setMobilePageIndex(getCheckinMobilePageIndex(todayDay));
     setSelectedDay(Math.min(todayDay, 28));
   }, [todayDay]);
 
@@ -112,7 +116,8 @@ export function DailyCheckInCard() {
     };
   }, [status?.daily_rewards]);
 
-  const visibleDays = getCheckinWeekDays(weekIndex);
+  const visibleWeekDays = getCheckinWeekDays(weekIndex);
+  const visibleMobileDays = getCheckinMobilePageDays(mobilePageIndex);
   const streak = computeCheckinStreak(completedDays, todayDay);
   const selectedReward = rewardsByDay.get(selectedDay);
   const selectedState = getCheckinDayState(
@@ -215,6 +220,39 @@ export function DailyCheckInCard() {
     setSelectedDay(day);
   };
 
+  const renderDayRow = (days: number[], skeletonCount: number) => {
+    if (loading) {
+      return Array.from({ length: skeletonCount }).map((_, i) => (
+        <div
+          key={i}
+          className="h-14 min-w-[2.75rem] flex-1 animate-pulse rounded-xl bg-[hsl(var(--latte)/0.45)] dark:bg-[hsl(var(--muted))] sm:h-[4.5rem] sm:rounded-2xl md:h-[5.5rem] lg:h-[5.75rem]"
+        />
+      ));
+    }
+
+    return days.map((day) => {
+      const state = getCheckinDayState(
+        day,
+        completedDays,
+        todayDay,
+        status?.makeup_window_open ?? false,
+      );
+      const reward = rewardsByDay.get(day);
+      return (
+        <CheckInDayCard
+          key={day}
+          day={day}
+          state={state}
+          reward={reward}
+          roleIcon={reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined}
+          isSelected={day === selectedDay}
+          disabled={acting}
+          onClick={() => handleDaySelect(day)}
+        />
+      );
+    });
+  };
+
   return (
     <>
       <div
@@ -253,7 +291,31 @@ export function DailyCheckInCard() {
           </button>
         </div>
 
-        <div className="mb-3 flex items-center gap-1 sm:mb-4 sm:gap-1.5 md:gap-2">
+        <div className="mb-3 flex items-center gap-1 sm:hidden">
+          <button
+            type="button"
+            aria-label="หน้าก่อนหน้า"
+            disabled={mobilePageIndex === 0}
+            onClick={() => setMobilePageIndex((p) => Math.max(0, p - 1))}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:bg-[hsl(var(--latte)/0.5)] disabled:opacity-30 dark:text-[hsl(var(--muted-foreground))] dark:hover:bg-[hsl(var(--muted))]"
+          >
+            <ChevronLeft size={20} className="text-[hsl(var(--bear-brown)/0.45)] dark:text-[hsl(var(--muted-foreground))]" />
+          </button>
+          <div className="flex min-w-0 flex-1 items-stretch justify-between gap-0.5">
+            {renderDayRow(visibleMobileDays, 4)}
+          </div>
+          <button
+            type="button"
+            aria-label="หน้าถัดไป"
+            disabled={mobilePageIndex >= 6}
+            onClick={() => setMobilePageIndex((p) => Math.min(6, p + 1))}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:bg-[hsl(var(--latte)/0.5)] disabled:opacity-30 dark:text-[hsl(var(--muted-foreground))] dark:hover:bg-[hsl(var(--muted))]"
+          >
+            <ChevronRight size={20} className="text-[hsl(var(--bear-brown)/0.45)] dark:text-[hsl(var(--muted-foreground))]" />
+          </button>
+        </div>
+
+        <div className="mb-3 hidden items-center gap-1 sm:mb-4 sm:flex sm:gap-1.5 md:gap-2">
           <button
             type="button"
             aria-label="สัปดาห์ก่อนหน้า"
@@ -263,39 +325,9 @@ export function DailyCheckInCard() {
           >
             <ChevronLeft size={20} className="text-[hsl(var(--bear-brown)/0.45)] dark:text-[hsl(var(--muted-foreground))]" />
           </button>
-
-          <div className="flex min-w-0 flex-1 gap-0.5 sm:gap-1.5 md:gap-2 justify-between items-stretch overflow-x-auto sm:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {loading
-              ? Array.from({ length: 7 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-14 min-w-[2.75rem] flex-1 animate-pulse rounded-xl bg-[hsl(var(--latte)/0.45)] dark:bg-[hsl(var(--muted))] sm:h-[4.5rem] sm:rounded-2xl md:h-[5.5rem] lg:h-[5.75rem]"
-                />
-              ))
-              : visibleDays.map((day) => {
-                const state = getCheckinDayState(
-                  day,
-                  completedDays,
-                  todayDay,
-                  status?.makeup_window_open ?? false,
-                );
-
-                const reward = rewardsByDay.get(day);
-                return (
-                  <CheckInDayCard
-                    key={day}
-                    day={day}
-                    state={state}
-                    reward={reward}
-                    roleIcon={reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined}
-                    isSelected={day === selectedDay}
-                    disabled={acting}
-                    onClick={() => handleDaySelect(day)}
-                  />
-                );
-              })}
+          <div className="flex min-w-0 flex-1 items-stretch justify-between gap-1.5 md:gap-2">
+            {renderDayRow(visibleWeekDays, 7)}
           </div>
-
           <button
             type="button"
             aria-label="สัปดาห์ถัดไป"
@@ -370,7 +402,7 @@ export function DailyCheckInCard() {
               disabled={!canClaimSelected || acting || selectedDay > 28}
               onClick={handleClaimSelected}
               className={cn(
-                "bear-body-regular-medium rounded-full px-8 py-2 cursor-pointer border-2",
+                "bear-body-regular-medium rounded-full px-8 py-1 md:py-2 cursor-pointer border-2",
                 "bg-[#C7EEC8] dark:bg-[#1E3A2F] border-[#9CCC9E] dark:border-[#2D5C48] text-[#89654A] dark:text-[#E9E6E2] disabled:bg-[#bedebf] dark:disabled:bg-[#0C1511] disabled:border-[#88ae89] dark:disabled:border-[#1E3A2F] disabled:text-[#a3c0a4] dark:disabled:text-[#1E3A2F]",
               )}
             >
