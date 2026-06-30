@@ -1,4 +1,4 @@
-﻿// ContractsManagement — สัญญาเช่า
+// ContractsManagement — สัญญาเช่า
 //
 // SQL:
 // CREATE TABLE public.contracts (
@@ -951,14 +951,18 @@ export function ContractsManagement() {
 
   async function fetchMemberProfiles(memberIds: string[]) {
     if (memberIds.length === 0) return;
-    const { data, error } = await (supabase as any)
-      .from('profiles')
-      .select('discord_id, username, discord_username')
-      .in('discord_id', memberIds);
-    if (error || !data) return;
     const map: Record<string, { username: string; discord_username: string | null }> = {};
-    for (const p of data) {
-      map[p.discord_id] = { username: p.username, discord_username: p.discord_username ?? null };
+    const chunkSize = 150;
+    for (let i = 0; i < memberIds.length; i += chunkSize) {
+      const chunk = memberIds.slice(i, i + chunkSize);
+      const { data, error } = await (supabase as any)
+        .from('profiles')
+        .select('discord_id, username, discord_username')
+        .in('discord_id', chunk);
+      if (error || !data) continue;
+      for (const p of data) {
+        map[p.discord_id] = { username: p.username, discord_username: p.discord_username ?? null };
+      }
     }
     setMemberProfiles(map);
   }

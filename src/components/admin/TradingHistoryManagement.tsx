@@ -263,50 +263,62 @@ export function TradingHistoryManagement() {
   const fetchProfiles = useCallback(async (ids: string[]) => {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (!uniqueIds.length) return;
-    const { data } = await supabase.from('profiles').select('discord_id, username, discord_username, avatar_url').in('discord_id', uniqueIds);
-    if (data) {
-      const map = new Map<string, DiscordProfile>();
-      data.forEach(p => map.set(p.discord_id, p));
-      setProfileMap(map);
+    const map = new Map<string, DiscordProfile>();
+    const chunkSize = 150;
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+      const chunk = uniqueIds.slice(i, i + chunkSize);
+      const { data } = await supabase.from('profiles').select('discord_id, username, discord_username, avatar_url').in('discord_id', chunk);
+      if (data) {
+        data.forEach(p => map.set(p.discord_id, p));
+      }
     }
+    setProfileMap(map);
   }, []);
 
   const fetchSalmonPoints = useCallback(async (ids: string[]) => {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (!uniqueIds.length) return;
-    const { data } = await supabase.from('user_points').select('discord_id, salmon_point').in('discord_id', uniqueIds);
-    if (data) {
-      const map = new Map<string, number>();
-      data.forEach(p => map.set(p.discord_id, p.salmon_point ?? 0));
-      setSalmonPointMap(map);
+    const map = new Map<string, number>();
+    const chunkSize = 150;
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+      const chunk = uniqueIds.slice(i, i + chunkSize);
+      const { data } = await supabase.from('user_points').select('discord_id, salmon_point').in('discord_id', chunk);
+      if (data) {
+        data.forEach(p => map.set(p.discord_id, p.salmon_point ?? 0));
+      }
     }
+    setSalmonPointMap(map);
   }, []);
 
   // ── Fetch purchase_items for new orders ──
   const fetchPurchaseItems = useCallback(async (orderIds: string[]): Promise<Map<string, PurchaseItemDetail[]>> => {
     if (!orderIds.length) return new Map();
-    const { data } = await (supabase as any)
-      .from('purchase_items')
-      .select(`
-        id, order_id, product_id, price_paid, original_price, is_promotion,
-        product_catalog!inner(display_name, product_type)
-      `)
-      .in('order_id', orderIds);
     const map = new Map<string, PurchaseItemDetail[]>();
-    if (data) {
-      for (const row of data as any[]) {
-        const item: PurchaseItemDetail = {
-          id: row.id,
-          product_id: row.product_id,
-          price_paid: row.price_paid,
-          original_price: row.original_price,
-          is_promotion: row.is_promotion,
-          product_display_name: row.product_catalog?.display_name ?? '?',
-          product_type: row.product_catalog?.product_type ?? 'other',
-        };
-        const arr = map.get(row.order_id) ?? [];
-        arr.push(item);
-        map.set(row.order_id, arr);
+    const chunkSize = 150;
+    for (let i = 0; i < orderIds.length; i += chunkSize) {
+      const chunk = orderIds.slice(i, i + chunkSize);
+      const { data } = await (supabase as any)
+        .from('purchase_items')
+        .select(`
+          id, order_id, product_id, price_paid, original_price, is_promotion,
+          product_catalog!inner(display_name, product_type)
+        `)
+        .in('order_id', chunk);
+      if (data) {
+        for (const row of data as any[]) {
+          const item: PurchaseItemDetail = {
+            id: row.id,
+            product_id: row.product_id,
+            price_paid: row.price_paid,
+            original_price: row.original_price,
+            is_promotion: row.is_promotion,
+            product_display_name: row.product_catalog?.display_name ?? '?',
+            product_type: row.product_catalog?.product_type ?? 'other',
+          };
+          const arr = map.get(row.order_id) ?? [];
+          arr.push(item);
+          map.set(row.order_id, arr);
+        }
       }
     }
     return map;
