@@ -267,8 +267,8 @@ export default function AdminPage() {
         case 'roles-to-delete': return canAccessPage('roles-to-delete') ? <RolesToDeleteManagement /> : null;
         case 'discord-servers': return canAccessPage('discord-servers') ? <DiscordServersManagement /> : null;
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
-        case 'campaigns': return isOwner ? <CampaignsManagement /> : null;
-        case 'product-catalog': return isOwner ? <ProductCatalogManagement /> : null;
+        case 'campaigns': return canAccessPage('campaigns') ? <CampaignsManagement /> : null;
+        case 'product-catalog': return canAccessPage('product-catalog') ? <ProductCatalogManagement /> : null;
         default: return null;
       }
     } catch (error) {
