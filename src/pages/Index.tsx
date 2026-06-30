@@ -76,11 +76,11 @@ function DisplayWelcomeMessage() {
 
   return (
     <div>
-      <p className="md:bear-body-regular-semibold bear-body-small-semibold text-[#D6C3B5]">
+      <p className="md:bear-body-regular-semibold bear-body-small-medium text-[#D6C3B5]">
         {message.line1}
       </p>
       {message.line2 && (
-        <p className="bear-body-regular-semibold bear-body-small-semibold line-clamp-3 text-[#D6C3B5] sm:line-clamp-none">
+        <p className="bear-body-regular-semibold bear-body-small-medium line-clamp-3 text-[#D6C3B5] sm:line-clamp-none">
           {message.line2}
         </p>
       )}

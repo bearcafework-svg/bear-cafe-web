@@ -259,27 +259,14 @@ export default {
           fontSize: "16px",
           letterSpacing: "0",
         },
-        // Body Small styles (14px)
+        // Body Small styles (12px)
         ".bear-body-small-regular": {
-          fontFamily: "Athiti, sans-serif",
-          fontWeight: "400",
-          fontSize: "14px",
-          letterSpacing: "0",
-        },
-        ".bear-body-small-medium": {
-          fontFamily: "Athiti, sans-serif",
-          fontWeight: "500",
-          fontSize: "14px",
-          letterSpacing: "0",
-        },
-        // Body XSmall styles (12px)
-        ".bear-body-xsmall-regular": {
           fontFamily: "Athiti, sans-serif",
           fontWeight: "400",
           fontSize: "12px",
           letterSpacing: "0",
         },
-        ".bear-body-xsmall-medium": {
+        ".bear-body-small-medium": {
           fontFamily: "Athiti, sans-serif",
           fontWeight: "500",
           fontSize: "12px",

@@ -164,7 +164,7 @@ export default function FullCheckInCalendar() {
 
             {/* Shown only during the post-month makeup window */}
             {status?.makeup_window_open && isAuthenticated && (
-              <p className="text-center bear-body-xsmall-regular sm:bear-body-small-regular text-[#D7A042] dark:text-[#D7A042] px-1">
+              <p className="text-center bear-body-small-regular text-[#D7A042] dark:text-[#D7A042] px-1">
                 ช่วงเติมเช็คอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
               </p>
             )}
@@ -180,7 +180,7 @@ export default function FullCheckInCalendar() {
                 <h2 className="bear-h3-bold md:bear-h2-bold text-[#89654A] dark:text-[#E9E6E2]">
                   รางวัลในวันที่ {selectedDay}
                 </h2>
-                <p className="bear-body-xsmall-regular sm:bear-body-small-regular text-[#94735C] dark:text-[#9D8F7B]">
+                <p className="bear-body-small-regular text-[#94735C] dark:text-[#9D8F7B]">
                   {rewardSubtitle}
                 </p>
               </div>
@@ -205,7 +205,7 @@ export default function FullCheckInCalendar() {
                 )}
               </div>
 
-              <p className="bear-body-small-regular-medium sm:bear-body-regular-medium text-[#89654A] dark:text-[#E9E6E2] text-center">
+              <p className="bear-body-small-medium sm:bear-body-regular-medium text-[#89654A] dark:text-[#E9E6E2] text-center">
                 ยอดสะสมปัจจุบัน {formatNumber(points)} แต้ม
               </p>
 
@@ -238,6 +238,7 @@ export default function FullCheckInCalendar() {
 
             <div className="bg-[#FDFAF7] dark:bg-[#101010] border-2 border-[#F4EEE5] dark:border-[#101010] rounded-lg p-3 sm:p-4 md:p-6 lg:p-8 min-w-0 sm:col-span-2 lg:col-span-1">
               <CheckinBigRewardPreview
+                fullCalendar={true}
                 bigReward={bigReward}
                 completedDays={totalCheckins}
                 claimed={bigRewardClaimed}
@@ -254,33 +255,33 @@ export default function FullCheckInCalendar() {
               <div className="flex items-center justify-between gap-2 bg-[#FAF2E4] border border-[#F4EEE5] dark:bg-[#121212] dark:border-[#242424] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <FireIcon size={16} color="#D7A042" className="shrink-0" />
-                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium truncate">
+                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
                     เช็คอินต่อเนื่อง
                   </span>
                 </div>
-                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium shrink-0">
+                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium shrink-0">
                   {streak} วัน
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 bg-[#FAF2E4] border border-[#F4EEE5] dark:bg-[#121212] dark:border-[#242424] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <Calendar2Icon size={16} color="#2D5C48" className="shrink-0" />
-                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium truncate">
+                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
                     เช็คอินสะสม
                   </span>
                 </div>
-                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium shrink-0">
+                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium shrink-0">
                   {totalCheckins} วัน
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 bg-[#FAF2E4] border border-[#F4EEE5] dark:bg-[#121212] dark:border-[#242424] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <BrokenHeartIcon size={16} color="#622F37" className="shrink-0" />
-                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium truncate">
+                  <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
                     พลาดในเดือนนี้
                   </span>
                 </div>
-                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-regular-medium sm:bear-body-regular-medium shrink-0">
+                <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium shrink-0">
                   {missedThisMonth} วัน
                 </span>
               </div>
