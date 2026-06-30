@@ -180,17 +180,7 @@ export default function AdminPage() {
 
   const activeItem = visibleItems.find(i => i.id === activeTab);
 
-  // Auto-redirect to first accessible tab if current tab is not accessible
-  useEffect(() => {
-    if (visibleItems.length > 0) {
-      const isAccessible = visibleItems.some(i => i.id === activeTab);
-      if (!isAccessible) {
-        const firstId = visibleItems[0].id;
-        setActiveTab(firstId);
-        localStorage.setItem('admin_active_tab', firstId);
-      }
-    }
-  }, [visibleItems, activeTab]);
+  // (Auto-redirect effect removed to prevent ping-pong loop with URL sync)
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -289,13 +279,27 @@ export default function AdminPage() {
     }
   };
 
-  // Sync URL section → activeTab when navigating directly
+  // Sync URL section → activeTab and ensure accessibility
   useEffect(() => {
-    if (section && section !== activeTab) {
-      setActiveTab(section);
-      localStorage.setItem('admin_active_tab', section);
+    if (visibleItems.length === 0) return;
+
+    const currentSection = section || activeTab;
+    const isAccessible = visibleItems.some(i => i.id === currentSection);
+
+    if (isAccessible) {
+      if (currentSection !== activeTab) {
+        setActiveTab(currentSection);
+        localStorage.setItem('admin_active_tab', currentSection);
+      }
+    } else {
+      const firstId = visibleItems[0].id;
+      setActiveTab(firstId);
+      localStorage.setItem('admin_active_tab', firstId);
+      if (section !== firstId) {
+        navigate(`/admin/${firstId}`, { replace: true });
+      }
     }
-  }, [section, activeTab]);
+  }, [section, activeTab, visibleItems, navigate]);
 
   if (!hasAdminAccess) return null;
 
