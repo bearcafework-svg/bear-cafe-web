@@ -9,10 +9,11 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "supabase:start": "npx supabase start && npx supabase functions serve --env-file ./supabase/functions/.env",
+    "supabase:start": "npx supabase start && npx supabase db query --local --file ./supabase/dev/grant_all_table_permissions.sql && npx supabase functions serve --env-file ./supabase/functions/.env",
     "supabase:stop": "npx supabase stop",
     "supabase:status": "npx supabase status",
-    "supabase:reset": "npx supabase db reset",
+    "supabase:reset": "npx supabase db reset && npx supabase db query --local --file ./supabase/dev/grant_all_table_permissions.sql",
+    "supabase:dev:permissions": "npx supabase db query --local --file ./supabase/dev/grant_all_table_permissions.sql",
     "test": "vitest --run",
     "test:watch": "vitest"
   },

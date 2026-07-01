@@ -50,17 +50,17 @@ export function CommunityCarousel() {
   useEffect(() => {
     const fetchAll = async () => {
       const [catRes, serverRes, countRes] = await Promise.all([
-        (supabase as any)
+        supabase
           .from('discord_server_categories')
           .select('id, name, icon')
           .order('sort_order', { ascending: true }),
-        (supabase as any)
+        supabase
           .from('discord_servers')
           .select('id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner')
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
-        (supabase as any)
+        supabase
           .from('discord_servers')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'approved'),
@@ -150,8 +150,6 @@ export function CommunityCarousel() {
     const cat = categories.find((c) => c.id === catId);
     return cat ? `${cat.icon} ${cat.name}` : null;
   };
-
-  if (!loading && servers.length === 0) return null;
 
   return (
     <section className="space-y-3">

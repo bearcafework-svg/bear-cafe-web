@@ -1405,18 +1405,24 @@ export type Database = {
           discord_id: string
           max_cap: number
           points: number
+          ticket_point: number
+          ticket_piece_point: number
           updated_at: string | null
         }
         Insert: {
           discord_id: string
           max_cap?: number
           points?: number
+          ticket_point?: number
+          ticket_piece_point?: number
           updated_at?: string | null
         }
         Update: {
           discord_id?: string
           max_cap?: number
           points?: number
+          ticket_point?: number
+          ticket_piece_point?: number
           updated_at?: string | null
         }
         Relationships: []

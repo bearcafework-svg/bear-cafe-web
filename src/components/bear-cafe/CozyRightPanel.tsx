@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 import strawberryIcon from '@/assets/strawberry-icon.png';
 import { RewardPopup, type RewardPopupData } from '@/components/bear-cafe/RewardPopup';
+import { formatNumber } from '@/lib/utils';
 
 // ─── Profile Card ─────────────────────────────────────────────────────────────
 function ProfileCard() {
@@ -166,9 +167,9 @@ function PointsWidget() {
       const hasRole = !!data.granted?.roleGranted;
       const popupType: RewardPopupData['type'] = hasPoints && hasRole ? 'both' : hasRole ? 'role' : 'points';
       const rewardMessage = hasPoints && hasRole
-        ? `ได้รับ +${data.granted.pointsAdded.toLocaleString()} 🍓 และยศใหม่`
+        ? `ได้รับ +${formatNumber(data.granted.pointsAdded)} 🍓 และยศใหม่`
         : hasRole ? 'ได้รับยศใหม่แล้ว 🎭'
-        : hasPoints ? `+${data.granted.pointsAdded.toLocaleString()} 🍓` : 'รับรางวัลสำเร็จ';
+        : hasPoints ? `+${formatNumber(data.granted.pointsAdded)} 🍓` : 'รับรางวัลสำเร็จ';
 
       setRedeemStatus('success');
       setRedeemMsg(rewardMessage);
@@ -212,9 +213,9 @@ function PointsWidget() {
         <div className="px-4 pb-3 space-y-2.5">
           <div className="flex items-end gap-1.5">
             <span className="text-3xl font-bold leading-none text-foreground">
-              {loading ? '—' : points.toLocaleString()}
+              {loading ? '—' : formatNumber(points)}
             </span>
-            <span className="text-xs pb-0.5 text-muted-foreground/60">/ {maxCap.toLocaleString()}</span>
+            <span className="text-xs pb-0.5 text-muted-foreground/60">/ {formatNumber(maxCap)}</span>
             <span className="text-base pb-0.5 ml-0.5">🍓</span>
           </div>
 

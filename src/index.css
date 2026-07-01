@@ -82,6 +82,14 @@
     --blush: 350 55% 88%;
     --mint: 165 45% 85%;
     --lavender: 270 40% 88%;
+
+    /* Text colors — Figma Bear Cafe (-l light theme, -d dark theme) */
+    --mocha-l: 20 30% 28%;
+    --mocha-d: 40 15% 90%;
+    --brown-l: 25 17% 27%;
+    --brown-d: 40 15% 90%;
+    --sand-l: 25 12% 63%;
+    --sand-d: 35 15% 55%;
   }
 
   .dark {

@@ -24,6 +24,9 @@ import HealingMessagePage from "./pages/HealingMessagePage";
 import ForStaffPage from "./pages/ForStaffPage";
 import ForStaffReportPage from "./pages/ForStaffReportPage";
 import SpinPrizePage from "./pages/SpinPrizePage";
+import FullCheckInCalendar from "./pages/FullCheckInCalendar";
+import InventoryPage from "./pages/InventoryPage";
+import GachaPage from "./pages/GachaPage";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +66,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/" element={<Index />} />
+      <Route path="/full-checkin-calendar" element={<FullCheckInCalendar />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/banned-role" element={<RoleBannedPage />} />
@@ -70,10 +74,12 @@ function AppRoutes() {
       <Route path="/create-session" element={<ProtectedRoute><CreateSessionPage /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><SessionHistoryPage /></ProtectedRoute>} />
       <Route path="/points" element={<ProtectedRoute><PointsPage /></ProtectedRoute>} />
+      <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/forstaff" element={<ForStaffPage />} />
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
+      <Route path="/gacha" element={<GachaPage />} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
