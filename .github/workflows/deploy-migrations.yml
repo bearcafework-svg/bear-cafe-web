@@ -24,8 +24,13 @@ jobs:
       - name: Link production project
         run: supabase link --project-ref $SUPABASE_PROJECT_ID
 
+      - name: Remove duplicate migration history rows
+        run: |
+          supabase db query --linked \
+            "DELETE FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]{14}_';"
+
       - name: Show migration status
         run: supabase migration list
 
       - name: Push migrations to production
-        run: supabase db push
+        run: supabase db push --include-all --yes
