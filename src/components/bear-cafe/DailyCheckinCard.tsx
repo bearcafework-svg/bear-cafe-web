@@ -167,11 +167,11 @@ export function DailyCheckInCard() {
             <div className="flex items-center gap-3">
               <CaffeLatteIcon size={{ mobile: 30, desktop: 38 }} />
               <h3 className="truncate bear-h3-bold text-[hsl(var(--mocha))] dark:text-[#E9E6E2] md:bear-h1-bold">
-                เช็คอิน {computeCheckinStreak(completedDays, todayDay)} วัน ติดต่อกัน!
+                เช็กอิน {computeCheckinStreak(completedDays, todayDay)} วัน ติดต่อกัน!
               </h3>
             </div>
             <p className="bear-body-small-medium text-[hsl(var(--bear-brown)/0.55)] dark:text-[#6B6B6B] md:bear-body-small-medium">
-              เช็คอินรายวันเพื่อรับของขวัญมากมาย ชวนเพื่อนมารับรางวัลกันด้วยน้า
+              เช็กอินรายวันเพื่อรับของขวัญมากมาย ชวนเพื่อนมารับรางวัลกันด้วยน้า
             </p>
           </div>
           <div className="hidden sm:block">{claimButton}</div>
@@ -229,7 +229,7 @@ export function DailyCheckInCard() {
 
         {status?.makeup_window_open && isAuthenticated && (
           <p className="mb-3 text-center text-[11px] text-[#9A7331] dark:text-[#D7A042]">
-            ช่วงเติมเช็คอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
+            ช่วงเติมเช็กอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
           </p>
         )}
 

@@ -206,19 +206,19 @@ export function formatSelectedDayRewardSubtitle(
 ) {
   switch (state) {
     case 'today':
-      return 'รางวัลพิเศษสำหรับการเช็คอินวันนี้';
+      return 'รางวัลพิเศษสำหรับการเช็กอินวันนี้';
     case 'future': {
       const daysUntil = selectedDay - todayDay;
-      return `รางวัลพิเศษนี้จะได้รับในอีก ${daysUntil} วัน อย่าลืมมาเช็คอินน้า`;
+      return `รางวัลพิเศษนี้จะได้รับในอีก ${daysUntil} วัน อย่าลืมมาเช็กอินน้า`;
     }
     case 'completed':
-      return 'รับรางวัลวันนี้เรียบร้อยแล้ว ขอบคุณที่มาเช็คอินทุกวันนะ!';
+      return 'รับรางวัลวันนี้เรียบร้อยแล้ว ขอบคุณที่มาเช็กอินทุกวันนะ!';
     case 'missed':
-      return 'พลาดการเช็คอินวันนี้ไปแล้ว รอบนี้ไม่สามารถเติมย้อนหลังได้';
+      return 'พลาดการเช็กอินวันนี้ไปแล้ว รอบนี้ไม่สามารถเติมย้อนหลังได้';
     case 'makeup':
-      return 'ยังเติมเช็คอินวันนี้ได้อยู่ ใช้แต้มเพื่อรับรางวัลที่พลาดไปนะ';
+      return 'ยังเติมเช็กอินวันนี้ได้อยู่ ใช้แต้มเพื่อรับรางวัลที่พลาดไปนะ';
     default:
-      return 'รางวัลพิเศษสำหรับการเช็คอินวันนี้';
+      return 'รางวัลพิเศษสำหรับการเช็กอินวันนี้';
   }
 }
 
@@ -247,10 +247,10 @@ export function getCheckinClaimButtonLabel(
 ): string {
   if (acting) return '';
   if (selectedCheckedIn) return 'รับรางวัลแล้ว';
-  if (selectedDay > 28) return 'หมดรอบเช็คอิน';
-  if (selectedState === 'makeup') return 'เติมเช็คอิน';
+  if (selectedDay > 28) return 'หมดรอบเช็กอิน';
+  if (selectedState === 'makeup') return 'เติมเช็กอิน';
   if (selectedState === 'future') return 'ยังรับรางวัลไม่ได้';
-  if (selectedState === 'missed') return 'พลาดเช็คอินแล้ว';
+  if (selectedState === 'missed') return 'พลาดเช็กอินแล้ว';
   return 'รับรางวัลวันนี้';
 }
 
@@ -259,13 +259,13 @@ export const CHECKIN_ERROR_MESSAGES: Record<string, string> = {
   missing_auth: 'กรุณาเข้าสู่ระบบก่อน',
   invalid_token: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
   forbidden: 'ไม่มีสิทธิ์ดำเนินการ',
-  already_checked_in: 'เช็คอินวันนี้แล้ว',
+  already_checked_in: 'เช็กอินวันนี้แล้ว',
   reward_not_configured: 'ยังไม่มีรางวัลสำหรับวันนี้',
-  day_mismatch: 'ไม่สามารถเช็คอินวันนี้ได้',
-  insufficient_points: 'แต้มไม่พอสำหรับเติมเช็คอิน',
-  makeup_window_not_open: 'ยังไม่ถึงช่วงเติมเช็คอิน',
-  makeup_day_not_past: 'ยังเติมเช็คอินวันนี้ไม่ได้',
-  makeup_window_expired: 'หมดเวลาเติมเช็คอินแล้ว',
-  day_already_filled: 'วันนี้เช็คอินแล้ว',
-  cycle_not_found: 'ไม่พบข้อมูลรอบเช็คอิน',
+  day_mismatch: 'ไม่สามารถเช็กอินวันนี้ได้',
+  insufficient_points: 'แต้มไม่พอสำหรับเติมเช็กอิน',
+  makeup_window_not_open: 'ยังไม่ถึงช่วงเติมเช็กอิน',
+  makeup_day_not_past: 'ยังเติมเช็กอินวันนี้ไม่ได้',
+  makeup_window_expired: 'หมดเวลาเติมเช็กอินแล้ว',
+  day_already_filled: 'วันนี้เช็กอินแล้ว',
+  cycle_not_found: 'ไม่พบข้อมูลรอบเช็กอิน',
 };

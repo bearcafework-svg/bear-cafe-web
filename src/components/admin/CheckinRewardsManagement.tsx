@@ -426,7 +426,7 @@ export function CheckinRewardsManagement() {
             <div>
               <CardTitle className="text-base font-semibold">รางวัลใหญ่ (28 วัน)</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                รางวัลเมื่อเช็คอินครบทั้งเดือน — {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
+                รางวัลเมื่อเช็กอินครบทั้งเดือน — {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
               </p>
             </div>
           </div>
@@ -766,7 +766,7 @@ export function CheckinRewardsManagement() {
           <DialogHeader>
             <DialogTitle>แก้ไขรางวัลใหญ่ (28 วัน)</DialogTitle>
             <DialogDescription>
-              รางวัลที่ได้รับเมื่อเช็คอินครบทั้ง 28 วัน
+              รางวัลที่ได้รับเมื่อเช็กอินครบทั้ง 28 วัน
             </DialogDescription>
           </DialogHeader>
 
@@ -817,7 +817,7 @@ export function CheckinRewardsManagement() {
             <div>
               <Label>คำอธิบาย</Label>
               <Input
-                placeholder="รางวัลพิเศษสำหรับการเช็คอินครบ 28 วัน"
+                placeholder="รางวัลพิเศษสำหรับการเช็กอินครบ 28 วัน"
                 value={bigRewardForm.description}
                 onChange={(e) => setBigRewardForm({ ...bigRewardForm, description: e.target.value })}
               />

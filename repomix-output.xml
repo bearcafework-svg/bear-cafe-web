@@ -34603,10 +34603,10 @@ export default function WorkspacePage() {
 
       if (error) throw error;
       
-      toast({ title: "เช็คอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
+      toast({ title: "เช็กอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
       fetchActiveSession();
     } catch (error: any) {
-      toast({ title: "เช็คอินล้มเหลว", description: error.message, variant: "destructive" });
+      toast({ title: "เช็กอินล้มเหลว", description: error.message, variant: "destructive" });
     }
   };
 
@@ -34872,7 +34872,7 @@ export default function WorkspacePage() {
                      <div className="flex-1 space-y-6 w-full">
                        <div className="space-y-2">
                          <h3 className="text-xl font-semibold">ยินดีต้อนรับสู่พื้นที่ทำงาน</h3>
-                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็คอินได้เลย</p>
+                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็กอินได้เลย</p>
                        </div>
                        
                        <div className="space-y-3">
@@ -34903,7 +34903,7 @@ export default function WorkspacePage() {
                          className="w-full md:w-64 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl shadow-xl shadow-emerald-500/20 text-xl font-bold transition-all hover:scale-105 active:scale-95"
                        >
                          <CheckCircle2 className="w-6 h-6 mr-2" />
-                         เช็คอินเข้างาน
+                         เช็กอินเข้างาน
                        </Button>
                      </div>
                   </div>
@@ -73397,7 +73397,7 @@ export default function ForStaffPage() {
               <div>
                 <CardTitle className="text-2xl text-[#4a6a4d]">Bear Paw Check-in</CardTitle>
                 <CardDescription className="text-sm">
-                  ระบบเช็คอิน / เช็คเอาท์พนักงาน — สแกนอุ้งเท้าหมี
+                  ระบบเช็กอิน / เช็คเอาท์พนักงาน — สแกนอุ้งเท้าหมี
                 </CardDescription>
               </div>
             </div>
@@ -73482,7 +73482,7 @@ export default function ForStaffPage() {
                       : "bg-[#dff5e4] text-[#2f6f3f] shrink-0"
                   }
                 >
-                  {isCheckedIn ? "กำลังทำงาน" : "ยังไม่ได้เช็คอิน"}
+                  {isCheckedIn ? "กำลังทำงาน" : "ยังไม่ได้เช็กอิน"}
                 </Badge>
               </div>
             )}
@@ -73490,7 +73490,7 @@ export default function ForStaffPage() {
             {/* ── Active session info ── */}
             {activeSession && (
               <div className="rounded-xl border border-[#ffe1a8] bg-[#fffbf0] px-4 py-3 text-sm text-[#7a5200]">
-                เช็คอินเมื่อ:{" "}
+                เช็กอินเมื่อ:{" "}
                 <strong>
                   {format(new Date(activeSession.check_in_time), "HH:mm น. (dd MMM yyyy)", {
                     locale: th,
@@ -73532,7 +73532,7 @@ export default function ForStaffPage() {
                       ? "กรุณากรอก Discord ID ก่อน"
                       : isCheckedIn
                       ? "แตะอุ้งเท้าเพื่อเช็คเอาท์"
-                      : "แตะอุ้งเท้าเพื่อเช็คอิน"}
+                      : "แตะอุ้งเท้าเพื่อเช็กอิน"}
                   </span>
                   <span className="z-10 text-xs opacity-60">
                     {profile ? "ระบบจะล็อกระหว่างสแกน ~1.5 วินาที" : ""}
@@ -73629,7 +73629,7 @@ export default function ForStaffPage() {
                 )}
                 <div>
                   {scanResult.action === "check-in"
-                    ? "เช็คอินเรียบร้อยแล้ว ✨ ขอให้ทำงานสนุกนะ!"
+                    ? "เช็กอินเรียบร้อยแล้ว ✨ ขอให้ทำงานสนุกนะ!"
                     : "เลิกงานแล้ว พักผ่อนเยอะ ๆ นะ 🌙"}
                   {scanResult.lateWarning && (
                     <p className="mt-1 font-semibold">⚠️ คุณเช็คเอาท์เกินเวลาที่กำหนด</p>
@@ -73819,7 +73819,7 @@ export default function ForStaffReportPage() {
         {/* ── Main card ── */}
         <Card className="rounded-2xl border-[#dbeedd] shadow-lg shadow-[#f4dde7]/50">
           <CardHeader className="space-y-4">
-            <CardTitle className="text-[#45684a]">รายงานเช็คอิน / เช็คเอาท์พนักงาน</CardTitle>
+            <CardTitle className="text-[#45684a]">รายงานเช็กอิน / เช็คเอาท์พนักงาน</CardTitle>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="relative">
@@ -73856,7 +73856,7 @@ export default function ForStaffReportPage() {
                       <TableHead>พนักงาน</TableHead>
                       <TableHead>Discord</TableHead>
                       <TableHead>ตำแหน่ง</TableHead>
-                      <TableHead>เช็คอิน</TableHead>
+                      <TableHead>เช็กอิน</TableHead>
                       <TableHead>เช็คเอาท์</TableHead>
                       <TableHead>
                         <Clock className="inline h-3.5 w-3.5 mr-1" />
@@ -77173,10 +77173,10 @@ export default function WorkspacePage() {
 
       if (error) throw error;
       
-      toast({ title: "เช็คอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
+      toast({ title: "เช็กอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
       fetchActiveSession();
     } catch (error: any) {
-      toast({ title: "เช็คอินล้มเหลว", description: error.message, variant: "destructive" });
+      toast({ title: "เช็กอินล้มเหลว", description: error.message, variant: "destructive" });
     }
   };
 
@@ -77442,7 +77442,7 @@ export default function WorkspacePage() {
                      <div className="flex-1 space-y-6 w-full">
                        <div className="space-y-2">
                          <h3 className="text-xl font-semibold">ยินดีต้อนรับสู่พื้นที่ทำงาน</h3>
-                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็คอินได้เลย</p>
+                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็กอินได้เลย</p>
                        </div>
                        
                        <div className="space-y-3">
@@ -77473,7 +77473,7 @@ export default function WorkspacePage() {
                          className="w-full md:w-64 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl shadow-xl shadow-emerald-500/20 text-xl font-bold transition-all hover:scale-105 active:scale-95"
                        >
                          <CheckCircle2 className="w-6 h-6 mr-2" />
-                         เช็คอินเข้างาน
+                         เช็กอินเข้างาน
                        </Button>
                      </div>
                   </div>

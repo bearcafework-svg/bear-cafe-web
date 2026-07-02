@@ -303,10 +303,10 @@ export default function WorkspacePage() {
 
       if (error) throw error;
       
-      toast({ title: "เช็คอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
+      toast({ title: "เช็กอินสำเร็จ", description: `เข้างานในตำแหน่ง: ${primaryRole}` });
       fetchActiveSession();
     } catch (error: any) {
-      toast({ title: "เช็คอินล้มเหลว", description: error.message, variant: "destructive" });
+      toast({ title: "เช็กอินล้มเหลว", description: error.message, variant: "destructive" });
     }
   };
 
@@ -572,7 +572,7 @@ export default function WorkspacePage() {
                      <div className="flex-1 space-y-6 w-full">
                        <div className="space-y-2">
                          <h3 className="text-xl font-semibold">ยินดีต้อนรับสู่พื้นที่ทำงาน</h3>
-                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็คอินได้เลย</p>
+                         <p className="text-muted-foreground">พร้อมที่จะเริ่มงานหรือยัง? ตรวจสอบตำแหน่งของคุณแล้วกดเช็กอินได้เลย</p>
                        </div>
                        
                        <div className="space-y-3">
@@ -603,7 +603,7 @@ export default function WorkspacePage() {
                          className="w-full md:w-64 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl shadow-xl shadow-emerald-500/20 text-xl font-bold transition-all hover:scale-105 active:scale-95"
                        >
                          <CheckCircle2 className="w-6 h-6 mr-2" />
-                         เช็คอินเข้างาน
+                         เช็กอินเข้างาน
                        </Button>
                      </div>
                   </div>

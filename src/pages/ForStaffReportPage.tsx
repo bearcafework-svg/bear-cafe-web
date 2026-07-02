@@ -164,7 +164,7 @@ export default function ForStaffReportPage() {
         {/* ── Main card ── */}
         <Card className="rounded-2xl border-[#dbeedd] shadow-lg shadow-[#f4dde7]/50">
           <CardHeader className="space-y-4">
-            <CardTitle className="text-[#45684a]">รายงานเช็คอิน / เช็คเอาท์พนักงาน</CardTitle>
+            <CardTitle className="text-[#45684a]">รายงานเช็กอิน / เช็คเอาท์พนักงาน</CardTitle>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="relative">
@@ -201,7 +201,7 @@ export default function ForStaffReportPage() {
                       <TableHead>พนักงาน</TableHead>
                       <TableHead>Discord</TableHead>
                       <TableHead>ตำแหน่ง</TableHead>
-                      <TableHead>เช็คอิน</TableHead>
+                      <TableHead>เช็กอิน</TableHead>
                       <TableHead>เช็คเอาท์</TableHead>
                       <TableHead>
                         <Clock className="inline h-3.5 w-3.5 mr-1" />

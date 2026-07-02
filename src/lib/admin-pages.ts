@@ -29,7 +29,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'categories', label: 'หมวดหมู่', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'banners', label: 'แบนเนอร์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'roles', label: 'ยศ Discord', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'checkin-rewards', label: 'เช็คอินรายวัน', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
+  { id: 'checkin-rewards', label: 'เช็กอินรายวัน', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'redeem-codes', label: 'โค้ดแลก', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'roles-to-delete', label: 'ยศที่ต้องลบเมื่อย้าย', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },

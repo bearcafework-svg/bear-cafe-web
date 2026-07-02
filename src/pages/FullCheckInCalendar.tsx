@@ -122,11 +122,11 @@ export default function FullCheckInCalendar() {
             <div className="flex items-start gap-2 sm:gap-3 min-w-0">
               <CaffeLatteIcon size={{ mobile: 24, desktop: 36 }} className="shrink-0" />
               <p className="bear-h3-bold md:bear-h1-bold text-[#89654A] dark:text-[#E9E6E2] leading-tight min-w-0">
-                เช็คอินรายวันเพื่อรับรางวัลพิเศษ!
+                เช็กอินรายวันเพื่อรับรางวัลพิเศษ!
               </p>
             </div>
             <p className="bear-body-small-regular md:bear-body-regular text-[#94735C] dark:text-[#9D8F7B]">
-              เช็คอินรายวันเพื่อรับของขวัญมากมาย ชวนเพื่อนมารับรางวัลกันด้วยน้า
+              เช็กอินรายวันเพื่อรับของขวัญมากมาย ชวนเพื่อนมารับรางวัลกันด้วยน้า
             </p>
 
             <div className="w-full min-w-0 overflow-x-auto sm:overflow-visible -mx-1 px-1 sm:mx-0 sm:px-0">
@@ -165,12 +165,12 @@ export default function FullCheckInCalendar() {
             {/* Shown only during the post-month makeup window */}
             {status?.makeup_window_open && isAuthenticated && (
               <p className="text-center bear-body-small-regular text-[#D7A042] dark:text-[#D7A042] px-1">
-                ช่วงเติมเช็คอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
+                ช่วงเติมเช็กอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
               </p>
             )}
 
             <p className="text-[#94735C] dark:text-[#9D8F7B] bear-body-small-regular md:bear-body-regular">
-              เช็คอินทุกวันเพื่อรับรางวัลสุดพิเศษ ถ้าพลาดวันไหนก็สามารถรับรางวัลย้อนหลังได้น้า
+              เช็กอินทุกวันเพื่อรับรางวัลสุดพิเศษ ถ้าพลาดวันไหนก็สามารถรับรางวัลย้อนหลังได้น้า
             </p>
           </div>
 
@@ -256,7 +256,7 @@ export default function FullCheckInCalendar() {
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <FireIcon size={16} color="#D7A042" className="shrink-0" />
                   <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
-                    เช็คอินต่อเนื่อง
+                    เช็กอินต่อเนื่อง
                   </span>
                 </div>
                 <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium shrink-0">
@@ -267,7 +267,7 @@ export default function FullCheckInCalendar() {
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <Calendar2Icon size={16} color="#2D5C48" className="shrink-0" />
                   <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
-                    เช็คอินสะสม
+                    เช็กอินสะสม
                   </span>
                 </div>
                 <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium shrink-0">

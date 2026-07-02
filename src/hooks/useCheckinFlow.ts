@@ -107,7 +107,7 @@ export function useCheckinFlow(
   const handleActionResult = useCallback(
     (result: CheckinActionResult, selectedReward: CheckinDailyReward | undefined) => {
       if (result.ok === false) {
-        const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเช็คอินได้';
+        const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเช็กอินได้';
         toast.error(message);
         return;
       }
@@ -116,7 +116,7 @@ export function useCheckinFlow(
       invalidateBalances(discordId);
 
       if (result.reward && 'role_grant_error' in result.reward) {
-        toast.error('เช็คอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
+        toast.error('เช็กอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
       }
 
       if (result.big_reward_granted) {
@@ -138,7 +138,7 @@ export function useCheckinFlow(
     const { dayNumber } = makeupModal;
     const result = await performMakeupCheckin(dayNumber, year, month);
     if (result.ok === false) {
-      const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเติมเช็คอินได้';
+      const message = CHECKIN_ERROR_MESSAGES[result.error] ?? 'ไม่สามารถเติมเช็กอินได้';
       toast.error(message);
       return;
     }
@@ -149,7 +149,7 @@ export function useCheckinFlow(
     invalidateBalances(discordId);
 
     if (result.reward && 'role_grant_error' in result.reward) {
-      toast.error('เติมเช็คอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
+      toast.error('เติมเช็กอินสำเร็จแล้ว แต่ไม่สามารถมอบ Role ได้ กรุณาติดต่อแอดมิน');
     }
 
     if (result.big_reward_granted) {

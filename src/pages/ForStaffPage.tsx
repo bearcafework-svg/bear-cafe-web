@@ -315,7 +315,7 @@ export default function ForStaffPage() {
               <div>
                 <CardTitle className="text-2xl text-[#4a6a4d]">Bear Paw Check-in</CardTitle>
                 <CardDescription className="text-sm">
-                  ระบบเช็คอิน / เช็คเอาท์พนักงาน — สแกนอุ้งเท้าหมี
+                  ระบบเช็กอิน / เช็คเอาท์พนักงาน — สแกนอุ้งเท้าหมี
                 </CardDescription>
               </div>
             </div>
@@ -400,7 +400,7 @@ export default function ForStaffPage() {
                       : "bg-[#dff5e4] text-[#2f6f3f] shrink-0"
                   }
                 >
-                  {isCheckedIn ? "กำลังทำงาน" : "ยังไม่ได้เช็คอิน"}
+                  {isCheckedIn ? "กำลังทำงาน" : "ยังไม่ได้เช็กอิน"}
                 </Badge>
               </div>
             )}
@@ -408,7 +408,7 @@ export default function ForStaffPage() {
             {/* ── Active session info ── */}
             {activeSession && (
               <div className="rounded-xl border border-[#ffe1a8] bg-[#fffbf0] px-4 py-3 text-sm text-[#7a5200]">
-                เช็คอินเมื่อ:{" "}
+                เช็กอินเมื่อ:{" "}
                 <strong>
                   {format(new Date(activeSession.check_in_time), "HH:mm น. (dd MMM yyyy)", {
                     locale: th,
@@ -450,7 +450,7 @@ export default function ForStaffPage() {
                       ? "กรุณากรอก Discord ID ก่อน"
                       : isCheckedIn
                       ? "แตะอุ้งเท้าเพื่อเช็คเอาท์"
-                      : "แตะอุ้งเท้าเพื่อเช็คอิน"}
+                      : "แตะอุ้งเท้าเพื่อเช็กอิน"}
                   </span>
                   <span className="z-10 text-xs opacity-60">
                     {profile ? "ระบบจะล็อกระหว่างสแกน ~1.5 วินาที" : ""}
@@ -547,7 +547,7 @@ export default function ForStaffPage() {
                 )}
                 <div>
                   {scanResult.action === "check-in"
-                    ? "เช็คอินเรียบร้อยแล้ว ✨ ขอให้ทำงานสนุกนะ!"
+                    ? "เช็กอินเรียบร้อยแล้ว ✨ ขอให้ทำงานสนุกนะ!"
                     : "เลิกงานแล้ว พักผ่อนเยอะ ๆ นะ 🌙"}
                   {scanResult.lateWarning && (
                     <p className="mt-1 font-semibold">⚠️ คุณเช็คเอาท์เกินเวลาที่กำหนด</p>

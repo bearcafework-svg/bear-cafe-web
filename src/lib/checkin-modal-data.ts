@@ -84,7 +84,7 @@ export function buildRewardModalData(
     ? rewardToPopup(result.reward, selectedReward)
     : selectedReward
       ? dailyRewardToModal(selectedReward)
-      : { type: 'points', pointsAdded: 0, message: 'เช็คอินสำเร็จ!' };
+      : { type: 'points', pointsAdded: 0, message: 'เช็กอินสำเร็จ!' };
 
   if (modalData.type === 'role' && modalData.roleId) {
     const meta = roleMeta[modalData.roleId];

@@ -168,7 +168,7 @@ export function CheckinBigRewardPreview({
               <button
                 type="button"
                 onClick={onCalendarClick}
-                aria-label="เปิดปฏิทินเช็คอิน"
+                aria-label="เปิดปฏิทินเช็กอิน"
                 className="shrink-0 text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:text-[hsl(var(--mocha))] dark:text-[#6B6B6B] dark:hover:text-[#E9E6E2]"
               >
                 <Calendar className="h-5 w-5" />
@@ -177,7 +177,7 @@ export function CheckinBigRewardPreview({
           </div>
           <div className="flex items-center justify-between gap-3 flex-1 w-full">
             <p className="bear-body-small-medium text-[#94735C] dark:text-[#6B6B6B]">
-              เช็คอินสะสมให้ครบ 28 วันเพื่อรับรางวัลใหญ่สุดพิเศษ
+              เช็กอินสะสมให้ครบ 28 วันเพื่อรับรางวัลใหญ่สุดพิเศษ
             </p>
             <span className="shrink-0 bear-body-small-medium text-[#94735C] dark:text-[#6B6B6B]">
               {progress} / 28

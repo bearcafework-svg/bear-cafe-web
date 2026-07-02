@@ -140,7 +140,7 @@ export function CheckinMakeupConfirmModal({
           id="checkin-makeup-title"
           className="bear-h3-bold text-[hsl(var(--mocha))] md:bear-h2-bold dark:text-[#E9E6E2]"
         >
-          ยืนยันเติมเช็คอิน
+          ยืนยันเติมเช็กอิน
         </p>
 
         <div className="flex items-center justify-center gap-3 py-4 px-3">
