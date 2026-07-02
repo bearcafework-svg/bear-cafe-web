@@ -78,6 +78,7 @@ export function CheckinRewardsManagement() {
 
   // Bulk edit daily rewards dialog
   const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkSelectedDays, setBulkSelectedDays] = useState<Set<number>>(new Set());
   const [bulkForm, setBulkForm] = useState({
     reward_type: 'points' as DailyReward['reward_type'],
     reward_amount: 10,
@@ -163,14 +164,51 @@ export function CheckinRewardsManagement() {
       role_id: '',
       makeup_cost: 50,
     });
+    const editableDays = Array.from({ length: 28 }, (_, i) => i + 1).filter(
+      (day) => !isDayInPast(day)
+    );
+    setBulkSelectedDays(new Set(editableDays));
     setBulkEditing(true);
   };
 
+  const toggleBulkDay = (dayNum: number) => {
+    setBulkSelectedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayNum)) {
+        next.delete(dayNum);
+      } else {
+        next.add(dayNum);
+      }
+      return next;
+    });
+  };
+
+  const selectAllBulkDays = () => {
+    const editableDays = Array.from({ length: 28 }, (_, i) => i + 1).filter(
+      (day) => !isDayInPast(day)
+    );
+    setBulkSelectedDays(new Set(editableDays));
+  };
+
+  const clearBulkDays = () => {
+    setBulkSelectedDays(new Set());
+  };
+
   const saveBulkRewards = async () => {
+    const selectedDays = Array.from(bulkSelectedDays).sort((a, b) => a - b);
+    if (selectedDays.length === 0) {
+      toast({
+        title: 'ยังไม่ได้เลือกวัน',
+        description: 'กรุณาเลือกอย่างน้อย 1 วัน',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      const rewards = Array.from({ length: 28 }, (_, i) => ({
-        day_number: i + 1,
+      const rewards = selectedDays.map((day_number) => ({
+        day_number,
         reward_type: bulkForm.reward_type,
         reward_amount: bulkForm.reward_type !== 'role' ? bulkForm.reward_amount : null,
         role_id: bulkForm.reward_type === 'role' ? bulkForm.role_id : null,
@@ -190,7 +228,7 @@ export function CheckinRewardsManagement() {
 
       toast({
         title: 'บันทึกสำเร็จ',
-        description: `ตั้งค่ารางวัลทั้ง 28 วัน (${MONTH_NAMES[selectedMonth - 1]} ${selectedYear + 543}) แล้ว`,
+        description: `ตั้งค่ารางวัล ${selectedDays.length} วัน (${MONTH_NAMES[selectedMonth - 1]} ${selectedYear + 543}) แล้ว`,
       });
       setBulkEditing(false);
       fetchRewards();
@@ -438,7 +476,7 @@ export function CheckinRewardsManagement() {
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={openBulkEditDialog} disabled={isPastMonth}>
                 <Gift className="w-4 h-4 mr-1" />
-                ตั้งค่ารางวัลทั้งหมด
+                ตั้งค่ารางวัลหลายวัน
               </Button>
               <Badge variant="secondary" className="text-xs">28 วัน</Badge>
             </div>
@@ -600,13 +638,56 @@ export function CheckinRewardsManagement() {
       <Dialog open={bulkEditing} onOpenChange={setBulkEditing}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>ตั้งค่ารางวัลทั้งหมด (28 วัน)</DialogTitle>
+            <DialogTitle>เลือกวันและตั้งค่ารางวัล</DialogTitle>
             <DialogDescription>
-              ใช้การตั้งค่าเดียวกันกับทุกวันใน {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
+              ใช้การตั้งค่าเดียวกันกับวันที่เลือกใน {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>เลือกวัน</Label>
+                <span className="text-xs text-muted-foreground">
+                  เลือกแล้ว {formatNumber(bulkSelectedDays.size)} วัน
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={selectAllBulkDays}>
+                  เลือกทั้งหมด
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={clearBulkDays}>
+                  ล้างการเลือก
+                </Button>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((dayNum) => {
+                  const isPast = isDayInPast(dayNum);
+                  const isSelected = bulkSelectedDays.has(dayNum);
+                  return (
+                    <button
+                      key={dayNum}
+                      type="button"
+                      onClick={() => !isPast && toggleBulkDay(dayNum)}
+                      disabled={isPast}
+                      className={cn(
+                        'aspect-square rounded-lg border-2 transition-all duration-200',
+                        'flex items-center justify-center text-sm font-bold',
+                        isPast
+                          ? 'border-border/50 bg-muted/30 opacity-50 cursor-not-allowed text-muted-foreground'
+                          : 'hover:scale-105 active:scale-95 cursor-pointer',
+                        !isPast && isSelected
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : !isPast && 'border-border bg-muted/50 text-muted-foreground'
+                      )}
+                    >
+                      {dayNum}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div>
               <Label>ประเภทรางวัล</Label>
               <Select
