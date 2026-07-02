@@ -76,6 +76,15 @@ export function CheckinRewardsManagement() {
     makeup_cost: 50,
   });
 
+  // Bulk edit daily rewards dialog
+  const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkForm, setBulkForm] = useState({
+    reward_type: 'points' as DailyReward['reward_type'],
+    reward_amount: 10,
+    role_id: '',
+    makeup_cost: 50,
+  });
+
   // Edit big reward dialog
   const [editingBigReward, setEditingBigReward] = useState(false);
   const [bigRewardForm, setBigRewardForm] = useState({
@@ -144,6 +153,56 @@ export function CheckinRewardsManagement() {
         role_id: bigReward.role_id || '',
         description: bigReward.description || '',
       });
+    }
+  };
+
+  const openBulkEditDialog = () => {
+    setBulkForm({
+      reward_type: 'points',
+      reward_amount: 10,
+      role_id: '',
+      makeup_cost: 50,
+    });
+    setBulkEditing(true);
+  };
+
+  const saveBulkRewards = async () => {
+    setSaving(true);
+    try {
+      const rewards = Array.from({ length: 28 }, (_, i) => ({
+        day_number: i + 1,
+        reward_type: bulkForm.reward_type,
+        reward_amount: bulkForm.reward_type !== 'role' ? bulkForm.reward_amount : null,
+        role_id: bulkForm.reward_type === 'role' ? bulkForm.role_id : null,
+        makeup_cost: bulkForm.makeup_cost,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('bulk-update-checkin-daily-rewards', {
+        body: {
+          year: selectedYear,
+          month: selectedMonth,
+          rewards,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Failed to save');
+
+      toast({
+        title: 'บันทึกสำเร็จ',
+        description: `ตั้งค่ารางวัลทั้ง 28 วัน (${MONTH_NAMES[selectedMonth - 1]} ${selectedYear + 543}) แล้ว`,
+      });
+      setBulkEditing(false);
+      fetchRewards();
+    } catch (error) {
+      console.error('Error saving bulk rewards:', error);
+      toast({
+        title: 'เกิดข้อผิดพลาด',
+        description: 'ไม่สามารถบันทึกรางวัลทั้งหมดได้',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -376,7 +435,13 @@ export function CheckinRewardsManagement() {
               <CalendarCheck className="w-5 h-5 text-primary" />
               <CardTitle className="text-base font-semibold">ปฏิทินรางวัลรายวัน</CardTitle>
             </div>
-            <Badge variant="secondary" className="text-xs">28 วัน</Badge>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={openBulkEditDialog} disabled={isPastMonth}>
+                <Gift className="w-4 h-4 mr-1" />
+                ตั้งค่ารางวัลทั้งหมด
+              </Button>
+              <Badge variant="secondary" className="text-xs">28 วัน</Badge>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
             คลิกที่วันเพื่อแก้ไขรางวัลและค่า Makeup • วันที่ผ่านไปแล้วไม่สามารถแก้ไขได้
@@ -513,7 +578,7 @@ export function CheckinRewardsManagement() {
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
-                แต้มที่ใช้เติมวันที่พลาดไปหลังวันที่ 28
+                แต้มที่ใช้เติมวันที่พลาดไป (เติมย้อนหลังได้ทันทีหลังวันนั้นผ่านไป)
               </p>
             </div>
           </div>
@@ -526,6 +591,89 @@ export function CheckinRewardsManagement() {
             <Button onClick={saveDailyReward} disabled={saving}>
               <Save className="w-4 h-4 mr-1" />
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Daily Rewards Dialog */}
+      <Dialog open={bulkEditing} onOpenChange={setBulkEditing}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>ตั้งค่ารางวัลทั้งหมด (28 วัน)</DialogTitle>
+            <DialogDescription>
+              ใช้การตั้งค่าเดียวกันกับทุกวันใน {MONTH_NAMES[selectedMonth - 1]} {selectedYear + 543}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>ประเภทรางวัล</Label>
+              <Select
+                value={bulkForm.reward_type}
+                onValueChange={(value) =>
+                  setBulkForm({ ...bulkForm, reward_type: value as DailyReward['reward_type'] })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="points">แต้ม</SelectItem>
+                  <SelectItem value="ticket_point">แต้มตั๋ว</SelectItem>
+                  <SelectItem value="ticket_piece_point">แต้มชิ้นตั๋ว</SelectItem>
+                  <SelectItem value="role">Discord Role</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkForm.reward_type === 'role' ? (
+              <div>
+                <Label>Discord Role ID</Label>
+                <Input
+                  placeholder="123456789012345678"
+                  value={bulkForm.role_id}
+                  onChange={(e) => setBulkForm({ ...bulkForm, role_id: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div>
+                <Label>จำนวนรางวัล</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={bulkForm.reward_amount}
+                  onChange={(e) =>
+                    setBulkForm({ ...bulkForm, reward_amount: parseInt(e.target.value) || 0 })
+                  }
+                />
+              </div>
+            )}
+
+            <div>
+              <Label>ค่า Makeup (แต้ม)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={bulkForm.makeup_cost}
+                onChange={(e) =>
+                  setBulkForm({ ...bulkForm, makeup_cost: parseInt(e.target.value) || 0 })
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                แต้มที่ใช้เติมวันที่พลาดไป (เติมย้อนหลังได้ทันทีหลังวันนั้นผ่านไป)
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkEditing(false)} disabled={saving}>
+              <X className="w-4 h-4 mr-1" />
+              ยกเลิก
+            </Button>
+            <Button onClick={saveBulkRewards} disabled={saving}>
+              <Save className="w-4 h-4 mr-1" />
+              {saving ? 'กำลังบันทึก...' : 'บันทึกทั้งหมด'}
             </Button>
           </DialogFooter>
         </DialogContent>

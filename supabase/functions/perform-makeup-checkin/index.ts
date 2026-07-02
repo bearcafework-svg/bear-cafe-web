@@ -50,14 +50,14 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "invalid_day" }, 400);
     }
 
-    // Makeup window: must be past day 28 of the current month, same month as target
+    // Makeup: same month as target; target day must be strictly in the past
     const { year: nowYear, month: nowMonth, day: nowDay } = getCheckinToday();
 
     if (year !== nowYear || month !== nowMonth) {
       return json({ ok: false, error: "makeup_window_expired" }, 400);
     }
-    if (nowDay <= 28) {
-      return json({ ok: false, error: "makeup_window_not_open" }, 400);
+    if (day_number >= nowDay) {
+      return json({ ok: false, error: "makeup_day_not_past" }, 400);
     }
 
     await ensureUserPoints(sb, discord_id);

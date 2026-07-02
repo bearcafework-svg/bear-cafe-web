@@ -44,7 +44,7 @@ function publicCheckinStatus(
     },
     daily_rewards,
     big_reward,
-    makeup_window_open: currentDay > 28,
+    makeup_window_open: currentDay > 1,
   };
 }
 

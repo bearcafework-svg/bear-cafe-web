@@ -59,7 +59,7 @@ Deno.serve(async (req): Promise<Response> => {
       .eq("month", month)
       .maybeSingle();
 
-    const makeupWindowOpen = currentDay > 28;
+    const makeupWindowOpen = currentDay > 1;
 
     return json({
       ok: true,

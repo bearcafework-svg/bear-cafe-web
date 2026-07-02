@@ -264,6 +264,7 @@ export const CHECKIN_ERROR_MESSAGES: Record<string, string> = {
   day_mismatch: 'ไม่สามารถเช็คอินวันนี้ได้',
   insufficient_points: 'แต้มไม่พอสำหรับเติมเช็คอิน',
   makeup_window_not_open: 'ยังไม่ถึงช่วงเติมเช็คอิน',
+  makeup_day_not_past: 'ยังเติมเช็คอินวันนี้ไม่ได้',
   makeup_window_expired: 'หมดเวลาเติมเช็คอินแล้ว',
   day_already_filled: 'วันนี้เช็คอินแล้ว',
   cycle_not_found: 'ไม่พบข้อมูลรอบเช็คอิน',
