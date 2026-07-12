@@ -276,7 +276,6 @@ export function TradingHistoryManagement() {
       .from('product_catalog')
       .select('id, role_id, display_name, product_type, current_price, is_purchasable, is_active, sort_order')
       .eq('is_active', true)
-      .eq('is_purchasable', true)
       .order('sort_order', { ascending: true })
       .order('display_name', { ascending: true });
     if (data) setCatalog(data as ProductCatalogRow[]);
