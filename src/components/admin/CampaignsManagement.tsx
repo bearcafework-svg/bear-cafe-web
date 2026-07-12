@@ -53,8 +53,11 @@ import {
   RotateCcw,
   Images,
   Megaphone,
+  Search,
+  X,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
+import { cn } from '@/lib/utils';
 
 // Type for campaign_messages table (will be auto-generated after migration)
 type CampaignMessage = {
@@ -152,6 +155,7 @@ export function CampaignsManagement() {
   const [testSendCampaign, setTestSendCampaign] = useState<CampaignMessage | null>(null);
   const [testSendChannel, setTestSendChannel] = useState<string>('');
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
+  const [channelSearch, setChannelSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploading2, setUploading2] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -436,6 +440,7 @@ export function CampaignsManagement() {
   // ─── Open edit dialog ────────────────────────────────────────────────────
   const handleEdit = (campaign: CampaignMessage) => {
     setEditingCampaign(campaign);
+    setChannelSearch('');
     setFormData({
       internal_name: campaign.internal_name,
       content_text: campaign.content_text,
@@ -459,6 +464,7 @@ export function CampaignsManagement() {
   // ─── Open create dialog ──────────────────────────────────────────────────
   const handleCreate = () => {
     setEditingCampaign(null);
+    setChannelSearch('');
     setFormData(INITIAL_FORM);
     setDialogOpen(true);
   };
@@ -472,6 +478,12 @@ export function CampaignsManagement() {
         : [...prev.target_channels, channelId],
     }));
   };
+
+  const filteredChannels = useMemo(() => {
+    const q = channelSearch.toLowerCase().trim();
+    if (!q) return channels;
+    return channels.filter((ch) => ch.name.toLowerCase().includes(q));
+  }, [channels, channelSearch]);
 
   // ─── Test send ───────────────────────────────────────────────────────────
   const handleOpenTestSend = (campaign: CampaignMessage) => {
@@ -611,26 +623,26 @@ export function CampaignsManagement() {
       <TabsContent value="campaigns" className="mt-0">
     <div className="space-y-6">
       {/* ─── Header ─── */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Send className="w-5 h-5" />
+      <Card className="rounded-2xl border-border/40 bg-card">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Send className="w-5 h-5 text-primary" />
               จัดการแคมเปญโฆษณา
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleResetQueue()}
                 disabled={isResettingQueue || campaigns.length === 0}
-                className="gap-2"
-                title="รีเซ็ตคิวใหม่ตาม sort_order และ interval ปัจจุบัน"
+                className="gap-2 rounded-xl text-xs h-9 border-border/40"
+                title="รีเซ็ตคิวใหม่ตามลำดับแคมเปญและรอบเวลาปัจจุบัน"
               >
                 {isResettingQueue ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-4 h-4 text-primary" />
                 )}
                 รีเซ็ตคิว
               </Button>
@@ -638,14 +650,19 @@ export function CampaignsManagement() {
                 variant="outline"
                 size="sm"
                 onClick={() => setScheduleDialogOpen(true)}
-                className="gap-2"
+                className="gap-2 rounded-xl text-xs h-9 border-border/40"
               >
-                <Clock className="w-4 h-4" />
+                <Clock className="w-4 h-4 text-accent" />
                 ตั้งเวลาส่ง
                 {scheduleConfig && (
                   <Badge
                     variant={scheduleConfig.is_enabled ? 'default' : 'secondary'}
-                    className="ml-1 text-xs"
+                    className={cn(
+                      "ml-1 text-[10px] px-1.5 py-0 h-4 rounded-full font-medium",
+                      scheduleConfig.is_enabled
+                        ? "bg-success/15 border-success/35 text-success hover:bg-success/20 border"
+                        : "bg-muted-foreground/15 border-muted-foreground/35 text-muted-foreground border"
+                    )}
                   >
                     {scheduleConfig.is_enabled
                       ? (() => {
@@ -656,8 +673,8 @@ export function CampaignsManagement() {
                   </Badge>
                 )}
               </Button>
-              <Button onClick={handleCreate} size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
+              <Button onClick={handleCreate} size="sm" className="gap-2 rounded-xl text-xs h-9 bg-primary hover:bg-primary/90 text-white">
+                <Plus className="w-4 h-4 text-white" />
                 สร้างแคมเปญ
               </Button>
             </div>
@@ -666,8 +683,8 @@ export function CampaignsManagement() {
       </Card>
 
       {/* ─── Campaigns table ─── */}
-      <Card>
-        <CardContent className="p-6">
+      <Card className="rounded-2xl border-border/40 bg-card">
+        <CardContent className="p-4 sm:p-6">
           {campaigns.length > 1 && !loading && (
             <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
               <GripVertical className="w-3.5 h-3.5" />
@@ -685,95 +702,107 @@ export function CampaignsManagement() {
             </div>
           ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8"></TableHead>
-                    <TableHead>ชื่อภายใน</TableHead>
-                    <TableHead>ข้อความ</TableHead>
-                    <TableHead>ช่องเป้าหมาย</TableHead>
-                    <TableHead>สถานะ</TableHead>
-                    <TableHead>คิวถัดไป</TableHead>
-                    <TableHead className="text-right">จัดการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <Droppable droppableId="campaigns">
-                  {(provided) => (
-                    <TableBody ref={provided.innerRef} {...provided.droppableProps}>
-                      {campaigns.map((campaign, index) => (
-                        <Draggable key={campaign.id} draggableId={campaign.id} index={index}>
-                          {(drag, snapshot) => (
-                            <TableRow
-                              ref={drag.innerRef}
-                              {...drag.draggableProps}
-                              className={snapshot.isDragging ? 'opacity-80 bg-honey/10 shadow-md' : ''}
-                            >
+              <Droppable droppableId="campaigns">
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="space-y-3"
+                  >
+                    {campaigns.map((campaign, index) => (
+                      <Draggable key={campaign.id} draggableId={campaign.id} index={index}>
+                        {(drag, snapshot) => (
+                          <div
+                            ref={drag.innerRef}
+                            {...drag.draggableProps}
+                            className={cn(
+                              "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border bg-card transition-all hover:shadow-sm",
+                              snapshot.isDragging
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-md scale-[1.01]"
+                                : "border-border/40 hover:bg-muted/30"
+                            )}
+                          >
+                            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                               {/* Drag handle */}
-                              <TableCell className="w-8 pr-0">
-                                <span
-                                  {...drag.dragHandleProps}
-                                  className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </span>
-                              </TableCell>
-                              <TableCell className="font-medium">{campaign.internal_name}</TableCell>
-                              <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
-                                {campaign.content_text}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{campaign.target_channels?.length || 0} ช่อง</Badge>
-                              </TableCell>
-                              <TableCell>
-                                {campaign.is_active ? (
-                                  <Badge className="bg-matcha/80 hover:bg-matcha text-cream">เปิดใช้งาน</Badge>
-                                ) : (
-                                  <Badge variant="secondary">ปิดใช้งาน</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatCountdown(campaign.next_send_at)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleOpenTestSend(campaign)}
-                                    title="ทดลองส่ง"
-                                    className="text-honey hover:text-honey/80 hover:bg-honey/10"
-                                  >
-                                    <FlaskConical className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEdit(campaign)}
-                                    title="แก้ไข"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDelete(campaign.id)}
-                                    disabled={isDeleting}
-                                    title="ลบ"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                              <button
+                                type="button"
+                                {...drag.dragHandleProps}
+                                className="flex items-center justify-center p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing shrink-0 animate-none"
+                              >
+                                <GripVertical className="w-4 h-4" />
+                              </button>
+
+                              {/* Image thumbnail if exists */}
+                              {campaign.image_url && (
+                                <div className="w-14 h-14 rounded-xl overflow-hidden border border-border/40 shrink-0 bg-muted hidden xs:block">
+                                  <img src={campaign.image_url} alt="" className="w-full h-full object-cover" />
                                 </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </TableBody>
-                  )}
-                </Droppable>
-              </Table>
+                              )}
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-semibold text-sm truncate text-foreground">{campaign.internal_name}</h4>
+                                  {campaign.is_active ? (
+                                    <Badge className="bg-success/15 border-success/35 text-success hover:bg-success/20 text-[10px] px-1.5 py-0 h-4 rounded-full font-medium">เปิดใช้งาน</Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 rounded-full font-medium">ปิดใช้งาน</Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-1 max-w-xl">
+                                  {campaign.content_text}
+                                </p>
+                                <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap pt-0.5">
+                                  <span className="flex items-center gap-1">
+                                    <Send className="w-3 h-3 text-primary/70" />
+                                    ช่องเป้าหมาย: <span className="font-semibold text-foreground">{campaign.target_channels?.length || 0} ช่อง</span>
+                                  </span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-accent/70" />
+                                    คิวถัดไป: {formatCountdown(campaign.next_send_at)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-1 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border/40">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenTestSend(campaign)}
+                                title="ทดลองส่ง"
+                                className="h-8 w-8 p-0 text-accent hover:text-accent/80 hover:bg-accent/10 rounded-xl"
+                              >
+                                <FlaskConical className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(campaign)}
+                                title="แก้ไข"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(campaign.id)}
+                                disabled={isDeleting}
+                                title="ลบ"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </DragDropContext>
           )}
         </CardContent>
@@ -781,7 +810,7 @@ export function CampaignsManagement() {
 
       {/* ─── Bucket Picker Dialog ─── */}
       <Dialog open={bucketPickerOpen} onOpenChange={setBucketPickerOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Images className="w-5 h-5" />
@@ -861,7 +890,7 @@ export function CampaignsManagement() {
 
       {/* ─── Test Send Dialog ─── */}
       <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FlaskConical className="w-5 h-5 text-honey" />
@@ -1164,33 +1193,53 @@ export function CampaignsManagement() {
               </div>
 
               {/* Target channels */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <Label>ช่องเป้าหมาย *</Label>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={syncChannels}
                     disabled={loadingChannels}
-                    className="gap-2"
+                    className="gap-1.5 text-xs h-7 hover:bg-muted/85 rounded-lg"
                   >
                     {loadingChannels ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <RefreshCw className="w-3 h-3" />
+                      <RefreshCw className="w-3.5 h-3.5" />
                     )}
                     ซิงค์ช่อง
                   </Button>
                 </div>
-                <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-                  {channels.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      คลิก "ซิงค์ช่อง" เพื่อดึงข้อมูลช่อง Discord
+                
+                {/* Channel Search Input */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={channelSearch}
+                    onChange={(e) => setChannelSearch(e.target.value)}
+                    placeholder="ค้นหาชื่อช่อง..."
+                    className="pl-8 h-8 text-xs rounded-xl bg-card border-border/40 focus:ring-primary/20"
+                  />
+                  {channelSearch && (
+                    <button
+                      onClick={() => setChannelSearch('')}
+                      className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="border rounded-2xl p-3 max-h-48 overflow-y-auto space-y-1.5 bg-muted/10 border-border/40">
+                  {filteredChannels.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4 italic">
+                      {channels.length === 0 ? 'คลิก "ซิงค์ช่อง" เพื่อดึงข้อมูลช่อง Discord' : 'ไม่พบช่องที่ตรงกับคำค้นหา'}
                     </p>
                   ) : (
-                    channels.map((channel) => (
-                      <div key={channel.id} className="flex items-center gap-2">
+                    filteredChannels.map((channel) => (
+                      <div key={channel.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
                         <Checkbox
                           id={`channel-${channel.id}`}
                           checked={formData.target_channels.includes(channel.id)}
@@ -1198,7 +1247,7 @@ export function CampaignsManagement() {
                         />
                         <Label
                           htmlFor={`channel-${channel.id}`}
-                          className="text-sm cursor-pointer flex-1"
+                          className="text-xs cursor-pointer flex-1 select-none font-medium text-foreground/80 hover:text-foreground"
                         >
                           # {channel.name}
                         </Label>
@@ -1206,8 +1255,8 @@ export function CampaignsManagement() {
                     ))
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  เลือกแล้ว {formData.target_channels.length} ช่อง
+                <p className="text-[10px] text-muted-foreground pl-1">
+                  เลือกแล้ว <span className="font-bold text-foreground">{formData.target_channels.length}</span> ช่อง
                 </p>
               </div>
 
@@ -1223,69 +1272,81 @@ export function CampaignsManagement() {
             </div>
 
             {/* ─── Right Column: Live Preview ─── */}
-            <div>
-              <Label className="mb-2 block">ตัวอย่างแบบเรียลไทม์</Label>
-              <Card className="bg-[#313338] text-white p-4">
-                <div className="space-y-3">
-                  {/* Image 1 preview */}
-                  {formData.image_url && (
-                    <img src={formData.image_url} alt="Preview 1" className="w-full rounded-lg" />
-                  )}
-
-                  {/* Image 2 preview */}
-                  {formData.image_url_2 && (
-                    <img src={formData.image_url_2} alt="Preview 2" className="w-full rounded-lg" />
-                  )}
-
-                  {/* Text content */}
-                  {formData.content_text && (
-                    <div className="text-sm whitespace-pre-wrap">
-                      {formData.content_text}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ตัวอย่างแบบเรียลไทม์ (จำลองหน้าจอ Discord)</Label>
+              <div className="bg-[#313338] text-[#dbdee1] p-4 rounded-2xl font-sans text-sm select-none border border-[#1e1f22] shadow-lg max-h-[500px] overflow-y-auto">
+                <div className="flex gap-3 items-start">
+                  {/* Mock Discord Bot Avatar */}
+                  <div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center shrink-0 text-white font-bold select-none text-xs">
+                    BC
+                  </div>
+                  
+                  {/* Discord Message Content */}
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    {/* Header info */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-white hover:underline cursor-pointer text-[15px]">Bear Cafe Bot</span>
+                      <span className="bg-[#5865F2] text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0 uppercase">BOT</span>
+                      <span className="text-[11px] text-[#949ba4] font-medium">วันนี้ เวลา 12:00 น.</span>
                     </div>
-                  )}
-
-                  {/* Divider */}
-                  {formData.content_text && (
-                    <div className="border-t border-gray-600" />
-                  )}
-
-                  {/* Buttons preview */}
-                  {(formData.has_button && formData.button_label) || formData.button_2_label ? (
-                    <div className="flex gap-2 flex-wrap">
-                      {formData.has_button && formData.button_label && (
-                        <Button variant="outline" className="bg-[#5865F2] hover:bg-[#4752C4] text-white border-0 gap-1.5 text-sm" disabled>
-                          {formData.button_emoji_name && <span>{formData.button_emoji_name}</span>}
-                          {formData.button_label}
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                      )}
-                      {formData.button_2_label && formData.button_2_url && (
-                        <Button variant="outline" className="bg-[#5865F2] hover:bg-[#4752C4] text-white border-0 gap-1.5 text-sm" disabled>
-                          {formData.button_2_emoji_name && <span>{formData.button_2_emoji_name}</span>}
-                          {formData.button_2_label}
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ) : null}
-
-                  {/* Empty state */}
-                  {!formData.content_text && !formData.image_url && !formData.image_url_2 && (
-                    <div className="text-center py-8 text-gray-400">
-                      <Eye className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">กรอกข้อมูลเพื่อดูตัวอย่าง</p>
-                    </div>
-                  )}
+                    
+                    {/* Text Content */}
+                    {formData.content_text ? (
+                      <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] whitespace-pre-wrap break-words font-normal">
+                        {formData.content_text}
+                      </div>
+                    ) : (
+                      <div className="text-[14px] text-muted-foreground/40 italic">
+                        พิมพ์ข้อความเพื่อแสดงตัวอย่างแคมเปญ
+                      </div>
+                    )}
+                    
+                    {/* Embed Layout (if there is an image) */}
+                    {(formData.image_url || formData.image_url_2) && (
+                      <div className="flex flex-col gap-2 mt-2 max-w-[520px]">
+                        {formData.image_url && (
+                          <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
+                            <img src={formData.image_url} alt="" className="max-h-[280px] object-cover w-full" />
+                          </div>
+                        )}
+                        {formData.image_url_2 && (
+                          <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
+                            <img src={formData.image_url_2} alt="" className="max-h-[280px] object-cover w-full" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Buttons preview */}
+                    {((formData.has_button && formData.button_label) || formData.button_2_label) && (
+                      <div className="flex gap-2 flex-wrap pt-2">
+                        {formData.has_button && formData.button_label && (
+                          <button
+                            type="button"
+                            disabled
+                            className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
+                          >
+                            {formData.button_emoji_name && <span className="text-sm">{formData.button_emoji_name}</span>}
+                            <span>{formData.button_label}</span>
+                            <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                          </button>
+                        )}
+                        {formData.button_2_label && formData.button_2_url && (
+                          <button
+                            type="button"
+                            disabled
+                            className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
+                          >
+                            {formData.button_2_emoji_name && <span className="text-sm">{formData.button_2_emoji_name}</span>}
+                            <span>{formData.button_2_label}</span>
+                            <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </Card>
-
-              {/* Validation warnings */}
-              {formData.content_text && formData.content_text.length > 1800 && (
-                <div className="mt-2 flex items-start gap-2 text-xs text-yellow-600">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <p>ข้อความใกล้ถึงขีดจำกัด 2000 ตัวอักษร</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1405,7 +1466,7 @@ function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: Schedu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />

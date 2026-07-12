@@ -310,7 +310,7 @@ function PlacementItemsPanel({ placement, onItemCountChange }: PlacementItemsPan
 
       {/* Add ads dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-4 h-4" />เพิ่มโฆษณาเข้า — {placement.display_name}
@@ -524,15 +524,15 @@ export function AdPlacementsManagement() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <>
-      <Card>
-        <CardHeader>
+      <Card className="rounded-2xl border-border/40 bg-card">
+        <CardHeader className="p-4 sm:p-6 pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Layers className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Layers className="w-5 h-5 text-primary" />
               Ad Placements
             </CardTitle>
-            <Button size="sm" className="gap-2" onClick={openCreate}>
-              <Plus className="w-4 h-4" />สร้าง Placement
+            <Button size="sm" className="gap-2 rounded-xl text-xs h-9 bg-primary hover:bg-primary/90 text-white" onClick={openCreate}>
+              <Plus className="w-4 h-4 text-white" />สร้าง Placement
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -644,7 +644,7 @@ export function AdPlacementsManagement() {
 
       {/* ── Create / Edit Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>{editingPlacement ? 'แก้ไข Placement' : 'สร้าง Placement ใหม่'}</DialogTitle>
           </DialogHeader>

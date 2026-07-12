@@ -478,22 +478,22 @@ export function SessionAdsManagement() {
       )}
 
       {/* Main card */}
-      <Card>
-        <CardHeader>
+      <Card className="rounded-2xl border-border/40 bg-card">
+        <CardHeader className="p-4 sm:p-6 pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Megaphone className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Megaphone className="w-5 h-5 text-primary" />
               โฆษณาผ่านระบบ
             </CardTitle>
-            <Button size="sm" className="gap-2" onClick={openCreate}>
-              <Plus className="w-4 h-4" />เพิ่มโฆษณา
+            <Button size="sm" className="gap-2 rounded-xl text-xs h-9 bg-primary hover:bg-primary/90 text-white" onClick={openCreate}>
+              <Plus className="w-4 h-4 text-white" />เพิ่มโฆษณา
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             ภาพและลิงก์จะถูกแทรกใน Component v2 ทุกครั้งที่มีการโพสต์หาเพื่อน ตามลำดับด้านล่าง
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -588,7 +588,7 @@ export function SessionAdsManagement() {
 
       {/* ── Create / Edit dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle>{editingAd ? 'แก้ไขโฆษณา' : 'เพิ่มโฆษณาใหม่'}</DialogTitle>
           </DialogHeader>
@@ -658,7 +658,7 @@ export function SessionAdsManagement() {
 
       {/* ── Bucket Picker dialog ── */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Images className="w-4 h-4" />เลือกภาพจาก Bucket
