@@ -119,7 +119,7 @@ export function ProductCatalogManagement() {
       const { data, error } = await supabase
         .from('product_catalog' as any)
         .select('*')
-        .order('sort_order', { ascending: true })
+        .order('product_type', { ascending: true })
         .order('display_name', { ascending: true });
       if (error) throw error;
       setProducts((data as unknown as ProductCatalogRow[]) ?? []);
@@ -504,7 +504,6 @@ export function ProductCatalogManagement() {
                       <TableHead>ราคา (บาท)</TableHead>
                       <TableHead>ขายได้</TableHead>
                       <TableHead>สถานะ</TableHead>
-                      <TableHead className="text-center">ลำดับ</TableHead>
                       <TableHead className="text-right">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -568,32 +567,7 @@ export function ProductCatalogManagement() {
                               )}
                             </button>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => moveProduct(product.id, 'up')}
-                                disabled={!isSortingAllowed || idx === 0}
-                                aria-label="เลื่อนขึ้น"
-                                title={!isSortingAllowed ? "กรุณาล้างตัวกรองและการค้นหาก่อนจัดเรียง" : "เลื่อนขึ้น"}
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => moveProduct(product.id, 'down')}
-                                disabled={!isSortingAllowed || idx === products.length - 1}
-                                aria-label="เลื่อนลง"
-                                title={!isSortingAllowed ? "กรุณาล้างตัวกรองและการค้นหาก่อนจัดเรียง" : "เลื่อนลง"}
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
+
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button
@@ -729,18 +703,7 @@ export function ProductCatalogManagement() {
               />
             </div>
 
-            {/* sort_order */}
-            <div className="space-y-1.5">
-              <Label htmlFor="pc-sort">ลำดับการแสดง</Label>
-              <Input
-                id="pc-sort"
-                type="number"
-                min="0"
-                step="1"
-                value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-              />
-            </div>
+
 
             {/* toggles */}
             <div className="space-y-3 pt-1 border-t border-border">

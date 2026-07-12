@@ -58,6 +58,7 @@ import {
   Pencil,
   Mail,
   Tag,
+  Search,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -237,6 +238,10 @@ export function TradingHistoryManagement() {
   // 2 separate item lists: class_role (max 1) and others (multi)
   const [selectedClassItem, setSelectedClassItem] = useState<SelectedItem | null>(null);
   const [selectedOtherItems, setSelectedOtherItems] = useState<SelectedItem[]>([]);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  useEffect(() => {
+    if (!isAddDialogOpen) setCatalogSearch('');
+  }, [isAddDialogOpen]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const previewUrls = useMemo(() => selectedFiles.map(f => URL.createObjectURL(f)), [selectedFiles]);
   useEffect(() => () => { previewUrls.forEach(URL.revokeObjectURL); }, [previewUrls]);
@@ -857,8 +862,14 @@ export function TradingHistoryManagement() {
   };
 
   // ── Catalog split ──
-  const classItems = useMemo(() => catalog.filter(c => c.product_type === 'class_role'), [catalog]);
-  const otherItems = useMemo(() => catalog.filter(c => c.product_type !== 'class_role'), [catalog]);
+  const classItems = useMemo(() => {
+    const q = catalogSearch.toLowerCase().trim();
+    return catalog.filter(c => c.product_type === 'class_role' && c.display_name.toLowerCase().includes(q));
+  }, [catalog, catalogSearch]);
+  const otherItems = useMemo(() => {
+    const q = catalogSearch.toLowerCase().trim();
+    return catalog.filter(c => c.product_type !== 'class_role' && c.display_name.toLowerCase().includes(q));
+  }, [catalog, catalogSearch]);
 
   // ── Loading / Error states ──
   if (loading && records.length === 0) {
@@ -948,9 +959,28 @@ export function TradingHistoryManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column: Product Catalog */}
                   <div className="flex flex-col border rounded-2xl p-4 bg-muted/20 h-[380px]">
-                    <h3 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 shrink-0">
-                      <Package className="w-3.5 h-3.5 text-primary" /> เลือกสินค้าใส่ตะกร้า
-                    </h3>
+                    <div className="flex flex-col gap-2 mb-3 shrink-0">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-primary" /> เลือกสินค้าใส่ตะกร้า
+                      </h3>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          value={catalogSearch}
+                          onChange={(e) => setCatalogSearch(e.target.value)}
+                          placeholder="ค้นหาชื่อสินค้า..."
+                          className="pl-8 h-7 text-xs rounded-xl bg-card border-border/40 focus:ring-primary/20"
+                        />
+                        {catalogSearch && (
+                          <button
+                            onClick={() => setCatalogSearch('')}
+                            className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     
                     <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                       {/* Class Roles Section */}
