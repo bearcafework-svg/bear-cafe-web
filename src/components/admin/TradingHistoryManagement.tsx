@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
