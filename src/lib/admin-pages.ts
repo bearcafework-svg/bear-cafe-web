@@ -16,6 +16,7 @@ export interface AdminPageDef {
 }
 
 export const ADMIN_PAGES: AdminPageDef[] = [
+  { id: 'overview', label: 'ภาพรวมระบบ', group: 'system', groupLabel: 'ระบบ' },
   { id: 'users', label: 'จัดการผู้ใช้', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'banned-roles', label: 'ยศที่ถูกแบน', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'banned-words', label: 'คำต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },

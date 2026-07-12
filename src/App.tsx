@@ -81,7 +81,7 @@ function AppRoutes() {
       <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/gacha" element={<GachaPage />} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
-      <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/users" replace /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/overview" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFound />} />

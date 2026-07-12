@@ -55,6 +55,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
 import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
+import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -88,6 +89,7 @@ interface NavItem {
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
+  'overview': LayoutDashboard,
   'users': Users,
   'banned-roles': Ban,
   'banned-words': AlertTriangle,
@@ -129,10 +131,27 @@ export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const [isTabletOrMobile, setIsTabletOrMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [activeTab, setActiveTab] = useState(
-    () => section || localStorage.getItem('admin_active_tab') || 'users'
+    () => section || localStorage.getItem('admin_active_tab') || 'overview'
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuerySidebar, setSearchQuerySidebar] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    moderation: true,
+    content: true,
+    system: true,
+  });
 
   // Admin role allowed pages from site_settings
   const [adminRolePages, setAdminRolePages] = useState<string[]>([]);
@@ -166,6 +185,7 @@ export default function AdminPage() {
 
   // Filter nav items based on role + custom permissions (merged, not overridden)
   const visibleItems = NAV_ITEMS.filter(item => {
+    if (item.id === 'overview') return true; // Always visible
     if (isOwner) return true; // Owner sees all
     // Merge admin role pages + custom permission pages
     const fromAdmin = user?.is_admin
@@ -176,63 +196,123 @@ export default function AdminPage() {
   });
 
   const groups = ['moderation', 'content', 'system'].filter(g =>
-    visibleItems.some(i => i.group === g)
+    visibleItems.some(i => i.group === g && i.id !== 'overview')
   );
 
   const activeItem = visibleItems.find(i => i.id === activeTab);
-
-  // (Auto-redirect effect removed to prevent ping-pong loop with URL sync)
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
     localStorage.setItem('admin_active_tab', id);
     navigate(`/admin/${id}`, { replace: true });
-    if (isMobile) setSidebarOpen(false);
+    if (isTabletOrMobile) setSidebarOpen(false);
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
   /* ─── Sidebar nav content (shared between mobile sheet & desktop) ─── */
-  const renderNav = () => (
-    <nav className="flex flex-col gap-1 p-2">
-      {groups.map((groupKey) => {
-        const groupInfo = GROUP_LABELS[groupKey];
-        const GroupIcon = groupInfo.icon;
-        const items = visibleItems.filter(i => i.group === groupKey);
-        if (items.length === 0) return null;
+  const renderNav = () => {
+    const filteredNavItems = visibleItems.filter(item => {
+      if (item.id === 'overview') return false; // overview is static at the top
+      if (!searchQuerySidebar.trim()) return true;
+      return item.label.toLowerCase().includes(searchQuerySidebar.toLowerCase()) ||
+             item.id.toLowerCase().includes(searchQuerySidebar.toLowerCase());
+    });
 
-        return (
-          <div key={groupKey} className="mb-2">
-            <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <GroupIcon className="w-3.5 h-3.5" />
-              {groupInfo.label}
-            </div>
-            {items.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
+    const groupsToRender = groups.filter(g =>
+      filteredNavItems.some(i => i.group === g)
+    );
+
+    return (
+      <nav className="flex flex-col gap-1 p-2">
+        {/* Sidebar Search */}
+        <div className="px-2 mb-3 relative">
+          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-5 top-2.5" />
+          <Input
+            value={searchQuerySidebar}
+            onChange={(e) => setSearchQuerySidebar(e.target.value)}
+            placeholder="ค้นหาเมนู..."
+            className="h-8 pl-8 pr-3 text-xs bg-background/50 rounded-xl border-border/60 focus-visible:ring-primary/20"
+          />
+        </div>
+
+        {/* Static Overview Page Link */}
+        <div className="px-2 mb-3">
+          <button
+            onClick={() => handleNavClick('overview')}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
+              activeTab === 'overview'
+                ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10 font-semibold'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
+            )}
+          >
+            <LayoutDashboard className={cn('w-4 h-4 shrink-0', activeTab === 'overview' && 'text-primary')} />
+            <span>ภาพรวมระบบ</span>
+            {activeTab === 'overview' && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
+          </button>
+        </div>
+
+        {/* Collapsible Groups */}
+        <div className="flex flex-col gap-1 px-1">
+          {groupsToRender.map((groupKey) => {
+            const groupInfo = GROUP_LABELS[groupKey];
+            const GroupIcon = groupInfo.icon;
+            const items = filteredNavItems.filter(i => i.group === groupKey);
+            const isExpanded = !!expandedGroups[groupKey] || !!searchQuerySidebar.trim();
+
+            return (
+              <div key={groupKey} className="mb-3">
                 <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
-                    isActive
-                      ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10'
-                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
-                  )}
+                  onClick={() => toggleGroup(groupKey)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
-                  <span className="truncate">{item.label}</span>
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
+                  <div className="flex items-center gap-2">
+                    <GroupIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{groupInfo.label}</span>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground/60 shrink-0">
+                    {isExpanded ? '▼' : '►'}
+                  </span>
                 </button>
-              );
-            })}
-          </div>
-        );
-      })}
-    </nav>
-  );
+
+                {isExpanded && (
+                  <div className="mt-1 pl-1 flex flex-col gap-0.5 animate-in fade-in duration-200">
+                    {items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleNavClick(item.id)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
+                            isActive
+                              ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10 font-semibold'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
+                          )}
+                        >
+                          <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
+                          <span className="truncate">{item.label}</span>
+                          {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  };
 
   /* ─── Content area ─── */
   const canAccessPage = (pageId: string) => {
+    if (pageId === 'overview') return true;
     if (isOwner) return true;
     const fromAdmin = user?.is_admin
       ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : true)
@@ -244,6 +324,7 @@ export default function AdminPage() {
   const renderContent = () => {
     try {
       switch (activeTab) {
+        case 'overview': return <AdminDashboardOverview onNavigate={handleNavClick} visibleItems={visibleItems} username={user?.username} />;
         case 'users': return canAccessPage('users') ? <UsersManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
         case 'banned-words': return canAccessPage('banned-words') ? <BannedWordsManagement /> : null;
@@ -327,7 +408,7 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Mobile menu toggle */}
-            {isMobile && (
+            {isTabletOrMobile && (
               <Button
                 variant="outline"
                 size="sm"
@@ -348,7 +429,7 @@ export default function AdminPage() {
       </header>
 
       {/* ─── Mobile nav dropdown ─── */}
-      {isMobile && sidebarOpen && (
+      {isTabletOrMobile && sidebarOpen && (
         <div className="border-b border-border bg-card/95 backdrop-blur-md animate-in slide-in-from-top-2 duration-200 z-40 relative">
           <div className="max-h-[60vh] overflow-y-auto">
             {renderNav()}
@@ -359,7 +440,7 @@ export default function AdminPage() {
       {/* ─── Main layout ─── */}
       <div className="max-w-[1600px] mx-auto flex">
         {/* Desktop sidebar */}
-        {!isMobile && (
+        {!isTabletOrMobile && (
           <aside className="w-60 lg:w-64 shrink-0 border-r border-latte/60 dark:border-border bg-cream/40 dark:bg-card/40 sticky top-[53px] h-[calc(100vh-53px)] overflow-y-auto">
             <div className="py-3">
               {renderNav()}
@@ -383,7 +464,7 @@ export default function AdminPage() {
         <main className="flex-1 min-w-0 p-4 sm:p-6">
           <div className="max-w-6xl mx-auto space-y-6">
           {/* Mobile maintenance toggle */}
-          {isMobile && isOwner && (
+          {isTabletOrMobile && isOwner && (
             <div className="mb-4">
               <MaintenanceToggle
                 isEnabled={isMaintenanceMode}
@@ -657,20 +738,20 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                           <Badge variant="outline" className="text-success border-success text-[10px] sm:text-xs px-1.5 sm:px-2">ปกติ</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right py-2 sm:py-3 px-2 sm:px-4">
-                        <div className="flex justify-end gap-0.5 sm:gap-1">
+                      <TableCell className="text-right py-2.5 sm:py-3.5 px-2 sm:px-4">
+                        <div className="flex justify-end gap-1.5 sm:gap-2">
                           {isOwner && (
                             <>
-                              <Button variant="ghost" size="sm" onClick={() => toggleRole(u.id, 'moderator', !!u.roles?.find(r => r.role === 'moderator'))} title="ให้/ถอดสิทธิ์ Owner" disabled={u.id === currentUser?.id} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                              <Button variant="ghost" size="sm" onClick={() => toggleRole(u.id, 'moderator', !!u.roles?.find(r => r.role === 'moderator'))} title="ให้/ถอดสิทธิ์ Owner" disabled={u.id === currentUser?.id} className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors">
+                                <Shield className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => openPermDialog(u)} title="จัดการสิทธิ์กำหนดเอง" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                                <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                              <Button variant="ghost" size="sm" onClick={() => openPermDialog(u)} title="จัดการสิทธิ์กำหนดเอง" className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors">
+                                <Key className="w-4 h-4" />
                               </Button>
                             </>
                           )}
-                          <Button variant={u.is_banned ? 'outline' : 'ghost'} size="sm" onClick={() => toggleBan(u.id, u.is_banned)} title="แบน/ปลดแบน" disabled={u.id === currentUser?.id} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                            <Ban className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <Button variant={u.is_banned ? 'outline' : 'ghost'} size="sm" onClick={() => toggleBan(u.id, u.is_banned)} title="แบน/ปลดแบน" disabled={u.id === currentUser?.id} className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-colors">
+                            <Ban className="w-4 h-4" />
                           </Button>
                         </div>
                       </TableCell>
