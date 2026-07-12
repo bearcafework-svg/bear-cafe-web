@@ -31,6 +31,7 @@ import {
   Plus, Trash2, Edit, Loader2, ArrowUp, ArrowDown, ExternalLink,
   Layers, ChevronDown, ChevronRight, Eye, EyeOff, Link2,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type DeliveryMode = 'random_one' | 'ordered';
@@ -555,89 +556,112 @@ export function AdPlacementsManagement() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>ชื่อ / Key</TableHead>
-                  <TableHead className="w-[130px]">โหมด</TableHead>
-                  <TableHead className="w-[80px]">โฆษณา</TableHead>
-                  <TableHead className="w-[80px]">สถานะ</TableHead>
-                  <TableHead className="text-right w-[100px]">จัดการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {placements.map(p => {
-                  const expanded = expandedId === p.id;
-                  const count = itemCounts[p.id] ?? 0;
-                  const isWebhook = p.key === 'session_webhook';
-                  return (
-                    <React.Fragment key={p.id}>
-                      <TableRow
-                        className="cursor-pointer hover:bg-muted/30"
-                        onClick={() => setExpandedId(expanded ? null : p.id)}>
-                        <TableCell className="w-8">
-                          {expanded
-                            ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                        </TableCell>
-                        <TableCell>
+            <div className="space-y-4">
+              {placements.map(p => {
+                const expanded = expandedId === p.id;
+                const count = itemCounts[p.id] ?? 0;
+                const isWebhook = p.key === 'session_webhook';
+                return (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "rounded-2xl border border-border/40 bg-card overflow-hidden transition-all shadow-sm",
+                      expanded ? "ring-2 ring-primary/10 border-primary/20" : "hover:border-border/80"
+                    )}
+                  >
+                    {/* Placement Header */}
+                    <div
+                      className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none bg-muted/10 hover:bg-muted/20 transition-colors"
+                      onClick={() => setExpandedId(expanded ? null : p.id)}
+                    >
+                      {/* Left Header info */}
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="mt-1 shrink-0">
+                          {expanded ? (
+                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{p.display_name}</span>
+                            <h3 className="font-bold text-foreground text-sm">{p.display_name}</h3>
                             {isWebhook && (
-                              <Badge variant="outline" className="text-xs gap-1 border-blue-500/20 text-blue-600 dark:text-blue-400 bg-blue-500/5">
+                              <Badge variant="outline" className="text-[10px] gap-1 border-blue-500/20 text-blue-600 dark:text-blue-400 bg-blue-500/5 px-2 py-0.5 rounded-full font-medium">
                                 <Link2 className="w-3 h-3" />ระบบหาเพื่อน
                               </Badge>
                             )}
-                            <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                            <code className="text-[10px] bg-muted px-2 py-0.5 rounded font-mono text-muted-foreground border border-border/30">
                               {p.key}
                             </code>
                           </div>
                           {p.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[320px]">
+                            <p className="text-xs text-muted-foreground max-w-[450px] truncate">
                               {p.description}
                             </p>
                           )}
-                        </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          <DeliveryModeBadge mode={p.delivery_mode} />
-                        </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          <Badge variant="outline" className="text-xs tabular-nums">
-                            {count} ชิ้น
-                          </Badge>
-                        </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          <Switch checked={p.is_active} onCheckedChange={() => toggleActive(p)} />
-                        </TableCell>
-                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDelete(p)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expanded && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="p-0 bg-muted/10">
-                            <PlacementItemsPanel
-                              placement={p}
-                              onItemCountChange={handleItemCountChange}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </div>
+                      </div>
+
+                      {/* Right Header Badges & Actions */}
+                      <div className="flex items-center gap-3 ml-8 md:ml-0 flex-wrap shrink-0 justify-end" onClick={e => e.stopPropagation()}>
+                        <DeliveryModeBadge mode={p.delivery_mode} />
+                        
+                        <Badge variant="secondary" className="text-xs tabular-nums px-2.5 py-0.5 rounded-full border border-border/30 font-medium">
+                          โฆษณา {count} ชิ้น
+                        </Badge>
+                        
+                        <div className="h-4 w-px bg-border/50 mx-1 shrink-0 hidden sm:block" />
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Label htmlFor={`active-placement-${p.id}`} className="text-xs text-muted-foreground cursor-pointer select-none">
+                            เปิดใช้งาน
+                          </Label>
+                          <Switch
+                            id={`active-placement-${p.id}`}
+                            checked={p.is_active}
+                            onCheckedChange={() => toggleActive(p)}
+                          />
+                        </div>
+
+                        <div className="h-4 w-px bg-border/50 mx-1 shrink-0 hidden sm:block" />
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(p)}
+                            title="แก้ไข"
+                            className="h-8 w-8 p-0 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(p)}
+                            title="ลบ"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Placement Body (Expanded nested items) */}
+                    {expanded && (
+                      <div className="bg-card">
+                        <PlacementItemsPanel
+                          placement={p}
+                          onItemCountChange={handleItemCountChange}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

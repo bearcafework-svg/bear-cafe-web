@@ -1294,11 +1294,60 @@ export function TradingHistoryManagement() {
 
         {/* ── Data Tab ── */}
         <TabsContent value="data" className="space-y-4 mt-0">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <Input value={serviceQuery} onChange={e => { setServiceQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาผู้ดำเนินการ" />
-            <Input value={memberQuery} onChange={e => { setMemberQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาผู้ซื้อ" />
-            <Input value={billTypeQuery} onChange={e => { setBillTypeQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาประเภทบิล" />
-            <Input type="date" value={dateQuery} onChange={e => { setDateQuery(e.target.value); setCurrentPage(1); }} />
+          <div className="p-4 rounded-2xl border border-border/40 bg-card/60 shadow-sm space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <Search className="w-3.5 h-3.5 text-primary" /> ค้นหาและกรองบิล
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-semibold text-muted-foreground">ผู้ดำเนินการ</Label>
+                <Input
+                  value={serviceQuery}
+                  onChange={e => { setServiceQuery(e.target.value); setCurrentPage(1); }}
+                  placeholder="ค้นหาผู้ดำเนินการ..."
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-semibold text-muted-foreground">ผู้ซื้อ (Member ID)</Label>
+                <Input
+                  value={memberQuery}
+                  onChange={e => { setMemberQuery(e.target.value); setCurrentPage(1); }}
+                  placeholder="ค้นหาผู้ซื้อ..."
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-semibold text-muted-foreground">ประเภทบิล</Label>
+                <Input
+                  value={billTypeQuery}
+                  onChange={e => { setBillTypeQuery(e.target.value); setCurrentPage(1); }}
+                  placeholder="ค้นหาประเภทบิล..."
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-semibold text-muted-foreground">วันที่ทำรายการ</Label>
+                <div className="relative">
+                  <Input
+                    type="date"
+                    value={dateQuery}
+                    onChange={e => { setDateQuery(e.target.value); setCurrentPage(1); }}
+                    className={cn('h-9 text-xs rounded-xl pr-9 w-full bg-background', !dateQuery && 'text-muted-foreground')}
+                  />
+                  {dateQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                      onClick={() => { setDateQuery(''); setCurrentPage(1); }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {filteredRecords.length === 0 ? (

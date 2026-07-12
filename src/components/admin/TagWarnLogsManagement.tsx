@@ -33,7 +33,7 @@ import {
   RefreshCw, Ban, AlertTriangle, Clock, User, Shield, Hash,
   MessageSquare, Gavel, X, ChevronLeft, ChevronRight,
   EyeOff, Eye, Loader2, Plus, UploadCloud, Trash2,
-  Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send,
+  Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send, Search,
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { cn } from '@/lib/utils';
@@ -103,6 +103,27 @@ function formatPunishLabel(punish: string | null): string {
     .replace('𓂃', '')
     .trim();
   return clean || punish;
+}
+
+function getPunishBadgeStyle(punish: string | null): string {
+  if (!punish) return "bg-muted text-muted-foreground border-border/30";
+  const clean = punish.toLowerCase();
+  if (clean.includes('ชาเขียว')) {
+    return "bg-green-500/10 border-green-500/25 text-green-700 dark:text-green-400";
+  }
+  if (clean.includes('ถ้วยกาแฟ')) {
+    return "bg-amber-500/10 border-amber-500/25 text-amber-800 dark:text-amber-400";
+  }
+  if (clean.includes('ดับเบิ้ลช็อต') || clean.includes('ดับเบิ้ล')) {
+    return "bg-orange-500/10 border-orange-500/25 text-orange-800 dark:text-orange-400";
+  }
+  if (clean.includes('เตะ')) {
+    return "bg-red-500/10 border-red-500/25 text-red-700 dark:text-red-400";
+  }
+  if (clean.includes('แบน')) {
+    return "bg-destructive/15 border-destructive/25 text-destructive";
+  }
+  return "bg-muted text-muted-foreground border-border/30";
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -615,17 +636,59 @@ export function TagWarnLogsManagement() {
       </div>
 
       {/* Search filters */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input value={caseQuery} onChange={(e) => { setCaseQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหาเลขเคส" />
-        <Input value={memberQuery} onChange={(e) => { setMemberQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหา Member ID" />
-        <Input value={baristaQuery} onChange={(e) => { setBaristaQuery(e.target.value); setCurrentPage(1); }} placeholder="ค้นหา Barista ID" />
-        <div className="relative">
-          <Input type="date" value={dateQuery} onChange={(e) => { setDateQuery(e.target.value); setCurrentPage(1); }} className={cn('w-full pr-9', !dateQuery && 'text-muted-foreground')} />
-          {dateQuery && (
-            <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground" onClick={() => { setDateQuery(''); setCurrentPage(1); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+      <div className="p-4 rounded-2xl border border-border/40 bg-card/60 shadow-sm space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <Search className="w-3.5 h-3.5 text-primary" /> ค้นหาและกรองประวัติ
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <Label className="text-[10px] font-semibold text-muted-foreground">เลขเคส</Label>
+            <Input
+              value={caseQuery}
+              onChange={(e) => { setCaseQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="ค้นหาเลขเคส..."
+              className="h-9 text-xs rounded-xl bg-background"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] font-semibold text-muted-foreground">Member ID (ผู้ถูกเตือน)</Label>
+            <Input
+              value={memberQuery}
+              onChange={(e) => { setMemberQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="ค้นหา Member ID..."
+              className="h-9 text-xs rounded-xl bg-background"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] font-semibold text-muted-foreground">Barista ID (ผู้เตือน)</Label>
+            <Input
+              value={baristaQuery}
+              onChange={(e) => { setBaristaQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="ค้นหา Barista ID..."
+              className="h-9 text-xs rounded-xl bg-background"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] font-semibold text-muted-foreground">วันที่ทำรายการ</Label>
+            <div className="relative">
+              <Input
+                type="date"
+                value={dateQuery}
+                onChange={(e) => { setDateQuery(e.target.value); setCurrentPage(1); }}
+                className={cn('h-9 text-xs rounded-xl pr-9 w-full bg-background', !dateQuery && 'text-muted-foreground')}
+              />
+              {dateQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                  onClick={() => { setDateQuery(''); setCurrentPage(1); }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -747,9 +810,11 @@ export function TagWarnLogsManagement() {
                       )}
 
                       {r.punish && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Gavel className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium">{formatPunishLabel(r.punish)}</span>
+                        <div className="flex items-center gap-2">
+                          <Gavel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <Badge variant="outline" className={cn("text-[11px] font-semibold px-2.5 py-0.5 rounded-full border", getPunishBadgeStyle(r.punish))}>
+                            {formatPunishLabel(r.punish)}
+                          </Badge>
                         </div>
                       )}
 

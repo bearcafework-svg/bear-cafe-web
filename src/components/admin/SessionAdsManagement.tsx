@@ -37,6 +37,7 @@ import {
   Megaphone,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
+import { cn } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type SessionAd = {
@@ -512,76 +513,116 @@ export function SessionAdsManagement() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">ลำดับ</TableHead>
-                  <TableHead className="w-[160px]">ภาพตัวอย่าง</TableHead>
-                  <TableHead>ลิงก์</TableHead>
-                  <TableHead className="w-[90px]">สถานะ</TableHead>
-                  <TableHead className="text-right w-[120px]">จัดการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ads.map((ad, index) => (
-                  <TableRow key={ad.id}>
-                    <TableCell>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-6 w-6"
-                          onClick={() => moveAd(ad, 'up')} disabled={index === 0}>
-                          <ArrowUp className="w-3 h-3" />
-                        </Button>
-                        <span className="text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6"
-                          onClick={() => moveAd(ad, 'down')} disabled={index === ads.length - 1}>
-                          <ArrowDown className="w-3 h-3" />
-                        </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {ads.map((ad, index) => (
+                <div
+                  key={ad.id}
+                  className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl border border-border/40 bg-card hover:shadow-sm transition-all"
+                >
+                  {/* Left: Thumbnail & Order Control */}
+                  <div className="flex sm:flex-col items-center gap-2 shrink-0">
+                    <div className="relative aspect-[2.5/1] w-48 rounded-xl overflow-hidden border border-border/30 bg-muted">
+                      <img src={ad.image_url} alt={`ad-${index + 1}`} className="w-full h-full object-cover" />
+                      <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full select-none">
+                        คิวที่ {index + 1}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <img
-                        src={ad.image_url}
-                        alt={`ad-${index + 1}`}
-                        className="w-36 h-[57px] object-cover rounded-lg border border-border/40"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <a href={ad.link_url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-primary hover:underline text-sm max-w-[260px] truncate">
-                        <ExternalLink className="w-3 h-3 shrink-0" />
+                    </div>
+                    {/* Order up/down buttons */}
+                    <div className="flex sm:w-full items-center justify-between gap-1 mt-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 flex-1 hover:bg-muted"
+                        onClick={() => moveAd(ad, 'up')}
+                        disabled={index === 0}
+                        title="เลื่อนขึ้น"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 flex-1 hover:bg-muted"
+                        onClick={() => moveAd(ad, 'down')}
+                        disabled={index === ads.length - 1}
+                        title="เลื่อนลง"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Right: Content details & Actions */}
+                  <div className="flex-1 flex flex-col justify-between min-w-0 space-y-3">
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        {ad.is_active ? (
+                          <Badge className="bg-matcha/15 border-matcha/35 text-matcha hover:bg-matcha/20 border text-[10px] px-2 py-0.5 rounded-full font-medium">
+                            แสดงผลอยู่
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full font-medium border border-border/30">
+                            ปิดการแสดงผล
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* URL button style link */}
+                      <a
+                        href={ad.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium break-all truncate max-w-full block pt-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">{ad.link_url}</span>
                       </a>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={ad.is_active ? 'default' : 'secondary'}
-                        className={ad.is_active ? 'bg-matcha/80 text-white border-0' : ''}>
-                        {ad.is_active
-                          ? <><Eye className="w-3 h-3 mr-1" />แสดง</>
-                          : <><EyeOff className="w-3 h-3 mr-1" />ซ่อน</>}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon"
-                          title={ad.is_active ? 'ซ่อน' : 'แสดง'}
-                          onClick={() => toggleActive(ad)}>
-                          {ad.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(ad)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDelete(ad)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+
+                    {/* Actions block */}
+                    <div className="flex items-center justify-end gap-1.5 border-t border-border/40 pt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleActive(ad)}
+                        title={ad.is_active ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}
+                        className="h-8 px-2 hover:bg-muted rounded-xl text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {ad.is_active ? (
+                          <>
+                            <EyeOff className="w-4 h-4 text-muted-foreground" />
+                            <span>ซ่อน</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-4 h-4 text-primary" />
+                            <span>แสดง</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(ad)}
+                        title="แก้ไข"
+                        className="h-8 w-8 p-0 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(ad)}
+                        title="ลบ"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

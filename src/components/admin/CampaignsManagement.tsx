@@ -607,14 +607,23 @@ export function CampaignsManagement() {
 
   return (
     <Tabs defaultValue="campaigns" className="space-y-6">
-      <TabsList className="w-fit">
-        <TabsTrigger value="campaigns" className="gap-2">
+      <TabsList className="w-fit p-1 bg-muted/60 border border-border/40 rounded-2xl shadow-sm">
+        <TabsTrigger
+          value="campaigns"
+          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
+        >
           <Send className="w-4 h-4" />แคมเปญโฆษณา
         </TabsTrigger>
-        <TabsTrigger value="session-ads" className="gap-2">
+        <TabsTrigger
+          value="session-ads"
+          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
+        >
           <Megaphone className="w-4 h-4" />โฆษณาผ่านระบบ
         </TabsTrigger>
-        <TabsTrigger value="placements" className="gap-2">
+        <TabsTrigger
+          value="placements"
+          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
+        >
           <Images className="w-4 h-4" />Ad Placements
         </TabsTrigger>
       </TabsList>
@@ -1274,79 +1283,7 @@ export function CampaignsManagement() {
             {/* ─── Right Column: Live Preview ─── */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ตัวอย่างแบบเรียลไทม์ (จำลองหน้าจอ Discord)</Label>
-              <div className="bg-[#313338] text-[#dbdee1] p-4 rounded-2xl font-sans text-sm select-none border border-[#1e1f22] shadow-lg max-h-[500px] overflow-y-auto">
-                <div className="flex gap-3 items-start">
-                  {/* Mock Discord Bot Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center shrink-0 text-white font-bold select-none text-xs">
-                    BC
-                  </div>
-                  
-                  {/* Discord Message Content */}
-                  <div className="space-y-1.5 min-w-0 flex-1">
-                    {/* Header info */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-semibold text-white hover:underline cursor-pointer text-[15px]">Bear Cafe Bot</span>
-                      <span className="bg-[#5865F2] text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0 uppercase">BOT</span>
-                      <span className="text-[11px] text-[#949ba4] font-medium">วันนี้ เวลา 12:00 น.</span>
-                    </div>
-                    
-                    {/* Text Content */}
-                    {formData.content_text ? (
-                      <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] whitespace-pre-wrap break-words font-normal">
-                        {formData.content_text}
-                      </div>
-                    ) : (
-                      <div className="text-[14px] text-muted-foreground/40 italic">
-                        พิมพ์ข้อความเพื่อแสดงตัวอย่างแคมเปญ
-                      </div>
-                    )}
-                    
-                    {/* Embed Layout (if there is an image) */}
-                    {(formData.image_url || formData.image_url_2) && (
-                      <div className="flex flex-col gap-2 mt-2 max-w-[520px]">
-                        {formData.image_url && (
-                          <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
-                            <img src={formData.image_url} alt="" className="max-h-[280px] object-cover w-full" />
-                          </div>
-                        )}
-                        {formData.image_url_2 && (
-                          <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
-                            <img src={formData.image_url_2} alt="" className="max-h-[280px] object-cover w-full" />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Buttons preview */}
-                    {((formData.has_button && formData.button_label) || formData.button_2_label) && (
-                      <div className="flex gap-2 flex-wrap pt-2">
-                        {formData.has_button && formData.button_label && (
-                          <button
-                            type="button"
-                            disabled
-                            className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
-                          >
-                            {formData.button_emoji_name && <span className="text-sm">{formData.button_emoji_name}</span>}
-                            <span>{formData.button_label}</span>
-                            <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
-                          </button>
-                        )}
-                        {formData.button_2_label && formData.button_2_url && (
-                          <button
-                            type="button"
-                            disabled
-                            className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
-                          >
-                            {formData.button_2_emoji_name && <span className="text-sm">{formData.button_2_emoji_name}</span>}
-                            <span>{formData.button_2_label}</span>
-                            <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <DiscordLiveMockup formData={formData} />
             </div>
           </div>
 
@@ -1626,5 +1563,690 @@ function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: Schedu
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DiscordSpoiler({ children }: { children: React.ReactNode }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        setRevealed(true);
+      }}
+      className={cn(
+        "cursor-pointer rounded px-1 transition-all text-xs font-sans select-none",
+        revealed
+          ? "bg-white/10 text-inherit cursor-default select-text"
+          : "bg-[#1e1f22] hover:bg-[#232428] text-transparent select-none"
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function renderDiscordMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+
+  // 1. Extract triple-backtick code blocks first to prevent parsing inside them
+  const codeBlocks: string[] = [];
+  let txt = text.replace(/```([a-zA-Z0-9+.-]+)?\n([\s\S]*?)\n```/g, (_, lang, content) => {
+    const id = codeBlocks.length;
+    codeBlocks.push(content);
+    return `\n__TRIPLE_CODE_${id}__\n`;
+  });
+
+  // 2. Extract inline code (single-backtick)
+  const inlineCodes: string[] = [];
+  txt = txt.replace(/`([^`\n]+)`/g, (_, content) => {
+    const id = inlineCodes.length;
+    inlineCodes.push(content);
+    return `__INLINE_CODE_${id}__`;
+  });
+
+  // 3. Extract links [label](url)
+  const mdLinks: { label: string; url: string }[] = [];
+  txt = txt.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+    const id = mdLinks.length;
+    mdLinks.push({ label, url });
+    return `__MD_LINK_${id}__`;
+  });
+
+  // Split into lines to parse line-by-line blocks (headings, quotes, lists)
+  const lines = txt.split('\n');
+  const elements: React.ReactNode[] = [];
+  
+  let inMultiLineQuote = false;
+  let multiLineQuoteLines: string[] = [];
+  
+  // Helper to parse inline styles (bold, italic, strikethrough, underline, spoilers, emojis, mentions)
+  const parseInline = (lineText: string): React.ReactNode => {
+    if (!lineText) return <br />;
+    
+    // We will do a token replacement for bold, italic, etc.
+    let tokens: Array<string | React.ReactNode> = [lineText];
+    
+    // 1. Restore Md Links
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(__MD_LINK_\d+__)/);
+      return parts.map(part => {
+        const match = part.match(/__MD_LINK_(\d+)__/);
+        if (match) {
+          const link = mdLinks[parseInt(match[1])];
+          return (
+            <a key={part} href={link.url} target="_blank" rel="noopener noreferrer" className="text-[#00a8fc] hover:underline cursor-pointer font-medium">
+              {link.label}
+            </a>
+          );
+        }
+        return part;
+      });
+    });
+
+    // 2. Restore Inline Codes
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(__INLINE_CODE_\d+__)/);
+      return parts.map(part => {
+        const match = part.match(/__INLINE_CODE_(\d+)__/);
+        if (match) {
+          return (
+            <code key={part} className="bg-[#1e1f22] text-[#e3e5e8] font-mono px-1 py-0.5 rounded text-[12px] border border-black/10">
+              {inlineCodes[parseInt(match[1])]}
+            </code>
+          );
+        }
+        return part;
+      });
+    });
+
+    // 3. Spoilers ||text||
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(\|\|.*?\|\|)/);
+      return parts.map(part => {
+        if (part.startsWith('||') && part.endsWith('||')) {
+          const inner = part.slice(2, -2);
+          return <DiscordSpoiler key={part}>{parseInline(inner)}</DiscordSpoiler>;
+        }
+        return part;
+      });
+    });
+
+    // 4. Bold-Italic ***text*** or **_text_** etc.
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(\*\*.*?\*\*)/);
+      return parts.map(part => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          const inner = part.slice(2, -2);
+          return <strong key={part} className="font-bold text-white">{parseInline(inner)}</strong>;
+        }
+        return part;
+      });
+    });
+
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(__.*?__)/);
+      return parts.map(part => {
+        if (part.startsWith('__') && part.endsWith('__')) {
+          const inner = part.slice(2, -2);
+          return <span key={part} className="underline">{parseInline(inner)}</span>;
+        }
+        return part;
+      });
+    });
+
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(\*.*?\*)/);
+      return parts.map(part => {
+        if (part.startsWith('*') && part.endsWith('*')) {
+          const inner = part.slice(1, -1);
+          return <em key={part} className="italic">{parseInline(inner)}</em>;
+        }
+        return part;
+      });
+    });
+
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(~~.*?~~)/);
+      return parts.map(part => {
+        if (part.startsWith('~~') && part.endsWith('~~')) {
+          const inner = part.slice(2, -2);
+          return <span key={part} className="line-through opacity-60">{parseInline(inner)}</span>;
+        }
+        return part;
+      });
+    });
+
+    // 5. Custom Emojis <:name:id> or <a:name:id>
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(<a?:[a-zA-Z0-9_~\s-]+:\d+>)/);
+      return parts.map(part => {
+        const emojiMatch = part.match(/<(a)?:([a-zA-Z0-9_~\s-]+):(\d+)>/);
+        if (emojiMatch) {
+          const isAnimated = !!emojiMatch[1];
+          const name = emojiMatch[2];
+          const id = emojiMatch[3];
+          const ext = isAnimated ? 'gif' : 'webp';
+          const src = `https://cdn.discordapp.com/emojis/${id}.${ext}?size=48&quality=lossless`;
+          return (
+            <img
+              key={part}
+              src={src}
+              alt={`:${name}:`}
+              title={`:${name}:`}
+              className="inline-block w-5.5 h-5.5 vertical-text-bottom mx-0.5 object-contain"
+            />
+          );
+        }
+        return part;
+      });
+    });
+
+    // 6. Mentions <@id>, <@&id>, <#id>
+    tokens = tokens.flatMap(t => {
+      if (typeof t !== 'string') return [t];
+      const parts = t.split(/(<@[!&]?\d+>|<#\d+>)/);
+      return parts.map(part => {
+        if (part.startsWith('<@&')) {
+          const id = part.slice(3, -1);
+          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">@role-{id}</span>;
+        } else if (part.startsWith('<@')) {
+          const id = part.slice(part.startsWith('<@!') ? 3 : 2, -1);
+          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">@user-{id}</span>;
+        } else if (part.startsWith('<#')) {
+          const id = part.slice(2, -1);
+          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">#channel-{id}</span>;
+        }
+        return part;
+      });
+    });
+
+    return (
+      <span className="break-words">
+        {tokens.map((tok, idx) => (typeof tok === 'string' ? tok : <React.Fragment key={idx}>{tok}</React.Fragment>))}
+      </span>
+    );
+  };
+
+  // Process line by line
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Handle multiline quote state
+    if (inMultiLineQuote) {
+      multiLineQuoteLines.push(line);
+      if (i === lines.length - 1) {
+        elements.push(
+          <div key={`multi-quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
+            {multiLineQuoteLines.map((l, li) => (
+              <div key={li}>{parseInline(l)}</div>
+            ))}
+          </div>
+        );
+      }
+      continue;
+    }
+
+    // 1. Triple-backtick Code Blocks placeholder restore
+    const tripleCodeMatch = line.match(/^__TRIPLE_CODE_(\d+)__$/);
+    if (tripleCodeMatch) {
+      const codeId = parseInt(tripleCodeMatch[1]);
+      elements.push(
+        <pre key={`code-${i}`} className="bg-[#1e1f22] text-[#e3e5e8] font-mono p-3 rounded-xl text-xs whitespace-pre-wrap block w-full border border-[#232428] my-1.5 select-text overflow-x-auto">
+          {codeBlocks[codeId]}
+        </pre>
+      );
+      continue;
+    }
+
+    // 2. Multiline Quote start
+    if (line.startsWith('>>>')) {
+      inMultiLineQuote = true;
+      const rest = line.slice(3).trim();
+      multiLineQuoteLines = rest ? [rest] : [];
+      if (i === lines.length - 1) {
+        elements.push(
+          <div key={`multi-quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
+            {multiLineQuoteLines.map((l, li) => (
+              <div key={li}>{parseInline(l)}</div>
+            ))}
+          </div>
+        );
+      }
+      continue;
+    }
+
+    // 3. Singleline Quote start
+    if (line.startsWith('>')) {
+      const content = line.slice(1).trim();
+      elements.push(
+        <div key={`quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
+          {parseInline(content)}
+        </div>
+      );
+      continue;
+    }
+
+    // 4. Headings
+    if (line.startsWith('# ')) {
+      elements.push(
+        <h1 key={`h1-${i}`} className="text-xl font-bold text-white border-b border-white/5 pb-1 mt-3 mb-1 select-text">
+          {parseInline(line.slice(2))}
+        </h1>
+      );
+      continue;
+    }
+    if (line.startsWith('## ')) {
+      elements.push(
+        <h2 key={`h2-${i}`} className="text-lg font-bold text-white border-b border-white/5 pb-1 mt-2.5 mb-1 select-text">
+          {parseInline(line.slice(3))}
+        </h2>
+      );
+      continue;
+    }
+    if (line.startsWith('### ')) {
+      elements.push(
+        <h3 key={`h3-${i}`} className="text-base font-bold text-white mt-2 mb-1 select-text">
+          {parseInline(line.slice(4))}
+        </h3>
+      );
+      continue;
+    }
+
+    // 5. Unordered List Items
+    const ulMatch = line.match(/^([*-])\s+(.*)$/);
+    if (ulMatch) {
+      elements.push(
+        <div key={`ul-${i}`} className="flex items-start gap-2 pl-4 py-0.5">
+          <span className="text-muted-foreground select-none shrink-0">•</span>
+          <span className="flex-1">{parseInline(ulMatch[2])}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // 6. Ordered List Items
+    const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
+    if (olMatch) {
+      elements.push(
+        <div key={`ol-${i}`} className="flex items-start gap-2 pl-4 py-0.5">
+          <span className="text-muted-foreground select-none shrink-0 font-medium font-mono text-xs mt-0.5">{olMatch[1]}.</span>
+          <span className="flex-1">{parseInline(olMatch[2])}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // 7. Regular line
+    elements.push(
+      <div key={`line-${i}`} className="min-h-[1rem]">
+        {parseInline(line)}
+      </div>
+    );
+  }
+
+  return <div className="space-y-0.5 select-text">{elements}</div>;
+}
+
+function DiscordEmbedRenderer({ embed }: { embed: any }) {
+  if (!embed || typeof embed !== 'object') return null;
+
+  // Convert decimal color to CSS hex color
+  let hexColor = "";
+  if (embed.color !== undefined) {
+    hexColor = embed.color.toString(16).padStart(6, '0');
+  }
+
+  return (
+    <div
+      style={hexColor ? { borderLeftColor: `#${hexColor}` } : {}}
+      className={cn(
+        "bg-[#2b2d31] rounded-r-lg p-4 border-l-[4px] border-[#1e1f22] text-[#dbdee1] flex gap-3 justify-between my-2 select-text shadow-sm",
+        hexColor ? "" : "border-[#1e1f22]"
+      )}
+    >
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* Author */}
+        {embed.author && (
+          <div className="flex items-center gap-2">
+            {embed.author.icon_url && (
+              <img src={embed.author.icon_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+            )}
+            {embed.author.url ? (
+              <a href={embed.author.url} target="_blank" rel="noopener noreferrer" className="text-white font-semibold text-sm hover:underline">
+                {embed.author.name}
+              </a>
+            ) : (
+              <span className="text-white font-semibold text-sm">{embed.author.name}</span>
+            )}
+          </div>
+        )}
+
+        {/* Title */}
+        {embed.title && (
+          <div>
+            {embed.url ? (
+              <a href={embed.url} target="_blank" rel="noopener noreferrer" className="text-white font-bold text-base hover:underline">
+                {embed.title}
+              </a>
+            ) : (
+              <span className="text-white font-bold text-base">{embed.title}</span>
+            )}
+          </div>
+        )}
+
+        {/* Description */}
+        {embed.description && (
+          <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal whitespace-pre-wrap">
+            {renderDiscordMarkdown(embed.description)}
+          </div>
+        )}
+
+        {/* Fields */}
+        {embed.fields && embed.fields.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 pt-1">
+            {embed.fields.map((f: any, idx: number) => (
+              <div key={idx} className={cn("space-y-0.5", f.inline ? "col-span-1" : "col-span-full")}>
+                <div className="text-xs font-semibold text-[#949ba4]">{f.name}</div>
+                <div className="text-sm text-[#dbdee1] whitespace-pre-wrap">{renderDiscordMarkdown(f.value)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Image */}
+        {embed.image?.url && (
+          <div className="rounded-lg overflow-hidden border border-[#1e1f22] bg-[#232428] mt-2 max-w-[500px]">
+            <img src={embed.image.url} alt="" className="max-h-[300px] object-cover w-full" />
+          </div>
+        )}
+
+        {/* Footer */}
+        {embed.footer && (
+          <div className="flex items-center gap-1.5 text-xs text-[#949ba4] font-medium pt-1">
+            {embed.footer.icon_url && (
+              <img src={embed.footer.icon_url} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+            )}
+            <span>{embed.footer.text}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Thumbnail */}
+      {embed.thumbnail?.url && (
+        <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-[#232428] border border-[#1e1f22]">
+          <img src={embed.thumbnail.url} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscordComponentRenderer({ comp }: { comp: any }) {
+  if (!comp || typeof comp !== 'object') return null;
+
+  switch (comp.type) {
+    case 1: // Action Row
+      return (
+        <div className="flex gap-2 flex-wrap pt-1.5 pb-1">
+          {comp.components?.map((child: any, idx: number) => (
+            <DiscordComponentRenderer key={idx} comp={child} />
+          ))}
+        </div>
+      );
+
+    case 2: // Button
+      {
+        const style = comp.style ?? 2;
+        let btnClass = "";
+        if (style === 1) btnClass = "bg-[#5865F2] hover:bg-[#4752C4] text-white";
+        else if (style === 3) btnClass = "bg-[#248046] hover:bg-[#1a6535] text-white";
+        else if (style === 4) btnClass = "bg-[#da373c] hover:bg-[#a92b2f] text-white";
+        else btnClass = "bg-[#4e5058] hover:bg-[#6d6f78] text-white"; // style 2 and 5
+
+        return (
+          <button
+            type="button"
+            disabled
+            className={cn(
+              "px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0 shadow-sm",
+              btnClass
+            )}
+          >
+            {comp.emoji && (
+              <span className="text-sm shrink-0">
+                {comp.emoji.id ? (
+                  <img
+                    src={`https://cdn.discordapp.com/emojis/${comp.emoji.id}.webp?size=32`}
+                    alt={comp.emoji.name}
+                    className="w-4 h-4 object-contain"
+                  />
+                ) : (
+                  comp.emoji.name
+                )}
+              </span>
+            )}
+            <span>{comp.label}</span>
+            {style === 5 && <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />}
+          </button>
+        );
+      }
+
+    case 17: // V2 Container (card box)
+      return (
+        <div className="border border-[#232428] bg-[#2b2d31] rounded-2xl p-4 my-2 shadow-sm space-y-3">
+          {comp.components?.map((child: any, idx: number) => (
+            <DiscordComponentRenderer key={idx} comp={child} />
+          ))}
+        </div>
+      );
+
+    case 14: // V2 Separator
+      {
+        const spacing = comp.spacing ?? 1;
+        const divider = comp.divider ?? true;
+        let spacingClass = "my-2";
+        if (spacing === 1) spacingClass = "my-1";
+        else if (spacing === 3) spacingClass = "my-4";
+        
+        return (
+          <div className={cn("w-full", spacingClass)}>
+            {divider && <div className="border-t border-[#3f4147]" />}
+          </div>
+        );
+      }
+
+    case 9: // V2 Section
+      return (
+        <div className="flex gap-4 items-start justify-between my-1">
+          <div className="flex-1 min-w-0 space-y-2">
+            {comp.components?.map((child: any, idx: number) => (
+              <DiscordComponentRenderer key={idx} comp={child} />
+            ))}
+          </div>
+          {comp.accessory && (
+            <div className="shrink-0 max-w-[100px] sm:max-w-[150px]">
+              <DiscordComponentRenderer comp={comp.accessory} />
+            </div>
+          )}
+        </div>
+      );
+
+    case 10: // V2 Text Display
+      return (
+        <div className="text-[14px] leading-[1.375rem] text-[#dbdee1]">
+          {renderDiscordMarkdown(comp.content)}
+        </div>
+      );
+
+    case 11: // V2 Media
+      return (
+        <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31] mt-1 max-w-[280px]">
+          <img
+            src={comp.media?.url}
+            alt=""
+            className="max-h-[180px] object-cover w-full"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        </div>
+      );
+
+    case 12: // V2 Media Gallery
+      return (
+        <div className="grid grid-cols-2 gap-2 my-2">
+          {comp.items?.map((item: any, idx: number) => (
+            <div key={idx} className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
+              <img
+                src={item.media?.url}
+                alt=""
+                className="max-h-[220px] object-cover w-full"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            </div>
+          ))}
+        </div>
+      );
+
+    default:
+      return null;
+  }
+}
+
+interface DiscordLiveMockupProps {
+  formData: FormData;
+}
+
+export function DiscordLiveMockup({ formData }: DiscordLiveMockupProps) {
+  const timeString = "วันนี้ เวลา 12:00 น.";
+  
+  // Try parsing the text as JSON
+  let parsedPayload: any = null;
+  let isJsonPayload = false;
+  
+  const trimmedText = (formData.content_text ?? "").trim();
+  if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+    try {
+      parsedPayload = JSON.parse(trimmedText);
+      isJsonPayload = true;
+    } catch {
+      // Not a valid JSON payload
+    }
+  }
+
+  return (
+    <div className="bg-[#313338] text-[#dbdee1] p-4 rounded-2xl font-sans text-sm select-none border border-[#1e1f22] shadow-lg max-h-[600px] overflow-y-auto">
+      <div className="flex gap-3 items-start">
+        {/* Mock Discord Bot Avatar */}
+        <div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center shrink-0 text-white font-bold select-none text-xs">
+          BC
+        </div>
+        
+        {/* Discord Message Content */}
+        <div className="space-y-2 min-w-0 flex-1">
+          {/* Header info */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-white hover:underline cursor-pointer text-[15px]">Bear Cafe Bot</span>
+            <span className="bg-[#5865F2] text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0 uppercase">BOT</span>
+            <span className="text-[11px] text-[#949ba4] font-medium">{timeString}</span>
+          </div>
+          
+          {isJsonPayload && parsedPayload ? (
+            // Render JSON Discohook Payload
+            <div className="space-y-3">
+              {/* 1. Main content */}
+              {parsedPayload.content && (
+                <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal whitespace-pre-wrap">
+                  {renderDiscordMarkdown(parsedPayload.content)}
+                </div>
+              )}
+              
+              {/* 2. Rich Embeds */}
+              {parsedPayload.embeds && Array.isArray(parsedPayload.embeds) && (
+                <div className="space-y-2">
+                  {parsedPayload.embeds.map((emb: any, idx: number) => (
+                    <DiscordEmbedRenderer key={idx} embed={emb} />
+                  ))}
+                </div>
+              )}
+              
+              {/* 3. Rich Components */}
+              {parsedPayload.components && Array.isArray(parsedPayload.components) && (
+                <div className="space-y-1">
+                  {parsedPayload.components.map((comp: any, idx: number) => (
+                    <DiscordComponentRenderer key={idx} comp={comp} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            // Render Standard Campaign Message (Form-based)
+            <div className="space-y-2">
+              {/* Text Content */}
+              {formData.content_text ? (
+                <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal">
+                  {renderDiscordMarkdown(formData.content_text)}
+                </div>
+              ) : (
+                <div className="text-[14px] text-muted-foreground/40 italic">
+                  พิมพ์ข้อความเพื่อแสดงตัวอย่างแคมเปญ
+                </div>
+              )}
+              
+              {/* Embed images */}
+              {(formData.image_url || formData.image_url_2) && (
+                <div className="flex flex-col gap-2 mt-2 max-w-[520px]">
+                  {formData.image_url && (
+                    <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
+                      <img src={formData.image_url} alt="" className="max-h-[280px] object-cover w-full" />
+                    </div>
+                  )}
+                  {formData.image_url_2 && (
+                    <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
+                      <img src={formData.image_url_2} alt="" className="max-h-[280px] object-cover w-full" />
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Form Buttons */}
+              {((formData.has_button && formData.button_label) || formData.button_2_label) && (
+                <div className="flex gap-2 flex-wrap pt-2">
+                  {formData.has_button && formData.button_label && (
+                    <button
+                      type="button"
+                      disabled
+                      className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
+                    >
+                      {formData.button_emoji_name && <span className="text-sm">{formData.button_emoji_name}</span>}
+                      <span>{formData.button_label}</span>
+                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                    </button>
+                  )}
+                  {formData.button_2_label && formData.button_2_url && (
+                    <button
+                      type="button"
+                      disabled
+                      className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
+                    >
+                      {formData.button_2_emoji_name && <span className="text-sm">{formData.button_2_emoji_name}</span>}
+                      <span>{formData.button_2_label}</span>
+                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
