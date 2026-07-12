@@ -274,9 +274,8 @@ export function TradingHistoryManagement() {
   const fetchCatalog = useCallback(async () => {
     const { data } = await (supabase as any)
       .from('product_catalog')
-      .select('id, role_id, display_name, product_type, current_price, is_purchasable, is_active, sort_order')
+      .select('*')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true })
       .order('display_name', { ascending: true });
     if (data) setCatalog(data as ProductCatalogRow[]);
   }, []);
