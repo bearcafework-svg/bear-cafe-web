@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  ArrowLeft, Users, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
+  ArrowLeft, Users, User, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers,
@@ -145,6 +145,13 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState(
     () => section || localStorage.getItem('admin_active_tab') || 'overview'
   );
+
+  useEffect(() => {
+    if (section && section !== activeTab) {
+      setActiveTab(section);
+    }
+  }, [section, activeTab]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuerySidebar, setSearchQuerySidebar] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -420,8 +427,8 @@ export default function AdminPage() {
                 <ChevronRight className={cn('w-3 h-3 transition-transform', sidebarOpen && 'rotate-90')} />
               </Button>
             )}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-base">
-              🐻
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-base text-primary">
+              <User className="w-4 h-4" />
             </div>
             <span className="font-medium hidden lg:block text-sm">{user?.username}</span>
           </div>
@@ -707,7 +714,7 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                           {u.avatar_url ? (
                             <img src={u.avatar_url} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" alt="" />
                           ) : (
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm">🐻</div>
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm text-muted-foreground"><User className="w-4 h-4" /></div>
                           )}
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-[160px]">{u.username}</p>

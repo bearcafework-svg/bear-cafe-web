@@ -276,8 +276,8 @@ export function BulkRoleManagement() {
 
             <div className="p-4 rounded-xl border bg-muted/30 space-y-1">
               <p className="text-sm font-medium">สรุปการดำเนินการ:</p>
-              <p className="text-sm text-muted-foreground">
-                {mode === 'add' ? '✅ เพิ่ม' : '❌ ถอด'}ยศ {targetRoleName || targetRoleId || '...'} จากสมาชิก {selectedMemberIds.size} คน
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                {mode === 'add' ? 'เพิ่ม' : 'ถอด'}ยศ {targetRoleName || targetRoleId || '...'} จากสมาชิก {selectedMemberIds.size} คน
               </p>
             </div>
 

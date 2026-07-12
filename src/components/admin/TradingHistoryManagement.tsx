@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,7 @@ import {
 } from 'recharts';
 import { formatThaiDate } from '@/lib/thai-date';
 import { computeSalmonPreview, computeSalmonDelta } from '@/lib/salmonPoint';
+import fishIcon from '@/assets/fish-icon.png';
 
 const ITEMS_PER_PAGE = 12;
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
@@ -177,6 +179,23 @@ export function TradingHistoryManagement() {
   const [records, setRecords] = useState<UnifiedRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Discord roles mapping for icon & colors
+  const [discordRolesMap, setDiscordRolesMap] = useState<Map<string, { display_name: string; color: string | null; emoji: string | null }>>(new Map());
+
+  // Fetch discord_roles on mount
+  useEffect(() => {
+    supabase.from('discord_roles').select('id, display_name, color, emoji')
+      .then(({ data }) => {
+        if (data) {
+          const map = new Map<string, { display_name: string; color: string | null; emoji: string | null }>();
+          data.forEach(r => {
+            map.set(r.id, { display_name: r.display_name, color: r.color, emoji: r.emoji });
+          });
+          setDiscordRolesMap(map);
+        }
+      });
+  }, []);
 
   // Product catalog
   const [catalog, setCatalog] = useState<ProductCatalogRow[]>([]);
@@ -892,151 +911,236 @@ export function TradingHistoryManagement() {
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" /> สร้างบิลใหม่</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto rounded-2xl">
               <DialogHeader>
-                <DialogTitle>สร้างบิลใหม่</DialogTitle>
+                <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-primary" />
+                  สร้างบิลใหม่
+                </DialogTitle>
                 <DialogDescription>บันทึกการขายเข้าระบบใหม่ (orders + purchase_items)</DialogDescription>
               </DialogHeader>
+
               <div className="space-y-5 py-2">
                 {/* Member / date / bill type */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="memberId">Member ID (ผู้ซื้อ) *</Label>
-                    <Input id="memberId" value={newBill.memberId} onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))} placeholder="Discord ID" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-muted/40 p-4 rounded-2xl border border-border/40">
+                  <div className="space-y-1">
+                    <Label htmlFor="memberId" className="text-xs font-semibold">Member ID (ผู้ซื้อ) *</Label>
+                    <Input id="memberId" value={newBill.memberId} onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))} placeholder="Discord ID" className="h-9 text-xs rounded-xl" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="txDate">วันทำรายการ *</Label>
-                    <Input type="date" id="txDate" value={newBill.transactionDate} onChange={e => setNewBill(p => ({ ...p, transactionDate: e.target.value }))} />
+                  <div className="space-y-1">
+                    <Label htmlFor="txDate" className="text-xs font-semibold">วันทำรายการ *</Label>
+                    <Input type="date" id="txDate" value={newBill.transactionDate} onChange={e => setNewBill(p => ({ ...p, transactionDate: e.target.value }))} className="h-9 text-xs rounded-xl" />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>ประเภทบิล</Label>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">ประเภทบิล</Label>
                     <Select value={newBill.billType} onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
+                      <SelectTrigger className="h-9 text-xs rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectContent className="rounded-xl">
                         <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
                         <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">ระบบเดา QR ให้ แต่แก้เองได้</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>ยอดรวม (คำนวณจากสินค้า)</Label>
-                    <div className="h-10 flex items-center px-3 rounded-md border bg-muted/40 text-sm font-semibold text-primary">
-                      ฿{computedTotalAmount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </div>
-                    {salmonPointPreview !== null && (
-                      <p className="text-xs text-muted-foreground">🐟 Salmon Point ที่จะได้รับ: <span className="font-semibold text-foreground">{salmonPointPreview}</span> แต้ม</p>
-                    )}
                   </div>
                 </div>
 
-                {/* Dropdown 1: เลือกคลาส (class_role, max 1) */}
-                <div className="space-y-2">
-                  <Label className="font-semibold">เลือกคลาสที่ซื้อ <span className="text-muted-foreground font-normal text-xs">(เลือกได้ 0 หรือ 1 รายการ)</span></Label>
-                  {classItems.length === 0
-                    ? <p className="text-xs text-muted-foreground">ไม่มีสินค้าประเภท class_role ที่เปิดขายอยู่</p>
-                    : (
-                      <Select onValueChange={handleSelectClassItem} value={selectedClassItem?.product_id ?? 'none'}>
-                        <SelectTrigger><SelectValue placeholder="เลือกคลาส..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">-- ไม่เลือกคลาส --</SelectItem>
-                          {classItems.map(p => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.display_name}{p.current_price != null ? ` (฿${p.current_price.toLocaleString()})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )
-                  }
-                  {selectedClassItem && (
-                    <div className="rounded-md border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{selectedClassItem.display_name}</span>
-                        <button onClick={() => { setSelectedClassItem(null); }} className="text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                {/* 2-Column Grid: Catalog vs Shopping Cart */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column: Product Catalog */}
+                  <div className="flex flex-col border rounded-2xl p-4 bg-muted/20 h-[380px]">
+                    <h3 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 shrink-0">
+                      <Package className="w-3.5 h-3.5 text-primary" /> เลือกสินค้าใส่ตะกร้า
+                    </h3>
+                    
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                      {/* Class Roles Section */}
+                      <div className="space-y-2">
+                        <h4 className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wide">คลาสเรียน (ยศหลัก — เลือกได้สูงสุด 1 คลาส)</h4>
+                        {classItems.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic pl-1">ไม่มีสินค้าประเภทคลาสเรียน</p>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {classItems.map(p => {
+                              const role = p.role_id ? discordRolesMap.get(p.role_id) : null;
+                              const isAdded = selectedClassItem?.product_id === p.id;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => handleSelectClassItem(p.id)}
+                                  className={cn(
+                                    'w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs transition-all hover:scale-[1.005] active:scale-[0.995]',
+                                    isAdded
+                                      ? 'bg-primary/10 border-primary/50 ring-1 ring-primary/20'
+                                      : 'bg-card border-border/40 hover:bg-muted/40'
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-6 h-6 rounded-lg bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                      {role?.emoji ? (
+                                        <IconDisplay icon={role.emoji} fallback="🎭" size="sm" />
+                                      ) : (
+                                        <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <span className="font-medium text-foreground truncate">{p.display_name}</span>
+                                  </div>
+                                  <span className="font-bold text-primary shrink-0 ml-2">฿{p.current_price?.toLocaleString() ?? 0}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-xs">ราคาที่จ่ายจริง (บาท) *</Label>
-                          <Input type="number" min="0" value={selectedClassItem.price_paid} onChange={e => updateItem('class', selectedClassItem.product_id, 'price_paid', e.target.value)} />
-                        </div>
-                        <div className="flex items-end pb-1 gap-2">
-                          <input type="checkbox" id="class-promo" checked={selectedClassItem.is_promotion}
-                            onChange={e => updateItem('class', selectedClassItem.product_id, 'is_promotion', e.target.checked)} className="w-4 h-4" />
-                          <Label htmlFor="class-promo" className="text-xs cursor-pointer">เป็นโปรโมชัน / ลดราคา</Label>
-                        </div>
+
+                      {/* Other Items Section */}
+                      <div className="space-y-2">
+                        <h4 className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wide font-semibold">ยศตกแต่ง / ของแถม / บริการอื่น ๆ</h4>
+                        {otherItems.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic pl-1">ไม่มีสินค้าอื่นที่เปิดขายอยู่</p>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {otherItems.map(p => {
+                              const role = p.role_id ? discordRolesMap.get(p.role_id) : null;
+                              const isAdded = !!selectedOtherItems.find(i => i.product_id === p.id);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => isAdded ? handleRemoveOtherItem(p.id) : handleAddOtherItem(p.id)}
+                                  className={cn(
+                                    'w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs transition-all hover:scale-[1.005] active:scale-[0.995]',
+                                    isAdded
+                                      ? 'bg-primary/10 border-primary/50 ring-1 ring-primary/20'
+                                      : 'bg-card border-border/40 hover:bg-muted/40'
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-6 h-6 rounded-lg bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                      {role?.emoji ? (
+                                        <IconDisplay icon={role.emoji} fallback="🎭" size="sm" />
+                                      ) : (
+                                        <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <span className="font-medium text-foreground truncate">{p.display_name}</span>
+                                  </div>
+                                  <span className="font-bold text-primary shrink-0 ml-2">฿{p.current_price?.toLocaleString() ?? 0}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      {selectedClassItem.is_promotion && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">ราคาเต็มก่อนลด (original_price) *</Label>
-                          <Input type="number" min="0" value={selectedClassItem.original_price} onChange={e => updateItem('class', selectedClassItem.product_id, 'original_price', e.target.value)} placeholder="ราคาปกติก่อนโปรโมชัน" />
+                    </div>
+                  </div>
+
+                  {/* Right Column: Shopping Cart & Price Details */}
+                  <div className="flex flex-col border rounded-2xl p-4 bg-muted/20 h-[380px]">
+                    <h3 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 shrink-0">
+                      <ShoppingCart className="w-3.5 h-3.5 text-primary" /> ตะกร้าสินค้า ({allSelectedItems.length})
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+                      {allSelectedItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs py-10">
+                          <ShoppingCart className="w-8 h-8 opacity-20 mb-2" />
+                          <span>ไม่มีสินค้าในตะกร้า</span>
+                        </div>
+                      ) : (
+                        allSelectedItems.map(item => {
+                          const catProduct = catalog.find(c => c.id === item.product_id);
+                          const role = catProduct?.role_id ? discordRolesMap.get(catProduct.role_id) : null;
+                          const which = item.product_type === 'class_role' ? 'class' : 'other';
+                          return (
+                            <div key={item.product_id} className="p-3 bg-card border border-border/40 rounded-xl space-y-2 relative shadow-sm">
+                              <div className="flex items-start justify-between gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-5 h-5 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                    {role?.emoji ? (
+                                      <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
+                                    ) : (
+                                      <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-bold truncate text-foreground">{item.display_name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => which === 'class' ? setSelectedClassItem(null) : handleRemoveOtherItem(item.product_id)}
+                                  className="text-muted-foreground hover:text-destructive shrink-0"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-0.5">
+                                  <Label className="text-[10px] text-muted-foreground font-semibold">ราคาขายจริง (บาท) *</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={item.price_paid}
+                                    onChange={e => updateItem(which, item.product_id, 'price_paid', e.target.value)}
+                                    className="h-7 text-xs px-2 rounded-lg"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5 pt-4 pl-1">
+                                  <input
+                                    type="checkbox"
+                                    id={`promo-${item.product_id}`}
+                                    checked={item.is_promotion}
+                                    onChange={e => updateItem(which, item.product_id, 'is_promotion', e.target.checked)}
+                                    className="w-3.5 h-3.5 rounded border-gray-300"
+                                  />
+                                  <Label htmlFor={`promo-${item.product_id}`} className="text-[10px] cursor-pointer select-none">โปรโมชัน</Label>
+                                </div>
+                              </div>
+
+                              {item.is_promotion && (
+                                <div className="space-y-0.5 pt-0.5">
+                                  <Label className="text-[10px] text-muted-foreground font-semibold">ราคาเต็มก่อนลด *</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={item.original_price}
+                                    onChange={e => updateItem(which, item.product_id, 'original_price', e.target.value)}
+                                    className="h-7 text-xs px-2 rounded-lg"
+                                    placeholder="ราคาปกติ"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Cart Summary */}
+                    <div className="border-t border-border/40 pt-2.5 mt-2.5 space-y-1.5 shrink-0">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">ยอดรวมทั้งหมด:</span>
+                        <span className="font-bold text-sm text-primary">฿{computedTotalAmount.toLocaleString()}</span>
+                      </div>
+                      {salmonPointPreview !== null && (
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground bg-secondary/50 px-2 py-1.5 rounded-xl border border-border/40">
+                          <span className="flex items-center gap-1"><img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /> Salmon Points:</span>
+                          <span className="font-bold text-foreground">+{salmonPointPreview} แต้ม</span>
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-
-                {/* Dropdown 2: ของแถม / บริการอื่นๆ (multi) */}
-                <div className="space-y-2">
-                  <Label className="font-semibold">ของแถม / บริการอื่นๆ <span className="text-muted-foreground font-normal text-xs">(เลือกได้หลายรายการ)</span></Label>
-                  {otherItems.length === 0
-                    ? <p className="text-xs text-muted-foreground">ไม่มีสินค้าอื่นที่เปิดขายอยู่</p>
-                    : (
-                      <Select onValueChange={handleAddOtherItem} value="">
-                        <SelectTrigger><SelectValue placeholder="เพิ่มสินค้า / บริการ..." /></SelectTrigger>
-                        <SelectContent>
-                          {otherItems.map(p => (
-                            <SelectItem key={p.id} value={p.id} disabled={!!selectedOtherItems.find(i => i.product_id === p.id)}>
-                              {p.display_name}{p.current_price != null ? ` (฿${p.current_price.toLocaleString()})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )
-                  }
-                  {selectedOtherItems.length > 0 && (
-                    <div className="space-y-2">
-                      {selectedOtherItems.map(item => (
-                        <div key={item.product_id} className="rounded-md border p-3 space-y-2 bg-muted/30">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">{item.display_name}</span>
-                            <button onClick={() => handleRemoveOtherItem(item.product_id)} className="text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <Label className="text-xs">ราคาที่จ่ายจริง (บาท) *</Label>
-                              <Input type="number" min="0" value={item.price_paid} onChange={e => updateItem('other', item.product_id, 'price_paid', e.target.value)} />
-                            </div>
-                            <div className="flex items-end pb-1 gap-2">
-                              <input type="checkbox" id={`other-promo-${item.product_id}`} checked={item.is_promotion}
-                                onChange={e => updateItem('other', item.product_id, 'is_promotion', e.target.checked)} className="w-4 h-4" />
-                              <Label htmlFor={`other-promo-${item.product_id}`} className="text-xs cursor-pointer">เป็นโปรโมชัน</Label>
-                            </div>
-                          </div>
-                          {item.is_promotion && (
-                            <div className="space-y-1">
-                              <Label className="text-xs">ราคาเต็มก่อนลด *</Label>
-                              <Input type="number" min="0" value={item.original_price} onChange={e => updateItem('other', item.product_id, 'original_price', e.target.value)} />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Slip upload */}
-                <div className="space-y-2">
-                  <Label>หลักฐานการโอน (1-2 รูป) *</Label>
-                  <Input type="file" multiple accept="image/*" onChange={handleFileChange} className="cursor-pointer" />
+                <div className="space-y-1.5 bg-muted/40 p-4 rounded-2xl border border-border/40">
+                  <Label className="text-xs font-semibold">หลักฐานการโอน (สลิป 1-2 รูป) *</Label>
+                  <Input type="file" multiple accept="image/*" onChange={handleFileChange} className="cursor-pointer h-9 text-xs rounded-xl" />
                   {selectedFiles.length > 0 && (
                     <div className="flex gap-2 mt-2">
                       {selectedFiles.map((f, i) => (
                         <div key={i} className="relative group">
-                          <img src={previewUrls[i]} alt={f.name} className="w-20 h-20 object-cover rounded-lg border border-border" />
-                          <button onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md"><X className="h-3 w-3" /></button>
+                          <img src={previewUrls[i]} alt={f.name} className="w-16 h-16 object-cover rounded-xl border" />
+                          <button onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full p-0.5 shadow-md"><X className="h-3 w-3" /></button>
                         </div>
                       ))}
                     </div>
@@ -1044,8 +1148,8 @@ export function TradingHistoryManagement() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading}>ยกเลิก</Button>
-                <Button onClick={handleAddBill} disabled={addLoading} className="gap-2">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading} className="rounded-xl">ยกเลิก</Button>
+                <Button onClick={handleAddBill} disabled={addLoading} className="gap-2 rounded-xl">
                   {addLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />} สร้างบิล
                 </Button>
               </DialogFooter>
@@ -1241,7 +1345,7 @@ export function TradingHistoryManagement() {
                         </div>
                         {r.type_bill && <Badge variant="secondary" className="text-[10px]">{r.type_bill}</Badge>}
                         <div className="flex items-center gap-1 text-xs text-honey font-semibold">
-                          <span>🐟</span><span>{computeSalmonDelta(r.total_amount)}</span>
+                          <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /><span>{computeSalmonDelta(r.total_amount)}</span>
                         </div>
                       </div>
 
@@ -1255,38 +1359,53 @@ export function TradingHistoryManagement() {
                         )}
                         {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
                           <div className="space-y-1.5">
-                            {r.purchase_items.map(item => (
-                              <div key={item.id} className="text-xs">
-                                {item.is_promotion ? (
-                                  <div className="rounded-md border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 space-y-0.5">
-                                    <div className="flex items-center gap-1 font-medium">
-                                      <Tag className="h-3 w-3 text-amber-600" />
-                                      <span>{item.product_display_name}</span>
-                                      <Badge className="text-[9px] h-4 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-0 ml-1">โปรโมชัน</Badge>
-                                    </div>
-                                    {item.original_price != null && (
-                                      <div className="text-muted-foreground">
-                                        ราคาเต็ม <span className="line-through">฿{formatCurrency(item.original_price)}</span>
-                                        {' → '}
-                                        <span className="font-semibold text-foreground">จ่ายจริง ฿{formatCurrency(item.price_paid)}</span>
-                                        {' '}
-                                        <span className="text-success">
-                                          (ลด {Math.round((1 - item.price_paid / item.original_price) * 100)}%)
-                                        </span>
+                            {r.purchase_items.map(item => {
+                              const catProduct = catalog.find(c => c.id === item.product_id);
+                              const role = catProduct?.role_id ? discordRolesMap.get(catProduct.role_id) : null;
+                              return (
+                                <div key={item.id} className="text-xs">
+                                  {item.is_promotion ? (
+                                    <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 space-y-0.5">
+                                      <div className="flex items-center gap-1 font-medium flex-wrap">
+                                        <div className="w-4 h-4 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                          {role?.emoji ? (
+                                            <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
+                                          ) : (
+                                            <Tag className="h-3 w-3 text-amber-600" />
+                                          )}
+                                        </div>
+                                        <span className="truncate max-w-[150px]">{item.product_display_name}</span>
+                                        <Badge className="text-[9px] h-4 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-0 ml-1">โปรโมชัน</Badge>
                                       </div>
-                                    )}
-                                    {item.original_price == null && (
-                                      <div className="text-foreground font-semibold">฿{formatCurrency(item.price_paid)}</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-foreground">{item.product_display_name}</span>
-                                    <span className="font-medium text-primary">฿{formatCurrency(item.price_paid)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                                      {item.original_price != null && (
+                                        <div className="text-[10px] text-muted-foreground font-medium">
+                                          ราคาเต็ม <span className="line-through">฿{formatCurrency(item.original_price)}</span>
+                                          {' → '}
+                                          <span className="font-semibold text-foreground">จ่ายจริง ฿{formatCurrency(item.price_paid)}</span>
+                                        </div>
+                                      )}
+                                      {item.original_price == null && (
+                                        <div className="text-foreground font-semibold">฿{formatCurrency(item.price_paid)}</div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-between py-0.5 border-b border-border/10 last:border-b-0">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="w-4.5 h-4.5 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                          {role?.emoji ? (
+                                            <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
+                                          ) : (
+                                            <Package className="w-3 h-3 text-muted-foreground" />
+                                          )}
+                                        </div>
+                                        <span className="text-foreground truncate">{item.product_display_name}</span>
+                                      </div>
+                                      <span className="font-medium text-primary">฿{formatCurrency(item.price_paid)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         {r.source === 'new' && (!r.purchase_items || r.purchase_items.length === 0) && (
@@ -1409,7 +1528,7 @@ export function TradingHistoryManagement() {
               <div className="flex justify-between"><span className="text-muted-foreground">ผู้ซื้อ</span><span className="font-medium">{resolveDisplayName(embedTarget.member_id).name}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">ยอดบิลนี้</span><span className="font-bold text-primary">{formatCurrency(embedTarget.total_amount)} บาท</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">ยอดรวมทั้งหมด</span><span className="font-bold">{formatCurrency(totalAmountByMember.get(embedTarget.member_id) ?? 0)} บาท</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">🐟 Salmon Point</span><span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground flex items-center gap-1"><img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /> Salmon Point</span><span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span></div>
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">

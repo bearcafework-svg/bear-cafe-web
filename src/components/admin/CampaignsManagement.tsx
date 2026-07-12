@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -928,7 +928,7 @@ export function CampaignsManagement() {
 
             {testSendChannel && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                 <span>
                   จะส่งไปยัง{' '}
                   <span className="font-medium text-foreground">
@@ -946,7 +946,7 @@ export function CampaignsManagement() {
             <Button
               onClick={handleTestSend}
               disabled={!testSendChannel || isSendingTest}
-              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              className="gap-2"
             >
               {isSendingTest ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

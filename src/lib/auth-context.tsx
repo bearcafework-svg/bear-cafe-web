@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { useLocation } from 'react-router-dom';
 
 interface User {
   id: string;
@@ -265,15 +266,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch (error) { console.error('[Auth] Failed to refresh user profile:', error); }
   }, [fetchUserProfileWithTimeout, session?.user]);
 
-  const value = useMemo(() => ({
-    user,
-    session,
-    isLoading,
-    isAuthenticated: !!session && !!user,
-    login,
-    logout,
-    refreshUser,
-  }), [isLoading, login, logout, refreshUser, session, user]);
+  const location = useLocation();
+  const devBypassActive = import.meta.env.DEV && location.pathname.startsWith('/admin');
+
+  const value = useMemo(() => {
+    if (devBypassActive) {
+      const mockAdminUser: User = {
+        id: 'mock-admin-id',
+        username: 'Mock Administrator (Local Dev)',
+        discord_username: 'mock_admin',
+        avatar_url: null,
+        banner_url: null,
+        discord_id: '123456789012345678',
+        is_admin: true,
+        is_owner: true,
+        is_banned: false,
+        ban_reason: null,
+        allowed_pages: ['users', 'banned-roles', 'banned-words', 'tag-warn', 'contracts', 'healing-messages', 'trading-history', 'role-transfer', 'bulk-role-manage', 'reports', 'categories', 'banners', 'roles', 'checkin-rewards', 'campaigns', 'product-catalog', 'discord-servers', 'redeem-codes', 'non-transferable-roles', 'roles-to-delete', 'permissions'],
+      };
+      return {
+        user: mockAdminUser,
+        session: {
+          access_token: 'mock-token',
+          token_type: 'bearer',
+          expires_in: 3600,
+          refresh_token: 'mock-refresh',
+          user: { id: 'mock-admin-id', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        isLoading: false,
+        isAuthenticated: true,
+        login: async () => {},
+        logout: () => { window.location.href = '/'; },
+        refreshUser: async () => {},
+      };
+    }
+
+    return {
+      user,
+      session,
+      isLoading,
+      isAuthenticated: !!session && !!user,
+      login,
+      logout,
+      refreshUser,
+    };
+  }, [isLoading, login, logout, refreshUser, session, user, devBypassActive]);
 
   return (
     <AuthContext.Provider value={value}>

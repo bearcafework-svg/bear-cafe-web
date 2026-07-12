@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
-import { ShieldBan, Plus, Trash2, Search, AlertTriangle, Loader2, Pencil, Check } from 'lucide-react';
+import { ShieldBan, Shield, Plus, Trash2, Search, AlertTriangle, Loader2, Pencil, Check } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { BulkDeleteToolbar } from '@/components/admin/BulkDeleteToolbar';
@@ -385,7 +385,13 @@ export function NonTransferableRolesManagement() {
                                 onClick={e => e.stopPropagation()}
                               />
                               <div className="flex items-center gap-2 min-w-0 flex-1">
-                                {role.unicode_emoji && <span className="text-sm">{role.unicode_emoji}</span>}
+                                {role.icon ? (
+                                  <img src={role.icon} alt="" className="w-4 h-4 rounded-sm object-cover shrink-0" />
+                                ) : role.color ? (
+                                  <div className="w-3 h-3 rounded-full shrink-0 border border-border/40" style={{ backgroundColor: role.color }} />
+                                ) : (
+                                  <Shield className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                )}
                                 <span className="text-sm font-medium truncate" style={{ color: role.color || undefined }}>
                                   {role.name}
                                 </span>

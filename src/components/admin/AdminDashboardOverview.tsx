@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Users, Flag, ShieldAlert, Settings, ChevronRight, RefreshCw
+  Users, Flag, ShieldAlert, Settings, ChevronRight, RefreshCw, Coffee, Sparkles
 } from 'lucide-react';
 import { AdminPageDef } from '@/lib/admin-pages';
 import { cn } from '@/lib/utils';
@@ -110,7 +110,7 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-accent/5 to-peach/10 border border-primary/10 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
         <div className="space-y-2 z-10">
           <h2 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            สวัสดีคุณ {username || 'Barista'}! 🐻☕
+            สวัสดีคุณ {username || 'Barista'}!
           </h2>
           <p className="text-sm text-muted-foreground max-w-xl">
             ยินดีต้อนรับกลับสู่ร้าน Bear Cafe วันนี้ต้องการปรับแต่งข้อมูลส่วนใด หรือมีรายงานชิ้นใหม่ที่ต้องให้ดูแลจัดการไหมคะ?
@@ -127,7 +127,7 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
             <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} />
             อัปเดตข้อมูล
           </Button>
-          <div className="text-4xl select-none hidden md:block animate-pulse duration-3000">☕🐻🥞</div>
+          <div className="text-primary/60 hidden md:block animate-pulse duration-3000"><Coffee className="w-8 h-8" /></div>
         </div>
         {/* Soft decorative background circles */}
         <div className="absolute -right-16 -bottom-16 w-48 h-48 rounded-full bg-primary/5 blur-3xl" />

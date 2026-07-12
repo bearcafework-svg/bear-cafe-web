@@ -17,9 +17,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Plus, Pencil, Trash2, UserPlus, UserMinus, Key, Shield, Users, ChevronDown, ChevronUp,
+  Plus, Pencil, Trash2, UserPlus, UserMinus, Key, Shield, Users, User, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
+import { cn } from '@/lib/utils';
 
 import { ASSIGNABLE_PAGES, getPermissionGroups } from '@/lib/admin-pages';
 
@@ -75,6 +76,7 @@ export function PermissionsManagement() {
   const [allUsers, setAllUsers] = useState<UserWithPermissions[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [assignTab, setAssignTab] = useState<'current' | 'add'>('current');
 
   // All assigned users (for cards + grouped view)
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
@@ -224,19 +226,13 @@ export function PermissionsManagement() {
     );
   }
 
-  // Bulk selection for assign dialog
-  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkMode, setBulkMode] = useState<'add' | 'remove' | null>(null);
-  const [bulkProcessing, setBulkProcessing] = useState(false);
-
   /* ─── Assign users ─── */
   async function openAssignDialog(perm: CustomPermission) {
     setAssignPermission(perm);
     setUserSearch('');
     setAssignDialogOpen(true);
     setLoadingUsers(true);
-    setBulkSelectedIds(new Set());
-    setBulkMode(null);
+    setAssignTab('current');
     try {
       const [{ data: profiles }, { data: assignments }] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url, discord_id').order('username'),
@@ -257,59 +253,6 @@ export function PermissionsManagement() {
       console.error(e);
     } finally {
       setLoadingUsers(false);
-    }
-  }
-
-  function toggleBulkSelect(userId: string) {
-    setBulkSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-  }
-
-  function selectAllFiltered(mode: 'add' | 'remove') {
-    const ids = filteredAssignUsers
-      .filter(u => {
-        const has = u.permissions.some(p => p.permission_id === assignPermission?.id);
-        return mode === 'add' ? !has : has;
-      })
-      .map(u => u.id);
-    setBulkSelectedIds(new Set(ids));
-    setBulkMode(mode);
-  }
-
-  async function executeBulkAction() {
-    if (!assignPermission || bulkSelectedIds.size === 0 || !bulkMode) return;
-    setBulkProcessing(true);
-    try {
-      if (bulkMode === 'add') {
-        const inserts = [...bulkSelectedIds].map(uid => ({
-          user_id: uid,
-          permission_id: assignPermission.id,
-          assigned_by: user?.id,
-        }));
-        const { error } = await supabase.from('user_custom_permissions').insert(inserts);
-        if (error) throw error;
-        toast({ title: `เพิ่มสิทธิ์ให้ ${inserts.length} คนแล้ว` });
-      } else {
-        const { error } = await supabase
-          .from('user_custom_permissions')
-          .delete()
-          .in('user_id', [...bulkSelectedIds])
-          .eq('permission_id', assignPermission.id);
-        if (error) throw error;
-        toast({ title: `ถอดสิทธิ์จาก ${bulkSelectedIds.size} คนแล้ว` });
-      }
-      setBulkSelectedIds(new Set());
-      setBulkMode(null);
-      openAssignDialog(assignPermission);
-      fetchAssignedUsers();
-    } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
-    } finally {
-      setBulkProcessing(false);
     }
   }
 
@@ -341,8 +284,8 @@ export function PermissionsManagement() {
     const q = userSearch.toLowerCase().trim();
     if (!q) return true;
     return (
-      u.username.toLowerCase().includes(q) ||
-      u.discord_id.includes(q) ||
+      (u.username ?? '').toLowerCase().includes(q) ||
+      (u.discord_id ?? '').includes(q) ||
       ((u as any).discord_username ?? '').toLowerCase().includes(q)
     );
   });
@@ -426,7 +369,7 @@ export function PermissionsManagement() {
                               m.avatar_url ? (
                                 <img key={m.user_id} src={m.avatar_url} className="w-5 h-5 rounded-full border-2 border-background" alt="" />
                               ) : (
-                                <div key={m.user_id} className="w-5 h-5 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[8px]">🐻</div>
+                                <div key={m.user_id} className="w-5 h-5 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[8px] text-muted-foreground"><User className="w-2.5 h-2.5" /></div>
                               )
                             ))}
                             {members.length > 5 && (
@@ -446,7 +389,7 @@ export function PermissionsManagement() {
                                 {m.avatar_url ? (
                                   <img src={m.avatar_url} className="w-5 h-5 rounded-full shrink-0" alt="" />
                                 ) : (
-                                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0 text-[10px]">🐻</div>
+                                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0 text-[10px] text-muted-foreground"><User className="w-2.5 h-2.5" /></div>
                                 )}
                                 <span className="text-xs truncate">{m.username}</span>
                               </div>
@@ -504,24 +447,35 @@ export function PermissionsManagement() {
               </div>
             </div>
             <div>
-              <Label>หน้าที่เข้าถึงได้ *</Label>
-              <div className="mt-2 space-y-3">
+              <Label className="text-xs font-semibold">หน้าที่เข้าถึงได้ *</Label>
+              <div className="mt-2 space-y-4">
                 {groups.map(group => (
-                  <div key={group}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{group}</p>
+                  <div key={group} className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">{group}</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {PAGE_OPTIONS.filter(p => p.group === group).map(page => (
-                        <label
-                          key={page.id}
-                          className="flex items-center gap-2 text-sm cursor-pointer p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <Checkbox
-                            checked={formPages.includes(page.id)}
-                            onCheckedChange={() => togglePage(page.id)}
-                          />
-                          {page.label}
-                        </label>
-                      ))}
+                      {PAGE_OPTIONS.filter(p => p.group === group).map(page => {
+                        const isChecked = formPages.includes(page.id);
+                        return (
+                          <button
+                            key={page.id}
+                            type="button"
+                            onClick={() => togglePage(page.id)}
+                            className={cn(
+                              'flex items-center gap-2.5 p-2.5 rounded-xl border text-xs text-left transition-all hover:scale-[1.01]',
+                              isChecked
+                                ? 'bg-primary/10 border-primary/50 text-primary font-semibold ring-1 ring-primary/10'
+                                : 'bg-card border-border/40 hover:bg-muted/40 text-muted-foreground'
+                            )}
+                          >
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() => togglePage(page.id)}
+                              className="pointer-events-none"
+                            />
+                            <span className="truncate">{page.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -529,8 +483,8 @@ export function PermissionsManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">ยกเลิก</Button>
+            <Button onClick={handleSave} disabled={saving} className="rounded-xl">
               {saving ? 'กำลังบันทึก...' : editingPermission ? 'อัปเดต' : 'สร้าง'}
             </Button>
           </DialogFooter>
@@ -539,7 +493,7 @@ export function PermissionsManagement() {
 
       {/* ─── Delete Confirm ─── */}
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>ลบสิทธิ์ "{deleteTarget?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -547,8 +501,8 @@ export function PermissionsManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel className="rounded-xl">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl">
               ลบ
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -556,123 +510,88 @@ export function PermissionsManagement() {
       </AlertDialog>
 
       {/* ─── Assign Users Dialog ─── */}
-      <Dialog open={assignDialogOpen} onOpenChange={(open) => {
-        setAssignDialogOpen(open);
-        if (!open) { setBulkSelectedIds(new Set()); setBulkMode(null); }
-      }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5" />
-              จัดการผู้ใช้ — {assignPermission?.name}
+              <Shield className="w-5 h-5 text-primary" />
+              จัดการสิทธิ์การเข้าถึง — {assignPermission?.name}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Search + Bulk actions */}
-          <div className="space-y-2">
-            <SearchBar value={userSearch} onChange={setUserSearch} placeholder="ค้นหาผู้ใช้, Discord ID, username..." />
-
-            {/* Bulk action bar */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant={bulkMode === 'add' ? 'default' : 'outline'}
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => {
-                  if (bulkMode === 'add') { setBulkMode(null); setBulkSelectedIds(new Set()); }
-                  else { setBulkMode('add'); setBulkSelectedIds(new Set()); }
-                }}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                เพิ่มหลายคน
-              </Button>
-              <Button
-                variant={bulkMode === 'remove' ? 'destructive' : 'outline'}
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => {
-                  if (bulkMode === 'remove') { setBulkMode(null); setBulkSelectedIds(new Set()); }
-                  else { setBulkMode('remove'); setBulkSelectedIds(new Set()); }
-                }}
-              >
-                <UserMinus className="w-3.5 h-3.5" />
-                ถอดหลายคน
-              </Button>
-
-              {bulkMode && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs ml-auto"
-                    onClick={() => selectAllFiltered(bulkMode)}
-                  >
-                    เลือกทั้งหมด
-                  </Button>
-                  {bulkSelectedIds.size > 0 && (
-                    <Button
-                      variant={bulkMode === 'remove' ? 'destructive' : 'default'}
-                      size="sm"
-                      className="h-7 text-xs gap-1"
-                      onClick={executeBulkAction}
-                      disabled={bulkProcessing}
-                    >
-                      {bulkProcessing ? 'กำลังดำเนินการ...' : (
-                        bulkMode === 'add'
-                          ? `เพิ่มสิทธิ์ (${bulkSelectedIds.size})`
-                          : `ถอดสิทธิ์ (${bulkSelectedIds.size})`
-                      )}
-                    </Button>
-                  )}
-                </>
+          {/* Simple Tab Toggles */}
+          <div className="flex border-b border-border/40 mb-3">
+            <button
+              onClick={() => { setAssignTab('current'); setUserSearch(''); }}
+              className={cn(
+                'flex-1 py-2 text-center text-xs font-semibold border-b-2 transition-all',
+                assignTab === 'current'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
-            </div>
+            >
+              สมาชิกปัจจุบัน ({allUsers.filter(u => u.permissions.some(p => p.permission_id === assignPermission?.id)).length})
+            </button>
+            <button
+              onClick={() => { setAssignTab('add'); setUserSearch(''); }}
+              className={cn(
+                'flex-1 py-2 text-center text-xs font-semibold border-b-2 transition-all',
+                assignTab === 'add'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              เพิ่มสมาชิกใหม่
+            </button>
           </div>
 
-          {loadingUsers ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">กำลังโหลด...</div>
-          ) : (
-            <div className="max-h-[50vh] overflow-y-auto space-y-1">
-              {filteredAssignUsers.map(u => {
-                const hasThisPerm = u.permissions.some(p => p.permission_id === assignPermission?.id);
-                const isSelected = bulkSelectedIds.has(u.id);
-                const showCheckbox = bulkMode && ((bulkMode === 'add' && !hasThisPerm) || (bulkMode === 'remove' && hasThisPerm));
+          {/* Search bar */}
+          <SearchBar value={userSearch} onChange={setUserSearch} placeholder="ค้นหาตามชื่อ หรือ Discord ID..." />
 
-                return (
+          {loadingUsers ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">กำลังโหลดรายชื่อผู้ใช้...</div>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto space-y-1.5 pt-2">
+              {(() => {
+                const isCurrent = assignTab === 'current';
+                const usersList = filteredAssignUsers.filter(u => {
+                  const hasPerm = u.permissions.some(p => p.permission_id === assignPermission?.id);
+                  return isCurrent ? hasPerm : !hasPerm;
+                });
+
+                if (usersList.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-xs text-muted-foreground italic bg-muted/25 rounded-2xl border border-dashed border-border/40 p-4">
+                      {isCurrent ? 'ยังไม่มีสมาชิกกลุ่มสิทธิ์นี้' : 'ไม่พบผู้ใช้ที่ต้องการเพิ่ม'}
+                    </div>
+                  );
+                }
+
+                return usersList.map(u => (
                   <div
                     key={u.id}
-                    className={`flex items-center justify-between gap-2 p-2 rounded-lg transition-colors cursor-pointer ${
-                      isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => {
-                      if (showCheckbox) toggleBulkSelect(u.id);
-                    }}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-border/40 bg-card hover:bg-muted/40 transition-all"
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {showCheckbox && (
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleBulkSelect(u.id)}
-                          className="shrink-0"
-                        />
-                      )}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       {u.avatar_url ? (
-                        <img src={u.avatar_url} className="w-7 h-7 rounded-full shrink-0" alt="" />
+                        <img src={u.avatar_url} className="w-8 h-8 rounded-full shrink-0 object-cover" alt="" />
                       ) : (
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm">🐻</div>
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm text-muted-foreground"><User className="w-4 h-4" /></div>
                       )}
                       <div className="min-w-0">
-                        <span className="text-sm font-medium truncate block">{u.username}</span>
-                        {u.permissions.length > 0 && (
+                        <span className="text-sm font-semibold truncate block text-foreground">{u.username}</span>
+                        
+                        {/* Other assigned permissions badges */}
+                        {u.permissions.filter(p => p.permission_id !== assignPermission?.id).length > 0 && (
                           <div className="flex flex-wrap gap-0.5 mt-0.5">
-                            {u.permissions.map(p => {
+                            {u.permissions.filter(p => p.permission_id !== assignPermission?.id).map(p => {
                               const permData = permissions.find(pp => pp.id === p.permission_id);
                               return (
                                 <Badge
                                   key={p.permission_id}
                                   variant="secondary"
-                                  className="text-[9px] px-1 py-0 h-4"
-                                  style={permData?.color ? { backgroundColor: `${permData.color}20`, color: permData.color, borderColor: `${permData.color}40` } : {}}
+                                  className="text-[9px] px-1 py-0 h-4 rounded"
+                                  style={permData?.color ? { backgroundColor: `${permData.color}15`, color: permData.color, borderColor: `${permData.color}30` } : {}}
                                 >
                                   {p.permission_name}
                                 </Badge>
@@ -682,31 +601,22 @@ export function PermissionsManagement() {
                         )}
                       </div>
                     </div>
-                    {!bulkMode && (
-                      <Button
-                        variant={hasThisPerm ? 'destructive' : 'default'}
-                        size="sm"
-                        className="h-7 px-2 text-xs gap-1 shrink-0"
-                        onClick={(e) => { e.stopPropagation(); toggleUserPermission(u.id, assignPermission!.id, hasThisPerm); }}
-                      >
-                        {hasThisPerm ? (
-                          <><UserMinus className="w-3.5 h-3.5" /> ถอดสิทธิ์</>
-                        ) : (
-                          <><UserPlus className="w-3.5 h-3.5" /> เพิ่มสิทธิ์</>
-                        )}
-                      </Button>
-                    )}
-                    {bulkMode && !showCheckbox && (
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {bulkMode === 'add' ? 'มีสิทธิ์แล้ว' : 'ไม่มีสิทธิ์'}
-                      </span>
-                    )}
+
+                    <Button
+                      variant={isCurrent ? 'destructive' : 'default'}
+                      size="sm"
+                      className="h-8 px-3 text-xs gap-1 shrink-0 rounded-xl"
+                      onClick={() => toggleUserPermission(u.id, assignPermission!.id, isCurrent)}
+                    >
+                      {isCurrent ? (
+                        <><UserMinus className="w-3.5 h-3.5" /> ถอดสิทธิ์</>
+                      ) : (
+                        <><UserPlus className="w-3.5 h-3.5" /> เพิ่มสิทธิ์</>
+                      )}
+                    </Button>
                   </div>
-                );
-              })}
-              {filteredAssignUsers.length === 0 && (
-                <p className="text-center py-4 text-sm text-muted-foreground">ไม่พบผู้ใช้</p>
-              )}
+                ));
+              })()}
             </div>
           )}
         </DialogContent>

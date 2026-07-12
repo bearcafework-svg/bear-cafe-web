@@ -2,10 +2,21 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 // Resolve env vars from `.env` (Vite exposes `VITE_*` via `import.meta.env`)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+let SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+if (import.meta.env.DEV) {
+  if (!SUPABASE_URL || SUPABASE_URL.trim().length === 0) {
+    SUPABASE_URL = "https://mock-supabase-url.supabase.co";
+    console.warn("[Supabase] VITE_SUPABASE_URL is missing in development. Using dummy mock URL.");
+  }
+  if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.trim().length === 0) {
+    SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2siLCJyb2xlIjoiYW5vbiIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.mock-signature";
+    console.warn("[Supabase] VITE_SUPABASE_ANON_KEY is missing in development. Using dummy mock key.");
+  }
+}
 
 const missingUrl = !SUPABASE_URL || SUPABASE_URL.trim().length === 0;
 const missingKey = !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.trim().length === 0;

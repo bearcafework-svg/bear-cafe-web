@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar } from 'lucide-react';
+import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Profile {
@@ -873,9 +873,9 @@ export function RoleTransferManagement() {
             <AlertDialogTitle>ยืนยันการย้ายบทบาท</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>ย้าย <strong>{selectedCount} ยศ</strong> จาก <strong>{sourceMember?.username}</strong> ไปยัง <strong>{targetMember?.username}</strong></p>
-              <p className="text-warning">⚠️ ยศจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
+              <p className="text-warning flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-warning shrink-0" /> ยศจะถูกลบออกจากผู้ใช้ต้นทางและเพิ่มให้ผู้ใช้ปลายทาง</p>
               {deleteOnTransferCount > 0 && (
-                <p className="text-destructive">🗑️ ยศที่ตั้งค่าให้ลบ {deleteOnTransferCount} ยศ จะถูกลบออกจากต้นทางโดยไม่ถูกย้ายไปปลายทาง</p>
+                <p className="text-destructive flex items-center gap-1.5"><Trash2 className="w-4 h-4 text-destructive shrink-0" /> ยศที่ตั้งค่าให้ลบ {deleteOnTransferCount} ยศ จะถูกลบออกจากต้นทางโดยไม่ถูกย้ายไปปลายทาง</p>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

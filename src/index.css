@@ -291,6 +291,48 @@
   .bear-paw {
     @apply cursor-pointer transition-transform hover:scale-110 active:scale-95;
   }
+
+  /* ─── Cozy Admin UI Overrides ─── */
+  /* Cozy Admin Card */
+  .admin-card {
+    @apply rounded-2xl border border-border/75 bg-card shadow-sm hover:shadow-md hover:scale-[1.002] transition-all duration-200 !important;
+  }
+
+  /* Cozy Table Styles */
+  table {
+    @apply w-full border-collapse text-left !important;
+  }
+
+  table thead tr {
+    @apply bg-secondary/50 text-foreground font-semibold border-b border-border/40 !important;
+  }
+
+  table thead th {
+    @apply py-3 px-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase first:rounded-l-2xl last:rounded-r-2xl !important;
+  }
+
+  table tbody tr {
+    @apply hover:bg-muted/30 transition-colors border-b border-border/30 last:border-b-0 !important;
+  }
+
+  table tbody td {
+    @apply py-3.5 px-4 text-sm align-middle !important;
+  }
+
+  /* Cozy Form Inputs, Dropdowns, and Textareas */
+  input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], textarea, select {
+    @apply rounded-xl border border-border/80 bg-background/50 px-3 py-2 text-sm focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all !important;
+  }
+
+  /* Cozy select dropdown overrides */
+  select {
+    @apply pr-8 rounded-xl !important;
+  }
+
+  /* Cozy dialog content rounded corners */
+  [role="dialog"] {
+    @apply rounded-2xl !important;
+  }
 }
 
 @layer utilities {

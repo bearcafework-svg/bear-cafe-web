@@ -43,7 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
-import { ShieldX, Plus, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { ShieldX, Shield, Plus, Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
@@ -480,14 +480,14 @@ export function BannedRolesManagement() {
                                 alt=""
                                 className="w-4 h-4 rounded-sm object-cover shrink-0"
                               />
-                            ) : role.unicode_emoji ? (
-                              <span className="text-sm shrink-0">{role.unicode_emoji}</span>
                             ) : role.color ? (
                               <div
-                                className="w-3 h-3 rounded-full shrink-0"
+                                className="w-3 h-3 rounded-full shrink-0 border border-border/40"
                                 style={{ backgroundColor: role.color }}
                               />
-                            ) : null}
+                            ) : (
+                              <Shield className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            )}
                             <span>{role.name}</span>
                           </div>
                         </SelectItem>

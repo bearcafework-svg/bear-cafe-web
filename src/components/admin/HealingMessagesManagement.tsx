@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Check, X, Trash2, Pencil, Plus, RefreshCw, Search, Heart, Loader2,
+  Check, X, Trash2, Pencil, Plus, RefreshCw, Search, Heart, Loader2, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -67,9 +67,9 @@ async function fetchAllMessages(): Promise<HealingMessage[]> {
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Status }) {
-  if (status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 border">✅ อนุมัติ</Badge>;
-  if (status === 'rejected') return <Badge className="bg-red-500/10 text-red-400 border-red-500/20 border">❌ ปฏิเสธ</Badge>;
-  return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 border">⏳ รออนุมัติ</Badge>;
+  if (status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 border gap-1"><CheckCircle2 className="w-3 h-3" /> อนุมัติ</Badge>;
+  if (status === 'rejected') return <Badge className="bg-red-500/10 text-red-400 border-red-500/20 border gap-1"><XCircle className="w-3 h-3" /> ปฏิเสธ</Badge>;
+  return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 border gap-1"><Clock className="w-3 h-3" /> รออนุมัติ</Badge>;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export function HealingMessagesManagement() {
         .from('healing_messages').update({ status }).eq('id', id);
       if (error) throw error;
       setRows((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
-      toast({ title: status === 'approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธแล้ว' });
+      toast({ title: status === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว' });
     } catch (e: any) {
       toast({ title: 'อัปเดตไม่สำเร็จ', description: e.message, variant: 'destructive' });
     } finally {
@@ -234,20 +234,24 @@ export function HealingMessagesManagement() {
       <div className="flex gap-1.5 flex-wrap">
         {([
           { key: 'all', label: 'ทั้งหมด', count: counts.all, cls: 'bg-muted/60 hover:bg-muted' },
-          { key: 'pending', label: '⏳ รออนุมัติ', count: counts.pending, cls: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600' },
-          { key: 'approved', label: '✅ อนุมัติ', count: counts.approved, cls: 'bg-green-500/10 hover:bg-green-500/20 text-green-600' },
-          { key: 'rejected', label: '❌ ปฏิเสธ', count: counts.rejected, cls: 'bg-red-500/10 hover:bg-red-500/20 text-red-500' },
+          { key: 'pending', label: 'รออนุมัติ', count: counts.pending, cls: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600' },
+          { key: 'approved', label: 'อนุมัติ', count: counts.approved, cls: 'bg-green-500/10 hover:bg-green-500/20 text-green-600' },
+          { key: 'rejected', label: 'ปฏิเสธ', count: counts.rejected, cls: 'bg-red-500/10 hover:bg-red-500/20 text-red-500' },
         ] as const).map(({ key, label, count, cls }) => (
           <button
             key={key}
             onClick={() => setFilterStatus(key as Status | 'all')}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-all border',
+              'rounded-lg px-3 py-1.5 text-sm font-medium transition-all border flex items-center gap-1.5',
               cls,
               filterStatus === key ? 'ring-2 ring-primary border-primary/40' : 'border-border/40'
             )}
           >
-            {label} <span className="ml-1 font-bold">{count}</span>
+            {key === 'pending' && <Clock className="w-3.5 h-3.5" />}
+            {key === 'approved' && <CheckCircle2 className="w-3.5 h-3.5" />}
+            {key === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
+            <span>{label}</span>
+            <span className="ml-1 font-bold">{count}</span>
           </button>
         ))}
       </div>

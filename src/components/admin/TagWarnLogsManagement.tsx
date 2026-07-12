@@ -44,9 +44,9 @@ const ITEMS_PER_PAGE = 12;
 
 const PUNISH_OPTIONS = [
   { value: 'ชื่อ/รูปไม่เหมาะสม', label: 'ชื่อ/รูปไม่เหมาะสม' },
-  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'ミ ชาเขียวเตือนใจ 𓂃 🍵' },
-  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ミ ถ้วยกาแฟ 𓂃 ☕' },
-  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕' },
+  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'มินต์ชาเขียวเตือนใจ' },
+  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ถ้วยกาแฟ' },
+  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'กาแฟดับเบิ้ลช็อต' },
   { value: 'เตะ', label: 'เตะ' },
   { value: 'แบนถาวร', label: 'แบนถาวร' },
 ];
@@ -91,6 +91,18 @@ function formatTimestamp(raw: string | null | undefined): string {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+function formatPunishLabel(punish: string | null): string {
+  if (!punish) return '-';
+  const clean = punish
+    .replace('🍵', '')
+    .replace('☕☕', '')
+    .replace('☕', '')
+    .replace('ミ', '')
+    .replace('𓂃', '')
+    .trim();
+  return clean || punish;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -737,7 +749,7 @@ export function TagWarnLogsManagement() {
                       {r.punish && (
                         <div className="flex items-center gap-2 text-sm">
                           <Gavel className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium">{r.punish}</span>
+                          <span className="font-medium">{formatPunishLabel(r.punish)}</span>
                         </div>
                       )}
 

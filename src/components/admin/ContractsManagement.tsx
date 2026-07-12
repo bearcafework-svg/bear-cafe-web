@@ -34,7 +34,8 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Home, Crown, User, Clock, Bell, Edit2, Search, RefreshCw,
-  Loader2, CheckCircle2, X, Upload,
+  Loader2, CheckCircle2, X, Upload, Star, Link, Hash, Users, Calendar,
+  AlertTriangle, HelpCircle, LayoutDashboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +62,12 @@ interface TypeIcons {
   role: string | null;
   personal_role: string | null;
 }
+
+const typeIconsMap: Record<ContractType, React.ComponentType<any>> = {
+  house: Home,
+  role: Crown,
+  personal_role: Star,
+};
 
 const ROLE_OPTIONS = [
   'ヽ 𝐂𝐨𝐨𝐤𝐢𝐞 (ยศพรีเมี่ยม 𝐒) 𓂃 🍪',
@@ -125,12 +132,6 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
   const [uploading, setUploading] = useState<ContractType | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingType = useRef<ContractType | null>(null);
-
-  const typeEmoji: Record<ContractType, string> = {
-    house: '🏠',
-    role: '👑',
-    personal_role: '⭐',
-  };
 
   const typeLabel: Record<ContractType, string> = {
     house: 'บ้าน',
@@ -204,7 +205,7 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
             ) : typeIcons[type] ? (
               <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover rounded-md" />
             ) : (
-              <span className="text-base">{typeEmoji[type]}</span>
+              React.createElement(typeIconsMap[type], { className: "w-4 h-4 text-muted-foreground" })
             )}
             <span className="absolute bottom-0 right-0 bg-background/80 rounded-tl p-0.5">
               <Upload className="w-2.5 h-2.5 text-muted-foreground" />
@@ -678,9 +679,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
     contract.type === 'role' ? 'bg-[#8B5E3C]/10 text-[#B8956A] border-[#8B5E3C]/20' :
     'bg-[#E9A84E]/10 text-[#E9A84E] border-[#E9A84E]/25';
 
-  const typeEmoji =
-    contract.type === 'house' ? '🏠' :
-    contract.type === 'role' ? '👑' : '⭐';
+  const TypeIcon = typeIconsMap[contract.type] || HelpCircle;
 
   const iconUrl = typeIcons[contract.type];
   const profile = memberProfiles[contract.member_id];
@@ -710,90 +709,45 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
   return (
     <>
       <div className={cn(
-        'group relative rounded-xl border-l-4 bg-card transition-all duration-200',
-        'hover:shadow-md hover:bg-muted/20',
+        'group relative rounded-2xl border bg-card transition-all duration-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 shadow-sm hover:shadow-md hover:scale-[1.002]',
         borderColor.replace('border-', 'border-l-'),
         'border border-border/40'
       )}>
-        {/* ── Main row ── */}
-        <div className="flex items-start gap-3 px-4 py-3">
-
-          {/* Icon */}
-          <div className="shrink-0 w-9 h-9 rounded-lg bg-muted/40 flex items-center justify-center mt-0.5">
+        {/* Left Side: Icon + Main Info */}
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          <div className="shrink-0 w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center border border-border/40 relative overflow-hidden">
             {iconUrl ? (
-              <img src={iconUrl} alt={contract.type} className="w-7 h-7 object-contain rounded"
+              <img src={iconUrl} alt={contract.type} className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
-              <span className="text-lg leading-none">{typeEmoji}</span>
+              <TypeIcon className="w-6 h-6 text-muted-foreground" />
             )}
           </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0 space-y-1">
-
-            {/* Row 1: Member ID + type badge + actions */}
+          <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono font-bold text-sm tracking-tight">{contract.member_id}</span>
+              <span className="font-mono font-bold text-xs sm:text-sm tracking-tight bg-muted/60 px-2 py-0.5 rounded-lg text-foreground">{contract.member_id}</span>
               {discordName && (
                 <span className="text-xs text-muted-foreground">@{discordName}</span>
               )}
-              <Badge variant="outline" className={cn('text-xs px-2 py-0.5 ml-auto shrink-0 font-medium', typeColor)}>
+              <Badge variant="outline" className={cn('text-[10px] sm:text-xs px-2.5 py-0.5 font-medium rounded-full', typeColor)}>
                 {typeLabel}
               </Badge>
-              {/* Actions */}
-              <div className="flex items-center gap-0.5 shrink-0">
-                {contract.type === 'house' && (
-                  <Button size="icon" variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary"
-                    onClick={() => onEdit(contract)}>
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-                <Button size="icon" variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleteOpen(true)}>
-                  <X className="w-3.5 h-3.5" />
-                </Button>
-              </div>
             </div>
 
-            {/* Row 2: Role name (if any) */}
+            {/* Role Name */}
             {(contract.type === 'role' || contract.type === 'personal_role') && contract.role_name && (
-              <div className="flex items-center gap-1.5">
-                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-sm text-muted-foreground">{contract.role_name}</span>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="font-medium text-foreground">{contract.role_name}</span>
               </div>
             )}
 
-            {/* Row 3: Time status */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Time remaining / elapsed */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className={cn(
-                  'text-sm font-medium',
-                  contract.type === 'house' ? statusColor : 'text-muted-foreground'
-                )}>
-                  {contract.type === 'personal_role'
-                    ? formatElapsed(contract.start_at)
-                    : contract.end_at ? formatRemaining(contract.end_at) : '—'}
-                </span>
-              </div>
-
-              {/* Status dot for house */}
-              {contract.type === 'house' && statusText && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', statusDot)} />
-                  <span className={cn('text-xs font-medium', statusColor)}>{statusText}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Row 3b: Channel link (own row so it never truncates) */}
+            {/* Channel link */}
             {contract.type === 'house' && contract.room_link && (
               <a href={contract.room_link} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 text-sm text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit">
-                <span>🔗</span>
+                className="flex items-center gap-1.5 text-xs text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit font-medium">
+                <Link className="w-3.5 h-3.5 shrink-0" />
                 {loadingHouseChannel
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <span>{houseChannelName ?? 'ดูห้อง'}</span>
@@ -803,8 +757,8 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
 
             {contract.type === 'personal_role' && contract.room_link && (
               <a href={contract.room_link} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 text-sm text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit">
-                <span>#</span>
+                className="flex items-center gap-1.5 text-xs text-[#C4895A] hover:text-[#E9A84E] hover:underline transition-colors w-fit font-medium">
+                <Hash className="w-3.5 h-3.5 shrink-0" />
                 {loadingExtra
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <span>{channelName ?? 'ดูห้อง'}</span>
@@ -812,50 +766,104 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh }
               </a>
             )}
 
-            {/* Row 4: personal_role member count + meta */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {contract.type === 'personal_role' && (
-                <>
-                  {loadingExtra && roleTotal === null ? (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" />โหลด...
-                    </span>
-                  ) : roleTotal !== null ? (
-                    <span className={cn(
-                      'text-xs font-semibold px-2 py-0.5 rounded-full',
-                      roleTotal > 5 ? 'bg-destructive/10 text-destructive' : 'bg-[#8FA77A]/10 text-[#8FA77A]'
-                    )}>
-                      👥 {roleTotal.toLocaleString()} คน{roleTotal > 5 ? ' (เกิน)' : ''}
-                    </span>
-                  ) : null}
-                </>
-              )}
-
-              {/* Operator + date — always at end */}
-              <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
-                <span>{contract.operator_name ?? '—'}</span>
-                <span className="shrink-0">
-                  {new Date(contract.created_at).toLocaleDateString('th-TH', {
-                    day: 'numeric', month: 'short', year: '2-digit',
-                  })}
+            {/* Dates & Operator info */}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap pt-0.5">
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span>
+                  {new Date(contract.start_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
+                {contract.end_at && (
+                  <>
+                    <span>-</span>
+                    <span>
+                      {new Date(contract.end_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  </>
+                )}
               </div>
+              <span>•</span>
+              <span>โดย: {contract.operator_name ?? '—'}</span>
             </div>
           </div>
         </div>
 
-        {/* Notify button — only when urgent */}
-        {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
-          <div className="px-4 pb-3 pt-0">
-            <Button
-              size="sm" variant="destructive"
-              className="w-full h-7 text-xs font-medium gap-1.5 rounded-lg"
-              onClick={() => setNotifyOpen(true)}
-            >
-              <Bell className="w-3 h-3" />แจ้งเตือนผู้เช่า
-            </Button>
+        {/* Right Side: Status Badge, Expire info, Actions */}
+        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-border/40 shrink-0">
+          <div className="flex flex-col items-start md:items-end gap-1">
+            {/* Status dot / Text for House */}
+            {contract.type === 'house' && statusText && (
+              <div className="flex items-center gap-1.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', statusDot)} />
+                <span className={cn('text-xs font-semibold', statusColor)}>{statusText}</span>
+              </div>
+            )}
+
+            {/* Time status badge */}
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className={cn(
+                'text-xs sm:text-sm font-semibold',
+                contract.type === 'house' ? statusColor : 'text-muted-foreground'
+              )}>
+                {contract.type === 'personal_role'
+                  ? formatElapsed(contract.start_at)
+                  : contract.end_at ? formatRemaining(contract.end_at) : '—'}
+              </span>
+            </div>
+
+            {/* Personal role count badge */}
+            {contract.type === 'personal_role' && (
+              <div className="pt-0.5">
+                {loadingExtra && roleTotal === null ? (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />โหลดจำนวนคน...
+                  </span>
+                ) : roleTotal !== null ? (
+                  <span className={cn(
+                    'text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1',
+                    roleTotal > 5 ? 'bg-destructive/10 text-destructive' : 'bg-success/15 text-success'
+                  )}>
+                    <Users className="w-3.5 h-3.5 shrink-0" />
+                    <span>{roleTotal.toLocaleString()} คน</span>
+                    {roleTotal > 5 && <span>(เกินสิทธิ์)</span>}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            {/* Notify button — only when urgent */}
+            {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-2.5 gap-1.5 border-destructive/30 hover:bg-destructive/10 hover:text-destructive text-xs"
+                disabled={sending}
+                onClick={() => setNotifyOpen(true)}
+              >
+                <Bell className={cn('w-3.5 h-3.5', sending && 'animate-spin')} />
+                แจ้งเตือน
+              </Button>
+            )}
+
+            <div className="flex items-center gap-1">
+              {contract.type === 'house' && (
+                <Button size="icon" variant="ghost"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl"
+                  onClick={() => onEdit(contract)}>
+                  <Edit2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
+              <Button size="icon" variant="ghost"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                onClick={() => setDeleteOpen(true)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Delete confirm dialog */}
@@ -1047,39 +1055,45 @@ export function ContractsManagement() {
       </div>
 
       {/* ── Stats row ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {/* Type counts — clickable quick-filter */}
         {([
-          { key: 'all', label: 'ทั้งหมด', count: contracts.length, color: 'bg-muted/60 hover:bg-muted' },
-          { key: 'house', label: '🏠 บ้าน', count: countByType.house, color: 'bg-[#8B5E3C]/10 hover:bg-[#8B5E3C]/20 text-[#C4895A]' },
-          { key: 'role', label: '👑 ยศ', count: countByType.role, color: 'bg-[#8B5E3C]/10 hover:bg-[#8B5E3C]/20 text-[#B8956A]' },
-          { key: 'personal_role', label: '⭐ ยศส่วนตัว', count: countByType.personal_role, color: 'bg-[#E9A84E]/10 hover:bg-[#E9A84E]/20 text-[#E9A84E]' },
-        ] as const).map(({ key, label, count, color }) => (
+          { key: 'all', label: 'ทั้งหมด', count: contracts.length, color: 'bg-muted/40 hover:bg-muted text-foreground', icon: LayoutDashboard },
+          { key: 'house', label: 'บ้าน', count: countByType.house, color: 'bg-[#8B5E3C]/5 hover:bg-[#8B5E3C]/10 text-[#C4895A]', icon: Home },
+          { key: 'role', label: 'ยศ', count: countByType.role, color: 'bg-[#8B5E3C]/5 hover:bg-[#8B5E3C]/10 text-[#B8956A]', icon: Crown },
+          { key: 'personal_role', label: 'ยศส่วนตัว', count: countByType.personal_role, color: 'bg-[#E9A84E]/5 hover:bg-[#E9A84E]/10 text-[#E9A84E]', icon: Star },
+        ] as const).map(({ key, label, count, color, icon: IconComponent }) => (
           <button
             key={key}
             onClick={() => { setFilterType(key as ContractType | 'all'); setPage(1); }}
             className={cn(
-              'rounded-xl px-3 py-2.5 text-left transition-all border',
+              'rounded-2xl p-4 text-left transition-all border flex flex-col gap-2 relative overflow-hidden shadow-sm hover:scale-[1.02] active:scale-[0.98]',
               color,
-              filterType === key ? 'ring-2 ring-primary border-primary/40' : 'border-border/40'
+              filterType === key ? 'ring-2 ring-primary/40 border-primary/60 bg-primary/5 shadow' : 'border-border/40'
             )}
           >
-            <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
-            <p className="text-xl font-bold leading-tight">{count}</p>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+              <IconComponent className="w-4 h-4 opacity-70 shrink-0" />
+            </div>
+            <p className="text-2xl font-bold leading-none tracking-tight">{count}</p>
           </button>
         ))}
         {/* Urgent alert */}
         <button
           onClick={() => { setFilterType('house'); setPage(1); }}
           className={cn(
-            'rounded-xl px-3 py-2.5 text-left transition-all border',
+            'rounded-2xl p-4 text-left transition-all border flex flex-col gap-2 relative overflow-hidden shadow-sm hover:scale-[1.02] active:scale-[0.98]',
             urgentCount > 0
-              ? 'bg-destructive/10 hover:bg-destructive/20 border-destructive/30'
-              : 'bg-muted/40 border-border/40 opacity-60'
+              ? 'bg-destructive/10 hover:bg-destructive/15 border-destructive/30 text-destructive'
+              : 'bg-muted/40 border-border/40 text-muted-foreground opacity-60'
           )}
         >
-          <p className="text-[11px] text-muted-foreground font-medium">🚨 ใกล้หมด</p>
-          <p className={cn('text-xl font-bold leading-tight', urgentCount > 0 && 'text-destructive')}>{urgentCount}</p>
+          <div className="flex items-center justify-between w-full">
+            <span className="text-xs font-semibold">ใกล้หมดสัญญา</span>
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          </div>
+          <p className="text-2xl font-bold leading-none tracking-tight">{urgentCount}</p>
         </button>
       </div>
 

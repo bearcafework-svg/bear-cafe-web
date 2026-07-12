@@ -162,7 +162,7 @@ export function DiscordServersManagement() {
       if (error) throw error;
       toast({
         title: status === 'approved' ? 'อนุมัติเรียบร้อย' : 'ปฏิเสธเรียบร้อย',
-        className: status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white',
+        className: status === 'approved' ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground',
       });
     } catch (error: any) {
       // Revert on failure
@@ -182,8 +182,8 @@ export function DiscordServersManagement() {
       const { error } = await (supabase.from('discord_servers' as any).update({ status }).eq('id', server.id)) as any;
       if (error) throw error;
       toast({
-        title: status === 'approved' ? '✅ อนุมัติเรียบร้อย' : '❌ ปฏิเสธเรียบร้อย',
-        className: status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white',
+        title: status === 'approved' ? 'อนุมัติเรียบร้อย' : 'ปฏิเสธเรียบร้อย',
+        className: status === 'approved' ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground',
       });
       setConfirmTarget(null);
       // Switch to the tab matching the new status
@@ -207,9 +207,9 @@ export function DiscordServersManagement() {
         s.id === server.id ? { ...s, ...result.updated } : s
       ));
       toast({
-        title: '✅ อัปเดตข้อมูลสำเร็จ',
+        title: 'อัปเดตข้อมูลสำเร็จ',
         description: `${result.updated.name} — ${(result.updated.member_count ?? 0).toLocaleString()} สมาชิก`,
-        className: 'bg-green-500 text-white',
+        className: 'bg-success text-success-foreground',
       });
     } else {
       toast({ title: 'อัปเดตไม่สำเร็จ', description: result.error, variant: 'destructive' });
@@ -249,7 +249,7 @@ export function DiscordServersManagement() {
         } as any)
         .eq('id', editServer.id)) as any;
       if (error) throw error;
-      toast({ title: 'บันทึกเรียบร้อย', className: 'bg-green-500 text-white' });
+      toast({ title: 'บันทึกเรียบร้อย', className: 'bg-success text-success-foreground' });
       setEditServer(null);
       fetchData();
     } catch (error: any) {
@@ -266,7 +266,7 @@ export function DiscordServersManagement() {
     try {
       const { error } = await (supabase.from('discord_servers' as any).delete().eq('id', deleteTarget.id)) as any;
       if (error) throw error;
-      toast({ title: 'ลบเซิร์ฟเวอร์เรียบร้อย', className: 'bg-green-500 text-white' });
+      toast({ title: 'ลบเซิร์ฟเวอร์เรียบร้อย', className: 'bg-success text-success-foreground' });
       setDeleteTarget(null);
       fetchData();
     } catch (error: any) {
@@ -285,7 +285,7 @@ export function DiscordServersManagement() {
         .from('discord_server_categories' as any)
         .insert({ name: newCatName, icon: newCatIcon, sort_order: categories.length } as any)) as any;
       if (error) throw error;
-      toast({ title: 'เพิ่มหมวดหมู่สำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'เพิ่มหมวดหมู่สำเร็จ', className: 'bg-success text-success-foreground' });
       setNewCatName('');
       setNewCatIcon('🎮');
       fetchData();
@@ -305,7 +305,7 @@ export function DiscordServersManagement() {
         .update({ name: editCat.name, icon: editCat.icon } as any)
         .eq('id', editCat.id)) as any;
       if (error) throw error;
-      toast({ title: 'แก้ไขหมวดหมู่สำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'แก้ไขหมวดหมู่สำเร็จ', className: 'bg-success text-success-foreground' });
       setEditCat(null);
       fetchData();
     } catch (error: any) {
@@ -319,7 +319,7 @@ export function DiscordServersManagement() {
     try {
       const { error } = await (supabase.from('discord_server_categories' as any).delete().eq('id', catId)) as any;
       if (error) throw error;
-      toast({ title: 'ลบหมวดหมู่สำเร็จ', className: 'bg-green-500 text-white' });
+      toast({ title: 'ลบหมวดหมู่สำเร็จ', className: 'bg-success text-success-foreground' });
       fetchData();
     } catch (error: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
@@ -368,7 +368,7 @@ export function DiscordServersManagement() {
           .eq('id', s.id) as any;
       });
       await Promise.all(updates);
-      toast({ title: 'บันทึก Carousel เรียบร้อย', className: 'bg-green-500 text-white' });
+      toast({ title: 'บันทึก Carousel เรียบร้อย', className: 'bg-success text-success-foreground' });
       setIsCarouselOpen(false);
       fetchData();
     } catch (error: any) {
@@ -518,7 +518,7 @@ export function DiscordServersManagement() {
                       <>
                         <Button
                           size="sm"
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-xs h-7"
+                          className="flex-1 bg-success hover:bg-success/90 text-success-foreground text-xs h-7"
                           onClick={() => setConfirmTarget({ server, status: 'approved' })}
                         >
                           <Check className="w-3 h-3 mr-1" />อนุมัติ
@@ -538,7 +538,7 @@ export function DiscordServersManagement() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1 text-xs h-7 text-amber-600 border-amber-300 hover:bg-amber-50"
+                        className="flex-1 text-xs h-7 text-warning border-warning/30 hover:bg-warning/10"
                         onClick={() => setConfirmTarget({ server, status: 'rejected' })}
                       >
                         <XCircle className="w-3 h-3 mr-1" />ถอนการอนุมัติ
@@ -548,7 +548,7 @@ export function DiscordServersManagement() {
                     {server.status === 'rejected' && (
                       <Button
                         size="sm"
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-xs h-7"
+                        className="flex-1 bg-success hover:bg-success/90 text-success-foreground text-xs h-7"
                         onClick={() => setConfirmTarget({ server, status: 'approved' })}
                       >
                         <Check className="w-3 h-3 mr-1" />อนุมัติใหม่
@@ -727,7 +727,7 @@ export function DiscordServersManagement() {
           <DialogHeader>
             <DialogTitle className={cn(
               'flex items-center gap-2',
-              confirmTarget?.status === 'approved' ? 'text-green-600' : 'text-destructive'
+              confirmTarget?.status === 'approved' ? 'text-success' : 'text-destructive'
             )}>
               {confirmTarget?.status === 'approved'
                 ? <><CheckCircle2 className="h-5 w-5" /> ยืนยันการอนุมัติ</>
@@ -748,7 +748,7 @@ export function DiscordServersManagement() {
             <Button
               onClick={handleConfirmStatus}
               disabled={confirmLoading}
-              className={confirmTarget?.status === 'approved' ? 'bg-green-500 hover:bg-green-600' : ''}
+              className={confirmTarget?.status === 'approved' ? 'bg-success hover:bg-success/90 text-success-foreground' : ''}
               variant={confirmTarget?.status === 'rejected' ? 'destructive' : 'default'}
             >
               {confirmLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
