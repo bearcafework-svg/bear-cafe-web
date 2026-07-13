@@ -25,19 +25,10 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
   const voiceCount = useActiveVoiceCount();
 
   const hasDiscord = Boolean(user?.discord_id);
-  const isDisabled = (isAuthenticated && !hasDiscord) || isOnCooldown;
+  const isDisabled = true;
 
   const handleClick = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (isOnCooldown) return;
-    if (hasDiscord) {
-      navigate('/create-session');
-      return;
-    }
-    window.open(BEAR_CAFE_INVITE, '_blank', 'noopener,noreferrer');
+    // Disabled - do nothing
   };
 
   return (
@@ -85,8 +76,16 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
         </p>
       )}
 
-      <button className='bear-body-regular-medium text-[#46362A] bg-[#FAC4CD] border border-[#CC97A0] rounded-full px-8 py-1'>
-        หาเพื่อนเลย!
+      <button 
+        disabled
+        className={cn(
+          'bear-body-regular-medium rounded-full px-8 py-1 border transition-colors',
+          isDisabled 
+            ? 'text-muted-foreground bg-muted border-muted cursor-default'
+            : 'text-[#46362A] bg-[#FAC4CD] border-[#CC97A0]'
+        )}
+      >
+        ปิดให้บริการ
       </button>
 
       {/* {isAuthenticated && !hasDiscord && (
