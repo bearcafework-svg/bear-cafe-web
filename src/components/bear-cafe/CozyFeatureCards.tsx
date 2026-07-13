@@ -41,9 +41,10 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
       whileTap={!isDisabled ? { scale: 0.98 } : undefined}
       className={cn(
         'w-full h-full xl:min-w-[270px] xl:max-w-[270px] flex flex-col gap-4',
+        'bg-[#FDFAF7] border-2 border-[#F4EEE5] dark:bg-[hsl(var(--card))] dark:border-[hsl(var(--coffee)/0.5)] dark:shadow-md dark:shadow-black/20',
         isDisabled
-          ? 'border-[hsl(var(--latte)/0.4)] dark:border-[hsl(var(--coffee)/0.3)] opacity-80 cursor-default'
-          : 'cursor-pointer bg-[#FDFAF7] border-2 border-[#F4EEE5] dark:bg-[hsl(var(--card))] dark:border-[hsl(var(--coffee)/0.5)] dark:shadow-md dark:shadow-black/20',
+          ? 'opacity-60 cursor-default'
+          : 'cursor-pointer',
       )}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
     >
