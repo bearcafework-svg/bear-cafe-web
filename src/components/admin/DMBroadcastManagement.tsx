@@ -10,10 +10,11 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { 
   Send, Users, Mail, AlertCircle, Play, Square, RefreshCw, XCircle, 
   CheckCircle, Shield, FileText, CheckCircle2, ChevronDown, ChevronUp,
-  MessageSquare, Eye
+  MessageSquare, Eye, Search
 } from 'lucide-react';
 
 interface CampaignQueue {
@@ -360,13 +361,95 @@ export function DMBroadcastManagement() {
 }`);
   const [submitting, setSubmitting] = useState(false);
 
+  // Member subscriptions list states
+  const [memberSubs, setMemberSubs] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterOption, setFilterOption] = useState<string>('all');
+
+  const fetchMemberSubscriptions = useCallback(async () => {
+    setLoadingMembers(true);
+    try {
+      const { data: optionsData, error: optionsErr } = await supabase
+        .from('dms_options' as any)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (optionsErr) throw optionsErr;
+      if (!optionsData) return;
+
+      // Group options by user_id
+      const grouped: Record<string, { userId: string; options: string[]; updatedAt: string }> = {};
+      optionsData.forEach((item: any) => {
+        const uid = item.user_id;
+        if (!uid) return;
+        if (!grouped[uid]) {
+          grouped[uid] = {
+            userId: uid,
+            options: [],
+            updatedAt: item.created_at
+          };
+        }
+        if (!grouped[uid].options.includes(item.option_value)) {
+          grouped[uid].options.push(item.option_value);
+        }
+        if (new Date(item.created_at) > new Date(grouped[uid].updatedAt)) {
+          grouped[uid].updatedAt = item.created_at;
+        }
+      });
+
+      const uniqueUids = Object.keys(grouped);
+
+      // Fetch profiles mapping
+      const profilesMap: Record<string, { username: string; discord_username: string | null }> = {};
+      if (uniqueUids.length > 0) {
+        const chunkSize = 100;
+        for (let i = 0; i < uniqueUids.length; i += chunkSize) {
+          const chunk = uniqueUids.slice(i, i + chunkSize);
+          const { data: profilesData, error: profilesErr } = await (supabase as any)
+            .from('profiles')
+            .select('discord_id, username, discord_username')
+            .in('discord_id', chunk);
+
+          if (!profilesErr && profilesData) {
+            profilesData.forEach((p: any) => {
+              profilesMap[p.discord_id] = {
+                username: p.username,
+                discord_username: p.discord_username ?? null
+              };
+            });
+          }
+        }
+      }
+
+      // Map results
+      const list = uniqueUids.map(uid => {
+        const profile = profilesMap[uid];
+        return {
+          userId: uid,
+          username: profile?.username ?? null,
+          discordUsername: profile?.discord_username ?? null,
+          options: grouped[uid].options,
+          updatedAt: grouped[uid].updatedAt
+        };
+      });
+
+      setMemberSubs(list);
+    } catch (e) {
+      console.error('Error fetching member subscriptions:', e);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
   // Fetch all stats and campaigns list
   const fetchDashboardData = useCallback(async () => {
     try {
+      fetchMemberSubscriptions();
       // 1. Fetch Subscription Stats
       const { data: rawSubs, error: subErr } = await supabase
         .from('dms_options' as any)
-        .select('option_value');
+        .select('user_id, option_value');
 
       if (!subErr && rawSubs) {
         const counts = {
@@ -375,13 +458,17 @@ export function DMBroadcastManagement() {
           'DsMHlVrjze': 0,
           '6io1xnaMWJ': 0
         };
+        const uniqueUsers = new Set<string>();
         rawSubs.forEach((item: any) => {
+          if (item.user_id) {
+            uniqueUsers.add(item.user_id);
+          }
           if (item.option_value in counts) {
             counts[item.option_value as keyof typeof counts]++;
           }
         });
         setSubStats({
-          totalSubs: rawSubs.length,
+          totalSubs: uniqueUsers.size,
           options: counts
         });
       }
@@ -550,6 +637,19 @@ export function DMBroadcastManagement() {
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
+
+  const filteredMemberSubs = memberSubs.filter(sub => {
+    if (searchQuery) {
+      const matchUserId = sub.userId.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchUsername = (sub.username ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchDiscord = (sub.discordUsername ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchUserId && !matchUsername && !matchDiscord) return false;
+    }
+    if (filterOption !== 'all') {
+      if (!sub.options.includes(filterOption)) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -899,6 +999,110 @@ export function DMBroadcastManagement() {
           </Card>
         </div>
       </div>
+
+      {/* 3. Member Subscriptions Directory */}
+      <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden mt-6">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-wrap">
+            <div className="space-y-1">
+              <CardTitle className="text-lg text-[#8C6239] dark:text-[#EAD8C8] font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-500" />
+                รายชื่อสมาชิกและสิทธิ์การรับข่าวสาร
+              </CardTitle>
+              <CardDescription className="text-xs">แสดงรายการผู้ใช้ที่ยินยอมรับข่าวสารแยกตามหมวดหมู่</CardDescription>
+            </div>
+            
+            {/* Search and Filters */}
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial sm:w-60">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-8.5 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+                  placeholder="ค้นหาผู้ใช้ หรือ Member ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={filterOption} onValueChange={setFilterOption}>
+                <SelectTrigger className="w-40 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl h-9 focus:ring-[#FAC4CD]">
+                  <SelectValue placeholder="เลือกหมวดหมู่" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
+                  <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
+                  <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
+                  <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          {loadingMembers ? (
+            <div className="text-center py-12 text-muted-foreground animate-pulse text-xs">กำลังโหลดรายชื่อสมาชิก...</div>
+          ) : filteredMemberSubs.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-xs border border-dashed border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl bg-[#FAF6F0]/20 dark:bg-muted/5">
+              ไม่พบรายชื่อสมาชิกที่ค้นหา
+            </div>
+          ) : (
+            <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl overflow-hidden shadow-xs bg-white dark:bg-[#1E1B18]">
+              <Table>
+                <TableHeader className="bg-[#FAF6F0]/50 dark:bg-[#25201C]/50">
+                  <TableRow className="border-b border-[#EAD8C8] dark:border-[#2D2520]">
+                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">สมาชิก</TableHead>
+                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">หัวข้อข่าวสารที่ติดตาม</TableHead>
+                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">ลงทะเบียนล่าสุด</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMemberSubs.map((sub) => (
+                    <TableRow key={sub.userId} className="border-b border-[#EAD8C8]/60 dark:border-[#2D2520]/60 hover:bg-[#FAF6F0]/20 dark:hover:bg-[#25201C]/20 transition-colors text-xs sm:text-sm">
+                      <TableCell className="py-3 px-4 font-sans">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9]">
+                            {sub.username ? `@${sub.username}` : (sub.discordUsername ? `@${sub.discordUsername}` : 'Unknown Member')}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{sub.userId}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {sub.options.map((opt: string) => {
+                            let label = '';
+                            let badgeStyle = '';
+                            if (opt === '49B40A9yBS') {
+                              label = '🎉 กิจกรรม';
+                              badgeStyle = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30';
+                            } else if (opt === 'JNySCX80ja') {
+                              label = '📢 ประกาศสำคัญ';
+                              badgeStyle = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30';
+                            } else if (opt === 'DsMHlVrjze') {
+                              label = '📑 ข่าวสารทั่วไป';
+                              badgeStyle = 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30';
+                            } else if (opt === '6io1xnaMWJ') {
+                              label = '🎁 โปรโมชันและโฆษณา';
+                              badgeStyle = 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30';
+                            }
+                            return (
+                              <Badge key={opt} variant="outline" className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold border", badgeStyle)}>
+                                {label}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-xs text-muted-foreground">
+                        {new Date(sub.updatedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
     </div>
   );
