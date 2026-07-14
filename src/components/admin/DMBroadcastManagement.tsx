@@ -505,19 +505,20 @@ export function DMBroadcastManagement() {
     }
   }, []);
 
-  // Poll active campaigns counts every 5 seconds for live progress
+  // 1. Initial fetch on mount
   useEffect(() => {
     fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // 2. Poll active campaigns counts every 5 seconds for live progress
+  useEffect(() => {
+    const hasActive = campaigns.some(c => c.status === 'processing' || c.status === 'pending');
+    if (!hasActive) return;
 
     const interval = setInterval(() => {
-      // Only refresh if we have active campaigns running
-      const hasActive = campaigns.some(c => c.status === 'processing' || c.status === 'pending');
-      if (hasActive) {
-        fetchDashboardData();
-        // If details are open, refresh logs too
-        if (expandedCampaignId) {
-          fetchCampaignLogs(expandedCampaignId);
-        }
+      fetchDashboardData();
+      if (expandedCampaignId) {
+        fetchCampaignLogs(expandedCampaignId);
       }
     }, 5000);
 

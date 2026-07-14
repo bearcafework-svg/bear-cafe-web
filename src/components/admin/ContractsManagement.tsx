@@ -249,6 +249,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
   const [roomLink, setRoomLink] = useState('');
+  const [packageName, setPackageName] = useState('');
 
   const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
@@ -286,7 +287,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
 
   function reset() {
     setType('house'); setMemberId(''); setStartAt(''); setEndAt('');
-    setRoomLink(''); setRoleSearch('');
+    setRoomLink(''); setRoleSearch(''); setPackageName('');
     setSelectedDiscordRole(null);
   }
 
@@ -299,15 +300,19 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
     if (type === 'personal_role' && !selectedDiscordRole) {
       toast({ title: 'กรุณาเลือกยศ Discord', variant: 'destructive' }); return;
     }
+    if (type === 'ad' && !packageName.trim()) {
+      toast({ title: 'กรุณากรอกชื่อแพ็กเกจโฆษณา', variant: 'destructive' }); return;
+    }
     setSaving(true);
     const payload: Record<string, unknown> = {
       type,
       member_id: memberId.trim(),
       start_at: new Date(startAt).toISOString(),
-      end_at: type === 'house' && endAt ? new Date(endAt).toISOString() : null,
-      room_link: roomLink.trim() || null,
+      end_at: (type === 'house' || type === 'ad') && endAt ? new Date(endAt).toISOString() : null,
+      room_link: type !== 'personal_role' && roomLink.trim() ? roomLink.trim() : null,
       role_name: type === 'personal_role' ? selectedDiscordRole?.name ?? null : null,
       discord_role_id: type === 'personal_role' ? selectedDiscordRole?.id ?? null : null,
+      package_name: type === 'ad' ? packageName.trim() : null,
       operator_id: operatorId,
       operator_name: operatorName,
       edit_log: [],
@@ -334,33 +339,47 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
 
         <div className="space-y-4 py-2">
           {/* Card Selector for Contract Type */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setType('house')}
               className={cn(
-                'flex flex-col items-center gap-2 p-3.5 rounded-2xl border-2 transition-all text-center',
+                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
                 type === 'house'
                   ? 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239] shadow-sm'
-                  : 'border-[#F4EEE5] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC]'
+                  : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Home className="w-6 h-6 shrink-0" />
-              <span className="text-xs font-semibold">สัญญาเช่าบ้าน</span>
+              <Home className="w-5.5 h-5.5 shrink-0" />
+              <span className="text-[10px] font-bold">สัญญาเช่าบ้าน</span>
             </button>
 
             <button
               type="button"
               onClick={() => setType('personal_role')}
               className={cn(
-                'flex flex-col items-center gap-2 p-3.5 rounded-2xl border-2 transition-all text-center',
+                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
                 type === 'personal_role'
                   ? 'border-[#D97706] bg-[#D97706]/5 text-[#D97706] shadow-sm'
-                  : 'border-[#F4EEE5] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC]'
+                  : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Star className="w-6 h-6 shrink-0" />
-              <span className="text-xs font-semibold">สัญญายศส่วนตัว</span>
+              <Star className="w-5.5 h-5.5 shrink-0" />
+              <span className="text-[10px] font-bold">สัญญายศส่วนตัว</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setType('ad')}
+              className={cn(
+                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
+                type === 'ad'
+                  ? 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1] shadow-sm'
+                  : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
+              )}
+            >
+              <Megaphone className="w-5.5 h-5.5 shrink-0" />
+              <span className="text-[10px] font-bold">สัญญาโฆษณา</span>
             </button>
           </div>
 
@@ -372,7 +391,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                 value={memberId}
                 onChange={e => setMemberId(e.target.value)}
                 placeholder="ป้อน Discord User ID (ตัวเลข)"
-                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm"
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
               />
             </div>
 
@@ -383,18 +402,18 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   type="datetime-local"
                   value={startAt}
                   onChange={e => setStartAt(e.target.value)}
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
                 />
               </div>
 
-              {type === 'house' && (
+              {(type === 'house' || type === 'ad') && (
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-[#827160]">วันที่สิ้นสุด</Label>
                   <Input
                     type="datetime-local"
                     value={endAt}
                     onChange={e => setEndAt(e.target.value)}
-                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm"
+                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
                   />
                 </div>
               )}
@@ -408,7 +427,20 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   value={roomLink}
                   onChange={e => setRoomLink(e.target.value)}
                   placeholder="https://discord.com/channels/..."
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
+                />
+              </div>
+            )}
+
+            {/* Fields for Ad */}
+            {type === 'ad' && (
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-[#827160]">ชื่อแพ็กเกจโฆษณา</Label>
+                <Input
+                  value={packageName}
+                  onChange={e => setPackageName(e.target.value)}
+                  placeholder="เช่น แพ็ก Banner A"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
                 />
               </div>
             )}
@@ -424,7 +456,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                     size="sm"
                     onClick={fetchDiscordRoles}
                     disabled={rolesLoading}
-                    className="h-6.5 text-[10px] gap-1 px-2 border-[#DFD5C0] hover:bg-white text-[#827160]"
+                    className="h-6.5 text-[10px] gap-1 px-2 border-[#DFD5C0] dark:border-[#3E3229] hover:bg-white text-[#827160]"
                   >
                     <RefreshCw className={cn('w-2.5 h-2.5', rolesLoading && 'animate-spin')} />
                     ซิงค์ยศจาก Discord
@@ -434,7 +466,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
-                    className="pl-8 h-7.5 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC]"
+                    className="pl-8 h-7.5 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3E3229]"
                     placeholder="ค้นหาชื่อบทบาท/ยศ..."
                     value={roleSearch}
                     onChange={e => setRoleSearch(e.target.value)}
@@ -446,7 +478,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                     <Loader2 className="w-5 h-5 animate-spin text-[#8C6239]" />
                   </div>
                 ) : (
-                  <div className="max-h-36 overflow-y-auto rounded-lg border bg-white dark:bg-[#1E1B18] divide-y text-xs">
+                  <div className="max-h-36 overflow-y-auto rounded-lg border bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520] divide-y divide-[#EAD8C8] dark:divide-[#2D2520] text-xs">
                     {filteredDiscordRoles.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-4">
                         {discordRoles.length === 0 ? 'กดปุ่มซิงค์ด้านบนเพื่อโหลดยศ' : 'ไม่พบยศที่ตรงกัน'}
@@ -483,31 +515,23 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                     </Badge>
                   </div>
                 )}
-
-                <div className="space-y-1 mt-1">
-                  <Label className="text-xs font-semibold text-[#827160]">Room Link (ช่อง Discord ส่วนตัว - ไม่บังคับ)</Label>
-                  <Input
-                    value={roomLink}
-                    onChange={e => setRoomLink(e.target.value)}
-                    placeholder="https://discord.com/channels/..."
-                    className="bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-8 text-xs"
-                  />
-                </div>
               </div>
             )}
           </div>
         </div>
 
         <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" onClick={handleClose} className="rounded-xl border-[#EFE7DC]">ยกเลิก</Button>
+          <Button variant="outline" onClick={handleClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520]">ยกเลิก</Button>
           <Button
             onClick={handleSave}
             disabled={saving}
             className={cn(
-              'rounded-xl text-white font-medium',
+              'rounded-xl text-white font-semibold shadow-sm transition-all',
               type === 'house'
                 ? 'bg-[#8C6239] hover:bg-[#76522E] text-white'
-                : 'bg-[#D97706] hover:bg-[#B45F06] text-white'
+                : type === 'personal_role'
+                  ? 'bg-[#D97706] hover:bg-[#B45F06] text-white'
+                  : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white'
             )}
           >
             {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin text-white" />}
@@ -533,6 +557,7 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
   const { toast } = useToast();
   const [endAt, setEndAt] = useState(contract.end_at ? toLocalDatetimeValue(contract.end_at) : '');
   const [roomLink, setRoomLink] = useState(contract.room_link ?? '');
+  const [packageName, setPackageName] = useState(contract.package_name ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -541,25 +566,34 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
       ...(contract.edit_log ?? []),
       { editor: operatorName, avatar: operatorAvatar, timestamp: new Date().toISOString() },
     ];
-    const { error } = await (supabase as any).from('contracts').update({
+    const updatePayload: Record<string, any> = {
       end_at: endAt ? new Date(endAt).toISOString() : null,
-      room_link: roomLink.trim() || null,
       updated_at: new Date().toISOString(),
       edit_log: newLog,
-    }).eq('id', contract.id);
+    };
+    if (contract.type === 'house') {
+      updatePayload.room_link = roomLink.trim() || null;
+    } else if (contract.type === 'ad') {
+      updatePayload.package_name = packageName.trim() || null;
+    }
+
+    const { error } = await (supabase as any).from('contracts').update(updatePayload).eq('id', contract.id);
     setSaving(false);
     if (error) { toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'แก้ไขสำเร็จ' });
     onSaved();
   }
 
+  const isAd = contract.type === 'ad';
+  const themeColor = isAd ? 'bg-[#6366F1] hover:bg-[#4F46E5]' : 'bg-[#8C6239] hover:bg-[#76522E]';
+
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-sm bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6">
         <DialogHeader>
           <DialogTitle className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
-            <Edit2 className="w-4 h-4 text-[#8C6239]" />
-            แก้ไขสัญญาเช่าบ้าน
+            {isAd ? <Megaphone className="w-4 h-4 text-[#6366F1]" /> : <Edit2 className="w-4 h-4 text-[#8C6239]" />}
+            {isAd ? 'แก้ไขสัญญาโฆษณา' : 'แก้ไขสัญญาเช่าบ้าน'}
           </DialogTitle>
           <DialogDescription className="text-xs text-[#827160]">
             สมาชิก ID: {contract.member_id}
@@ -573,24 +607,37 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
               type="datetime-local"
               value={endAt}
               onChange={e => setEndAt(e.target.value)}
-              className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5"
+              className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold text-[#827160]">Room Link (ช่อง Discord)</Label>
-            <Input
-              value={roomLink}
-              onChange={e => setRoomLink(e.target.value)}
-              placeholder="https://discord.com/channels/..."
-              className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5"
-            />
-          </div>
+          
+          {!isAd ? (
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-[#827160]">Room Link (ช่อง Discord)</Label>
+              <Input
+                value={roomLink}
+                onChange={e => setRoomLink(e.target.value)}
+                placeholder="https://discord.com/channels/..."
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-[#827160]">ชื่อแพ็กเกจโฆษณา</Label>
+              <Input
+                value={packageName}
+                onChange={e => setPackageName(e.target.value)}
+                placeholder="เช่น แพ็ก Banner A"
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} className="rounded-xl border-[#EFE7DC]">ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-[#8C6239] hover:bg-[#76522E] text-white rounded-xl">
-            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}บันทึก
+          <Button variant="outline" onClick={onClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520]">ยกเลิก</Button>
+          <Button onClick={handleSave} disabled={saving} className={cn("text-white rounded-xl font-semibold shadow-sm transition-all", themeColor)}>
+            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin text-white" />}บันทึก
           </Button>
         </DialogFooter>
       </DialogContent>
