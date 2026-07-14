@@ -282,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_owner: true,
         is_banned: false,
         ban_reason: null,
-        allowed_pages: ['users', 'banned-roles', 'banned-words', 'tag-warn', 'contracts', 'healing-messages', 'trading-history', 'role-transfer', 'bulk-role-manage', 'reports', 'categories', 'banners', 'roles', 'checkin-rewards', 'campaigns', 'product-catalog', 'discord-servers', 'redeem-codes', 'non-transferable-roles', 'roles-to-delete', 'permissions'],
+        allowed_pages: ['users', 'banned-roles', 'banned-words', 'tag-warn', 'contracts', 'healing-messages', 'trading-history', 'role-transfer', 'bulk-role-manage', 'reports', 'banners', 'checkin-rewards', 'campaigns', 'product-catalog', 'discord-servers', 'redeem-codes', 'non-transferable-roles', 'roles-to-delete', 'permissions'],
       };
       return {
         user: mockAdminUser,

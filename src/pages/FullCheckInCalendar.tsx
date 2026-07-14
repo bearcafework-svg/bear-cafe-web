@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
 import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
@@ -11,7 +10,6 @@ import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigReward
 import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
 import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
-import { useCooldown } from '@/hooks/useCooldown';
 import { useCheckinFlow } from '@/hooks/useCheckinFlow';
 import { useUserBalances } from '@/hooks/useUserBalances';
 import {
@@ -34,7 +32,7 @@ export default function FullCheckInCalendar() {
   const navigate = useNavigate();
   const { points } = useUserBalances(user?.discord_id);
 
-  const { isOnCooldown, formattedTime, remainingMinutes } = useCooldown(user?.id ?? null);
+
 
   const {
     status,
@@ -97,11 +95,6 @@ export default function FullCheckInCalendar() {
       overlays={
         <>
           <GreenTeaWarningPopup userId={user?.id} />
-          <CooldownBox
-            isOnCooldown={isOnCooldown}
-            formattedTime={formattedTime}
-            remainingMinutes={remainingMinutes}
-          />
         </>
       }
     >

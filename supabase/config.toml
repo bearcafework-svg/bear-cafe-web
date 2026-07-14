@@ -16,9 +16,6 @@ verify_jwt = false
 [functions.discord-webhook]
 verify_jwt = true
 
-# Primary session messaging endpoint. Messages that require buttons/components must go through the Bot API here.
-[functions.send-session-webhook]
-verify_jwt = false
 
 [functions.discord-roles]
 verify_jwt = false
@@ -26,20 +23,10 @@ verify_jwt = false
 [functions.discord-member-count]
 verify_jwt = false
 
-[functions.cleanup-sessions]
-verify_jwt = false
 
 [functions.cleanup-voice-states]
 verify_jwt = false
 
-[functions.session-create]
-verify_jwt = false
-
-[functions.session-cancel]
-verify_jwt = false
-
-[functions.complete-expired-sessions]
-verify_jwt = false
 
 [functions.tag-warn-logs]
 verify_jwt = false

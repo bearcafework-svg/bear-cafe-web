@@ -185,18 +185,9 @@ export function TradingHistoryManagement() {
   // Discord roles mapping for icon & colors
   const [discordRolesMap, setDiscordRolesMap] = useState<Map<string, { display_name: string; color: string | null; emoji: string | null }>>(new Map());
 
-  // Fetch discord_roles on mount
+  // Fetch discord_roles bypassed as discord_roles table is being deleted
   useEffect(() => {
-    supabase.from('discord_roles').select('id, display_name, color, emoji')
-      .then(({ data }) => {
-        if (data) {
-          const map = new Map<string, { display_name: string; color: string | null; emoji: string | null }>();
-          data.forEach(r => {
-            map.set(r.id, { display_name: r.display_name, color: r.color, emoji: r.emoji });
-          });
-          setDiscordRolesMap(map);
-        }
-      });
+    setDiscordRolesMap(new Map());
   }, []);
 
   // Product catalog

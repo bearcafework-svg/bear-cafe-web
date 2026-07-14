@@ -134,28 +134,16 @@ function PointsWidget() {
       let roleColor: string | undefined;
 
       if (data.granted?.roleGranted) {
-        const { data: roleData } = await supabase
-          .from('discord_roles')
-          .select('display_name, emoji, color')
-          .eq('discord_role_id', data.granted.roleGranted)
-          .maybeSingle();
-        if (roleData) {
-          roleName = roleData.display_name;
-          roleEmoji = roleData.emoji ?? undefined;
-          roleColor = roleData.color ?? undefined;
-        }
-        if (!roleName || !roleEmoji) {
-          try {
-            const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
-              body: { role_id: data.granted.roleGranted },
-            });
-            if (roleInfo && !roleInfo.error) {
-              roleName = roleName || roleInfo.name;
-              roleEmoji = roleEmoji || roleInfo.icon || roleInfo.unicode_emoji || undefined;
-              roleColor = roleColor || roleInfo.color || undefined;
-            }
-          } catch { /* ignore */ }
-        }
+        try {
+          const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
+            body: { role_id: data.granted.roleGranted },
+          });
+          if (roleInfo && !roleInfo.error) {
+            roleName = roleInfo.name;
+            roleEmoji = roleInfo.icon || roleInfo.unicode_emoji || undefined;
+            roleColor = roleInfo.color || undefined;
+          }
+        } catch { /* ignore */ }
         if (!roleName) roleName = `ยศพิเศษ (${data.granted.roleGranted.slice(-6)})`;
         if (!roleEmoji) roleEmoji = '🎭';
       }

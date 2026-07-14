@@ -19,7 +19,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'overview', label: 'ภาพรวมระบบ', group: 'system', groupLabel: 'ระบบ' },
   { id: 'users', label: 'จัดการผู้ใช้', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'banned-roles', label: 'ยศที่ถูกแบน', group: 'moderation', groupLabel: 'การดูแล' },
-  { id: 'banned-words', label: 'คำต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },
+  { id: 'banned-words', label: 'ชื่อต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'tag-warn', label: 'ประวัติแท็กเตือน', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'contracts', label: 'สัญญาเช่า', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'healing-messages', label: 'กระดานให้กำลังใจ', group: 'moderation', groupLabel: 'การดูแล' },
@@ -27,9 +27,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'role-transfer', label: 'ย้ายบทบาท', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'bulk-role-manage', label: 'จัดการยศกลุ่ม', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'reports', label: 'รายงาน', group: 'moderation', groupLabel: 'การดูแล', ownerOnly: true },
-  { id: 'categories', label: 'หมวดหมู่', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'banners', label: 'แบนเนอร์', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'roles', label: 'ยศ Discord', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'checkin-rewards', label: 'เช็กอินรายวัน', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'redeem-codes', label: 'โค้ดแลก', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
@@ -39,6 +37,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'campaigns', label: 'แคมเปญโฆษณา', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'product-catalog', label: 'คลังสินค้า', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
+  { id: 'dm-broadcast', label: 'ส่งข่าวสารบอท DM', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */

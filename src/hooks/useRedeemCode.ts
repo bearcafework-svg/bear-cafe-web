@@ -57,31 +57,17 @@ export function useRedeemCode(discordId: string | null | undefined) {
     let roleEmoji: string | undefined;
     let roleColor: string | undefined;
 
-    const { data: roleData } = await supabase
-      .from('discord_roles')
-      .select('display_name, emoji, color')
-      .eq('discord_role_id', roleId)
-      .maybeSingle();
-
-    if (roleData) {
-      roleName = roleData.display_name;
-      roleEmoji = roleData.emoji ?? undefined;
-      roleColor = roleData.color ?? undefined;
-    }
-
-    if (!roleName || !roleEmoji) {
-      try {
-        const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
-          body: { role_id: roleId },
-        });
-        if (roleInfo && !roleInfo.error) {
-          roleName = roleName || roleInfo.name;
-          roleEmoji = roleEmoji || roleInfo.icon || roleInfo.unicode_emoji || undefined;
-          roleColor = roleColor || roleInfo.color || undefined;
-        }
-      } catch {
-        /* non-blocking */
+    try {
+      const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
+        body: { role_id: roleId },
+      });
+      if (roleInfo && !roleInfo.error) {
+        roleName = roleInfo.name;
+        roleEmoji = roleInfo.icon || roleInfo.unicode_emoji || undefined;
+        roleColor = roleInfo.color || undefined;
       }
+    } catch {
+      /* non-blocking */
     }
 
     if (!roleName) roleName = `ยศพิเศษ (${roleId.slice(-6)})`;

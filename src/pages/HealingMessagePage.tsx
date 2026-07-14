@@ -72,7 +72,7 @@ export default function HealingMessagePage() {
   }, [messages, user?.id]);
 
   const containsBannedWord = useCallback(async (text: string): Promise<string | null> => {
-    const { data, error } = await supabase.from('banned_words').select('word');
+    const { data, error } = await supabase.from('banned_name').select('word');
     if (error) throw error;
     const lower = text.toLowerCase();
     for (const row of data || []) {
@@ -101,7 +101,7 @@ export default function HealingMessagePage() {
     try {
       const blocked = await containsBannedWord(trimmed);
       if (blocked) {
-        toast({ title: 'ไม่สามารถส่งได้', description: `พบคำต้องห้าม: "${blocked}"`, variant: 'destructive' });
+        toast({ title: 'ไม่สามารถส่งได้', description: `พบชื่อต้องห้าม: "${blocked}"`, variant: 'destructive' });
         return;
       }
       const { error } = await (supabase as any)

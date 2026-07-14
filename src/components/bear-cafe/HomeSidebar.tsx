@@ -8,7 +8,6 @@ import { useTheme } from 'next-themes';
 import pointIcon from '@/assets/point-icon.png';
 import lightmodeIcon from '@/assets/lightmode-icon.png';
 import darkmodeIcon from '@/assets/darkmode-icon.png';
-import historyIcon from '@/assets/history-icon.png';
 import lotteryIcon from '@/assets/lottery-icon.png';
 import ruleIcon from '@/assets/rule-icon.png';
 import settingIcon from '@/assets/setting-icon.png';
@@ -93,18 +92,6 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
           <span className="font-medium">สลับโหมด</span>
         </button>
 
-        {/* ประวัติการใช้งาน */}
-        <Link
-          to={isAuthenticated ? "/history" : "/login"}
-          className="group w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-foreground hover:bg-white/50 dark:hover:bg-black/20 transition-colors [@media(max-height:820px)]:py-2 [@media(max-height:820px)]:text-sm"
-        >
-          <img 
-            src={historyIcon} 
-            alt="History Icon" 
-            className="w-6 h-6 shrink-0 object-contain drop-shadow-sm transition-all duration-300 group-hover:scale-125 group-hover:-translate-y-1 [@media(max-height:820px)]:w-5 [@media(max-height:820px)]:h-5" 
-          />
-          <span className="font-medium">ประวัติการใช้งาน</span>
-        </Link>
 
         {/* เช็คแต้มของคุณ */}
         {user && (

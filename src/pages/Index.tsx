@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CooldownBox } from '@/components/bear-cafe/CooldownBox';
 import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { CozyFeatureCards } from '@/components/bear-cafe/CozyFeatureCards';
 import { CommunityCarousel } from '@/components/bear-cafe/CommunityCarousel';
-import { useCooldown } from '@/hooks/useCooldown';
 import { motion } from 'framer-motion';
 
 type WelcomeMessage = { line1: string; line2?: string };
@@ -90,7 +88,6 @@ function DisplayWelcomeMessage() {
 
 export default function Index() {
   const { user, isLoading } = useAuth();
-  const { isOnCooldown, formattedTime, remainingMinutes } = useCooldown(user?.id ?? null);
   const displayName = user?.discord_username ?? user?.username ?? 'เพื่อน';
 
   return (
@@ -100,11 +97,6 @@ export default function Index() {
       overlays={
         <>
           <GreenTeaWarningPopup userId={user?.id} />
-          <CooldownBox
-            isOnCooldown={isOnCooldown}
-            formattedTime={formattedTime}
-            remainingMinutes={remainingMinutes}
-          />
         </>
       }
     >
@@ -133,7 +125,7 @@ export default function Index() {
           transition={{ duration: 0.45 }}
           className="space-y-2"
         >
-          <CozyFeatureCards isOnCooldown={isOnCooldown} formattedTime={formattedTime} />
+          <CozyFeatureCards />
         </motion.div>
 
         <motion.div

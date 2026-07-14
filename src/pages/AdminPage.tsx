@@ -31,8 +31,7 @@ import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
 import { BannedRolesManagement } from '@/components/admin/BannedRolesManagement';
 import { BannedWordsManagement } from '@/components/admin/BannedWordsManagement';
-import { CategoriesManagement } from '@/components/admin/CategoriesManagement';
-import { DiscordRolesManagement } from '@/components/admin/DiscordRolesManagement';
+import { DMBroadcastManagement } from '@/components/admin/DMBroadcastManagement';
 import { RedeemCodesManagement } from '@/components/admin/RedeemCodesManagement';
 import { TagWarnLogsManagement } from '@/components/admin/TagWarnLogsManagement';
 import { TradingHistoryManagement } from '@/components/admin/TradingHistoryManagement';
@@ -101,15 +100,14 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'bulk-role-manage': Users,
   'role-migration': Layers,
   'reports': Flag,
-  'categories': FolderOpen,
   'banners': ImageIcon,
-  'roles': Palette,
   'checkin-rewards': CalendarCheck,
   'redeem-codes': Ticket,
   'non-transferable-roles': ShieldBan,
   'discord-servers': Settings,
   'campaigns': Send,
   'product-catalog': ShoppingCart,
+  'dm-broadcast': Send,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -339,9 +337,7 @@ export default function AdminPage() {
         case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
         case 'healing-messages': return canAccessPage('healing-messages') ? <HealingMessagesManagement /> : null;
         case 'trading-history': return canAccessPage('trading-history') ? <TradingHistoryManagement /> : null;
-        case 'categories': return canAccessPage('categories') ? <CategoriesManagement /> : null;
         case 'banners': return canAccessPage('banners') ? <BannerManagement /> : null;
-        case 'roles': return canAccessPage('roles') ? <DiscordRolesManagement /> : null;
         case 'checkin-rewards': return canAccessPage('checkin-rewards') ? <CheckinRewardsManagement /> : null;
         case 'role-transfer': return canAccessPage('role-transfer') ? <RoleTransferManagement /> : null;
         case 'bulk-role-manage': return canAccessPage('bulk-role-manage') ? <BulkRoleManagement /> : null;
@@ -354,6 +350,7 @@ export default function AdminPage() {
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'campaigns': return canAccessPage('campaigns') ? <CampaignsManagement /> : null;
         case 'product-catalog': return canAccessPage('product-catalog') ? <ProductCatalogManagement /> : null;
+        case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
         default: return null;
       }
     } catch (error) {

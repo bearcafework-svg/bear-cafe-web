@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useActiveVoiceCount } from '@/hooks/useActiveVoiceCount';
 import { DailyCheckInCard } from '@/components/bear-cafe/DailyCheckinCard';
 import {
   FeatureBadge,
@@ -10,19 +9,12 @@ import {
   FeatureImage,
 } from '@/components/bear-cafe/FeatureCardFrame';
 import { BeeIcon } from '@/icon/outline';
-import { OpenMicIcon } from '@/icon/inline';
 
 const BEAR_CAFE_INVITE = 'https://discord.gg/bearcafe';
 
-interface FindFriendsCardProps {
-  isOnCooldown?: boolean;
-  formattedTime?: string;
-}
-
-function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) {
+function FindFriendsCard() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const voiceCount = useActiveVoiceCount();
 
   const hasDiscord = Boolean(user?.discord_id);
   const isDisabled = true;
@@ -64,18 +56,7 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
       </FeatureBadge> */}
 
       <h3 className="bear-h2-bold text-foreground leading-tight">หาเพื่อนลงห้อง</h3>
-      <div className='flex items-center gap-2'>
-        <OpenMicIcon size={16} color='#50A582' strokeWidth={1.5} />
-        <p className="bear-body-regular-medium text-[hsl(var(--matcha))]">
-          {voiceCount} คนออนไลน์อยู่
-        </p>
-      </div>
 
-      {isOnCooldown && formattedTime && (
-        <p className="text-[11px] text-destructive mt-1.5 font-mono font-bold bg-destructive/10 px-2 py-0.5 rounded-full">
-          ⏳ {formattedTime}
-        </p>
-      )}
 
       <button 
         disabled
@@ -103,16 +84,11 @@ function FindFriendsCard({ isOnCooldown, formattedTime }: FindFriendsCardProps) 
   );
 }
 
-interface CozyFeatureCardsProps {
-  isOnCooldown?: boolean;
-  formattedTime?: string;
-}
-
-export function CozyFeatureCards({ isOnCooldown, formattedTime }: CozyFeatureCardsProps) {
+export function CozyFeatureCards() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
       <DailyCheckInCard />
-      <FindFriendsCard isOnCooldown={isOnCooldown} formattedTime={formattedTime} />
+      <FindFriendsCard />
     </div>
   );
 }

@@ -10,8 +10,6 @@ import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
-import CreateSessionPage from "./pages/CreateSessionPage";
-import SessionHistoryPage from "./pages/SessionHistoryPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import AdminPage from "./pages/AdminPage";
 import BannedPage from "./pages/BannedPage";
@@ -71,8 +69,6 @@ function AppRoutes() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/banned-role" element={<RoleBannedPage />} />
 
-      <Route path="/create-session" element={<ProtectedRoute><CreateSessionPage /></ProtectedRoute>} />
-      <Route path="/history" element={<ProtectedRoute><SessionHistoryPage /></ProtectedRoute>} />
       <Route path="/points" element={<ProtectedRoute><PointsPage /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
