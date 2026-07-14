@@ -47,7 +47,7 @@ export function BannedWordsManagement() {
   const [editingWord, setEditingWord] = useState<BannedWord | null>(null);
   const [editWordValue, setEditWordValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<BannedWord | null>(null);
-  
+
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -194,9 +194,9 @@ export function BannedWordsManagement() {
           </div>
           <div className="flex items-center gap-2">
             <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาชื่อ..." className="w-48 sm:w-56" />
-            <Button 
-              onClick={() => setDialogOpen(true)} 
-              size="sm" 
+            <Button
+              onClick={() => setDialogOpen(true)}
+              size="sm"
               className="gap-1.5 shrink-0 bg-[#FAC4CD] hover:bg-[#F8AAB6] text-[#6B323B] border border-[#E9B1BA]"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -234,7 +234,7 @@ export function BannedWordsManagement() {
                     <span className="text-sm font-medium text-[#6B5A4B] dark:text-foreground">
                       {word.word}
                     </span>
-                    
+
                     {/* Actions — visible on hover */}
                     <div className="flex items-center gap-1 opacity-0 group-hover/chip:opacity-100 transition-opacity ml-1">
                       <button
@@ -294,7 +294,7 @@ export function BannedWordsManagement() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-[#EAD8C8]">
               ยกเลิก
             </Button>
-            <Button 
+            <Button
               onClick={handleAddWords}
               className="bg-[#FAC4CD] hover:bg-[#F8AAB6] text-[#6B323B] border border-[#E9B1BA]"
             >
@@ -327,7 +327,7 @@ export function BannedWordsManagement() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="border-[#EAD8C8]">
               ยกเลิก
             </Button>
-            <Button 
+            <Button
               onClick={handleEditWord}
               className="bg-[#FAC4CD] hover:bg-[#F8AAB6] text-[#6B323B] border border-[#E9B1BA]"
             >

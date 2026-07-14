@@ -185,7 +185,7 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
   return (
     <div className="flex items-center gap-2 bg-[#FAF6F0] dark:bg-[#2C241E] px-3 py-1 rounded-xl border border-[#F0E8DC] dark:border-[#42352B]">
       <span className="text-[11px] font-medium text-[#827160] dark:text-[#A89889]">ไอคอน:</span>
-      {([ 'house', 'personal_role' ] as ContractType[]).map(type => (
+      {(['house', 'personal_role'] as ContractType[]).map(type => (
         <div key={type} className="relative group">
           <button
             onClick={() => handleClick(type)}
@@ -772,31 +772,31 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
   const cardBorder =
     contract.type !== 'house' ? 'border-[#F4EEE5]' :
-    isExpired ? 'border-red-200 shadow-red-50/20' :
-    isUrgent ? 'border-rose-200 shadow-rose-50/20' :
-    isWarning ? 'border-amber-200' :
-    'border-[#F4EEE5]';
+      isExpired ? 'border-red-200 shadow-red-50/20' :
+        isUrgent ? 'border-rose-200 shadow-rose-50/20' :
+          isWarning ? 'border-amber-200' :
+            'border-[#F4EEE5]';
 
   const cardBackground =
     contract.type !== 'house' ? 'bg-white dark:bg-[#1E1B18]' :
-    isExpired ? 'bg-red-50/10 dark:bg-red-950/5' :
-    isUrgent ? 'bg-rose-50/15 dark:bg-rose-950/5' :
-    isWarning ? 'bg-amber-50/10 dark:bg-amber-950/5' :
-    'bg-white dark:bg-[#1E1B18]';
+      isExpired ? 'bg-red-50/10 dark:bg-red-950/5' :
+        isUrgent ? 'bg-rose-50/15 dark:bg-rose-950/5' :
+          isWarning ? 'bg-amber-50/10 dark:bg-amber-950/5' :
+            'bg-white dark:bg-[#1E1B18]';
 
   const statusBadgeColor =
     contract.type !== 'house' ? 'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20' :
-    isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400' :
-    isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 animate-pulse' :
-    isWarning ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#3E2E16] dark:text-amber-400' :
-    'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20';
+      isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400' :
+        isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 animate-pulse' :
+          isWarning ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#3E2E16] dark:text-amber-400' :
+            'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20';
 
   const statusText =
     contract.type !== 'house' ? 'ปกติ' :
-    isExpired ? 'หมดอายุแล้ว' :
-    isUrgent ? 'ใกล้หมดอายุ (วิกฤต)' :
-    isWarning ? 'ใกล้หมดอายุ' :
-    'ปกติ';
+      isExpired ? 'หมดอายุแล้ว' :
+        isUrgent ? 'ใกล้หมดอายุ (วิกฤต)' :
+          isWarning ? 'ใกล้หมดอายุ' :
+            'ปกติ';
 
   const typeLabel = contract.type === 'house' ? 'สัญญาเช่าบ้าน' : 'สัญญายศส่วนตัว';
 
@@ -842,9 +842,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
   const progressBarColor =
     isExpired ? 'bg-red-500' :
-    isUrgent ? 'bg-rose-500' :
-    isWarning ? 'bg-amber-500' :
-    'bg-[#50A582]';
+      isUrgent ? 'bg-rose-500' :
+        isWarning ? 'bg-amber-500' :
+          'bg-[#50A582]';
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(contract.member_id);
@@ -1024,9 +1024,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
               <span className={cn(
                 'text-xs font-semibold',
                 isExpired ? 'text-red-500' :
-                isUrgent ? 'text-rose-500' :
-                isWarning ? 'text-amber-500' :
-                'text-muted-foreground'
+                  isUrgent ? 'text-rose-500' :
+                    isWarning ? 'text-amber-500' :
+                      'text-muted-foreground'
               )}>
                 {formatRemaining(contract.end_at)}
               </span>
@@ -1216,7 +1216,7 @@ export function ContractsManagement() {
       const memberIdMatch = c.member_id.toLowerCase().includes(searchMember.toLowerCase());
       const profile = memberProfiles[c.member_id];
       const usernameMatch = profile?.username?.toLowerCase().includes(searchMember.toLowerCase()) ||
-                            profile?.discord_username?.toLowerCase().includes(searchMember.toLowerCase());
+        profile?.discord_username?.toLowerCase().includes(searchMember.toLowerCase());
       if (!memberIdMatch && !usernameMatch) return false;
     }
 
@@ -1243,6 +1243,7 @@ export function ContractsManagement() {
   const countByType = {
     house: contracts.filter(c => c.type === 'house').length,
     personal_role: contracts.filter(c => c.type === 'personal_role').length,
+    ad: contracts.filter(c => c.type === 'ad').length,
   };
   const urgentCount = contracts.filter(c => {
     if (c.type !== 'house' || !c.end_at) return false;
@@ -1291,12 +1292,13 @@ export function ContractsManagement() {
       </div>
 
       {/* ── Stats Panel (Interactive Quick Filters) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {([
-          { key: 'all', label: 'สัญญาทั้งหมด', count: contracts.length, color: 'bg-white text-[#4E3F30] border-[#F4EEE5] hover:border-[#DFD5C0]', activeBg: 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239]', icon: Home },
-          { key: 'house', label: 'สัญญาเช่าบ้าน', count: countByType.house, color: 'bg-white text-[#4E3F30] border-[#F4EEE5] hover:border-[#DFD5C0]', activeBg: 'border-[#8B5E3C] bg-[#8B5E3C]/5 text-[#8B5E3C]', icon: Home },
-          { key: 'personal_role', label: 'สัญญายศส่วนตัว', count: countByType.personal_role, color: 'bg-white text-[#4E3F30] border-[#F4EEE5] hover:border-[#DFD5C0]', activeBg: 'border-[#D97706] bg-[#D97706]/5 text-[#D97706]', icon: Star },
-          { key: 'urgent', label: 'ใกล้หมดอายุ/หมดอายุ', count: urgentCount, color: 'bg-white text-[#C23B51] border-[#F4EEE5] hover:border-red-200', activeBg: 'border-red-500 bg-red-500/5 text-red-600', icon: AlertTriangle },
+          { key: 'all', label: 'สัญญาทั้งหมด', count: contracts.length, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239]', icon: Home },
+          { key: 'house', label: 'สัญญาเช่าบ้าน', count: countByType.house, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8B5E3C] bg-[#8B5E3C]/5 text-[#8B5E3C]', icon: Home },
+          { key: 'personal_role', label: 'สัญญายศส่วนตัว', count: countByType.personal_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#D97706] bg-[#D97706]/5 text-[#D97706]', icon: Star },
+          { key: 'ad', label: 'สัญญาโฆษณา', count: countByType.ad, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1]', icon: Megaphone },
+          { key: 'urgent', label: 'ใกล้หมดอายุ/หมดอายุ', count: urgentCount, color: 'bg-white dark:bg-[#1E1B18] text-[#C23B51] dark:text-red-400 border-[#F4EEE5] dark:border-[#2D2520] hover:border-red-200', activeBg: 'border-red-500 bg-red-500/5 text-red-600', icon: AlertTriangle },
         ] as const).map(({ key, label, count, color, activeBg, icon: IconComponent }) => {
           const isActive = filterType === key;
           return (
