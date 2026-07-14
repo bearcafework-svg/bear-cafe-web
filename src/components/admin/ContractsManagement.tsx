@@ -32,21 +32,22 @@ import {
 import {
   Plus, Home, User, Clock, Bell, Edit2, Search, RefreshCw,
   Loader2, CheckCircle2, X, Upload, Star, Link, Hash, Users, Calendar,
-  AlertTriangle, Copy, History, HelpCircle, ArrowRight
+  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type ContractType = 'house' | 'personal_role';
+type ContractType = 'house' | 'personal_role' | 'ad';
 
 interface Contract {
   id: string;
-  type: 'house' | 'personal_role' | 'role'; // Keep 'role' in interface to filter legacy records
+  type: 'house' | 'personal_role' | 'ad' | 'role'; // Keep 'role' in interface to filter legacy records
   member_id: string;
   start_at: string;
   end_at: string | null;
   room_link: string | null;
   role_name: string | null;
   discord_role_id: string | null;
+  package_name?: string | null;
   operator_id: string | null;
   operator_name: string | null;
   created_at: string;
@@ -57,11 +58,13 @@ interface Contract {
 interface TypeIcons {
   house: string | null;
   personal_role: string | null;
+  ad: string | null;
 }
 
 const typeIconsMap: Record<ContractType, React.ComponentType<any>> = {
   house: Home,
   personal_role: Star,
+  ad: Megaphone,
 };
 
 function formatRemaining(endAt: string) {
