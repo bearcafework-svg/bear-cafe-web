@@ -283,7 +283,7 @@ export function BannedWordsManagement() {
                 placeholder="ตัวอย่าง: แอดมิน, สตาฟ, admin, staff"
                 value={newWords}
                 onChange={(e) => setNewWords(e.target.value)}
-                className="border-[#EAD8C8] bg-white focus-visible:ring-[#FAC4CD]"
+                className="border-[#EAD8C8] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground focus-visible:ring-[#FAC4CD]"
               />
               <p className="text-[11px] text-[#8C6239]/80 dark:text-muted-foreground">
                 💡 คำแนะนำ: คั่นแต่ละชื่อด้วยจุลภาค เช่น "แอดมิน, ผู้ดูแล"
@@ -319,7 +319,7 @@ export function BannedWordsManagement() {
                 placeholder="กรอกชื่อต้องห้าม..."
                 value={editWordValue}
                 onChange={(e) => setEditWordValue(e.target.value)}
-                className="border-[#EAD8C8] bg-white focus-visible:ring-[#FAC4CD]"
+                className="border-[#EAD8C8] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground focus-visible:ring-[#FAC4CD]"
               />
             </div>
           </div>
