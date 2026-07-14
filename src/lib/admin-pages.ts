@@ -19,7 +19,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'overview', label: 'ภาพรวมระบบ', group: 'system', groupLabel: 'ระบบ' },
   { id: 'users', label: 'จัดการผู้ใช้', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'banned-roles', label: 'ยศที่ถูกแบน', group: 'moderation', groupLabel: 'การดูแล' },
-  { id: 'banned-words', label: 'ชื่อต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },
+  { id: 'banned-name', label: 'ชื่อต้องห้าม', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'tag-warn', label: 'ประวัติแท็กเตือน', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'contracts', label: 'สัญญาเช่า', group: 'moderation', groupLabel: 'การดูแล' },
   { id: 'healing-messages', label: 'กระดานให้กำลังใจ', group: 'moderation', groupLabel: 'การดูแล' },

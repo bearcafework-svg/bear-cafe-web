@@ -91,7 +91,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'overview': LayoutDashboard,
   'users': Users,
   'banned-roles': Ban,
-  'banned-words': AlertTriangle,
+  'banned-name': AlertTriangle,
   'tag-warn': ClipboardList,
   'contracts': Home,
   'healing-messages': Heart,
@@ -332,7 +332,7 @@ export default function AdminPage() {
         case 'overview': return <AdminDashboardOverview onNavigate={handleNavClick} visibleItems={visibleItems} username={user?.username} />;
         case 'users': return canAccessPage('users') ? <UsersManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
-        case 'banned-words': return canAccessPage('banned-words') ? <BannedWordsManagement /> : null;
+        case 'banned-name': return canAccessPage('banned-name') ? <BannedWordsManagement /> : null;
         case 'tag-warn': return canAccessPage('tag-warn') ? <TagWarnLogsManagement /> : null;
         case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
         case 'healing-messages': return canAccessPage('healing-messages') ? <HealingMessagesManagement /> : null;

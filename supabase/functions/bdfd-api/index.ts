@@ -17,7 +17,16 @@ const ROLE_CAPS: Record<string, number> = {
 };
 const DEFAULT_CAP = 750;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || '';
@@ -43,12 +52,12 @@ serve(async (req) => {
         message: row?.message || fallbackMessage,
         author_discord_id: row?.discord_id || '',
         author_username: row?.username || 'Bearcafe Community',
-      }), { headers: { 'Content-Type': 'application/json' } });
+      }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     // ⭐ 2. ถ้าไม่ใช่ Healing ถึงจะบังคับเช็ค userId (สำหรับพวก add, sub, get แต้ม)
     if (!discordId) {
-       return new Response(JSON.stringify({ ok: false, error: 'missing_userId' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+       return new Response(JSON.stringify({ ok: false, error: 'missing_userId' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     // --- ส่วนของระบบแต้ม (Logic เดิมของคุณ) ---
@@ -83,7 +92,7 @@ serve(async (req) => {
         max_cap: finalCap, 
         updated_at: new Date().toISOString() 
       });
-      return new Response(JSON.stringify({ ok: true, userId: discordId, points: currentPoints, maxCap: finalCap }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, userId: discordId, points: currentPoints, maxCap: finalCap }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     if (action === 'add') {
@@ -92,19 +101,19 @@ serve(async (req) => {
       if (isCapped) newPoints = finalCap;
       
       await supabaseAdmin.from('user_points').upsert({ discord_id: discordId, points: newPoints, max_cap: finalCap, updated_at: new Date().toISOString() });
-      return new Response(JSON.stringify({ ok: true, userId: discordId, points: newPoints, added: newPoints - currentPoints, maxCap: finalCap, isCapped }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, userId: discordId, points: newPoints, added: newPoints - currentPoints, maxCap: finalCap, isCapped }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     if (action === 'sub') {
       let newPoints = Math.max(0, currentPoints - amount);
       await supabaseAdmin.from('user_points').upsert({ discord_id: discordId, points: newPoints, max_cap: finalCap, updated_at: new Date().toISOString() });
-      return new Response(JSON.stringify({ ok: true, userId: discordId, points: newPoints, removed: currentPoints - newPoints, maxCap: finalCap }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, userId: discordId, points: newPoints, removed: currentPoints - newPoints, maxCap: finalCap }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     // 🌟 ถ้าหลุดมาถึงตรงนี้ แสดงว่า action ไม่ตรงกับอะไรเลย
-    return new Response(JSON.stringify({ ok: false, error: 'unknown_action' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ ok: false, error: 'unknown_action' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 });
