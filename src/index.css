@@ -670,3 +670,15 @@
     scrollbar-color: rgba(224, 180, 138, 0.3) transparent;
   }
 }
+
+/* Custom styling for native date inputs in Chrome/Safari to push the icon from border edges */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  margin-right: 8px;
+  cursor: pointer;
+  filter: invert(0.3); /* Cozy brown color filter or match theme */
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8); /* Invert in dark mode so it is visible and soft */
+}

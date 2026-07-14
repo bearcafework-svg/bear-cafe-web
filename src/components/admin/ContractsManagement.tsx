@@ -672,7 +672,7 @@ function EditLogDialog({ contract, onClose }: EditLogDialogProps) {
           {logs.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-6">ไม่มีประวัติการแก้ไขข้อมูลสำหรับสัญญานี้</p>
           ) : (
-            <div className="relative border-l border-[#EFE7DC] dark:border-[#382F28] ml-3.5 pl-5.5 space-y-4">
+            <div className="relative border-l border-[#EFE7DC] dark:border-[#382F28] ml-3.5 pl-6 space-y-4">
               {logs.map((log, index) => (
                 <div key={index} className="relative">
                   <span className="absolute -left-[30px] top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#FAF5EE] dark:bg-[#201D1A] border border-[#8C6239]/40 text-[#8C6239] text-[9px] font-bold">
@@ -1376,7 +1376,7 @@ export function ContractsManagement() {
         <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            className="pl-8.5 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3A322C] rounded-xl focus-visible:ring-[#8C6239]"
+            className="pl-9 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3A322C] rounded-xl focus-visible:ring-[#8C6239]"
             placeholder="ค้นหา Member ID หรือชื่อ..."
             value={searchMember}
             onChange={e => setSearchMember(e.target.value)}
@@ -1392,7 +1392,7 @@ export function ContractsManagement() {
         <div className="relative flex-1 min-w-[140px] max-w-xs">
           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            className="pl-8.5 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3A322C] rounded-xl focus-visible:ring-[#8C6239]"
+            className="pl-9 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3A322C] rounded-xl focus-visible:ring-[#8C6239]"
             placeholder="ค้นหาผู้ดำเนินการ..."
             value={searchOperator}
             onChange={e => setSearchOperator(e.target.value)}

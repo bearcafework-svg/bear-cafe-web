@@ -1018,7 +1018,7 @@ export function DMBroadcastManagement() {
               <div className="relative flex-1 sm:flex-initial sm:w-60">
                 <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-8.5 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+                  className="pl-9 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
                   placeholder="ค้นหาผู้ใช้ หรือ Member ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
