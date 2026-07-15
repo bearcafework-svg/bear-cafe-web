@@ -820,40 +820,47 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const isUrgent = days !== null && days <= 3 && !isExpired;
   const isWarning = days !== null && days <= 7 && !isExpired && !isUrgent;
 
+  const isEvalType = contract.type === 'house' || contract.type === 'ad';
+
   const cardBorder =
-    contract.type !== 'house' ? 'border-[#F4EEE5]' :
+    !isEvalType ? 'border-[#F4EEE5]' :
       isExpired ? 'border-red-200 shadow-red-50/20' :
         isUrgent ? 'border-rose-200 shadow-rose-50/20' :
           isWarning ? 'border-amber-200' :
             'border-[#F4EEE5]';
 
   const cardBackground =
-    contract.type !== 'house' ? 'bg-white dark:bg-[#1E1B18]' :
+    !isEvalType ? 'bg-white dark:bg-[#1E1B18]' :
       isExpired ? 'bg-red-50/10 dark:bg-red-950/5' :
         isUrgent ? 'bg-rose-50/15 dark:bg-rose-950/5' :
           isWarning ? 'bg-amber-50/10 dark:bg-amber-950/5' :
             'bg-white dark:bg-[#1E1B18]';
 
   const statusBadgeColor =
-    contract.type !== 'house' ? 'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20' :
+    !isEvalType ? 'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20' :
       isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400' :
         isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 animate-pulse' :
           isWarning ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#3E2E16] dark:text-amber-400' :
             'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20';
 
   const statusText =
-    contract.type !== 'house' ? 'ปกติ' :
+    !isEvalType ? 'ปกติ' :
       isExpired ? 'หมดอายุแล้ว' :
         isUrgent ? 'ใกล้หมดอายุ (วิกฤต)' :
           isWarning ? 'ใกล้หมดอายุ' :
             'ปกติ';
 
-  const typeLabel = contract.type === 'house' ? 'สัญญาเช่าบ้าน' : 'สัญญายศส่วนตัว';
+  const typeLabel = 
+    contract.type === 'house' ? 'สัญญาเช่าบ้าน' : 
+    contract.type === 'personal_role' ? 'สัญญายศส่วนตัว' : 
+    'สัญญาโฆษณา';
 
   const typeBadgeStyle =
     contract.type === 'house'
       ? 'bg-[#8B5E3C]/10 text-[#8B5E3C] border-[#8B5E3C]/20 dark:bg-[#36261A]/40 dark:text-[#B8956A]'
-      : 'bg-[#D97706]/10 text-[#A66E2E] border-[#FAE3C1] dark:bg-[#3A2208]/30 dark:text-[#E9A84E]';
+      : contract.type === 'personal_role'
+        ? 'bg-[#D97706]/10 text-[#A66E2E] border-[#FAE3C1] dark:bg-[#3A2208]/30 dark:text-[#E9A84E]'
+        : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/30 dark:text-[#A5B4FC]';
 
   const TypeIcon = typeIconsMap[contract.type as ContractType] || HelpCircle;
   const iconUrl = typeIcons[contract.type as ContractType];
@@ -886,7 +893,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const endMs = contract.end_at ? new Date(contract.end_at).getTime() : 0;
   const nowMs = Date.now();
   let progressPercent = 0;
-  if (contract.type === 'house' && endMs > startMs) {
+  if ((contract.type === 'house' || contract.type === 'ad') && endMs > startMs) {
     progressPercent = Math.min(100, Math.max(0, ((nowMs - startMs) / (endMs - startMs)) * 100));
   }
 
@@ -941,9 +948,16 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
             </div>
 
             {/* Middle Row: Details depending on type */}
-            {contract.type === 'house' && (
+            {(contract.type === 'house' || contract.type === 'ad') && (
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  {contract.type === 'ad' && contract.package_name && (
+                    <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 dark:border-[#6366F1]/30 text-xs px-2.5 py-0.5 rounded-xl font-bold flex items-center gap-1">
+                      <Megaphone className="w-3.5 h-3.5 text-[#6366F1] fill-[#6366F1]/10" />
+                      {contract.package_name}
+                    </Badge>
+                  )}
+
                   {contract.room_link ? (
                     <a
                       href={contract.room_link}
@@ -958,9 +972,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
                         <span>{houseChannelName ?? 'ดูห้องในเซิร์ฟเวอร์'}</span>
                       )}
                     </a>
-                  ) : (
+                  ) : contract.type === 'house' ? (
                     <span className="text-xs text-muted-foreground italic">ไม่มีลิ้งก์ห้อง</span>
-                  )}
+                  ) : null}
 
                   {/* Date range display */}
                   <span className="text-xs text-muted-foreground flex items-center gap-1 ml-1 font-medium">
@@ -975,7 +989,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
                 {contract.end_at && (
                   <div className="space-y-1 max-w-md pt-0.5">
                     <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-muted-foreground">ระยะเวลาสัญญาเช่า</span>
+                      <span className="text-muted-foreground">ระยะเวลาสัญญา</span>
                       <span className="font-semibold text-[#827160]">
                         {isExpired ? 'หมดอายุสัญญาแล้ว' : `${Math.round(progressPercent)}% ผ่านไป`}
                       </span>
