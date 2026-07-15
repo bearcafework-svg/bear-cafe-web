@@ -632,18 +632,23 @@ export function DMBroadcastManagement() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (c: CampaignQueue) => {
+    switch (c.status) {
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">รอดำเนินการ</Badge>;
       case 'processing':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 animate-pulse">กำลังส่ง DMs</Badge>;
+        const processed = c.sent_count + c.failed_count;
+        if (processed === 0) {
+          return <Badge variant="outline" className="bg-sky-500/10 text-sky-500 border-sky-500/30 animate-pulse">🤖 ล็อกอินเข้าบอทเรียบร้อย</Badge>;
+        } else {
+          return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 animate-pulse">📡 กำลังกระจายข่าวสาร...</Badge>;
+        }
       case 'completed':
         return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">สำเร็จเสร็จสิ้น</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30">ถูกยกเลิก</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{c.status}</Badge>;
     }
   };
 
@@ -929,7 +934,7 @@ export function DMBroadcastManagement() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 ml-auto">
-                              {getStatusBadge(c.status)}
+                              {getStatusBadge(c)}
                               
                               {/* Cancel button if running */}
                               {(c.status === 'processing' || c.status === 'pending') && (
