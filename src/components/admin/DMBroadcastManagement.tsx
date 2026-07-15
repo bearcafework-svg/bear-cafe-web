@@ -272,8 +272,10 @@ export function DMBroadcastManagement() {
 
   // Composer Form
   const [composerTitle, setComposerTitle] = useState('');
-  const [targetType, setTargetType] = useState<'all' | 'option'>('option');
+  const [targetType, setTargetType] = useState<'all' | 'option' | 'test'>('option');
   const [targetOption, setTargetOption] = useState('49B40A9yBS');
+  const [testUserId, setTestUserId] = useState('');
+  const [logSearchQuery, setLogSearchQuery] = useState('');
   const [tokenType, setTokenType] = useState<'token1' | 'token2'>('token1');
   const [inputMode, setInputMode] = useState<'text' | 'json'>('text');
   const [textContent, setTextContent] = useState('');
@@ -597,6 +599,11 @@ export function DMBroadcastManagement() {
       }
     }
 
+    if (targetType === 'test' && !testUserId.trim()) {
+      toast({ title: 'กรุณากรอก Discord User ID สำหรับทดสอบ', variant: 'destructive' });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { error } = await supabase
@@ -605,7 +612,7 @@ export function DMBroadcastManagement() {
           title: composerTitle,
           message_payload: payload,
           target_type: targetType,
-          target_value: targetType === 'option' ? targetOption : null,
+          target_value: targetType === 'option' ? targetOption : (targetType === 'test' ? testUserId.trim() : null),
           token_type: tokenType,
           status: 'pending'
         });
@@ -615,6 +622,7 @@ export function DMBroadcastManagement() {
       toast({ title: 'สร้างแคมเปญสำเร็จ', description: 'ระบบนำเข้าคิวเพื่อเตรียมส่งเรียบร้อยแล้วค่ะ' });
       setComposerTitle('');
       setTextContent('');
+      setTestUserId('');
       fetchDashboardData();
 
     } catch (err: any) {
@@ -751,11 +759,12 @@ export function DMBroadcastManagement() {
                 {/* Target Audience Selector */}
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-[#827160]">กลุ่มเป้าหมายผู้รับสาร</Label>
-                  <Select value={targetType} onValueChange={(val: 'all' | 'option') => setTargetType(val)}>
+                  <Select value={targetType} onValueChange={(val: 'all' | 'option' | 'test') => setTargetType(val)}>
                     <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="option">แยกตามหมวดหมู่การติดตาม</SelectItem>
                       <SelectItem value="all">ส่งหาสมาชิกทุกคน (ทั้งหมด)</SelectItem>
+                      <SelectItem value="test">🧪 ส่งทดสอบเฉพาะบุคคล (ระบุ ID)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -773,6 +782,22 @@ export function DMBroadcastManagement() {
                         <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+
+                {/* Test User ID Input (Conditional) */}
+                {targetType === 'test' && (
+                  <div className="space-y-1 animate-in fade-in duration-200">
+                    <Label htmlFor="testUserId" className="text-xs font-semibold text-[#827160]">Discord User ID สำหรับส่งทดสอบ</Label>
+                    <Input 
+                      id="testUserId"
+                      placeholder="ป้อน Discord User ID (เช่น 944920660759707658)"
+                      value={testUserId}
+                      onChange={(e) => setTestUserId(e.target.value)}
+                      required
+                      className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD] h-9 focus-visible:ring-offset-0 text-xs"
+                    />
+                    <span className="text-[10px] text-muted-foreground block leading-tight">หากมีหลายคนให้คั่นด้วยเครื่องหมายจุลภาค ( , )</span>
                   </div>
                 )}
 
@@ -871,27 +896,39 @@ export function DMBroadcastManagement() {
                   ยังไม่มีการบรอดแคสต์ใดๆ ถูกสร้างขึ้น
                 </div>
               ) : (
-                <div className="space-y-3.5">
+                <div className="space-y-4">
                   {campaigns.map((c) => {
                     const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
                     const isExpanded = expandedCampaignId === c.id;
+                    const statusBorderClass = 
+                      c.status === 'pending' ? 'border-l-4 border-l-amber-500' : 
+                      c.status === 'processing' ? 'border-l-4 border-l-blue-500' : 
+                      c.status === 'completed' ? 'border-l-4 border-l-emerald-500' : 
+                      'border-l-4 border-l-red-500';
+
+                    const filteredLogs = campaignLogs.filter(log => 
+                      log.user_id.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+                      (log.username || '').toLowerCase().includes(logSearchQuery.toLowerCase())
+                    );
 
                     return (
-                      <Card key={c.id} className="border border-[#EAD8C8] dark:border-[#2D2520] overflow-hidden shadow-xs bg-white dark:bg-[#1E1B18]">
-                        <CardContent className="p-3.5 space-y-2.5">
+                      <Card key={c.id} className={cn("border border-[#EAD8C8] dark:border-[#2D2520] overflow-hidden shadow-xs bg-white dark:bg-[#1E1B18] transition-all duration-200", statusBorderClass)}>
+                        <CardContent className="p-3.5 space-y-3">
                           
                           {/* Queue Header info */}
-                          <div className="flex flex-wrap items-center justify-between gap-1.5">
-                            <div className="space-y-0.5">
-                              <h3 className="font-semibold text-xs flex items-center gap-1.5 flex-wrap">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="space-y-1 max-w-[70%]">
+                              <h3 className="font-bold text-xs text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-1.5 flex-wrap">
                                 {c.title}
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-[#EAD8C8]">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
                               </h3>
-                              <span className="text-[10px] text-muted-foreground">
-                                {new Date(c.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
-                              </span>
+                              <div className="flex flex-wrap gap-1 items-center">
+                                <Badge variant="outline" className="text-[8px] py-0 px-1 border-[#EAD8C8] bg-amber-500/5 text-amber-600 dark:border-[#2D2520] dark:text-amber-400 font-semibold">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
+                                <span className="text-[9px] text-muted-foreground">
+                                  {new Date(c.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 ml-auto">
                               {getStatusBadge(c.status)}
                               
                               {/* Cancel button if running */}
@@ -899,10 +936,10 @@ export function DMBroadcastManagement() {
                                 <Button 
                                   size="sm" 
                                   variant="destructive" 
-                                  className="h-6.5 px-2 rounded-lg text-[10px] gap-1 shrink-0"
+                                  className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 font-bold"
                                   onClick={() => handleCancelCampaign(c.id)}
                                 >
-                                  <Square className="w-2.5 h-2.5" /> หยุดส่ง
+                                  <Square className="w-2.5 h-2.5 text-white" /> หยุดส่ง
                                 </Button>
                               )}
 
@@ -910,7 +947,7 @@ export function DMBroadcastManagement() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6.5 px-2 rounded-lg text-[10px] gap-1 shrink-0 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                                className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] hover:bg-[#FAF6F0]/20"
                                 onClick={() => handleToggleExpand(c.id)}
                               >
                                 {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -919,67 +956,101 @@ export function DMBroadcastManagement() {
                           </div>
 
                           {/* Target Info */}
-                          <div className="text-[11px] text-muted-foreground">
-                            กลุ่มเป้าหมาย: {c.target_type === 'all' ? (
-                              <strong className="text-foreground">สมาชิกทุกคน</strong>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            <span>ผู้รับสาร:</span>
+                            {c.target_type === 'all' ? (
+                              <Badge variant="outline" className="text-[9px] font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30">👥 สมาชิกทุกคน</Badge>
+                            ) : c.target_type === 'test' ? (
+                              <Badge variant="outline" className="text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/30">🧪 ทดสอบเฉพาะบุคคล ({c.target_value})</Badge>
                             ) : (
-                              <span>หัวข้อ <strong className="text-foreground">
-                                {c.target_value === '49B40A9yBS' && 'กิจกรรม'}
+                              <Badge variant="outline" className="text-[9px] font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30">
+                                🏷️ {c.target_value === '49B40A9yBS' && 'กิจกรรม'}
                                 {c.target_value === 'JNySCX80ja' && 'ประกาศสำคัญ'}
                                 {c.target_value === 'DsMHlVrjze' && 'ข่าวสารทั่วไป'}
                                 {c.target_value === '6io1xnaMWJ' && 'โปรโมชันและโฆษณา'}
-                              </strong></span>
+                              </Badge>
                             )}
                           </div>
 
-                          {/* Progress Bar (Only visible if processing or completed or cancelled) */}
-                          {c.status !== 'pending' && (
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center text-[10px]">
-                                <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
-                                <div className="flex gap-2">
-                                  <span className="text-emerald-500 font-medium">สำเร็จ: {c.sent_count}</span>
-                                  <span className="text-destructive font-medium">ล้มเหลว: {c.failed_count}</span>
-                                </div>
+                          {/* Progress Panel */}
+                          <div className="space-y-1.5 bg-[#FAF6F0]/50 dark:bg-[#25201C]/50 p-2.5 rounded-2xl border border-[#F0E8DC] dark:border-[#2D2520]">
+                            <div className="flex justify-between items-center text-[9px] text-[#8C6239] dark:text-[#EAD8C8]">
+                              <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
+                              <div className="flex gap-2 font-semibold">
+                                <span className="text-emerald-500">สำเร็จ: {c.sent_count}</span>
+                                <span className="text-rose-500">ล้มเหลว: {c.failed_count}</span>
                               </div>
-                              <Progress value={percent} className="h-1 bg-muted" />
                             </div>
-                          )}
+                            <Progress 
+                              value={percent} 
+                              className={cn(
+                                "h-1.5 bg-muted",
+                                c.status === 'completed' && "[&>div]:bg-emerald-500",
+                                c.status === 'processing' && "[&>div]:bg-blue-500 animate-pulse",
+                                c.status === 'cancelled' && "[&>div]:bg-red-400",
+                                c.status === 'pending' && "[&>div]:bg-amber-400"
+                              )}
+                            />
+                          </div>
 
                           {/* Detailed Logs area (Expanded) */}
                           {isExpanded && (
-                            <div className="pt-2.5 border-t border-border/40 space-y-1.5 animate-in fade-in duration-200">
-                              <h4 className="text-[10px] font-semibold text-foreground flex items-center gap-1.5">
-                                <AlertCircle className="w-3 h-3 text-muted-foreground" /> รายละเอียดการจัดส่ง (DMs Logs)
-                              </h4>
+                            <div className="pt-3 border-t border-border/40 space-y-2 animate-in fade-in duration-200">
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
+                                <h4 className="text-[10px] font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" /> รายละเอียดผลการจัดส่ง (DMs Logs)
+                                </h4>
+                                
+                                {/* Inner Search */}
+                                <div className="relative w-full sm:w-44 shrink-0">
+                                  <Search className="absolute left-2.5 top-1.5 w-3 h-3 text-muted-foreground" />
+                                  <Input
+                                    value={logSearchQuery}
+                                    onChange={(e) => setLogSearchQuery(e.target.value)}
+                                    placeholder="ค้นหา ID หรือชื่อ..."
+                                    className="pl-7 pr-2 h-6 text-[9px] rounded-lg bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520] focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+                                  />
+                                </div>
+                              </div>
 
                               {loadingLogs ? (
-                                <div className="text-center py-4 text-[10px] text-muted-foreground animate-pulse">กำลังดึงข้อมูล...</div>
-                              ) : campaignLogs.length === 0 ? (
-                                <div className="text-center py-4 text-[10px] text-muted-foreground">ไม่มีข้อมูลการส่งให้ตรวจสอบ</div>
+                                <div className="text-center py-6 text-[10px] text-muted-foreground animate-pulse">กำลังโหลดบันทึกการส่ง...</div>
+                              ) : c.status === 'pending' ? (
+                                <div className="text-center py-6 text-[10px] text-amber-500 bg-amber-500/5 rounded-xl border border-amber-500/10">คิวกำลังรอเตรียมระบบและรายชื่อเป้าหมายจากบอท...</div>
+                              ) : filteredLogs.length === 0 ? (
+                                <div className="text-center py-6 text-[10px] text-muted-foreground border border-dashed rounded-xl">ไม่พบข้อมูลผลลัพธ์การส่งที่ตรงกัน</div>
                               ) : (
-                                <div className="border border-border/30 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                                <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-white dark:bg-[#1E1B18]">
                                   <Table>
-                                    <TableHeader className="bg-muted/50">
-                                      <TableRow className="h-7">
-                                        <TableHead className="text-[9px] h-7 py-0.5 px-2">User ID</TableHead>
-                                        <TableHead className="text-[9px] h-7 py-0.5 px-2">ชื่อ</TableHead>
-                                        <TableHead className="text-[9px] h-7 py-0.5 px-2">ผลลัพธ์</TableHead>
+                                    <TableHeader className="bg-[#FAF6F0]/40 dark:bg-[#25201C]/40">
+                                      <TableRow className="h-7 border-b border-[#EAD8C8] dark:border-[#2D2520]">
+                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">User ID</TableHead>
+                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">ชื่อ</TableHead>
+                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">ผลลัพธ์</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {campaignLogs.map((log) => (
-                                        <TableRow key={log.id} className="h-7 text-[10px]">
-                                          <TableCell className="font-mono text-[9px] py-0.5 px-2 max-w-[80px] truncate" title={log.user_id}>{log.user_id}</TableCell>
-                                          <TableCell className="py-0.5 px-2 truncate max-w-[80px]" title={log.username || ''}>{log.username || '-'}</TableCell>
-                                          <TableCell className="py-0.5 px-2">
-                                            {log.status === 'success' ? (
-                                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[8px] py-0 px-1 leading-none">สำเร็จ</Badge>
-                                            ) : log.status === 'failed' ? (
-                                              <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-[8px] py-0 px-1 leading-none" title={log.error_message || ''}>ล้มเหลว</Badge>
-                                            ) : (
-                                              <Badge variant="outline" className="text-[8px] py-0 px-1 leading-none">รอ</Badge>
-                                            )}
+                                      {filteredLogs.map((log) => (
+                                        <TableRow key={log.id} className="h-7 text-[10px] border-b border-[#EAD8C8]/60 dark:border-[#2D2520]/60 hover:bg-[#FAF6F0]/10 dark:hover:bg-[#25201C]/10">
+                                          <TableCell className="font-mono text-[9px] py-1 px-2 max-w-[90px] truncate" title={log.user_id}>{log.user_id}</TableCell>
+                                          <TableCell className="py-1 px-2 truncate max-w-[80px]" title={log.username || ''}>{log.username || '-'}</TableCell>
+                                          <TableCell className="py-1 px-2">
+                                            <div className="flex flex-col gap-0.5">
+                                              {log.status === 'success' ? (
+                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[8px] py-0 px-1 leading-none w-fit font-bold">สำเร็จ</Badge>
+                                              ) : log.status === 'failed' ? (
+                                                <div className="space-y-0.5">
+                                                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-[8px] py-0 px-1 leading-none w-fit font-bold">ล้มเหลว</Badge>
+                                                  {log.error_message && (
+                                                    <span className="block text-[8px] text-rose-500 dark:text-rose-400 font-sans leading-tight" title={log.error_message}>
+                                                      {log.error_message}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <Badge variant="outline" className="text-[8px] py-0 px-1 leading-none w-fit bg-amber-500/5 text-amber-600 border-amber-500/15">รอคิว</Badge>
+                                              )}
+                                            </div>
                                           </TableCell>
                                         </TableRow>
                                       ))}
