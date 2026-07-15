@@ -36,7 +36,6 @@ interface ProductCatalogRow {
   current_price: number | null;
   is_purchasable: boolean;
   is_active: boolean;
-  sort_order: number;
   created_at: string;
 }
 
@@ -72,7 +71,6 @@ const blankForm = {
   current_price: '',
   is_purchasable: true,
   is_active: true,
-  sort_order: '0',
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -158,12 +156,11 @@ export function ProductCatalogManagement() {
     }
   }, [totalPages, currentPage]);
 
-  const isSortingAllowed = filterType === 'all' && filterActive === 'all' && !searchQuery.trim() && !filterSetupNeeded;
 
   // ── open dialogs ──
   function openAdd() {
     setEditTarget(null);
-    setForm({ ...blankForm, sort_order: String(products.length) });
+    setForm({ ...blankForm });
     setDialogOpen(true);
   }
 
@@ -176,7 +173,6 @@ export function ProductCatalogManagement() {
       current_price: product.current_price != null ? String(product.current_price) : '',
       is_purchasable: product.is_purchasable,
       is_active: product.is_active,
-      sort_order: String(product.sort_order),
     });
     setDialogOpen(true);
   }
@@ -203,7 +199,6 @@ export function ProductCatalogManagement() {
         current_price: priceNum,
         is_purchasable: form.is_purchasable,
         is_active: form.is_active,
-        sort_order: parseInt(form.sort_order, 10) || 0,
       };
 
       if (editTarget) {
@@ -250,33 +245,6 @@ export function ProductCatalogManagement() {
     }
   }
 
-  // ── sort order arrows ──
-  async function moveProduct(id: string, direction: 'up' | 'down') {
-    const idx = products.findIndex((p) => p.id === id);
-    if (idx === -1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= products.length) return;
-
-    const next = [...products];
-    const [movedItem] = next.splice(idx, 1);
-    next.splice(targetIdx, 0, movedItem);
-
-    // Re-index all sort_orders to be clean sequential integers to prevent duplicate issues
-    const updatedProducts = next.map((p, i) => ({ ...p, sort_order: i }));
-    setProducts(updatedProducts);
-
-    try {
-      const upsertData = updatedProducts.map(p => ({
-        id: p.id,
-        sort_order: p.sort_order
-      }));
-      const { error } = await supabase.from('product_catalog' as any).upsert(upsertData);
-      if (error) throw error;
-    } catch (err: any) {
-      toast({ title: 'จัดเรียงไม่สำเร็จ', description: err.message, variant: 'destructive' });
-      fetchProducts(); // revert on error
-    }
-  }
 
   // ── quick toggle is_active ──
   async function toggleActive(product: ProductCatalogRow) {

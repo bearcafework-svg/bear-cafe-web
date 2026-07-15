@@ -129,7 +129,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
           current_price: null,
           is_purchasable: false, // รอ admin ตั้งราคาและประเภทเอง
           is_active: true,
-          sort_order: 0,
         });
         if (insertError) {
           console.error(`Failed to insert role ${roleId} (${roleName}):`, insertError);
