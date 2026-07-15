@@ -362,7 +362,7 @@ export function DMBroadcastManagement() {
                 "type": 2,
                 "style": 5,
                 "label": "กลับไปคาเฟ่หมี",
-                "url": "https://discord.gg/bercafe"
+                "url": "https://discord.gg/bearcafe"
               },
               {
                 "type": 2,
