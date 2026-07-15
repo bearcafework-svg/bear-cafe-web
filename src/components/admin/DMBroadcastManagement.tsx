@@ -346,8 +346,8 @@ export function DMBroadcastManagement() {
                 "placeholder": "🐻︲เลือกการแจ้งเตือนที่ต้องการ",
                 "flows": {},
                 "custom_id": "p_324120127182213152",
-                "min_values": 1,
-                "max_values": 1
+                "min_values": 0,
+                "max_values": 4
               }
             ]
           },
