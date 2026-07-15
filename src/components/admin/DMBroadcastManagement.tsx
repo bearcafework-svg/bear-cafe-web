@@ -354,6 +354,23 @@ export function DMBroadcastManagement() {
           {
             "type": 14,
             "spacing": 2
+          },
+          {
+            "type": 1,
+            "components": [
+              {
+                "type": 2,
+                "style": 5,
+                "label": "กลับไปคาเฟ่หมี",
+                "url": "https://discord.gg/bercafe"
+              },
+              {
+                "type": 2,
+                "style": 5,
+                "label": "ไปหน้าตั้งค่าแจ้งเตือน",
+                "url": "https://discord.com/channels/1144251788493602848/1526842327790780476"
+              }
+            ]
           }
         ]
       }
