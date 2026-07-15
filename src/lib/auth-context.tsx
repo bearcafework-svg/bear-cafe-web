@@ -267,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserProfileWithTimeout, session?.user]);
 
   const location = useLocation();
-  const devBypassActive = import.meta.env.DEV && location.pathname.startsWith('/admin');
+  const devBypassActive = import.meta.env.DEV && location.pathname.startsWith('/admin') && !session?.user;
 
   const value = useMemo(() => {
     if (devBypassActive) {
