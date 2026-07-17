@@ -129,17 +129,17 @@ Deno.serve(async (req): Promise<Response> => {
 
           if (!missedErr) {
             missedMarkedCount++;
-            // Send DM notifying user they missed the deadline
+            // Send message notifying user they missed the deadline
             const missedMessage = [
               `## 🐻︲__\` การส่งงานโปรโมท 𓂃 \`__`,
-              `-# **สถานะ:** หมดเวลาส่งงานประจำสัปดาห์ ⚠️`,
+              `-# **สถานะ:** หมดเวลาส่งงานประจำสัปดาห์ ของ <@${member.discord_id}> ⚠️`,
               ``,
               `> **สัปดาห์ที่:** ${currentWeekNumber} (${month}/${year})`,
               `> **สถานะ:** Missed (ขาดการส่งงาน)`,
               ``,
               `สัปดาห์ปัจจุบันหมดเขตแล้ว ระบบบันทึกประวัติการขาดงานเรียบร้อยแล้วค่ะ`
             ].join('\n');
-            await sendDiscordDM(botToken, member.discord_id, missedMessage).catch(() => {});
+            await sendDiscordChannelMessage(botToken, "1524124241291776070", missedMessage).catch(() => {});
           }
         }
         continue;
@@ -175,6 +175,7 @@ Deno.serve(async (req): Promise<Response> => {
 
             const reminderMessage = [
               `## 🐻︲__\` แจ้งเตือนการส่งงานโปรโมท 𓂃 \`__`,
+              `-# **แจ้งเตือนทีมงาน:** <@${member.discord_id}>`,
               `-# **เวลาที่เหลือ:** เหลืออีกประมาณ __${timeLeftLabel}__ จะหมดเขต! ⏳`,
               ``,
               `> **สัปดาห์ที่:** ${currentWeekNumber} (${month}/${year})`,
@@ -183,7 +184,7 @@ Deno.serve(async (req): Promise<Response> => {
               `กรุณาส่งงานโปรโมทประจำสัปดาห์ (โพสต์ 5 ครั้ง หรือ คอมเมนต์ 5 ครั้ง) ผ่านทางระบบบนเว็บไซต์ด้วยนะคะ! 🧸`
             ].join('\n');
 
-            const sendResult = await sendDiscordDM(botToken, member.discord_id, reminderMessage)
+            const sendResult = await sendDiscordChannelMessage(botToken, "1524124241291776070", reminderMessage)
               .then(() => true)
               .catch((err) => {
                 console.error(`Failed to remind member ${member.discord_id}:`, err.message);
@@ -225,28 +226,9 @@ Deno.serve(async (req): Promise<Response> => {
   }
 });
 
-// Helper: send DM message using discord Bot token
-async function sendDiscordDM(botToken: string, userId: string, content: string) {
-  // 1. Create DM channel
-  const channelRes = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bot ${botToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ recipient_id: userId }),
-  });
-
-  if (!channelRes.ok) {
-    const errText = await channelRes.text();
-    throw new Error(`เปิดห้อง DM ล้มเหลว (403/404): ${channelRes.status} ${errText}`);
-  }
-
-  const channelData = await channelRes.json();
-  const dmChannelId = channelData.id;
-
-  // 2. Send message
-  const msgRes = await fetch(`https://discord.com/api/v10/channels/${dmChannelId}/messages`, {
+// Helper: send channel message using discord Bot token
+async function sendDiscordChannelMessage(botToken: string, channelId: string, content: string) {
+  const msgRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
     method: 'POST',
     headers: {
       'Authorization': `Bot ${botToken}`,
@@ -257,7 +239,7 @@ async function sendDiscordDM(botToken: string, userId: string, content: string) 
 
   if (!msgRes.ok) {
     const errText = await msgRes.text();
-    throw new Error(`ส่งข้อความ DM ล้มเหลว: ${msgRes.status} ${errText}`);
+    throw new Error(`ส่งข้อความไปที่ช่องล้มเหลว: ${msgRes.status} ${errText}`);
   }
 
   return await msgRes.json();

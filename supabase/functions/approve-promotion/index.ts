@@ -111,13 +111,10 @@ Deno.serve(async (req): Promise<Response> => {
         );
       }
 
-      let dmSent = false;
-      let dmErrorMsg = null;
-
       try {
         const textMessage = [
           `## 🐻︲__\` การตรวจงานโปรโมท 𓂃 \`__`,
-          `-# **สถานะ:** งานของคุณถูกปฏิเสธ ✖`,
+          `-# **สถานะ:** งานของ <@${submission.discord_id}> ถูกปฏิเสธ ✖`,
           ``,
           `> **ประเภทงาน:** ${submission.submission_type}`,
           `> **รอบงาน:** สัปดาห์ที่ ${submission.week_number} (${submission.month}/${submission.year})`,
@@ -126,10 +123,10 @@ Deno.serve(async (req): Promise<Response> => {
           `กรุณาตรวจสอบรูปหรืออัปโหลดรูปหลักฐานใหม่เพื่อยื่นส่งงานใหม่อีกครั้งค่ะ`
         ].join('\n');
 
-        await sendDiscordDM(botToken, submission.discord_id, textMessage);
+        await sendDiscordChannelMessage(botToken, targetChannelId, textMessage);
         dmSent = true;
       } catch (dmError: any) {
-        console.warn('Discord Rejection DM failed (non-fatal):', dmError);
+        console.warn('Discord Rejection message failed (non-fatal):', dmError);
         dmErrorMsg = dmError.message;
       }
 
@@ -138,7 +135,7 @@ Deno.serve(async (req): Promise<Response> => {
           success: true, 
           message: dmSent 
             ? 'Submission rejected and notified successfully' 
-            : `ปฏิเสธสำเร็จแต่ไม่สามารถส่ง DM แจ้งเตือนได้: ${dmErrorMsg}`, 
+            : `ปฏิเสธสำเร็จแต่ไม่สามารถส่งแจ้งเตือนได้: ${dmErrorMsg}`, 
           dm_sent: dmSent
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -164,21 +161,18 @@ Deno.serve(async (req): Promise<Response> => {
 
     const { discord_id, points_awarded } = rpcResult;
 
-    // Fetch submission details to craft DM message
+    // Fetch submission details to craft message
     const { data: submission } = await adminClient
       .from('promotion_submissions')
       .select('*')
       .eq('id', submission_id)
       .single();
 
-    let dmSent = false;
-    let dmErrorMsg = null;
-
     try {
-      // 2. Send Discord DM to notify the user of point increase
+      // 2. Send Discord message to notify the user of point increase
       const textMessage = [
         `## 🐻︲__\` การตรวจงานโปรโมท 𓂃 \`__`,
-        `-# **สถานะ:** งานของคุณผ่านการอนุมัติแล้ว! 🎉`,
+        `-# **สถานะ:** งานของ <@${discord_id}> ผ่านการอนุมัติแล้ว! 🎉`,
         ``,
         `> **ประเภทงาน:** ${submission.submission_type}`,
         `> **รอบงาน:** สัปดาห์ที่ ${submission.week_number} (${submission.month}/${submission.year})`,
@@ -188,10 +182,10 @@ Deno.serve(async (req): Promise<Response> => {
         `ขอบคุณที่ช่วยสนับสนุนเซิร์ฟเวอร์หมีคาเฟ่นะคะ! 🧸`
       ].join('\n');
 
-      await sendDiscordDM(botToken, discord_id, textMessage);
+      await sendDiscordChannelMessage(botToken, targetChannelId, textMessage);
       dmSent = true;
     } catch (dmError: any) {
-      console.warn('Discord Approval DM failed (non-fatal):', dmError);
+      console.warn('Discord Approval message failed (non-fatal):', dmError);
       dmErrorMsg = dmError.message;
     }
 
@@ -200,7 +194,7 @@ Deno.serve(async (req): Promise<Response> => {
         success: true, 
         message: dmSent 
           ? 'Submission approved and notified successfully' 
-          : `อนุมัติสำเร็จแต่ไม่สามารถส่ง DM แจ้งเตือนได้: ${dmErrorMsg}`, 
+          : `อนุมัติสำเร็จแต่ไม่สามารถส่งแจ้งเตือนได้: ${dmErrorMsg}`, 
         points: points_awarded,
         dm_sent: dmSent
       }),
@@ -215,28 +209,9 @@ Deno.serve(async (req): Promise<Response> => {
   }
 });
 
-// Helper: send DM message using discord Bot token
-async function sendDiscordDM(botToken: string, userId: string, content: string) {
-  // 1. Create DM channel
-  const channelRes = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bot ${botToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ recipient_id: userId }),
-  });
-
-  if (!channelRes.ok) {
-    const errText = await channelRes.text();
-    throw new Error(`เปิดห้อง DM ล้มเหลว (403/404): ${channelRes.status} ${errText}`);
-  }
-
-  const channelData = await channelRes.json();
-  const dmChannelId = channelData.id;
-
-  // 2. Send message
-  const msgRes = await fetch(`https://discord.com/api/v10/channels/${dmChannelId}/messages`, {
+// Helper: send channel message using discord Bot token
+async function sendDiscordChannelMessage(botToken: string, channelId: string, content: string) {
+  const msgRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
     method: 'POST',
     headers: {
       'Authorization': `Bot ${botToken}`,
@@ -247,7 +222,7 @@ async function sendDiscordDM(botToken: string, userId: string, content: string) 
 
   if (!msgRes.ok) {
     const errText = await msgRes.text();
-    throw new Error(`ส่งข้อความ DM ล้มเหลว: ${msgRes.status} ${errText}`);
+    throw new Error(`ส่งข้อความไปที่ช่องล้มเหลว: ${msgRes.status} ${errText}`);
   }
 
   return await msgRes.json();
