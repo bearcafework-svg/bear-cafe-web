@@ -1,4 +1,4 @@
--- Fix Point Calculation to multiply by count, update RLS policies and add points rollback trigger
+-- Fix Point Calculation to multiply by count, update RLS policies, redefine rollback function and add points rollback trigger
 
 -- 1. Update approve_promotion_submission function to multiply points by count
 CREATE OR REPLACE FUNCTION public.approve_promotion_submission(
@@ -96,7 +96,64 @@ BEGIN
 END;
 $$;
 
--- 2. Drop old policy and create new one allowing users to edit approved submissions
+-- 2. Redefine rollback_promotion_approval function to NOT manually subtract points
+-- (The before_promotion_submission_update trigger will handle points deduction automatically)
+CREATE OR REPLACE FUNCTION public.rollback_promotion_approval(
+  p_operator_id uuid,
+  p_submission_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_submission record;
+  v_audit_log  record;
+BEGIN
+  -- Fetch approved submission
+  SELECT * INTO v_submission
+  FROM public.promotion_submissions
+  WHERE id = p_submission_id FOR UPDATE;
+
+  IF v_submission IS NULL OR v_submission.status <> 'approved' THEN
+    RETURN false;
+  END IF;
+
+  -- Revert submission to pending (Trigger will automatically rollback points)
+  UPDATE public.promotion_submissions
+  SET status = 'pending',
+      approved_by = NULL,
+      approved_at = NULL,
+      points_awarded = 0,
+      updated_at = now()
+  WHERE id = p_submission_id;
+
+  -- Create negative notification
+  INSERT INTO public.web_notifications (user_id, title, message, type)
+  VALUES (
+    v_submission.user_id,
+    'ระบบขัดข้อง: ยกเลิกการอนุมัติงานโปรโมท ⚠️',
+    'เกิดความผิดพลาดในการส่งข้อความ Discord DM จึงยกเลิกแต้มและการอนุมัติ กรุณาติดต่อทีมงาน',
+    'error'
+  );
+
+  -- Log rollback audit
+  INSERT INTO public.staff_audit_logs (staff_member_id, action, operator_id, operator_name, before_data, after_data)
+  VALUES (
+    (select id from public.staff_members where discord_id = v_submission.discord_id limit 1),
+    'rollback_approve_submission',
+    p_operator_id,
+    (select username from public.profiles where id = p_operator_id limit 1),
+    row_to_json(v_submission)::jsonb,
+    row_to_json((select r from public.promotion_submissions r where r.id = p_submission_id))::jsonb
+  );
+
+  RETURN true;
+END;
+$$;
+
+-- 3. Drop old policy and create new one allowing users to edit approved submissions
 DROP POLICY IF EXISTS "Allow update own pending or admin/owner" ON public.promotion_submissions;
 
 CREATE POLICY "Allow update own pending/approved or admin/owner" ON public.promotion_submissions FOR UPDATE TO authenticated
@@ -109,7 +166,7 @@ WITH CHECK (
   OR exists (select 1 from public.user_roles where user_id = auth.uid() and role in ('admin', 'moderator'))
 );
 
--- 3. Create Points Rollback trigger to rollback points when user edits approved submission
+-- 4. Create Points Rollback trigger to rollback points when status transitions away from 'approved'
 CREATE OR REPLACE FUNCTION public.tr_before_promotion_submission_update()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -117,8 +174,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- If status changes from approved to pending, rollback points
-  IF OLD.status = 'approved' AND NEW.status = 'pending' THEN
+  -- If status changes from approved to anything else, rollback points
+  IF OLD.status = 'approved' AND NEW.status <> 'approved' THEN
     UPDATE public.user_points
     SET points = GREATEST(0, points - OLD.points_awarded),
         updated_at = now()

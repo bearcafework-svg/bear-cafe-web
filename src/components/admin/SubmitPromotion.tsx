@@ -93,6 +93,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
   const [personalHistory, setPersonalHistory] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
 
   // Stats Dashboard
   const [stats, setStats] = useState({
@@ -159,6 +160,38 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
   useEffect(() => {
     fetchStaffPerformance();
   }, [perfMonth, perfYear]);
+
+  // Sync selectedWeek on activeWeekConfig change
+  useEffect(() => {
+    if (activeWeekConfig) {
+      setSelectedWeek(activeWeekConfig.week);
+    }
+  }, [activeWeekConfig]);
+
+  // Sync submitForm based on selectedWeek and personalHistory
+  useEffect(() => {
+    const existingSub = personalHistory.find(
+      h => h.year === currentYear && h.month === currentMonth && h.week_number === selectedWeek
+    );
+
+    if (existingSub) {
+      setSubmitForm({
+        type: existingSub.submission_type,
+        count: existingSub.count,
+        notes: existingSub.notes || '',
+        images: [],
+        previewUrls: existingSub.images || []
+      });
+    } else {
+      setSubmitForm({
+        type: 'โพสต์',
+        count: 0,
+        notes: '',
+        images: [],
+        previewUrls: []
+      });
+    }
+  }, [selectedWeek, personalHistory, currentYear, currentMonth]);
 
   const fetchStaffPerformance = async () => {
     setLoadingPerformance(true);
@@ -284,21 +317,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
         .order('created_at', { ascending: false });
 
       setPersonalHistory(history || []);
-
-      // If user has a pending submission for the current week, pre-fill form
-      const currentWeekSub = history?.find(
-        h => h.year === currentYear && h.month === currentMonth && h.week_number === activeWeekConfig.week
-      );
-
-      if (currentWeekSub && (currentWeekSub.status === 'pending' || (currentWeekSub.status === 'approved' && currentWeekSub.count < settings.max_count))) {
-        setSubmitForm({
-          type: currentWeekSub.submission_type,
-          count: currentWeekSub.count,
-          notes: currentWeekSub.notes || '',
-          images: [],
-          previewUrls: currentWeekSub.images || []
-        });
-      }
+      // Prefill is handled dynamically by selectedWeek useEffect
 
     } catch (e: any) {
       toast({ title: 'โหลดการตั้งค่าล้มเหลว', description: e.message, variant: 'destructive' });
@@ -363,8 +382,8 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
     const files = Array.from(e.target.files || []);
     
     // Check constraints
-    if (submitForm.images.length + files.length > settings.max_images) {
-      toast({ title: `อัปโหลดรูปภาพได้สูงสุด ${settings.max_images} รูป`, variant: 'destructive' });
+    if (submitForm.previewUrls.length + files.length > settings.max_images) {
+      toast({ title: `อัปโหลดรูปภาพได้สูงสุด ${settings.max_images} รูป (มีอยู่แล้ว ${submitForm.previewUrls.length} รูป)`, variant: 'destructive' });
       return;
     }
 
@@ -407,7 +426,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
     try {
       const year = currentYear;
       const month = currentMonth;
-      const weekNumber = activeWeekConfig.week;
+      const weekNumber = selectedWeek;
       const discordId = currentUser.discord_id;
 
       if (!discordId) throw new Error('ไม่พบข้อมูล Discord ID ของคุณในโปรไฟล์');
@@ -670,7 +689,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
   }, [submissions, filterSearch]);
 
   const activeSubmission = personalHistory.find(
-    h => h.year === currentYear && h.month === currentMonth && h.week_number === activeWeekConfig.week
+    h => h.year === currentYear && h.month === currentMonth && h.week_number === selectedWeek
   );
 
   return (
@@ -724,51 +743,70 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
           <div className="lg:col-span-1 space-y-4">
             <Card className="border-latte/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">ฟอร์มส่งงานสัปดาห์นี้</CardTitle>
-                <CardDescription className="text-xs">
-                  สัปดาห์ที่ {activeWeekConfig.week} ({currentMonth}/{currentYear}) • หมดเขตวันที่ {activeWeekConfig.end}
+                <CardTitle className="text-lg font-bold">ฟอร์มส่งงานโปรโมท</CardTitle>
+                <CardDescription className="text-sm">
+                  ประจำเดือน {currentMonth}/{currentYear}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-1.5 pb-2.5 border-b border-latte/20">
+                  <Label className="text-sm font-semibold">เลือกสัปดาห์ที่ต้องการส่งงาน</Label>
+                  <Select
+                    value={String(selectedWeek)}
+                    onValueChange={v => setSelectedWeek(Number(v))}
+                  >
+                    <SelectTrigger className="h-10 border-latte/40 rounded-xl text-sm">
+                      <SelectValue placeholder="เลือกสัปดาห์" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {settings.weeks.map(w => (
+                        <SelectItem key={w.week} value={String(w.week)} className="text-sm">
+                          สัปดาห์ที่ {w.week} (วันที่ {w.start} - {w.end})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {activeSubmission && activeSubmission.status !== 'pending' && activeSubmission.status !== 'rejected' && !(activeSubmission.status === 'approved' && activeSubmission.count < settings.max_count) ? (
                   <div className="p-4 bg-green-50/5 border border-green-500/20 rounded-2xl text-center space-y-2">
                     <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto" />
-                    <h3 className="font-bold text-sm">งานประจำสัปดาห์ผ่านการตรวจแล้ว!</h3>
-                    <p className="text-xs text-muted-foreground">คุณได้รับ {activeSubmission.points_awarded} แต้มสะสมเรียบร้อยแล้วค่ะ</p>
+                    <h3 className="font-bold text-base">งานประจำสัปดาห์ผ่านการตรวจแล้ว!</h3>
+                    <p className="text-sm text-muted-foreground">คุณได้รับ {activeSubmission.points_awarded} แต้มสะสมเรียบร้อยแล้วค่ะ</p>
                   </div>
                 ) : (
                   <>
                     {activeSubmission && activeSubmission.status === 'approved' && activeSubmission.count < settings.max_count && (
                       <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
-                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold text-xs">
-                          <AlertTriangle className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold text-sm">
+                          <AlertTriangle className="w-4 h-4" />
                           <span>ตรวจผ่านแล้ว แต่ยังไม่ครบโควตา</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground leading-normal">
                           คุณเคยส่งงานผ่านแล้ว {activeSubmission.count} ชิ้น หากส่งงานเพิ่ม ระบบจะดึงสถานะกลับเป็น <strong>รอตรวจ</strong> และหักแต้มเดิมออกชั่วคราวจนกว่าจะได้รับการอนุมัติรอบใหม่ค่ะ
                         </p>
                       </div>
                     )}
-                    <div className="space-y-1">
-                      <Label className="text-xs">ประเภทงานโปรโมท</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">ประเภทงานโปรโมท</Label>
                       <Select
                         value={submitForm.type}
                         onValueChange={v => setSubmitForm(prev => ({ ...prev, type: v as Submission['submission_type'] }))}
                       >
-                        <SelectTrigger className="h-9 border-latte/40 rounded-xl">
+                        <SelectTrigger className="h-10 border-latte/40 rounded-xl text-sm">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="โพสต์">โพสต์ (ได้รับ {settings.post_points} แต้ม/ชิ้น)</SelectItem>
-                          <SelectItem value="คอมเมนต์">คอมเมนต์ (ได้รับ {settings.comment_points} แต้ม/ชิ้น)</SelectItem>
+                        <SelectContent className="text-sm">
+                          <SelectItem value="โพสต์" className="text-sm">โพสต์ (ได้รับ {settings.post_points} แต้ม/ชิ้น)</SelectItem>
+                          <SelectItem value="คอมเมนต์" className="text-sm">คอมเมนต์ (ได้รับ {settings.comment_points} แต้ม/ชิ้น)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <Label className="text-xs">จำนวนงานสำเร็จ</Label>
-                        <span className="text-[10px] font-bold text-primary">{submitForm.count} / {settings.max_count} ครั้ง</span>
+                        <Label className="text-sm">จำนวนงานสำเร็จ</Label>
+                        <span className="text-xs font-bold text-primary">{submitForm.count} / {settings.max_count} ครั้ง</span>
                       </div>
                       <Input
                         type="number"
@@ -780,12 +818,12 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                           setSubmitForm(prev => ({ ...prev, count: val }));
                         }}
                         placeholder="กรอกจำนวนครั้ง (สูงสุด 5)"
-                        className="h-9 border-latte/40 rounded-xl"
+                        className="h-10 border-latte/40 rounded-xl text-sm"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs">รูปภาพหลักฐานงาน (สูงสุด {settings.max_images} รูป)</Label>
+                      <Label className="text-sm">รูปภาพหลักฐานงาน (สูงสุด {settings.max_images} รูป)</Label>
                       
                       {/* Image Preview Grid */}
                       {submitForm.previewUrls.length > 0 && (
@@ -797,7 +835,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                                 onClick={() => handleRemoveImage(idx)}
                                 className="absolute top-0.5 right-0.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-0.5 shrink-0"
                               >
-                                <Trash2 className="w-2.5 h-2.5" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ))}
@@ -816,22 +854,22 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                           />
                           <Label
                             htmlFor="promotion-image-uploader"
-                            className="w-full h-16 border border-dashed border-latte/60 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-cream/10 transition-colors gap-1 text-[10px] text-muted-foreground"
+                            className="w-full h-18 border border-dashed border-latte/60 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-cream/10 transition-colors gap-1.5 text-xs text-muted-foreground"
                           >
-                            <Upload className="w-4 h-4 text-primary" />
+                            <Upload className="w-4.5 h-4.5 text-primary" />
                             คลิกเพื่ออัปโหลดหลักฐานรูปภาพ
                           </Label>
                         </div>
                       )}
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">หมายเหตุ</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">หมายเหตุ</Label>
                       <Textarea
                         value={submitForm.notes}
                         onChange={e => setSubmitForm(prev => ({ ...prev, notes: e.target.value }))}
                         placeholder="พิมพ์หมายเหตุเพิ่มเติมหรือแปะลิงก์ผลงาน..."
-                        className="border-latte/40 rounded-xl h-14"
+                        className="border-latte/40 rounded-xl h-16 text-sm"
                       />
                     </div>
 
@@ -849,19 +887,19 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
           <div className="lg:col-span-2 space-y-4">
             <Card className="border-latte/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">ประวัติการส่งงานของคุณ</CardTitle>
-                <CardDescription className="text-xs">ตรวจสอบสถานะการยื่นคำร้องส่งงานและแต้มรางวัลสะสมรายบุคคล</CardDescription>
+                <CardTitle className="text-lg font-bold">ประวัติการส่งงานของคุณ</CardTitle>
+                <CardDescription className="text-sm">ตรวจสอบสถานะการยื่นคำร้องส่งงานและแต้มรางวัลสะสมรายบุคคล</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-cream/20">
-                    <TableRow>
-                      <TableHead className="pl-6">สัปดาห์</TableHead>
-                      <TableHead>ประเภท</TableHead>
-                      <TableHead>จำนวน</TableHead>
-                      <TableHead>สถานะ</TableHead>
-                      <TableHead>แต้มที่ได้รับ</TableHead>
-                      <TableHead className="pr-6">รายละเอียด</TableHead>
+                    <TableRow className="text-sm">
+                      <TableHead className="pl-6 text-sm">สัปดาห์</TableHead>
+                      <TableHead className="text-sm">ประเภท</TableHead>
+                      <TableHead className="text-sm">จำนวน</TableHead>
+                      <TableHead className="text-sm">สถานะ</TableHead>
+                      <TableHead className="text-sm">แต้มที่ได้รับ</TableHead>
+                      <TableHead className="pr-6 text-sm">รายละเอียด</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -870,21 +908,21 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                     ) : personalHistory.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center py-6 text-sm text-muted-foreground">ไม่มีประวัติการส่งงาน</TableCell></TableRow>
                     ) : personalHistory.map(h => (
-                      <TableRow key={h.id}>
-                        <TableCell className="pl-6 font-semibold">Week {h.week_number} <span className="text-[10px] text-muted-foreground block">{h.month}/{h.year}</span></TableCell>
-                        <TableCell>{h.submission_type === 'none' ? '-' : h.submission_type}</TableCell>
-                        <TableCell>{h.count} / {settings.max_count}</TableCell>
-                        <TableCell>
-                          <Badge variant={h.status === 'approved' ? 'success' : h.status === 'pending' ? 'warning' : h.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[9px]">
+                      <TableRow key={h.id} className="text-sm">
+                        <TableCell className="pl-6 font-semibold text-sm">Week {h.week_number} <span className="text-xs text-muted-foreground block">{h.month}/{h.year}</span></TableCell>
+                        <TableCell className="text-sm">{h.submission_type === 'none' ? '-' : h.submission_type}</TableCell>
+                        <TableCell className="text-sm">{h.count} / {settings.max_count}</TableCell>
+                        <TableCell className="text-sm">
+                          <Badge variant={h.status === 'approved' ? 'success' : h.status === 'pending' ? 'warning' : h.status === 'rejected' ? 'destructive' : 'secondary'} className="text-xs">
                             {h.status === 'approved' ? 'ผ่าน' : h.status === 'pending' ? 'รอตรวจ' : h.status === 'rejected' ? 'ไม่ผ่าน' : 'Missed'}
                           </Badge>
                           {h.status === 'rejected' && h.rejection_reason && (
-                            <span className="text-[9px] text-red-500 block">เหตุผล: {h.rejection_reason}</span>
+                            <span className="text-xs text-red-500 block mt-1">เหตุผล: {h.rejection_reason}</span>
                           )}
                         </TableCell>
-                        <TableCell className="font-bold text-sm text-green-600">+{h.points_awarded} แต้ม</TableCell>
+                        <TableCell className="font-bold text-base text-green-600">+{h.points_awarded} แต้ม</TableCell>
                         <TableCell className="pr-6">
-                          <Button variant="ghost" size="sm" className="h-8 text-xs text-primary" onClick={() => { setSelectedSubmission(h); setDetailOpen(true); }}>
+                          <Button variant="ghost" size="sm" className="h-8 text-sm text-primary" onClick={() => { setSelectedSubmission(h); setDetailOpen(true); }}>
                             เปิดดู
                           </Button>
                         </TableCell>
@@ -1088,29 +1126,29 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
         {isOwner && (
           <TabsContent value="review" className="space-y-6">
             {/* Stats Dashboard */}
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 text-sm">
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">ทีมงาน (Active)</span>
+                <span className="text-xs text-muted-foreground">ทีมงาน (Active)</span>
                 <span className="text-lg font-bold mt-1 text-[#8C6239]">{stats.totalStaff} คน</span>
               </Card>
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">ผู้ฝึกงาน (Trainees)</span>
+                <span className="text-xs text-muted-foreground">ผู้ฝึกงาน (Trainees)</span>
                 <span className="text-lg font-bold mt-1 text-indigo-500">{stats.totalTrainees} คน</span>
               </Card>
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">สตาฟยังไม่ส่งงาน</span>
+                <span className="text-xs text-muted-foreground">สตาฟยังไม่ส่งงาน</span>
                 <span className="text-lg font-bold mt-1 text-red-500">{stats.yetToSubmit} คน</span>
               </Card>
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">งานรอตรวจ (Pending)</span>
+                <span className="text-xs text-muted-foreground">งานรอตรวจ (Pending)</span>
                 <span className="text-lg font-bold mt-1 text-amber-500">{stats.pendingCount} รายการ</span>
               </Card>
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">อนุมัติแล้ว (Approved)</span>
+                <span className="text-xs text-muted-foreground">อนุมัติแล้ว (Approved)</span>
                 <span className="text-lg font-bold mt-1 text-green-500">{stats.approvedCount} รายการ</span>
               </Card>
               <Card className="border-latte/40 bg-card/80 p-3 flex flex-col justify-between">
-                <span className="text-[10px] text-muted-foreground">ปฏิเสธแล้ว (Rejected)</span>
+                <span className="text-xs text-muted-foreground">ปฏิเสธแล้ว (Rejected)</span>
                 <span className="text-lg font-bold mt-1 text-red-600">{stats.rejectedCount} รายการ</span>
               </Card>
             </div>
@@ -1118,8 +1156,8 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
             <Card className="border-latte/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
               <CardHeader className="pb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <CardTitle className="text-base font-semibold">รายการส่งงานของทีมงาน</CardTitle>
-                  <CardDescription className="text-xs">ค้นหาและตรวจสอบรูปภาพหลักฐานการทำโปรโมทและอนุมัติแต้มรางวัล</CardDescription>
+                  <CardTitle className="text-lg font-bold">รายการส่งงานของทีมงาน</CardTitle>
+                  <CardDescription className="text-sm">ค้นหาและตรวจสอบรูปภาพหลักฐานการทำโปรโมทและอนุมัติแต้มรางวัล</CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   <div className="relative w-full sm:w-44">
@@ -1128,41 +1166,41 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                       value={filterSearch}
                       onChange={e => setFilterSearch(e.target.value)}
                       placeholder="ค้นหาชื่อผู้ใช้..."
-                      className="pl-9 bg-background/50 border-latte/40 rounded-xl h-9 text-xs"
+                      className="pl-9 bg-background/50 border-latte/40 rounded-xl h-9 text-sm"
                     />
                   </div>
                   <Select value={filterMonth} onValueChange={setFilterMonth}>
-                    <SelectTrigger className="w-28 bg-background/50 border-latte/40 rounded-xl h-9 text-xs">
+                    <SelectTrigger className="w-28 bg-background/50 border-latte/40 rounded-xl h-9 text-sm">
                       <SelectValue placeholder="เลือกเดือน" />
                     </SelectTrigger>
                     <SelectContent>
                       {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                        <SelectItem key={m} value={String(m)}>เดือน {m}</SelectItem>
+                        <SelectItem key={m} value={String(m)} className="text-sm">เดือน {m}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select value={filterWeek} onValueChange={setFilterWeek}>
-                    <SelectTrigger className="w-28 bg-background/50 border-latte/40 rounded-xl h-9 text-xs">
+                    <SelectTrigger className="w-28 bg-background/50 border-latte/40 rounded-xl h-9 text-sm">
                       <SelectValue placeholder="สัปดาห์" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">ทุกสัปดาห์</SelectItem>
-                      <SelectItem value="1">Week 1</SelectItem>
-                      <SelectItem value="2">Week 2</SelectItem>
-                      <SelectItem value="3">Week 3</SelectItem>
-                      <SelectItem value="4">Week 4</SelectItem>
+                      <SelectItem value="all" className="text-sm">ทุกสัปดาห์</SelectItem>
+                      <SelectItem value="1" className="text-sm">Week 1</SelectItem>
+                      <SelectItem value="2" className="text-sm">Week 2</SelectItem>
+                      <SelectItem value="3" className="text-sm">Week 3</SelectItem>
+                      <SelectItem value="4" className="text-sm">Week 4</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-32 bg-background/50 border-latte/40 rounded-xl h-9 text-xs">
+                    <SelectTrigger className="w-32 bg-background/50 border-latte/40 rounded-xl h-9 text-sm">
                       <SelectValue placeholder="กรองสถานะ" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">ทุกสถานะ</SelectItem>
-                      <SelectItem value="pending">รอตรวจ</SelectItem>
-                      <SelectItem value="approved">ผ่าน</SelectItem>
-                      <SelectItem value="rejected">ไม่ผ่าน</SelectItem>
-                      <SelectItem value="missed">Missed</SelectItem>
+                      <SelectItem value="all" className="text-sm">ทุกสถานะ</SelectItem>
+                      <SelectItem value="pending" className="text-sm">รอตรวจ</SelectItem>
+                      <SelectItem value="approved" className="text-sm">ผ่าน</SelectItem>
+                      <SelectItem value="rejected" className="text-sm">ไม่ผ่าน</SelectItem>
+                      <SelectItem value="missed" className="text-sm">Missed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1170,21 +1208,21 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
               <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-cream/20">
-                    <TableRow>
-                      <TableHead className="pl-6">สตาฟสมาชิค</TableHead>
-                      <TableHead>เดือน/สัปดาห์</TableHead>
-                      <TableHead>ประเภทงาน</TableHead>
-                      <TableHead>จำนวนครั้ง</TableHead>
-                      <TableHead>วันที่ส่ง</TableHead>
-                      <TableHead>สถานะ</TableHead>
-                      <TableHead className="text-right pr-6">จัดการ</TableHead>
+                    <TableRow className="text-sm">
+                      <TableHead className="pl-6 text-sm">สตาฟสมาชิค</TableHead>
+                      <TableHead className="text-sm">เดือน/สัปดาห์</TableHead>
+                      <TableHead className="text-sm">ประเภทงาน</TableHead>
+                      <TableHead className="text-sm">จำนวนครั้ง</TableHead>
+                      <TableHead className="text-sm">วันที่ส่ง</TableHead>
+                      <TableHead className="text-sm">สถานะ</TableHead>
+                      <TableHead className="text-right pr-6 text-sm">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {getSubmissionsFiltered.length === 0 ? (
                       <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">ไม่พบรายการส่งงาน</TableCell></TableRow>
                     ) : getSubmissionsFiltered.map(sub => (
-                      <TableRow key={sub.id} className="hover:bg-cream/5 transition-colors">
+                      <TableRow key={sub.id} className="hover:bg-cream/5 transition-colors text-sm">
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-2">
                             <img
@@ -1192,22 +1230,22 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                               className="w-7 h-7 rounded-full border"
                             />
                             <div className="flex flex-col">
-                              <span className="font-semibold text-xs">{sub.profiles?.username || 'Unknown'}</span>
-                              <span className="text-[9px] text-muted-foreground">@{sub.profiles?.discord_username || sub.discord_id}</span>
+                              <span className="font-semibold text-sm">{sub.profiles?.username || 'Unknown'}</span>
+                              <span className="text-xs text-muted-foreground">@{sub.profiles?.discord_username || sub.discord_id}</span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs font-medium">สัปดาห์ที่ {sub.week_number} ({sub.month}/{sub.year})</TableCell>
-                        <TableCell className="text-xs">{sub.submission_type === 'none' ? '-' : sub.submission_type}</TableCell>
-                        <TableCell className="text-xs font-semibold">{sub.count} / {settings.max_count}</TableCell>
-                        <TableCell className="text-[10px]">{new Date(sub.created_at).toLocaleString('th-TH')}</TableCell>
+                        <TableCell className="text-sm font-medium">สัปดาห์ที่ {sub.week_number} ({sub.month}/{sub.year})</TableCell>
+                        <TableCell className="text-sm">{sub.submission_type === 'none' ? '-' : sub.submission_type}</TableCell>
+                        <TableCell className="text-sm font-semibold">{sub.count} / {settings.max_count}</TableCell>
+                        <TableCell className="text-xs">{new Date(sub.created_at).toLocaleString('th-TH')}</TableCell>
                         <TableCell>
-                          <Badge variant={sub.status === 'approved' ? 'success' : sub.status === 'pending' ? 'warning' : sub.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[9px] scale-90">
+                          <Badge variant={sub.status === 'approved' ? 'success' : sub.status === 'pending' ? 'warning' : sub.status === 'rejected' ? 'destructive' : 'secondary'} className="text-xs scale-90">
                             {sub.status === 'approved' ? 'ผ่าน' : sub.status === 'pending' ? 'รอตรวจ' : sub.status === 'rejected' ? 'ไม่ผ่าน' : 'Missed'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <Button variant="ghost" size="sm" className="h-8 text-xs text-primary" onClick={() => { setSelectedSubmission(sub); setSelectedSubmission(sub); setDetailOpen(true); }}>
+                          <Button variant="ghost" size="sm" className="h-8 text-sm text-primary" onClick={() => { setSelectedSubmission(sub); setSelectedSubmission(sub); setDetailOpen(true); }}>
                             ตรวจสอบ
                           </Button>
                         </TableCell>
@@ -1225,60 +1263,60 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
           <TabsContent value="settings" className="space-y-4">
             <Card className="border-latte/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden max-w-xl">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">ตั้งค่าระบบแต้มและสัปดาห์ส่งงาน</CardTitle>
-                <CardDescription className="text-xs">ปรับค่าแต้ม จำนวนสัปดาห์ และรอบแจ้งเตือนได้โดยไม่แก้ไขโค้ด</CardDescription>
+                <CardTitle className="text-lg font-bold">ตั้งค่าระบบแต้มและสัปดาห์ส่งงาน</CardTitle>
+                <CardDescription className="text-sm">ปรับค่าแต้ม จำนวนสัปดาห์ และรอบแจ้งเตือนได้โดยไม่แก้ไขโค้ด</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 text-xs">
+              <CardContent className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">แต้มรางวัล โพสต์ (Post)</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">แต้มรางวัล โพสต์ (Post)</Label>
                     <Input
                       type="number"
                       value={settingsForm.post_points}
                       onChange={e => setSettingsForm(prev => ({ ...prev, post_points: Number(e.target.value) || 0 }))}
-                      className="h-9 border-latte/40 rounded-xl"
+                      className="h-10 border-latte/40 rounded-xl text-sm"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">แต้มรางวัล คอมเมนต์ (Comment)</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">แต้มรางวัล คอมเมนต์ (Comment)</Label>
                     <Input
                       type="number"
                       value={settingsForm.comment_points}
                       onChange={e => setSettingsForm(prev => ({ ...prev, comment_points: Number(e.target.value) || 0 }))}
-                      className="h-9 border-latte/40 rounded-xl"
+                      className="h-10 border-latte/40 rounded-xl text-sm"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">จำนวนครั้งสูงสุดที่จะส่ง</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">จำนวนครั้งสูงสุดที่จะส่ง</Label>
                     <Input
                       type="number"
                       value={settingsForm.max_count}
                       onChange={e => setSettingsForm(prev => ({ ...prev, max_count: Number(e.target.value) || 5 }))}
-                      className="h-9 border-latte/40 rounded-xl"
+                      className="h-10 border-latte/40 rounded-xl text-sm"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">จำนวนรูปภาพสูงสุดหลักฐาน</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">จำนวนรูปภาพสูงสุดหลักฐาน</Label>
                     <Input
                       type="number"
                       value={settingsForm.max_images}
                       onChange={e => setSettingsForm(prev => ({ ...prev, max_images: Number(e.target.value) || 5 }))}
-                      className="h-9 border-latte/40 rounded-xl"
+                      className="h-10 border-latte/40 rounded-xl text-sm"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-[#8C6239]">ช่วงวันแต่ละสัปดาห์ (ระบุวันที่ในเดือน เช่น 1-7)</Label>
-                  <p className="text-[10px] text-muted-foreground leading-normal mb-2">กำหนดช่วงของวันที่ (Day of month) ที่สตาฟสามารถส่งงานได้ในแต่ละสัปดาห์</p>
+                  <Label className="text-sm font-bold text-[#8C6239]">ช่วงวันแต่ละสัปดาห์ (ระบุวันที่ในเดือน เช่น 1-7)</Label>
+                  <p className="text-xs text-muted-foreground leading-normal mb-2">กำหนดช่วงของวันที่ (Day of month) ที่สตาฟสามารถส่งงานได้ในแต่ละสัปดาห์</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                     {settingsForm.weeks.map((w, idx) => (
-                      <div key={w.week} className="p-2.5 border border-latte/40 rounded-xl bg-background/50 space-y-2">
-                        <Label className="text-[11px] font-bold text-[#8C6239] block">สัปดาห์ที่ {w.week}</Label>
-                        <div className="space-y-1 text-[10px]">
+                      <div key={w.week} className="p-2.5 border border-latte/40 rounded-xl bg-background/50 space-y-2 text-sm">
+                        <Label className="text-xs font-bold text-[#8C6239] block">สัปดาห์ที่ {w.week}</Label>
+                        <div className="space-y-1 text-xs">
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground w-12 shrink-0">วันที่เริ่ม:</span>
                             <Input
@@ -1315,7 +1353,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                   </div>
                 </div>
 
-                <Button onClick={handleSaveSettings} className="w-full gap-2 rounded-xl mt-2">
+                <Button onClick={handleSaveSettings} className="w-full gap-2 rounded-xl mt-2 text-sm h-10">
                   <Settings className="w-4 h-4" />
                   บันทึกการตั้งค่าระบบ
                 </Button>
@@ -1329,16 +1367,16 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-w-md bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">
+            <DialogTitle className="text-lg font-bold text-[#8C6239] dark:text-[#EAD8C8]">
               รายละเอียดงานโปรโมท
             </DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-sm">
               ยื่นส่งสัปดาห์ที่ {selectedSubmission?.week_number} • ประเภท {selectedSubmission?.submission_type} ({selectedSubmission?.count} ครั้ง)
             </DialogDescription>
           </DialogHeader>
 
           {selectedSubmission && (
-            <div className="space-y-4 my-2 text-xs">
+            <div className="space-y-4 my-2 text-sm">
               <div className="flex items-center gap-2 p-2 bg-cream/10 border border-latte/20 rounded-xl">
                 <img
                   src={selectedSubmission.profiles?.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"}
@@ -1346,22 +1384,22 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                 />
                 <div className="flex flex-col">
                   <span className="font-bold text-sm">{selectedSubmission.profiles?.username || 'Unknown'}</span>
-                  <span className="text-muted-foreground text-[10px]">Discord ID: {selectedSubmission.discord_id}</span>
+                  <span className="text-muted-foreground text-xs">Discord ID: {selectedSubmission.discord_id}</span>
                 </div>
               </div>
 
               {selectedSubmission.notes && (
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground text-[10px]">หมายเหตุ/ข้อความสตาฟ:</Label>
-                  <div className="p-2 border rounded-xl bg-background/50 leading-relaxed break-words">{selectedSubmission.notes}</div>
+                  <Label className="text-muted-foreground text-xs">หมายเหตุ/ข้อความสตาฟ:</Label>
+                  <div className="p-2 border rounded-xl bg-background/50 leading-relaxed break-words text-sm">{selectedSubmission.notes}</div>
                 </div>
               )}
 
               {/* Uploaded Images Gallery */}
               <div className="space-y-1">
-                <Label className="text-muted-foreground text-[10px]">หลักฐานรูปภาพ ({selectedSubmission.images.length} รูป):</Label>
+                <Label className="text-muted-foreground text-xs">หลักฐานรูปภาพ ({selectedSubmission.images.length} รูป):</Label>
                 {selectedSubmission.images.length === 0 ? (
-                  <p className="text-muted-foreground italic text-[11px] p-2 border rounded-xl">ไม่มีรูปภาพหลักฐาน</p>
+                  <p className="text-muted-foreground italic text-xs p-2 border rounded-xl">ไม่มีรูปภาพหลักฐาน</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {selectedSubmission.images.map((url, idx) => (
@@ -1386,19 +1424,19 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
               {/* Status Badge */}
               <div className="flex justify-between items-center pt-2">
                 <span className="text-muted-foreground">สถานะตรวจสอบ:</span>
-                <Badge variant={selectedSubmission.status === 'approved' ? 'success' : selectedSubmission.status === 'pending' ? 'warning' : 'destructive'} className="text-[10px]">
+                <Badge variant={selectedSubmission.status === 'approved' ? 'success' : selectedSubmission.status === 'pending' ? 'warning' : 'destructive'} className="text-xs">
                   {selectedSubmission.status === 'approved' ? 'อนุมัติแล้ว' : selectedSubmission.status === 'pending' ? 'รอตรวจ' : 'ถูกปฏิเสธ/ขาดงาน'}
                 </Badge>
               </div>
 
               {/* Owner actions */}
               {isOwner && selectedSubmission.status === 'pending' && (
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <Button onClick={handleOpenReject} disabled={processingAction} variant="outline" className="gap-1 rounded-xl text-red-500 border-red-200 hover:bg-red-50/10">
+                <div className="grid grid-cols-2 gap-2 pt-2 text-sm">
+                  <Button onClick={handleOpenReject} disabled={processingAction} variant="outline" className="gap-1 rounded-xl text-red-500 border-red-200 hover:bg-red-50/10 text-sm h-10">
                     <XCircle className="w-4 h-4" />
                     ปฏิเสธคำร้อง
                   </Button>
-                  <Button onClick={() => handleApprove(selectedSubmission)} disabled={processingAction} className="gap-1 rounded-xl bg-green-600 hover:bg-green-700 text-white">
+                  <Button onClick={() => handleApprove(selectedSubmission)} disabled={processingAction} className="gap-1 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm h-10">
                     {processingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                     อนุมัติงาน (+แต้ม)
                   </Button>
@@ -1416,18 +1454,18 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
             <DialogTitle className="text-sm font-bold">เหตุผลการปฏิเสธงาน</DialogTitle>
             <DialogDescription className="sr-only">ระบุเหตุผลในการปฏิเสธการส่งงานของสตาฟ</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 my-2 text-xs">
-            <Label className="text-xs">เหตุผล</Label>
+          <div className="space-y-3 my-2 text-sm">
+            <Label className="text-sm">เหตุผล</Label>
             <Input
               value={rejectionReason}
               onChange={e => setRejectionReason(e.target.value)}
               placeholder="ระบุเหตุผล เช่น รูปไม่ครบ / หลักฐานไม่ตรงกับสัปดาห์"
-              className="h-9 border-latte/40 rounded-xl"
+              className="h-10 border-latte/40 rounded-xl text-sm"
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectOpen(false)} className="rounded-xl">ยกเลิก</Button>
-            <Button onClick={handleReject} disabled={processingAction} className="rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2">
+            <Button variant="ghost" onClick={() => setRejectOpen(false)} className="rounded-xl text-sm">ยกเลิก</Button>
+            <Button onClick={handleReject} disabled={processingAction} className="rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2 text-sm h-10">
               {processingAction && <Loader2 className="w-4 h-4 animate-spin" />}
               ยืนยันปฏิเสธ
             </Button>
