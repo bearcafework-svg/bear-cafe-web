@@ -23,7 +23,7 @@ interface CampaignQueue {
   message_payload: any;
   target_type: string;
   target_value: string | null;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'paused';
   token_type: 'token1' | 'token2';
   total_targets: number;
   sent_count: number;
@@ -531,7 +531,7 @@ export function DMBroadcastManagement() {
 
   // 2. Poll active campaigns counts every 5 seconds for live progress
   useEffect(() => {
-    const hasActive = campaigns.some(c => c.status === 'processing' || c.status === 'pending');
+    const hasActive = campaigns.some(c => c.status === 'processing' || c.status === 'pending' || c.status === 'paused');
     if (!hasActive) return;
 
     const interval = setInterval(() => {
@@ -622,6 +622,43 @@ export function DMBroadcastManagement() {
     }
 
     setSubmitting(true);
+
+    let targetVal = null;
+    if (targetType === 'option') {
+      targetVal = targetOption;
+    } else if (targetType === 'test') {
+      const inputs = testUserId.split(',').map(s => s.trim()).filter(Boolean);
+      const resolvedIds: string[] = [];
+
+      for (const input of inputs) {
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('discord_id')
+            .or(`discord_id.eq."${input}",username.ilike."${input}",discord_username.ilike."${input}"`)
+            .maybeSingle();
+
+          if (profileData) {
+            resolvedIds.push(profileData.discord_id);
+          } else {
+            if (/^\d+$/.test(input)) {
+              resolvedIds.push(input);
+            } else {
+              toast({ title: `ไม่พบผู้ใช้: ${input}`, variant: 'destructive' });
+              setSubmitting(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error(e);
+          if (/^\d+$/.test(input)) {
+            resolvedIds.push(input);
+          }
+        }
+      }
+      targetVal = resolvedIds.join(',');
+    }
+
     try {
       const { error } = await supabase
         .from('dm_broadcast_queues' as any)
@@ -629,7 +666,7 @@ export function DMBroadcastManagement() {
           title: composerTitle,
           message_payload: payload,
           target_type: targetType,
-          target_value: targetType === 'option' ? targetOption : (targetType === 'test' ? testUserId.trim() : null),
+          target_value: targetVal,
           token_type: tokenType,
           status: 'pending'
         });
@@ -653,6 +690,8 @@ export function DMBroadcastManagement() {
     switch (c.status) {
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">รอดำเนินการ</Badge>;
+      case 'paused':
+        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 animate-pulse">⏳ จำกัดความเร็ว (รอส่งต่อ)</Badge>;
       case 'processing':
         const processed = c.sent_count + c.failed_count;
         if (processed === 0) {
@@ -925,6 +964,7 @@ export function DMBroadcastManagement() {
                     const statusBorderClass = 
                       c.status === 'pending' ? 'border-l-4 border-l-amber-500' : 
                       c.status === 'processing' ? 'border-l-4 border-l-blue-500' : 
+                      c.status === 'paused' ? 'border-l-4 border-l-amber-400' : 
                       c.status === 'completed' ? 'border-l-4 border-l-emerald-500' : 
                       'border-l-4 border-l-red-500';
 
@@ -954,7 +994,7 @@ export function DMBroadcastManagement() {
                               {getStatusBadge(c)}
                               
                               {/* Cancel button if running */}
-                              {(c.status === 'processing' || c.status === 'pending') && (
+                              {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
                                 <Button 
                                   size="sm" 
                                   variant="destructive" 
@@ -1009,6 +1049,7 @@ export function DMBroadcastManagement() {
                                 "h-1.5 bg-muted",
                                 c.status === 'completed' && "[&>div]:bg-emerald-500",
                                 c.status === 'processing' && "[&>div]:bg-blue-500 animate-pulse",
+                                c.status === 'paused' && "[&>div]:bg-amber-400 animate-pulse",
                                 c.status === 'cancelled' && "[&>div]:bg-red-400",
                                 c.status === 'pending' && "[&>div]:bg-amber-400"
                               )}

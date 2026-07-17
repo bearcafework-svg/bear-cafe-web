@@ -19,8 +19,6 @@ import NotFound from "./pages/NotFound";
 import PointsPage from "./pages/PointsPage";
 import DiscordServersPage from "./pages/DiscordServersPage";
 import HealingMessagePage from "./pages/HealingMessagePage";
-import ForStaffPage from "./pages/ForStaffPage";
-import ForStaffReportPage from "./pages/ForStaffReportPage";
 import SpinPrizePage from "./pages/SpinPrizePage";
 import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 import InventoryPage from "./pages/InventoryPage";
@@ -73,8 +71,6 @@ function AppRoutes() {
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
-      <Route path="/forstaff" element={<ForStaffPage />} />
-      <Route path="/forstaff/report" element={<ForStaffReportPage />} />
       <Route path="/gacha" element={<GachaPage />} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/overview" replace /></ProtectedRoute>} />

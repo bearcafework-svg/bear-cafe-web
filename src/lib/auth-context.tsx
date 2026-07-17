@@ -296,9 +296,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } as any,
         isLoading: false,
         isAuthenticated: true,
-        login: async () => {},
+        login: async () => { },
         logout: () => { window.location.href = '/'; },
-        refreshUser: async () => {},
+        refreshUser: async () => { },
       };
     }
 

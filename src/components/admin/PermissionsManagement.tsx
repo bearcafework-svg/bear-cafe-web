@@ -235,7 +235,7 @@ export function PermissionsManagement() {
     setAssignTab('current');
     try {
       const [{ data: profiles }, { data: assignments }] = await Promise.all([
-        supabase.from('profiles').select('id, username, avatar_url, discord_id').order('username'),
+        supabase.from('profiles').select('id, username, avatar_url, discord_id, discord_username').order('username'),
         supabase.from('user_custom_permissions').select('user_id, permission_id, custom_permissions(name)'),
       ]);
 

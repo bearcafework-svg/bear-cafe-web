@@ -443,6 +443,27 @@ function LogsTab() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [matchedDiscordIds, setMatchedDiscordIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (!trimmed) {
+      setMatchedDiscordIds([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('discord_id')
+          .or(`discord_id.ilike."%${trimmed}%",username.ilike."%${trimmed}%",discord_username.ilike."%${trimmed}%"`);
+        setMatchedDiscordIds((data || []).map(p => p.discord_id));
+      } catch (err) {
+        console.error(err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => { fetchLogs(); }, [page]);
 
@@ -468,9 +489,13 @@ function LogsTab() {
 
   const filtered = useMemo(() => {
     if (!search) return logs;
-    const q = search.toLowerCase();
-    return logs.filter(l => l.discord_id?.toLowerCase().includes(q) || l.code?.toLowerCase().includes(q));
-  }, [logs, search]);
+    const q = search.toLowerCase().trim();
+    return logs.filter(l => 
+      l.discord_id?.toLowerCase().includes(q) || 
+      l.code?.toLowerCase().includes(q) ||
+      (l.discord_id && matchedDiscordIds.includes(l.discord_id))
+    );
+  }, [logs, search, matchedDiscordIds]);
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
@@ -555,7 +580,17 @@ function UserPointsTab() {
         .order('points', { ascending: false });
 
       if (search.trim()) {
-        query = query.eq('discord_id', search.trim());
+        const q = search.trim();
+        const { data: matchedProfiles } = await supabase
+          .from('profiles')
+          .select('discord_id')
+          .or(`discord_id.ilike."%${q}%",username.ilike."%${q}%",discord_username.ilike."%${q}%"`);
+        
+        const matchedIds = (matchedProfiles || []).map(p => p.discord_id);
+        if (!matchedIds.includes(q)) {
+          matchedIds.push(q);
+        }
+        query = query.in('discord_id', matchedIds);
       }
 
       const { data, error, count } = await query

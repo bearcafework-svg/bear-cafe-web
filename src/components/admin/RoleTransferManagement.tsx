@@ -90,7 +90,7 @@ export function RoleTransferManagement() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, discord_id, username, avatar_url')
+          .select('id, discord_id, username, discord_username, avatar_url')
           .order('username');
         if (error) throw error;
         setProfiles(data || []);

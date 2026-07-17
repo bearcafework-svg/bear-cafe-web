@@ -32,6 +32,7 @@ interface HealingMessage {
   created_at: string;
   discord_id?: string | null;
   username?: string | null;
+  discord_username?: string | null;
 }
 
 // ─── API: fetch all messages joined with profiles ─────────────────────────────
@@ -50,18 +51,19 @@ async function fetchAllMessages(): Promise<HealingMessage[]> {
 
   const { data: profiles } = await (supabase as any)
     .from('profiles')
-    .select('id, discord_id, username')
+    .select('id, discord_id, username, discord_username')
     .in('id', authorIds);
 
-  const profileMap: Record<string, { discord_id: string; username: string }> = {};
+  const profileMap: Record<string, { discord_id: string; username: string; discord_username: string | null }> = {};
   (profiles ?? []).forEach((p: any) => {
-    profileMap[p.id] = { discord_id: p.discord_id, username: p.username };
+    profileMap[p.id] = { discord_id: p.discord_id, username: p.username, discord_username: p.discord_username ?? null };
   });
 
   return rows.map((r) => ({
     ...r,
     discord_id: profileMap[r.author_id]?.discord_id ?? null,
     username: profileMap[r.author_id]?.username ?? null,
+    discord_username: profileMap[r.author_id]?.discord_username ?? null,
   }));
 }
 
@@ -195,9 +197,10 @@ export function HealingMessagesManagement() {
   const filtered = rows.filter((r) => {
     if (filterStatus !== 'all' && r.status !== filterStatus) return false;
     if (search) {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
       return r.message.toLowerCase().includes(q)
         || (r.username ?? '').toLowerCase().includes(q)
+        || (r.discord_username ?? '').toLowerCase().includes(q)
         || (r.discord_id ?? '').includes(q);
     }
     return true;

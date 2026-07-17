@@ -193,8 +193,22 @@ export function TagWarnLogsManagement() {
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       if (caseQuery && !String(r.sequence).includes(caseQuery.trim())) return false;
-      if (memberQuery && !(r.member_id ?? '').toLowerCase().includes(memberQuery.toLowerCase())) return false;
-      if (baristaQuery && !(r.barista_id ?? '').toLowerCase().includes(baristaQuery.toLowerCase())) return false;
+      if (memberQuery) {
+        const q = memberQuery.toLowerCase().trim();
+        const member = r.member_id ? profileMap.get(r.member_id) : null;
+        const matchesId = (r.member_id ?? '').toLowerCase().includes(q);
+        const matchesUsername = member ? member.username.toLowerCase().includes(q) : false;
+        const matchesDiscordUsername = member && member.discord_username ? member.discord_username.toLowerCase().includes(q) : false;
+        if (!matchesId && !matchesUsername && !matchesDiscordUsername) return false;
+      }
+      if (baristaQuery) {
+        const q = baristaQuery.toLowerCase().trim();
+        const barista = r.barista_id ? profileMap.get(r.barista_id) : null;
+        const matchesId = (r.barista_id ?? '').toLowerCase().includes(q);
+        const matchesUsername = barista ? barista.username.toLowerCase().includes(q) : false;
+        const matchesDiscordUsername = barista && barista.discord_username ? barista.discord_username.toLowerCase().includes(q) : false;
+        if (!matchesId && !matchesUsername && !matchesDiscordUsername) return false;
+      }
       if (dateQuery) {
         const d = new Date(r.log_timestamp || r.created_at);
         const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -202,7 +216,7 @@ export function TagWarnLogsManagement() {
       }
       return true;
     });
-  }, [records, caseQuery, memberQuery, baristaQuery, dateQuery]);
+  }, [records, caseQuery, memberQuery, baristaQuery, dateQuery, profileMap]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
   const paginatedRecords = filteredRecords.slice(
@@ -349,6 +363,35 @@ export function TagWarnLogsManagement() {
       return;
     }
     setAddLoading(true);
+
+    const inputId = newWarn.memberId.trim();
+    let resolvedMemberId = inputId;
+
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('discord_id')
+        .or(`discord_id.eq."${inputId}",username.ilike."${inputId}",discord_username.ilike."${inputId}"`)
+        .maybeSingle();
+
+      if (profileData) {
+        resolvedMemberId = profileData.discord_id;
+      } else {
+        const isNumeric = /^\d+$/.test(inputId);
+        if (!isNumeric) {
+          toast({
+            title: 'ไม่พบผู้ใช้',
+            description: 'ไม่พบชื่อผู้ใช้หรือข้อมูลที่ระบุในระบบ กรุณาตรวจสอบหรือใช้ Discord ID (ตัวเลข) เท่านั้น',
+            variant: 'destructive'
+          });
+          setAddLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error resolving member ID:', e);
+    }
+
     try {
       const uploadUrl = async (file: File, idx: number): Promise<string> => {
         const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
@@ -364,7 +407,7 @@ export function TagWarnLogsManagement() {
       const url2 = selectedFiles[1] ? await uploadUrl(selectedFiles[1], 1) : null;
 
       const { error: insertErr } = await supabase.from('tag_warn_logs').insert({
-        member_id: newWarn.memberId.trim(),
+        member_id: resolvedMemberId,
         message: newWarn.message.trim(),
         punish: newWarn.punish,
         barista_id: user?.discord_id ?? null,

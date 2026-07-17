@@ -40,6 +40,8 @@ import { MaintenanceToggle } from '@/components/admin/MaintenanceToggle';
 import { PermissionsManagement } from '@/components/admin/PermissionsManagement';
 import { HealingMessagesManagement } from '@/components/admin/HealingMessagesManagement';
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
+import { StaffManagement } from '@/components/admin/StaffManagement';
+import { SubmitPromotion } from '@/components/admin/SubmitPromotion';
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
@@ -108,6 +110,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'campaigns': Send,
   'product-catalog': ShoppingCart,
   'dm-broadcast': Send,
+  'manage-staff': Users,
+  'submit-promotion': ClipboardList,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -160,9 +164,26 @@ export default function AdminPage() {
 
   // Admin role allowed pages from site_settings
   const [adminRolePages, setAdminRolePages] = useState<string[]>([]);
+  const [isStaff, setIsStaff] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const discordId = user.discord_id;
+    if (!discordId) return;
+    supabase
+      .from('staff_members' as any)
+      .select('id, status')
+      .eq('discord_id', discordId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.status !== 'Resigned') {
+          setIsStaff(true);
+        }
+      });
+  }, [user]);
 
   const { isMaintenanceMode, maintenanceMessage, enabledStaff, toggleMaintenanceMode, updateMaintenanceMode } = useMaintenanceMode();
-  const hasAdminAccess = user?.is_admin || user?.is_owner || (user?.allowed_pages && user.allowed_pages.length > 0);
+  const hasAdminAccess = user?.is_admin || user?.is_owner || (user?.allowed_pages && user.allowed_pages.length > 0) || isStaff;
   const isOwner = user?.is_owner;
   const userAllowedPages = user?.allowed_pages || [];
 
@@ -192,6 +213,7 @@ export default function AdminPage() {
   const visibleItems = NAV_ITEMS.filter(item => {
     if (item.id === 'overview') return true; // Always visible
     if (isOwner) return true; // Owner sees all
+    if (item.id === 'submit-promotion' && isStaff) return true; // Staff sees submit-promotion
     // Merge admin role pages + custom permission pages
     const fromAdmin = user?.is_admin
       ? (adminRolePages.length > 0 ? adminRolePages.includes(item.id) : !item.ownerOnly)
@@ -319,6 +341,7 @@ export default function AdminPage() {
   const canAccessPage = (pageId: string) => {
     if (pageId === 'overview') return true;
     if (isOwner) return true;
+    if (pageId === 'submit-promotion' && isStaff) return true;
     const fromAdmin = user?.is_admin
       ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : true)
       : false;
@@ -351,6 +374,8 @@ export default function AdminPage() {
         case 'campaigns': return canAccessPage('campaigns') ? <CampaignsManagement /> : null;
         case 'product-catalog': return canAccessPage('product-catalog') ? <ProductCatalogManagement /> : null;
         case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
+        case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
+        case 'submit-promotion': return canAccessPage('submit-promotion') ? <SubmitPromotion currentUser={user} isOwner={isOwner} /> : null;
         default: return null;
       }
     } catch (error) {

@@ -304,9 +304,38 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       toast({ title: 'กรุณากรอกชื่อแพ็กเกจโฆษณา', variant: 'destructive' }); return;
     }
     setSaving(true);
+
+    const inputId = memberId.trim();
+    let resolvedMemberId = inputId;
+
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('discord_id')
+        .or(`discord_id.eq."${inputId}",username.ilike."${inputId}",discord_username.ilike."${inputId}"`)
+        .maybeSingle();
+
+      if (profileData) {
+        resolvedMemberId = profileData.discord_id;
+      } else {
+        const isNumeric = /^\d+$/.test(inputId);
+        if (!isNumeric) {
+          toast({
+            title: 'ไม่พบผู้ใช้',
+            description: 'ไม่พบชื่อผู้ใช้หรือข้อมูลที่ระบุในระบบ กรุณาตรวจสอบหรือใช้ Discord ID (ตัวเลข) เท่านั้น',
+            variant: 'destructive'
+          });
+          setSaving(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error resolving member ID:', e);
+    }
+
     const payload: Record<string, unknown> = {
       type,
-      member_id: memberId.trim(),
+      member_id: resolvedMemberId,
       start_at: new Date(startAt).toISOString(),
       end_at: (type === 'house' || type === 'ad') && endAt ? new Date(endAt).toISOString() : null,
       room_link: type !== 'personal_role' && roomLink.trim() ? roomLink.trim() : null,

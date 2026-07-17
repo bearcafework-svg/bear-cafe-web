@@ -1427,7 +1427,7 @@ export function TradingHistoryManagement() {
                           <p className="text-xs text-foreground break-words">{r.item}</p>
                         )}
                         {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
-                          <div className="space-y-1.5">
+                          <div className={cn("space-y-1.5", r.purchase_items.length > 2 && "max-h-[140px] overflow-y-auto pr-1 custom-scrollbar")}>
                             {r.purchase_items.map(item => {
                               const catProduct = catalog.find(c => c.id === item.product_id);
                               const role = catProduct?.role_id ? discordRolesMap.get(catProduct.role_id) : null;
@@ -1593,11 +1593,44 @@ export function TradingHistoryManagement() {
             <DialogDescription>ระบบจะส่ง embed ขอบคุณไปยัง Discord สำหรับ <strong>{resolveDisplayName(embedTarget?.member_id ?? '').name}</strong></DialogDescription>
           </DialogHeader>
           {embedTarget && (
-            <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">ผู้ซื้อ</span><span className="font-medium">{resolveDisplayName(embedTarget.member_id).name}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">ยอดบิลนี้</span><span className="font-bold text-primary">{formatCurrency(embedTarget.total_amount)} บาท</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">ยอดรวมทั้งหมด</span><span className="font-bold">{formatCurrency(totalAmountByMember.get(embedTarget.member_id) ?? 0)} บาท</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground flex items-center gap-1"><img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /> Salmon Point</span><span className="font-bold text-warning">{salmonPointMap.get(embedTarget.member_id) ?? 0} แต้ม</span></div>
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-2.5 text-sm">
+              <div className="flex justify-between items-center pb-2 border-b border-border/40">
+                <span className="text-muted-foreground text-xs">ผู้ซื้อ</span>
+                <span className="font-bold text-foreground">{resolveDisplayName(embedTarget.member_id).name}</span>
+              </div>
+              
+              {/* Product items in this bill */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground text-xs block mb-1">รายการสินค้าในบิล:</span>
+                {embedTarget.source === 'legacy' && embedTarget.item && (
+                  <p className="text-xs font-medium pl-2 border-l-2 border-primary/40 text-foreground break-words">{embedTarget.item}</p>
+                )}
+                {embedTarget.source === 'new' && embedTarget.purchase_items && embedTarget.purchase_items.length > 0 ? (
+                  <div className="pl-2 border-l-2 border-primary/40 space-y-1 max-h-32 overflow-y-auto">
+                    {embedTarget.purchase_items.map(item => (
+                      <div key={item.id} className="flex justify-between text-xs">
+                        <span className="text-foreground/80 truncate max-w-[200px]">{item.product_display_name}</span>
+                        <span className="font-medium text-muted-foreground shrink-0">฿{formatCurrency(item.price_paid)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : embedTarget.source === 'new' && (
+                  <p className="text-xs italic text-muted-foreground pl-2 border-l-2 border-primary/40">ไม่มีข้อมูลสินค้า</p>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-border/40">
+                <span className="text-muted-foreground text-xs">ยอดรวมบิลนี้</span>
+                <span className="font-bold text-sm text-primary">฿{formatCurrency(embedTarget.total_amount)} บาท</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs flex items-center gap-1">
+                  <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" />
+                  แต้มแซลมอนที่ได้รับจากบิลนี้
+                </span>
+                <span className="font-bold text-xs text-honey">+{computeSalmonDelta(embedTarget.total_amount)} แต้ม</span>
+              </div>
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
