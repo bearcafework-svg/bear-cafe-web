@@ -9,11 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import {
   Check, X, Trash2, Pencil, Plus, RefreshCw, Search, Heart, Loader2, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
@@ -33,45 +30,49 @@ interface HealingMessage {
   discord_id?: string | null;
   username?: string | null;
   discord_username?: string | null;
+  avatar_url?: string | null;
 }
 
 // ─── API: fetch all messages joined with profiles ─────────────────────────────
 async function fetchAllMessages(): Promise<HealingMessage[]> {
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('healing_messages')
-    .select('id, message, status, author_id, created_at')
+    .select(`
+      id,
+      message,
+      status,
+      author_id,
+      created_at,
+      profiles:author_id (
+        username,
+        discord_username,
+        avatar_url,
+        discord_id
+      )
+    `)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  const rows = (data || []) as HealingMessage[];
-  const authorIds = [...new Set(rows.map((r) => r.author_id).filter(Boolean))];
-
-  if (authorIds.length === 0) return rows;
-
-  const { data: profiles } = await (supabase as any)
-    .from('profiles')
-    .select('id, discord_id, username, discord_username')
-    .in('id', authorIds);
-
-  const profileMap: Record<string, { discord_id: string; username: string; discord_username: string | null }> = {};
-  (profiles ?? []).forEach((p: any) => {
-    profileMap[p.id] = { discord_id: p.discord_id, username: p.username, discord_username: p.discord_username ?? null };
-  });
-
+  const rows = (data || []) as any[];
   return rows.map((r) => ({
-    ...r,
-    discord_id: profileMap[r.author_id]?.discord_id ?? null,
-    username: profileMap[r.author_id]?.username ?? null,
-    discord_username: profileMap[r.author_id]?.discord_username ?? null,
+    id: r.id,
+    message: r.message,
+    status: r.status,
+    author_id: r.author_id,
+    created_at: r.created_at,
+    username: r.profiles?.username ?? null,
+    discord_username: r.profiles?.discord_username ?? null,
+    discord_id: r.profiles?.discord_id ?? null,
+    avatar_url: r.profiles?.avatar_url ?? null,
   }));
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Status }) {
-  if (status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 border gap-1"><CheckCircle2 className="w-3 h-3" /> อนุมัติ</Badge>;
-  if (status === 'rejected') return <Badge className="bg-red-500/10 text-red-400 border-red-500/20 border gap-1"><XCircle className="w-3 h-3" /> ปฏิเสธ</Badge>;
-  return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 border gap-1"><Clock className="w-3 h-3" /> รออนุมัติ</Badge>;
+  if (status === 'approved') return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 border gap-1 rounded-full"><CheckCircle2 className="w-3 h-3" /> อนุมัติ</Badge>;
+  if (status === 'rejected') return <Badge className="bg-red-500/10 text-red-400 border-red-500/20 border gap-1 rounded-full"><XCircle className="w-3 h-3" /> ปฏิเสธ</Badge>;
+  return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 border gap-1 rounded-full"><Clock className="w-3 h-3" /> รออนุมัติ</Badge>;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export function HealingMessagesManagement() {
   const updateStatus = async (id: string, status: Status) => {
     setUpdatingId(id);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('healing_messages').update({ status }).eq('id', id);
       if (error) throw error;
       setRows((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
@@ -136,7 +137,7 @@ export function HealingMessagesManagement() {
     }
     setAddSaving(true);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('healing_messages')
         .insert({ message: trimmed, author_id: user?.id, status: 'approved' });
       if (error) throw error;
@@ -162,7 +163,7 @@ export function HealingMessagesManagement() {
     }
     setEditSaving(true);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('healing_messages').update({ message: trimmed }).eq('id', editTarget.id);
       if (error) throw error;
       setRows((prev) => prev.map((r) => r.id === editTarget.id ? { ...r, message: trimmed } : r));
@@ -180,7 +181,7 @@ export function HealingMessagesManagement() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('healing_messages').delete().eq('id', deleteTarget.id);
       if (error) throw error;
       setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
@@ -214,185 +215,238 @@ export function HealingMessagesManagement() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Heart className="w-5 h-5 text-pink-400" />
-          <h2 className="text-lg font-semibold">ข้อความกำลังใจ</h2>
-          <Badge variant="secondary" className="text-xs">{filtered.length} / {rows.length}</Badge>
+    <div className="space-y-5">
+      
+      {/* Header card info */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-pink-500/10 flex items-center justify-center">
+            <Heart className="w-5 h-5 text-pink-500 fill-pink-500/20" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-[#8C6239] dark:text-[#EAD8C8]">ข้อความให้กำลังใจ (Healing Messages)</h2>
+            <p className="text-[10px] text-muted-foreground">จัดการและตรวจสอบคำให้กำลังใจจากคอมมูนิตี้บอร์ด</p>
+          </div>
         </div>
+
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5 rounded-xl text-xs h-9">
             <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
             รีเฟรช
           </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" />เพิ่มข้อความ
+          <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5 rounded-xl text-xs h-9 bg-pink-600 hover:bg-pink-700 text-white">
+            <Plus className="w-3.5 h-3.5" /> เพิ่มข้อความ
           </Button>
         </div>
       </div>
 
-      {/* ── Stats tabs ── */}
-      <div className="flex gap-1.5 flex-wrap">
-        {([
-          { key: 'all', label: 'ทั้งหมด', count: counts.all, cls: 'bg-muted/60 hover:bg-muted' },
-          { key: 'pending', label: 'รออนุมัติ', count: counts.pending, cls: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600' },
-          { key: 'approved', label: 'อนุมัติ', count: counts.approved, cls: 'bg-green-500/10 hover:bg-green-500/20 text-green-600' },
-          { key: 'rejected', label: 'ปฏิเสธ', count: counts.rejected, cls: 'bg-red-500/10 hover:bg-red-500/20 text-red-500' },
-        ] as const).map(({ key, label, count, cls }) => (
-          <button
-            key={key}
-            onClick={() => setFilterStatus(key as Status | 'all')}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-all border flex items-center gap-1.5',
-              cls,
-              filterStatus === key ? 'ring-2 ring-primary border-primary/40' : 'border-border/40'
-            )}
-          >
-            {key === 'pending' && <Clock className="w-3.5 h-3.5" />}
-            {key === 'approved' && <CheckCircle2 className="w-3.5 h-3.5" />}
-            {key === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
-            <span>{label}</span>
-            <span className="ml-1 font-bold">{count}</span>
-          </button>
-        ))}
+      {/* Filter Tabs and Search Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        
+        {/* Stats tabs */}
+        <div className="md:col-span-8 flex gap-1.5 flex-wrap">
+          {([
+            { key: 'all', label: 'ทั้งหมด', count: counts.all, cls: 'bg-muted/60 hover:bg-muted text-muted-foreground' },
+            { key: 'pending', label: 'รออนุมัติ', count: counts.pending, cls: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600' },
+            { key: 'approved', label: 'อนุมัติ', count: counts.approved, cls: 'bg-green-500/10 hover:bg-green-500/20 text-green-600' },
+            { key: 'rejected', label: 'ปฏิเสธ', count: counts.rejected, cls: 'bg-red-500/10 hover:bg-red-500/20 text-red-500' },
+          ] as const).map(({ key, label, count, cls }) => (
+            <button
+              key={key}
+              onClick={() => setFilterStatus(key as Status | 'all')}
+              className={cn(
+                'rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all border flex items-center gap-1.5 shadow-sm',
+                cls,
+                filterStatus === key ? 'ring-2 ring-primary border-primary/40' : 'border-border/40'
+              )}
+            >
+              {key === 'pending' && <Clock className="w-3.5 h-3.5" />}
+              {key === 'approved' && <CheckCircle2 className="w-3.5 h-3.5" />}
+              {key === 'rejected' && <XCircle className="w-3.5 h-3.5" />}
+              <span>{label}</span>
+              <span className="ml-0.5 bg-background/60 dark:bg-black/25 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="md:col-span-4 relative">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9 text-xs rounded-xl border-latte/40 focus-visible:ring-pink-500"
+            placeholder="ค้นหาข้อความ, ชื่อ, Discord ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* ── Search ── */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-        <Input
-          className="pl-8 h-9 text-sm"
-          placeholder="ค้นหาข้อความ, ชื่อ, Discord ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {/* ── List ── */}
+      {/* Grid List */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground text-sm">ไม่พบข้อความ</div>
+        <div className="text-center py-16 border border-dashed rounded-2xl text-muted-foreground text-xs">
+          ไม่พบข้อความให้กำลังใจในขณะนี้ค่ะ
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((row) => (
-            <div
+            <Card
               key={row.id}
               className={cn(
-                'group rounded-xl border-l-4 border border-border/40 bg-card px-4 py-3 transition-all hover:bg-muted/20 hover:shadow-sm',
-                row.status === 'approved' ? 'border-l-green-500' :
-                row.status === 'rejected' ? 'border-l-red-400' : 'border-l-amber-400'
+                'border-l-4 rounded-2xl bg-card shadow-sm hover:shadow transition-shadow overflow-hidden flex flex-col justify-between',
+                row.status === 'approved' ? 'border-l-green-500 border-border/40' :
+                row.status === 'rejected' ? 'border-l-red-500 border-border/40' : 'border-l-amber-500 border-border/40'
               )}
             >
-              <div className="flex items-start gap-3">
-                {/* Content */}
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <p className="text-sm leading-relaxed">{row.message}</p>
-                  <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                    {row.username && <span className="font-medium text-foreground/70">@{row.username}</span>}
-                    {row.discord_id && <span className="font-mono">{row.discord_id}</span>}
-                    <span>{new Date(row.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
-                    <StatusBadge status={row.status} />
+              <CardContent className="p-4 space-y-3.5">
+                
+                {/* Author Info */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={row.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png'}
+                      alt="avatar"
+                      className="w-8 h-8 rounded-full border border-latte/20 shrink-0"
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="text-xs font-bold text-foreground">
+                        @{row.username || 'Unknown'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        ID: {row.discord_id || '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <StatusBadge status={row.status} />
+                </div>
+
+                {/* Message Box */}
+                <div className="p-3 bg-secondary/30 rounded-xl border border-latte/10 text-xs text-foreground leading-relaxed italic break-words">
+                  "{row.message}"
+                </div>
+
+                {/* Date & Actions */}
+                <div className="flex items-center justify-between border-t border-latte/15 pt-2.5 text-[10px] text-muted-foreground">
+                  <span>
+                    สร้างเมื่อ: {new Date(row.created_at).toLocaleString('th-TH', {
+                      day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+                    })}
+                  </span>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Approve / Reject buttons */}
+                    {row.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-green-600 hover:bg-green-500/10 rounded-lg text-[10px] font-bold"
+                          disabled={updatingId === row.id}
+                          onClick={() => updateStatus(row.id, 'approved')}
+                        >
+                          {updatingId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                          อนุมัติ
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-red-500 hover:bg-red-500/10 rounded-lg text-[10px] font-bold"
+                          disabled={updatingId === row.id}
+                          onClick={() => updateStatus(row.id, 'rejected')}
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          ปฏิเสธ
+                        </Button>
+                      </>
+                    )}
+                    {row.status === 'approved' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-amber-600 hover:bg-amber-500/10 rounded-lg text-[10px] font-bold"
+                        disabled={updatingId === row.id}
+                        onClick={() => updateStatus(row.id, 'rejected')}
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        ระงับอนุมัติ
+                      </Button>
+                    )}
+                    {row.status === 'rejected' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-green-600 hover:bg-green-500/10 rounded-lg text-[10px] font-bold"
+                        disabled={updatingId === row.id}
+                        onClick={() => updateStatus(row.id, 'approved')}
+                      >
+                        <Check className="w-3 h-3 mr-1" />
+                        อนุมัติใหม่
+                      </Button>
+                    )}
+
+                    <span className="w-px h-3.5 bg-latte/30 mx-0.5" />
+
+                    {/* Edit / Delete */}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-primary rounded-lg"
+                      onClick={() => openEdit(row)}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive rounded-lg"
+                      onClick={() => setDeleteTarget(row)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {row.status === 'pending' && (
-                    <>
-                      <Button
-                        size="icon" variant="ghost"
-                        className="h-7 w-7 text-green-500 hover:bg-green-500/10"
-                        disabled={updatingId === row.id}
-                        onClick={() => updateStatus(row.id, 'approved')}
-                        title="อนุมัติ"
-                      >
-                        {updatingId === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                      </Button>
-                      <Button
-                        size="icon" variant="ghost"
-                        className="h-7 w-7 text-red-400 hover:bg-red-500/10"
-                        disabled={updatingId === row.id}
-                        onClick={() => updateStatus(row.id, 'rejected')}
-                        title="ปฏิเสธ"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </>
-                  )}
-                  {row.status === 'approved' && (
-                    <Button
-                      size="icon" variant="ghost"
-                      className="h-7 w-7 text-amber-500 hover:bg-amber-500/10"
-                      disabled={updatingId === row.id}
-                      onClick={() => updateStatus(row.id, 'rejected')}
-                      title="ถอนการอนุมัติ"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                  {row.status === 'rejected' && (
-                    <Button
-                      size="icon" variant="ghost"
-                      className="h-7 w-7 text-green-500 hover:bg-green-500/10"
-                      disabled={updatingId === row.id}
-                      onClick={() => updateStatus(row.id, 'approved')}
-                      title="อนุมัติใหม่"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                  <Button
-                    size="icon" variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary"
-                    onClick={() => openEdit(row)}
-                    title="แก้ไข"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="icon" variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(row)}
-                    title="ลบ"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
       {/* ── Add Dialog ── */}
       <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) setAddText(''); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Heart className="w-4 h-4 text-pink-400" />เพิ่มข้อความกำลังใจ</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>ข้อความ ({MIN_LEN}–{MAX_LEN} ตัวอักษร)</Label>
+        <DialogContent className="max-w-md bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">
+              <Heart className="w-4 h-4 text-pink-500 fill-pink-500/20" />เพิ่มข้อความกำลังใจ (แอดมิน)
+            </DialogTitle>
+            <DialogDescription className="sr-only">เขียนข้อความให้กำลังใจที่จะได้รับการอนุมัติโดยทันที</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 my-2 text-xs">
+            <Label className="text-xs font-semibold">ข้อความ ({MIN_LEN}–{MAX_LEN} ตัวอักษร)</Label>
             <Textarea
               value={addText}
               onChange={(e) => setAddText(e.target.value)}
               placeholder="เขียนข้อความให้กำลังใจ..."
-              className="min-h-[100px] resize-none"
+              className="min-h-[100px] resize-none border-latte/40 rounded-xl"
               maxLength={MAX_LEN}
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-[10px] text-muted-foreground font-semibold">
               <span className={addText.trim().length < MIN_LEN ? 'text-amber-500' : 'text-green-500'}>
                 {addText.trim().length} / {MAX_LEN} ตัวอักษร
               </span>
               <span>ขั้นต่ำ {MIN_LEN} ตัวอักษร</span>
             </div>
           </div>
+
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setAddOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleAdd} disabled={addSaving || addText.trim().length < MIN_LEN}>
-              {addSaving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}เพิ่ม (อนุมัติทันที)
+            <Button variant="ghost" onClick={() => setAddOpen(false)} className="rounded-xl">ยกเลิก</Button>
+            <Button onClick={handleAdd} disabled={addSaving || addText.trim().length < MIN_LEN} className="rounded-xl bg-pink-600 text-white hover:bg-pink-700">
+              {addSaving && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}เพิ่ม (อนุมัติทันที)
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -400,27 +454,32 @@ export function HealingMessagesManagement() {
 
       {/* ── Edit Dialog ── */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>แก้ไขข้อความ</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>ข้อความ ({MIN_LEN}–{MAX_LEN} ตัวอักษร)</Label>
+        <DialogContent className="max-w-md bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">แก้ไขข้อความ</DialogTitle>
+            <DialogDescription className="sr-only">แอดมินพิมพ์แก้ไขข้อความ</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 my-2 text-xs">
+            <Label className="text-xs font-semibold">ข้อความ ({MIN_LEN}–{MAX_LEN} ตัวอักษร)</Label>
             <Textarea
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="min-h-[100px] resize-none"
+              className="min-h-[100px] resize-none border-latte/40 rounded-xl"
               maxLength={MAX_LEN}
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-[10px] text-muted-foreground font-semibold">
               <span className={editText.trim().length < MIN_LEN ? 'text-amber-500' : 'text-green-500'}>
                 {editText.trim().length} / {MAX_LEN} ตัวอักษร
               </span>
               <span>ขั้นต่ำ {MIN_LEN} ตัวอักษร</span>
             </div>
           </div>
+
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditTarget(null)}>ยกเลิก</Button>
-            <Button onClick={handleEdit} disabled={editSaving || editText.trim().length < MIN_LEN}>
-              {editSaving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}บันทึก
+            <Button variant="ghost" onClick={() => setEditTarget(null)} className="rounded-xl">ยกเลิก</Button>
+            <Button onClick={handleEdit} disabled={editSaving || editText.trim().length < MIN_LEN} className="rounded-xl">
+              {editSaving && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}บันทึก
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -428,24 +487,31 @@ export function HealingMessagesManagement() {
 
       {/* ── Delete Dialog ── */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="w-4 h-4" />ยืนยันการลบ
+            <DialogTitle className="text-base font-bold text-destructive flex items-center gap-1.5">
+              <Trash2 className="w-4 h-4" />ยืนยันการลบข้อความ
             </DialogTitle>
+            <DialogDescription className="sr-only">แอดมินยืนยันลบข้อความถาวร</DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            ลบข้อความ <span className="text-foreground font-medium">"{deleteTarget?.message.slice(0, 40)}..."</span>?
-            <br /><span className="text-destructive text-xs">ไม่สามารถย้อนกลับได้</span>
-          </p>
+
+          <div className="my-2 text-xs leading-relaxed text-muted-foreground">
+            <p>ลบข้อความนี้ถาวร?</p>
+            <div className="my-2 p-3 bg-secondary/50 rounded-xl font-medium text-foreground italic break-words">
+              "{deleteTarget?.message}"
+            </div>
+            <p className="text-[10px] text-red-500 leading-normal">* การดำเนินการนี้ไม่สามารถยกเลิกภายหลังได้ค่ะ</p>
+          </div>
+
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>ยกเลิก</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}ลบ
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} className="rounded-xl" disabled={deleting}>ยกเลิก</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="rounded-xl">
+              {deleting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}ลบถาวร
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

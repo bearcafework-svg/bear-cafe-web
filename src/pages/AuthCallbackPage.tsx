@@ -257,7 +257,9 @@ export default function AuthCallbackPage() {
 
       setStatus("success");
       timeoutRef.current = window.setTimeout(() => {
-        navigate("/", { replace: true });
+        const nextUrl = localStorage.getItem('redirect_after_login') || "/";
+        localStorage.removeItem('redirect_after_login');
+        navigate(nextUrl, { replace: true });
       }, SUCCESS_REDIRECT_DELAY_MS);
     } catch (err) {
       console.error("[AuthCallback] Callback processing error:", err);
