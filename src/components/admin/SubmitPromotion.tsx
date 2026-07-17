@@ -551,10 +551,15 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
       });
 
       // Call Deno edge function to send DM (fire and forget)
-      // (The prompt doesn't ask for a rollback on rejection failure, only on approval).
-      const botToken = Deno.env.get('DISCORD_BOT_TOKEN');
-      // If we don't have local env token, it will fall back, but inside Edge Function is cleaner.
-      // So let's trigger it.
+      supabase.functions.invoke('approve-promotion', {
+        body: {
+          submission_id: selectedSubmission.id,
+          action: 'reject',
+          rejection_reason: rejectionReason.trim()
+        }
+      }).catch(err => {
+        console.warn('Failed to invoke rejection notification:', err);
+      });
 
       toast({ title: 'ปฏิเสธงานโปรโมทเรียบร้อย' });
       setRejectOpen(false);
@@ -1398,6 +1403,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
         <DialogContent className="max-w-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">เหตุผลการปฏิเสธงาน</DialogTitle>
+            <DialogDescription className="sr-only">ระบุเหตุผลในการปฏิเสธการส่งงานของสตาฟ</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 my-2 text-xs">
             <Label className="text-xs">เหตุผล</Label>

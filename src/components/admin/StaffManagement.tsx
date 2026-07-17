@@ -1194,6 +1194,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
         <DialogContent className="max-w-md bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">ข้อมูลการเปลี่ยนแปลง (JSON)</DialogTitle>
+            <DialogDescription className="sr-only">แสดงข้อมูลเปรียบเทียบก่อนและหลังแก้ไขในรูปแบบ JSON</DialogDescription>
           </DialogHeader>
           <div className="p-3 bg-zinc-900 rounded-xl text-[10px] font-mono text-zinc-300 max-h-80 overflow-y-auto space-y-3">
             <div>
@@ -1215,6 +1216,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
             <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">
               {posForm.id ? 'แก้ไขตำแหน่ง' : 'เพิ่มตำแหน่งใหม่'}
             </DialogTitle>
+            <DialogDescription className="sr-only">ตั้งค่าข้อมูลตำแหน่งสตาฟในระบบ</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 my-2 text-xs">
             <div className="space-y-1">
@@ -1241,7 +1243,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                 <div className="flex gap-2 items-center">
                   <Input
                     type="color"
-                    value={posForm.color}
+                    value={posForm.color.startsWith('#') && posForm.color.length === 7 ? posForm.color : '#ffffff'}
                     onChange={e => setPosForm(prev => ({ ...prev, color: e.target.value }))}
                     className="w-10 h-9 p-0 border border-latte/40 rounded-xl cursor-pointer"
                   />
@@ -1287,6 +1289,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
             <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">
               {levelForm.id ? 'แก้ไขระดับ' : 'เพิ่มระดับใหม่'}
             </DialogTitle>
+            <DialogDescription className="sr-only">ตั้งค่าข้อมูลระดับของสตาฟและการสลับยศ</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 my-2 text-xs">
             <div className="space-y-1">

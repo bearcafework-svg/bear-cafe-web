@@ -75,7 +75,7 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const body = await req.json();
-    const { submission_id } = body;
+    const { submission_id, action = 'approve', rejection_reason } = body;
 
     if (!submission_id) {
       return new Response(
@@ -94,6 +94,60 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
+    // ============================================================
+    // Action: REJECT SUBMISSION DM (DB status is updated by client)
+    // ============================================================
+    if (action === 'reject') {
+      const { data: submission, error: subFetchErr } = await adminClient
+        .from('promotion_submissions')
+        .select('*')
+        .eq('id', submission_id)
+        .single();
+
+      if (subFetchErr || !submission) {
+        return new Response(
+          JSON.stringify({ error: 'Submission not found for rejection DM' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let dmSent = false;
+      let dmErrorMsg = null;
+
+      try {
+        const textMessage = [
+          `## 🐻︲__\` การตรวจงานโปรโมท 𓂃 \`__`,
+          `-# **สถานะ:** งานของคุณถูกปฏิเสธ ✖`,
+          ``,
+          `> **ประเภทงาน:** ${submission.submission_type}`,
+          `> **รอบงาน:** สัปดาห์ที่ ${submission.week_number} (${submission.month}/${submission.year})`,
+          `> **เหตุผล:** ${rejection_reason || '-'}`,
+          ``,
+          `กรุณาตรวจสอบรูปหรืออัปโหลดรูปหลักฐานใหม่เพื่อยื่นส่งงานใหม่อีกครั้งค่ะ`
+        ].join('\n');
+
+        await sendDiscordDM(botToken, submission.discord_id, textMessage);
+        dmSent = true;
+      } catch (dmError: any) {
+        console.warn('Discord Rejection DM failed (non-fatal):', dmError);
+        dmErrorMsg = dmError.message;
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: dmSent 
+            ? 'Submission rejected and notified successfully' 
+            : `ปฏิเสธสำเร็จแต่ไม่สามารถส่ง DM แจ้งเตือนได้: ${dmErrorMsg}`, 
+          dm_sent: dmSent
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ============================================================
+    // Action: APPROVE SUBMISSION (RPC handles points, status, audit, web notify)
+    // ============================================================
     // 1. Invoke database approval RPC function (atomic point increase & status change)
     const { data: rpcResult, error: rpcError } = await adminClient.rpc('approve_promotion_submission', {
       p_operator_id: operatorProfile.id,
@@ -108,7 +162,7 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const { discord_id, points_awarded, user_id } = rpcResult;
+    const { discord_id, points_awarded } = rpcResult;
 
     // Fetch submission details to craft DM message
     const { data: submission } = await adminClient
@@ -116,6 +170,9 @@ Deno.serve(async (req): Promise<Response> => {
       .select('*')
       .eq('id', submission_id)
       .single();
+
+    let dmSent = false;
+    let dmErrorMsg = null;
 
     try {
       // 2. Send Discord DM to notify the user of point increase
@@ -132,34 +189,23 @@ Deno.serve(async (req): Promise<Response> => {
       ].join('\n');
 
       await sendDiscordDM(botToken, discord_id, textMessage);
-
-      return new Response(
-        JSON.stringify({ success: true, message: 'Submission approved and notified successfully', points: points_awarded }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
+      dmSent = true;
     } catch (dmError: any) {
-      console.error('Discord DM failed. Initiating database rollback...', dmError);
-
-      // 3. Rollback point increase & status change in DB
-      const { data: rollbackSuccess, error: rollbackError } = await adminClient.rpc('rollback_promotion_approval', {
-        p_operator_id: operatorProfile.id,
-        p_submission_id: submission_id
-      });
-
-      if (rollbackError || !rollbackSuccess) {
-        console.error('Rollback RPC failed:', rollbackError);
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: 'discord_dm_failed',
-          message: `ไม่สามารถส่งข้อความแจ้งเตือนทาง Discord DM ได้: ${dmError.message}. ได้โรลแบ็กการอนุมัติและแต้มคืนแล้ว`
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.warn('Discord Approval DM failed (non-fatal):', dmError);
+      dmErrorMsg = dmError.message;
     }
 
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: dmSent 
+          ? 'Submission approved and notified successfully' 
+          : `อนุมัติสำเร็จแต่ไม่สามารถส่ง DM แจ้งเตือนได้: ${dmErrorMsg}`, 
+        points: points_awarded,
+        dm_sent: dmSent
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error('Error in approve-promotion:', error);
     return new Response(
