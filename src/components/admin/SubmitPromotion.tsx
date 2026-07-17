@@ -290,7 +290,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
         h => h.year === currentYear && h.month === currentMonth && h.week_number === activeWeekConfig.week
       );
 
-      if (currentWeekSub && currentWeekSub.status === 'pending') {
+      if (currentWeekSub && (currentWeekSub.status === 'pending' || (currentWeekSub.status === 'approved' && currentWeekSub.count < settings.max_count))) {
         setSubmitForm({
           type: currentWeekSub.submission_type,
           count: currentWeekSub.count,
@@ -311,7 +311,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
     try {
       let query = supabase
         .from('promotion_submissions')
-        .select('*, profiles(username, discord_username, avatar_url)')
+        .select('*, profiles!promotion_submissions_user_id_fkey(username, discord_username, avatar_url)')
         .eq('year', currentYear)
         .eq('month', Number(filterMonth));
 
@@ -459,7 +459,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
       );
 
       if (existingSub) {
-        if (existingSub.status !== 'pending' && existingSub.status !== 'rejected') {
+        if (existingSub.status !== 'pending' && existingSub.status !== 'rejected' && !(existingSub.status === 'approved' && existingSub.count < settings.max_count)) {
           throw new Error('ไม่สามารถแก้ไขงานที่ได้รับการอนุมัติแล้วได้');
         }
         const { error } = await supabase
@@ -730,7 +730,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {activeSubmission && activeSubmission.status !== 'pending' && activeSubmission.status !== 'rejected' ? (
+                {activeSubmission && activeSubmission.status !== 'pending' && activeSubmission.status !== 'rejected' && !(activeSubmission.status === 'approved' && activeSubmission.count < settings.max_count) ? (
                   <div className="p-4 bg-green-50/5 border border-green-500/20 rounded-2xl text-center space-y-2">
                     <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto" />
                     <h3 className="font-bold text-sm">งานประจำสัปดาห์ผ่านการตรวจแล้ว!</h3>
@@ -738,6 +738,17 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                   </div>
                 ) : (
                   <>
+                    {activeSubmission && activeSubmission.status === 'approved' && activeSubmission.count < settings.max_count && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
+                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold text-xs">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>ตรวจผ่านแล้ว แต่ยังไม่ครบโควตา</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          คุณเคยส่งงานผ่านแล้ว {activeSubmission.count} ชิ้น หากส่งงานเพิ่ม ระบบจะดึงสถานะกลับเป็น <strong>รอตรวจ</strong> และหักแต้มเดิมออกชั่วคราวจนกว่าจะได้รับการอนุมัติรอบใหม่ค่ะ
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <Label className="text-xs">ประเภทงานโปรโมท</Label>
                       <Select
