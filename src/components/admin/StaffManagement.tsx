@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/select';
 import { 
   Users, UserPlus, Shield, Settings, Activity, Clock, Trash2, Edit2, 
-  ArrowUpDown, Plus, Calendar, Save, History, Search, CheckCircle, Loader2, GripVertical
+  ArrowUpDown, Plus, Calendar, Save, History, Search, CheckCircle, Loader2, GripVertical,
+  Pencil, Copy, PlusCircle, MinusCircle, RotateCcw
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -161,6 +162,12 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   // Table filtering
   const [filterQuery, setFilterQuery] = useState('');
 
+  // Edit Points Dialog States (similar to redeem codes)
+  const [editPointsMember, setEditPointsMember] = useState<StaffMember | null>(null);
+  const [editPointsAction, setEditPointsAction] = useState<'add' | 'sub' | 'set'>('add');
+  const [editPointsAmount, setEditPointsAmount] = useState<string>('');
+  const [editPointsSaving, setEditPointsSaving] = useState<boolean>(false);
+
   const [submittingMember, setSubmittingMember] = useState(false);
   const [submittingPos, setSubmittingPos] = useState(false);
   const [submittingLevel, setSubmittingLevel] = useState(false);
@@ -283,6 +290,24 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     const diffTime = endDate.getTime() - startDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+    const formatDaysToYearMonthDay = (totalDays: number) => {
+      if (totalDays < 30) {
+        return `${totalDays} วัน`;
+      } else if (totalDays < 365) {
+        const months = Math.floor(totalDays / 30);
+        const remainingDays = totalDays % 30;
+        return `${months} เดือน${remainingDays > 0 ? ` ${remainingDays} วัน` : ''}`;
+      } else {
+        const years = Math.floor(totalDays / 365);
+        const remainingMonths = Math.floor((totalDays % 365) / 30);
+        const remainingDays = (totalDays % 365) % 30;
+        let res = `${years} ปี`;
+        if (remainingMonths > 0) res += ` ${remainingMonths} เดือน`;
+        if (remainingDays > 0) res += ` ${remainingDays} วัน`;
+        return res;
+      }
+    };
+
     if (end) {
       const endParsed = new Date(end);
       if (today < endParsed) {
@@ -290,11 +315,11 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
         return `เหลืออีก ${remaining} วัน`;
       } else {
         const passed = Math.ceil((today.getTime() - endParsed.getTime()) / (1000 * 60 * 60 * 24));
-        return `ผ่านฝึกงานแล้ว ${passed} วัน`;
+        return `ผ่านฝึกงานแล้ว ${formatDaysToYearMonthDay(passed)}`;
       }
     } else {
       const passed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      return `ผ่านฝึกงานแล้ว ${passed} วัน`;
+      return `ผ่านฝึกงานแล้ว ${formatDaysToYearMonthDay(passed)}`;
     }
   };
 
@@ -469,6 +494,56 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       toast({ title: 'เกิดข้อผิดพลาด', description: e.message || e, variant: 'destructive' });
     } finally {
       setSubmittingMember(false);
+    }
+  };
+
+  const handleOpenEditPoints = (member: StaffMember) => {
+    setEditPointsMember(member);
+    setEditPointsAction('add');
+    setEditPointsAmount('');
+  };
+
+  const handleEditPointsSubmit = async () => {
+    if (!editPointsMember) return;
+    const amt = Number(editPointsAmount) || 0;
+    if (editPointsAction !== 'set' && amt <= 0) {
+      toast({ title: 'กรุณากรอกจำนวนที่มากกว่า 0', variant: 'destructive' });
+      return;
+    }
+
+    let newPoints = editPointsMember.points || 0;
+    if (editPointsAction === 'add') {
+      newPoints += amt;
+    } else if (editPointsAction === 'sub') {
+      newPoints -= amt;
+    } else if (editPointsAction === 'set') {
+      newPoints = 0;
+    }
+
+    setEditPointsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('user_points')
+        .upsert({
+          discord_id: editPointsMember.discord_id,
+          points: newPoints,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'discord_id' });
+
+      if (error) throw error;
+
+      toast({
+        title: 'อัปเดตแต้มสตาฟสำเร็จ',
+        description: `${editPointsMember.nickname || editPointsMember.discord_id}: ${(editPointsMember.points || 0).toLocaleString()} → ${newPoints.toLocaleString()}`
+      });
+      
+      setMemberPoints(newPoints);
+      setEditPointsMember(null);
+      fetchInitialData();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการแก้ไขแต้ม', description: e.message, variant: 'destructive' });
+    } finally {
+      setEditPointsSaving(false);
     }
   };
 
@@ -711,17 +786,16 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                       <TableHead className="text-sm font-bold">ตำแหน่ง</TableHead>
                       <TableHead className="text-sm font-bold">ระดับ</TableHead>
                       <TableHead className="text-sm font-bold">แต้มสะสม</TableHead>
-                      <TableHead className="text-sm font-bold">วันเดือนปีเปิด</TableHead>
+                      <TableHead className="text-sm font-bold">วันเดือนปีเปิด / อายุงาน</TableHead>
                       <TableHead className="text-sm font-bold">การฝึกงาน</TableHead>
-                      <TableHead className="text-sm font-bold">อายุงาน</TableHead>
                       <TableHead className="text-right pr-6 text-sm font-bold">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.map(m => {
                       const isIntern = m.intern_start_at !== null;
                       const hasColor = m.staff_positions?.color;
@@ -759,34 +833,92 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                             </Badge>
                           </TableCell>
                           <TableCell className="font-bold text-base text-amber-600 dark:text-amber-400">
-                            {m.points || 0} แต้ม
+                            <div className="flex items-center gap-1.5">
+                              <span>{(m.points || 0).toLocaleString()} แต้ม</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditPoints(m);
+                                }}
+                                title="จัดการแต้มสะสม"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {(() => {
-                              const today = new Date();
-                              let dateToUse = new Date(m.joined_at);
-                              if (m.intern_start_at) {
-                                const isPassed = m.intern_end_at ? new Date(m.intern_end_at) <= today : false;
-                                if (isPassed) {
-                                  dateToUse = new Date(m.intern_start_at);
+                            <div>
+                              {(() => {
+                                const today = new Date();
+                                let dateToUse = new Date(m.joined_at);
+                                if (m.intern_start_at) {
+                                  const isPassed = m.intern_end_at ? new Date(m.intern_end_at) <= today : false;
+                                  if (isPassed) {
+                                    dateToUse = new Date(m.intern_start_at);
+                                  }
                                 }
-                              }
-                              return dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-                            })()}
+                                return dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+                              })()}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5 font-medium">
+                              อายุงาน: {calculateDuration(m)}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm">
                             {isIntern ? (
                               <div className="flex flex-col">
                                 <span className="font-medium text-[#8C6239] dark:text-[#EAD8C8]">{calculateInternship(m.intern_start_at, m.intern_end_at)}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(m.intern_start_at!).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })} - {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ปัจจุบัน'}
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <span>
+                                      {new Date(m.intern_start_at!).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const unix = Math.floor(new Date(m.intern_start_at!).getTime() / 1000);
+                                        navigator.clipboard.writeText(String(unix));
+                                        toast({ title: 'คัดลอก Unix Timestamp วันเริ่มฝึกงานสำเร็จ', description: `ค่าที่คัดลอก: ${unix}` });
+                                      }}
+                                      title="คัดลอก Unix Timestamp ของวันเริ่มฝึกงาน"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                    </Button>
+                                  </div>
+                                  <span>-</span>
+                                  <div className="flex items-center gap-1">
+                                    <span>
+                                      {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ปัจจุบัน'}
+                                    </span>
+                                    {m.intern_end_at && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const unix = Math.floor(new Date(m.intern_end_at!).getTime() / 1000);
+                                          navigator.clipboard.writeText(String(unix));
+                                          toast({ title: 'คัดลอก Unix Timestamp วันสิ้นสุดฝึกงานสำเร็จ', description: `ค่าที่คัดลอก: ${unix}` });
+                                        }}
+                                        title="คัดลอก Unix Timestamp ของวันสิ้นสุดฝึกงาน"
+                                      >
+                                        <Copy className="w-2.5 h-2.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm">{calculateDuration(m)}</TableCell>
                           <TableCell className="text-right pr-6">
                             <div className="flex justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => handleOpenTimeline(m)}>
@@ -1011,13 +1143,23 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">แต้มสะสม (Points)</Label>
-                <Input
-                  type="number"
-                  value={memberPoints}
-                  onChange={e => setMemberPoints(Number(e.target.value) || 0)}
-                  placeholder="แต้มสะสม"
-                  className="h-9 border-latte/40 rounded-xl"
-                />
+                <div className="flex items-center gap-2">
+                  <div className="h-9 px-3 flex items-center bg-muted/40 border border-latte/40 rounded-xl text-sm font-bold text-amber-700 dark:text-amber-400 w-full">
+                    {memberPoints.toLocaleString()} แต้ม
+                  </div>
+                  {selectedMember && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 text-xs gap-1 border-latte/40 rounded-xl shrink-0"
+                      onClick={() => {
+                        handleOpenEditPoints(selectedMember);
+                      }}
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> จัดการแต้ม
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1394,6 +1536,55 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
             <Button onClick={handleSubmitLevel} disabled={submittingLevel} className="gap-2 rounded-xl">
               {submittingLevel && <Loader2 className="w-4 h-4 animate-spin" />}
               บันทึก
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Points Dialog */}
+      <Dialog open={!!editPointsMember} onOpenChange={open => { if (!open) setEditPointsMember(null); }}>
+        <DialogContent className="max-w-md border-latte/40 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle>แก้ไขแต้มทีมงาน</DialogTitle>
+            <DialogDescription>
+              <span className="font-mono text-xs">@{editPointsMember?.discord_user?.username || editPointsMember?.discord_id}</span> ({editPointsMember?.nickname || 'ไม่มีชื่อเล่น'}) — แต้มปัจจุบัน:{' '}
+              <span className={cn('font-bold', (editPointsMember?.points ?? 0) < 0 ? 'text-destructive' : '')}>{(editPointsMember?.points ?? 0).toLocaleString()}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-2">
+              <Button variant={editPointsAction === 'add' ? 'default' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('add')}>
+                <PlusCircle className="w-4 h-4" /> เพิ่ม
+              </Button>
+              <Button variant={editPointsAction === 'sub' ? 'default' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('sub')}>
+                <MinusCircle className="w-4 h-4" /> ลด
+              </Button>
+              <Button variant={editPointsAction === 'set' ? 'destructive' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('set')}>
+                <RotateCcw className="w-4 h-4" /> รีเซ็ต (0)
+              </Button>
+            </div>
+            {editPointsAction !== 'set' && (
+              <div className="space-y-2">
+                <Label>จำนวนแต้ม</Label>
+                <Input type="number" min="1" value={editPointsAmount} onChange={e => setEditPointsAmount(e.target.value)} placeholder="กรอกจำนวนแต้มที่ต้องการปรับ" className="rounded-xl border-latte/40" />
+              </div>
+            )}
+            {editPointsMember && editPointsAction !== 'set' && editPointsAmount && Number(editPointsAmount) > 0 && (
+              <p className="text-sm text-muted-foreground">
+                ผลลัพธ์: {(editPointsMember.points || 0).toLocaleString()} {editPointsAction === 'add' ? '+' : '−'} {Number(editPointsAmount).toLocaleString()} ={' '}
+                <span className="font-bold">
+                  {(editPointsAction === 'add' ? (editPointsMember.points || 0) + Number(editPointsAmount) : (editPointsMember.points || 0) - Number(editPointsAmount)).toLocaleString()}
+                </span>
+              </p>
+            )}
+            {editPointsAction === 'set' && (
+              <p className="text-sm text-destructive font-medium">แต้มสะสมจะถูกปรับเป็น 0 ทันที</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditPointsMember(null)} className="rounded-xl">ยกเลิก</Button>
+            <Button onClick={handleEditPointsSubmit} disabled={editPointsSaving} className="gap-2 rounded-xl">
+              {editPointsSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              ยืนยัน
             </Button>
           </DialogFooter>
         </DialogContent>

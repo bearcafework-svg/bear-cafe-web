@@ -119,6 +119,20 @@ export function DatePicker({ value, onChange, placeholder = "วว/ดด/ป�
             onSelect={handleSelect}
             initialFocus
           />
+          <div className="border-t border-latte/20 p-2 flex justify-center bg-muted/20 rounded-b-2xl">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs font-semibold text-amber-700 hover:text-amber-800 hover:bg-cream/10 h-8 rounded-lg"
+              onClick={() => {
+                const today = new Date();
+                handleSelect(today);
+              }}
+            >
+              เลือกวันนี้ (Today)
+            </Button>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

@@ -35,6 +35,7 @@ import {
   AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 
 type ContractType = 'house' | 'personal_role' | 'ad';
 
@@ -427,22 +428,20 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-[#827160]">วันที่เริ่มต้น</Label>
-                <Input
-                  type="datetime-local"
+                <DateTimePicker
                   value={startAt}
-                  onChange={e => setStartAt(e.target.value)}
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
+                  onChange={setStartAt}
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
                 />
               </div>
 
               {(type === 'house' || type === 'ad') && (
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-[#827160]">วันที่สิ้นสุด</Label>
-                  <Input
-                    type="datetime-local"
+                  <DateTimePicker
                     value={endAt}
-                    onChange={e => setEndAt(e.target.value)}
-                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
+                    onChange={setEndAt}
+                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
                   />
                 </div>
               )}
@@ -632,11 +631,10 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
         <div className="space-y-3.5 py-1">
           <div className="space-y-1">
             <Label className="text-xs font-semibold text-[#827160]">วันที่สิ้นสุดสัญญา</Label>
-            <Input
-              type="datetime-local"
+            <DateTimePicker
               value={endAt}
-              onChange={e => setEndAt(e.target.value)}
-              className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+              onChange={setEndAt}
+              className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
             />
           </div>
           
