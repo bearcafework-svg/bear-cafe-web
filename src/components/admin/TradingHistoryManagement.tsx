@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
 import imageCompression from 'browser-image-compression';
 import jsQR from 'jsqr';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   RefreshCw,
   AlertTriangle,
@@ -930,7 +931,10 @@ export function TradingHistoryManagement() {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="txDate" className="text-xs font-semibold">วันทำรายการ *</Label>
-                    <Input type="date" id="txDate" value={newBill.transactionDate} onChange={e => setNewBill(p => ({ ...p, transactionDate: e.target.value }))} className="h-9 text-xs rounded-xl" />
+                    <DatePicker
+                      value={newBill.transactionDate}
+                      onChange={date => setNewBill(p => ({ ...p, transactionDate: date }))}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">ประเภทบิล</Label>
@@ -1317,18 +1321,18 @@ export function TradingHistoryManagement() {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-semibold text-muted-foreground">วันที่ทำรายการ</Label>
-                <div className="relative">
-                  <Input
-                    type="date"
+                <div className="flex gap-2 items-center">
+                  <DatePicker
                     value={dateQuery}
-                    onChange={e => { setDateQuery(e.target.value); setCurrentPage(1); }}
-                    className={cn('h-9 text-xs rounded-xl pr-9 w-full bg-background', !dateQuery && 'text-muted-foreground')}
+                    onChange={date => { setDateQuery(date); setCurrentPage(1); }}
+                    placeholder="เลือกวันที่"
+                    className="w-full"
                   />
                   {dateQuery && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                      className="h-9 w-9 hover:bg-transparent text-muted-foreground hover:text-foreground shrink-0"
                       onClick={() => { setDateQuery(''); setCurrentPage(1); }}
                     >
                       <X className="h-4 w-4" />
@@ -1562,7 +1566,10 @@ export function TradingHistoryManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>วันทำรายการ</Label>
-                <Input type="date" value={editForm.transaction} onChange={e => setEditForm(p => ({ ...p, transaction: e.target.value }))} />
+                <DatePicker
+                  value={editForm.transaction}
+                  onChange={date => setEditForm(p => ({ ...p, transaction: date }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>ประเภทบิล</Label>

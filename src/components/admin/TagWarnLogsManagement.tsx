@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/ui/date-picker';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -713,18 +714,18 @@ export function TagWarnLogsManagement() {
           </div>
           <div className="space-y-1">
             <Label className="text-[10px] font-semibold text-muted-foreground">วันที่ทำรายการ</Label>
-            <div className="relative">
-              <Input
-                type="date"
+            <div className="flex gap-2 items-center">
+              <DatePicker
                 value={dateQuery}
-                onChange={(e) => { setDateQuery(e.target.value); setCurrentPage(1); }}
-                className={cn('h-9 text-xs rounded-xl pr-9 w-full bg-background', !dateQuery && 'text-muted-foreground')}
+                onChange={(date) => { setDateQuery(date); setCurrentPage(1); }}
+                placeholder="เลือกวันที่"
+                className="w-full"
               />
               {dateQuery && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                  className="h-9 w-9 hover:bg-transparent text-muted-foreground hover:text-foreground shrink-0"
                   onClick={() => { setDateQuery(''); setCurrentPage(1); }}
                 >
                   <X className="h-4 w-4" />

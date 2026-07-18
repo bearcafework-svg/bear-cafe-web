@@ -23,7 +23,7 @@ import {
   ArrowLeft, Users, User, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers,
+  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -41,7 +41,7 @@ import { PermissionsManagement } from '@/components/admin/PermissionsManagement'
 import { HealingMessagesManagement } from '@/components/admin/HealingMessagesManagement';
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
-import { SubmitPromotion } from '@/components/admin/SubmitPromotion';
+import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
@@ -52,6 +52,7 @@ import { RoleMigrationManagement } from '@/components/admin/RoleMigrationManagem
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/ui/date-picker';
 import type { Tables } from '@/integrations/supabase/types';
 import { BannerManagement } from '@/components/admin/BannerManagement';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
@@ -111,7 +112,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'product-catalog': ShoppingCart,
   'dm-broadcast': Send,
   'manage-staff': Users,
-  'submit-promotion': ClipboardList,
+  'sticky-messages': Pin,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -213,7 +214,6 @@ export default function AdminPage() {
   const visibleItems = NAV_ITEMS.filter(item => {
     if (item.id === 'overview') return true; // Always visible
     if (isOwner) return true; // Owner sees all
-    if (item.id === 'submit-promotion' && isStaff) return true; // Staff sees submit-promotion
     // Merge admin role pages + custom permission pages
     const fromAdmin = user?.is_admin
       ? (adminRolePages.length > 0 ? adminRolePages.includes(item.id) : !item.ownerOnly)
@@ -341,7 +341,6 @@ export default function AdminPage() {
   const canAccessPage = (pageId: string) => {
     if (pageId === 'overview') return true;
     if (isOwner) return true;
-    if (pageId === 'submit-promotion' && isStaff) return true;
     const fromAdmin = user?.is_admin
       ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : true)
       : false;
@@ -375,7 +374,7 @@ export default function AdminPage() {
         case 'product-catalog': return canAccessPage('product-catalog') ? <ProductCatalogManagement /> : null;
         case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
         case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
-        case 'submit-promotion': return canAccessPage('submit-promotion') ? <SubmitPromotion currentUser={user} isOwner={isOwner} /> : null;
+        case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
         default: return null;
       }
     } catch (error) {
@@ -1175,11 +1174,11 @@ function ReportsManagement() {
               placeholder="ค้นหา Barista ID"
               className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
             />
-            <Input
-              type="date"
+            <DatePicker
               value={dateQuery}
-              onChange={(e) => setDateQuery(e.target.value)}
-              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+              onChange={setDateQuery}
+              placeholder="เลือกวันที่"
+              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl"
             />
           </div>
         </div>

@@ -24,6 +24,7 @@ import {
   ArrowUpDown, Plus, Calendar, Save, History, Search, CheckCircle, Loader2, GripVertical
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface Position {
   id: string;
@@ -63,6 +64,7 @@ interface StaffMember {
     display_name: string;
     avatar_url: string;
   } | null;
+  points?: number;
 }
 
 interface DiscordUserSearch {
@@ -129,6 +131,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     level_change_reason: ''
   });
 
+  const [memberPoints, setMemberPoints] = useState<number>(0);
+
   const [posForm, setPosForm] = useState({
     id: '',
     name: '',
@@ -168,14 +172,15 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [posRes, lvlRes, memRes] = await Promise.all([
+      const [posRes, lvlRes, memRes, ptsRes] = await Promise.all([
         supabase.from('staff_positions').select('*').order('display_order', { ascending: true }),
         supabase.from('staff_levels').select('*').order('name', { ascending: true }),
         supabase.from('staff_members').select(`
           *,
           staff_positions(*),
           staff_levels(*)
-        `)
+        `),
+        supabase.from('user_points').select('discord_id, points')
       ]);
 
       if (posRes.error) throw posRes.error;
@@ -184,6 +189,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
       setPositions(posRes.data || []);
       setLevels(lvlRes.data || []);
+
+      const pointsMap = new Map((ptsRes.data || []).map(p => [p.discord_id, p.points]));
 
       // Fetch Discord User Details (Avatar / Username) for each member
       const memberList: StaffMember[] = memRes.data || [];
@@ -196,6 +203,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
         if (!pError && profiles?.profiles) {
           const mappedMembers = memberList.map(m => ({
             ...m,
+            points: pointsMap.get(m.discord_id) || 0,
             discord_user: profiles.profiles[m.discord_id] ? {
               username: profiles.profiles[m.discord_id].username,
               display_name: profiles.profiles[m.discord_id].display_name,
@@ -204,10 +212,10 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
           }));
           setMembers(mappedMembers);
         } else {
-          setMembers(memberList);
+          setMembers(memberList.map(m => ({ ...m, points: pointsMap.get(m.discord_id) || 0 })));
         }
       } else {
-        setMembers(memberList);
+        setMembers(memberList.map(m => ({ ...m, points: pointsMap.get(m.discord_id) || 0 })));
       }
     } catch (e: any) {
       console.error(e);
@@ -306,10 +314,19 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     
     if (diffDays < 30) {
       return `${diffDays} วัน`;
-    } else {
+    } else if (diffDays < 365) {
       const months = Math.floor(diffDays / 30);
       const remainingDays = diffDays % 30;
       return `${months} เดือน ${remainingDays} วัน`;
+    } else {
+      const years = Math.floor(diffDays / 365);
+      const remainingMonths = Math.floor((diffDays % 365) / 30);
+      const remainingDays = (diffDays % 365) % 30;
+      
+      let result = `${years} ปี`;
+      if (remainingMonths > 0) result += ` ${remainingMonths} เดือน`;
+      if (remainingDays > 0) result += ` ${remainingDays} วัน`;
+      return result;
     }
   };
 
@@ -358,6 +375,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     setSelectedDiscordUser(null);
     setSearchQuery('');
     setDiscordSearchResults([]);
+    setMemberPoints(0);
     setMemberForm({
       discord_id: '',
       nickname: '',
@@ -381,6 +399,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       display_name: member.discord_user.display_name,
       avatar_url: member.discord_user.avatar_url
     } : null);
+    setMemberPoints(member.points || 0);
     
     setMemberForm({
       discord_id: member.discord_id,
@@ -430,6 +449,18 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     try {
       const { data, error } = await supabase.functions.invoke('manage-staff', { body: payload });
       if (error) throw error;
+
+      // Save/Upsert points
+      const discordId = selectedMember ? selectedMember.discord_id : selectedDiscordUser?.id;
+      if (discordId) {
+        const { error: pointsErr } = await supabase
+          .from('user_points')
+          .upsert({
+            discord_id: discordId,
+            points: memberPoints
+          });
+        if (pointsErr) throw pointsErr;
+      }
 
       toast({ title: selectedMember ? 'อัปเดตข้อมูลทีมงานสำเร็จ' : 'เพิ่มทีมงานสำเร็จ' });
       setMemberDialogOpen(false);
@@ -577,24 +608,10 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   };
 
   const handleDeleteMember = async (member: StaffMember) => {
-    if (!confirm(`ยืนยันที่จะลบข้อมูลทีมงาน "${member.nickname || member.discord_user?.display_name || member.discord_id}" หรือไม่?\nการลบนี้จะลบข้อมูลประวัติการทำงาน การเลื่อนระดับ และข้อมูลส่งงานโปรโมททั้งหมดที่เกี่ยวข้องกับสตาฟคนนี้ออกจากระบบอย่างถาวร!`)) return;
+    if (!confirm(`ยืนยันที่จะลบข้อมูลทีมงาน "${member.nickname || member.discord_user?.display_name || member.discord_id}" หรือไม่?\nการลบนี้จะลบข้อมูลประวัติการทำงาน และการเลื่อนระดับทั้งหมดที่เกี่ยวข้องกับสตาฟคนนี้ออกจากระบบอย่างถาวร!`)) return;
     
     setLoading(true);
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('discord_id', member.discord_id)
-        .maybeSingle();
-
-      if (profile?.id) {
-        const { error: subErr } = await supabase
-          .from('promotion_submissions')
-          .delete()
-          .eq('user_id', profile.id);
-        if (subErr) throw subErr;
-      }
-
       const { error: memberErr } = await supabase
         .from('staff_members')
         .delete()
@@ -602,7 +619,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       
       if (memberErr) throw memberErr;
 
-      toast({ title: 'ลบข้อมูลทีมงานและข้อมูลที่เกี่ยวข้องทั้งหมดสำเร็จ' });
+      toast({ title: 'ลบข้อมูลทีมงานสำเร็จ' });
       fetchInitialData();
     } catch (e: any) {
       toast({ title: 'ไม่สามารถลบข้อมูลทีมงานได้', description: e.message, variant: 'destructive' });
@@ -642,16 +659,16 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#8C6239] dark:text-[#EAD8C8]">จัดการทีมงาน</h1>
-          <p className="text-sm text-muted-foreground">ระบบจัดการข้อมูลทีมงาน ลำดับตำแหน่ง/ระดับ และประวัติการเลื่อนยศ (เชื่อมต่อ Discord + Supabase)</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#8C6239] dark:text-[#EAD8C8]">จัดการทีมงาน</h1>
+          <p className="text-base text-muted-foreground">ระบบจัดการข้อมูลทีมงาน ลำดับตำแหน่ง/ระดับ และประวัติการเลื่อนยศ (เชื่อมต่อ Discord + Supabase)</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleOpenAuditLogs} variant="outline" className="gap-2 border-latte/40 dark:border-coffee/40">
-            <History className="w-4 h-4" />
+          <Button onClick={handleOpenAuditLogs} variant="outline" className="gap-2 border-latte/40 dark:border-coffee/40 text-sm h-10 px-4 rounded-xl">
+            <History className="w-4.5 h-4.5" />
             ประวัติระบบ
           </Button>
-          <Button onClick={handleOpenAddMember} className="gap-2 bg-gradient-to-r from-primary to-bear-brown text-primary-foreground">
-            <UserPlus className="w-4 h-4" />
+          <Button onClick={handleOpenAddMember} className="gap-2 bg-gradient-to-r from-primary to-bear-brown text-primary-foreground text-sm h-10 px-4 rounded-xl">
+            <UserPlus className="w-4.5 h-4.5" />
             เพิ่มทีมงาน
           </Button>
         </div>
@@ -659,9 +676,9 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
       <Tabs defaultValue="staff" className="w-full">
         <TabsList className="bg-cream/40 dark:bg-card/40 border border-latte/40 dark:border-coffee/40 rounded-2xl p-1 mb-4">
-          <TabsTrigger value="staff" className="rounded-xl px-4 py-2">รายชื่อทีมงาน ({sortedAndFilteredMembers.length})</TabsTrigger>
-          <TabsTrigger value="positions" className="rounded-xl px-4 py-2">ระบบตำแหน่ง ({positions.length})</TabsTrigger>
-          <TabsTrigger value="levels" className="rounded-xl px-4 py-2">ระบบระดับ ({levels.length})</TabsTrigger>
+          <TabsTrigger value="staff" className="rounded-xl px-5 py-2.5 text-sm font-semibold">รายชื่อทีมงาน ({sortedAndFilteredMembers.length})</TabsTrigger>
+          <TabsTrigger value="positions" className="rounded-xl px-5 py-2.5 text-sm font-semibold">ระบบตำแหน่ง ({positions.length})</TabsTrigger>
+          <TabsTrigger value="levels" className="rounded-xl px-5 py-2.5 text-sm font-semibold">ระบบระดับ ({levels.length})</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: STAFF LIST */}
@@ -669,8 +686,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
           <Card className="border-latte/40 dark:border-coffee/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
             <CardHeader className="pb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <CardTitle className="text-base font-semibold">รายชื่อทีมงานทั้งหมด</CardTitle>
-                <CardDescription className="text-xs">จัดเรียงตาม: ลำดับตำแหน่ง → ลำดับระดับ → วันเข้าทีมงาน</CardDescription>
+                <CardTitle className="text-lg font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายชื่อทีมงานทั้งหมด</CardTitle>
+                <CardDescription className="text-sm">จัดเรียงตาม: ลำดับตำแหน่ง → ลำดับระดับ → วันเข้าทีมงาน</CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 <div className="relative w-full sm:w-60">
@@ -679,7 +696,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                     value={filterQuery}
                     onChange={e => setFilterQuery(e.target.value)}
                     placeholder="ค้นหาชื่อเล่น / Discord..."
-                    className="pl-9 bg-background/50 border-latte/40 rounded-xl"
+                    className="pl-9 bg-background/50 border-latte/40 rounded-xl h-10 text-sm"
                   />
                 </div>
               </div>
@@ -688,44 +705,45 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-cream/20 dark:bg-card/60">
-                    <TableRow>
-                      <TableHead className="pl-6 w-[220px]">สมาชิก</TableHead>
-                      <TableHead>ชื่อเล่น</TableHead>
-                      <TableHead>ตำแหน่ง</TableHead>
-                      <TableHead>ระดับ</TableHead>
-                      <TableHead>วันเดือนปีเปิด</TableHead>
-                      <TableHead>การฝึกงาน</TableHead>
-                      <TableHead>อายุงาน</TableHead>
-                      <TableHead className="text-right pr-6">จัดการ</TableHead>
+                    <TableRow className="text-sm font-bold">
+                      <TableHead className="pl-6 w-[220px] text-sm font-bold">สมาชิก</TableHead>
+                      <TableHead className="text-sm font-bold">ชื่อเล่น</TableHead>
+                      <TableHead className="text-sm font-bold">ตำแหน่ง</TableHead>
+                      <TableHead className="text-sm font-bold">ระดับ</TableHead>
+                      <TableHead className="text-sm font-bold">แต้มสะสม</TableHead>
+                      <TableHead className="text-sm font-bold">วันเดือนปีเปิด</TableHead>
+                      <TableHead className="text-sm font-bold">การฝึกงาน</TableHead>
+                      <TableHead className="text-sm font-bold">อายุงาน</TableHead>
+                      <TableHead className="text-right pr-6 text-sm font-bold">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.map(m => {
                       const isIntern = m.intern_start_at !== null;
                       const hasColor = m.staff_positions?.color;
                       return (
-                        <TableRow key={m.id} className="hover:bg-cream/5 dark:hover:bg-card/40 transition-colors">
+                        <TableRow key={m.id} className="hover:bg-cream/5 dark:hover:bg-card/40 transition-colors text-sm">
                           <TableCell className="pl-6">
                             <div className="flex items-center gap-3">
                               <img
                                 src={m.discord_user?.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"}
                                 alt="Discord Avatar"
-                                className="w-8 h-8 rounded-full border border-latte/30 dark:border-coffee/30 shrink-0"
+                                className="w-9 h-9 rounded-full border border-latte/30 dark:border-coffee/30 shrink-0"
                               />
                               <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-sm truncate">{m.discord_user?.display_name || 'Loading...'}</span>
-                                <span className="text-[10px] text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
+                                <span className="font-bold text-base truncate">{m.discord_user?.display_name || 'Loading...'}</span>
+                                <span className="text-xs text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium text-sm">{m.nickname || '-'}</TableCell>
+                          <TableCell className="font-semibold text-base">{m.nickname || '-'}</TableCell>
                           <TableCell>
                             <Badge 
-                              className="text-xs font-medium"
+                              className="text-sm font-semibold py-1 px-2.5"
                               style={{ 
                                 backgroundColor: hasColor ? `${hasColor}15` : 'rgba(var(--primary), 0.1)',
                                 color: hasColor || 'var(--primary)',
@@ -736,11 +754,14 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs border-latte/60">
+                            <Badge variant="outline" className="text-sm font-medium border-latte/60 py-1 px-2.5">
                               {m.staff_levels?.name || 'ไม่มี'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs">
+                          <TableCell className="font-bold text-base text-amber-600 dark:text-amber-400">
+                            {m.points || 0} แต้ม
+                          </TableCell>
+                          <TableCell className="text-sm">
                             {(() => {
                               const today = new Date();
                               let dateToUse = new Date(m.joined_at);
@@ -750,33 +771,33 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                                   dateToUse = new Date(m.intern_start_at);
                                 }
                               }
-                              return dateToUse.toLocaleDateString('th-TH');
+                              return dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
                             })()}
                           </TableCell>
-                          <TableCell className="text-xs">
+                          <TableCell className="text-sm">
                             {isIntern ? (
                               <div className="flex flex-col">
                                 <span className="font-medium text-[#8C6239] dark:text-[#EAD8C8]">{calculateInternship(m.intern_start_at, m.intern_end_at)}</span>
-                                <span className="text-[9px] text-muted-foreground">
-                                  {new Date(m.intern_start_at!).toLocaleDateString('th-TH')} - {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH') : 'ปัจจุบัน'}
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(m.intern_start_at!).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })} - {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ปัจจุบัน'}
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-[11px]">-</span>
+                              <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-xs">{calculateDuration(m)}</TableCell>
+                          <TableCell className="text-sm">{calculateDuration(m)}</TableCell>
                           <TableCell className="text-right pr-6">
                             <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => handleOpenTimeline(m)}>
-                                <Activity className="w-3.5 h-3.5" />
+                              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => handleOpenTimeline(m)}>
+                                <Activity className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-indigo-500 hover:text-indigo-600" onClick={() => handleOpenEditMember(m)}>
-                                <Edit2 className="w-3.5 h-3.5" />
+                              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-indigo-500 hover:text-indigo-600" onClick={() => handleOpenEditMember(m)}>
+                                <Edit2 className="w-4 h-4" />
                               </Button>
                               {isOwner && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50/10" onClick={() => handleDeleteMember(m)}>
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50/10" onClick={() => handleDeleteMember(m)}>
+                                  <Trash2 className="w-4 h-4" />
                                 </Button>
                               )}
                             </div>
@@ -978,14 +999,26 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               </div>
             )}
 
-            <div className="space-y-1">
-              <Label className="text-xs">ชื่อเล่น</Label>
-              <Input
-                value={memberForm.nickname}
-                onChange={e => setMemberForm(prev => ({ ...prev, nickname: e.target.value }))}
-                placeholder="เช่น พี่หมี"
-                className="h-9 border-latte/40 rounded-xl"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">ชื่อเล่น</Label>
+                <Input
+                  value={memberForm.nickname}
+                  onChange={e => setMemberForm(prev => ({ ...prev, nickname: e.target.value }))}
+                  placeholder="เช่น พี่หมี"
+                  className="h-9 border-latte/40 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">แต้มสะสม (Points)</Label>
+                <Input
+                  type="number"
+                  value={memberPoints}
+                  onChange={e => setMemberPoints(Number(e.target.value) || 0)}
+                  placeholder="แต้มสะสม"
+                  className="h-9 border-latte/40 rounded-xl"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1025,31 +1058,25 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
             <div className="space-y-1">
               <Label className="text-xs">วันเดือนปีเปิด</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={memberForm.joined_at}
-                onChange={e => setMemberForm(prev => ({ ...prev, joined_at: e.target.value }))}
-                className="h-9 border-latte/40 rounded-xl"
+                onChange={date => setMemberForm(prev => ({ ...prev, joined_at: date }))}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">วันเริ่มฝึกงาน (ถ้ามี)</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={memberForm.intern_start_at}
-                  onChange={e => setMemberForm(prev => ({ ...prev, intern_start_at: e.target.value }))}
-                  className="h-9 border-latte/40 rounded-xl"
+                  onChange={date => setMemberForm(prev => ({ ...prev, intern_start_at: date }))}
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">วันสิ้นสุดฝึกงาน (ถ้ามี)</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={memberForm.intern_end_at}
-                  onChange={e => setMemberForm(prev => ({ ...prev, intern_end_at: e.target.value }))}
-                  className="h-9 border-latte/40 rounded-xl"
+                  onChange={date => setMemberForm(prev => ({ ...prev, intern_end_at: date }))}
                 />
               </div>
             </div>
@@ -1118,8 +1145,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                         <Badge variant="outline" className="text-[9px] uppercase tracking-wider">
                           {ev.event_type}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(ev.created_at).toLocaleString('th-TH')}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(ev.created_at).toLocaleString('th-TH', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                       <p className="text-xs font-semibold text-foreground leading-relaxed">{ev.details}</p>
@@ -1167,7 +1194,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                   <TableBody>
                     {auditLogs.map(log => (
                       <TableRow key={log.id} className="text-xs">
-                        <TableCell className="font-mono text-[10px]">{new Date(log.created_at).toLocaleString('th-TH')}</TableCell>
+                        <TableCell className="font-mono text-xs">{new Date(log.created_at).toLocaleString('th-TH', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="scale-90">
                             {log.action}

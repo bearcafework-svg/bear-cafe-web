@@ -39,7 +39,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'product-catalog', label: 'คลังสินค้า', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
   { id: 'dm-broadcast', label: 'ส่งข่าวสารบอท DM', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'manage-staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
-  { id: 'submit-promotion', label: 'ส่งงานโปรโมท', group: 'system', groupLabel: 'ระบบ' },
+  { id: 'sticky-messages', label: 'ข้อความติดหนึบ', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */

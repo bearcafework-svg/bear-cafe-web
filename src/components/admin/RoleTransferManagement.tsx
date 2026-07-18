@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface Profile {
   id: string;
@@ -696,20 +697,18 @@ export function RoleTransferManagement() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <Input
-                    type="date"
-                    className="h-9 text-sm w-[140px]"
+                  <DatePicker
                     value={logDateFrom}
-                    onChange={e => setLogDateFrom(e.target.value)}
-                    title="ตั้งแต่วันที่"
+                    onChange={setLogDateFrom}
+                    placeholder="เริ่ม"
+                    className="w-[140px]"
                   />
                   <span className="text-muted-foreground text-sm">–</span>
-                  <Input
-                    type="date"
-                    className="h-9 text-sm w-[140px]"
+                  <DatePicker
                     value={logDateTo}
-                    onChange={e => setLogDateTo(e.target.value)}
-                    title="ถึงวันที่"
+                    onChange={setLogDateTo}
+                    placeholder="สิ้นสุด"
+                    className="w-[140px]"
                   />
                 </div>
                 {(logSearch || logDateFrom || logDateTo) && (

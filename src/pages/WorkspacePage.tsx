@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -754,10 +755,9 @@ export default function WorkspacePage() {
                       </div>
                       <div className="space-y-2">
                         <Label>วันที่ <span className="text-red-500">*</span></Label>
-                        <Input 
-                          type="date" 
+                        <DatePicker 
                           value={leaveDate} 
-                          onChange={(e) => setLeaveDate(e.target.value)} 
+                          onChange={setLeaveDate} 
                           className="bg-white/80 dark:bg-black/50 rounded-xl"
                         />
                       </div>
