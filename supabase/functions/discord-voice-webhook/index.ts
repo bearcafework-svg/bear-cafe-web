@@ -81,7 +81,7 @@ Deno.serve(async (req): Promise<Response> => {
       .from('voice_states')
       .select('channel_id, joined_at')
       .eq('discord_user_id', user_id)
-      .single();
+      .maybeSingle();
 
     // Determine joined_at value:
     // - If no existing record OR channel changed -> set to now()

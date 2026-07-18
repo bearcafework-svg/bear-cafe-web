@@ -44,3 +44,16 @@ DROP POLICY IF EXISTS "sticky_channels_select" ON sticky_channels;
 CREATE POLICY "sticky_channels_select"
   ON sticky_channels FOR SELECT
   USING (true);
+
+-- ─── Enable Supabase Realtime Replication ──────────────────────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'sticky_channels'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE sticky_channels;
+  END IF;
+END $$;
