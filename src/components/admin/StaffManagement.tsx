@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { DatePicker } from '@/components/ui/date-picker';
+import { cn } from '@/lib/utils';
 
 interface Position {
   id: string;
