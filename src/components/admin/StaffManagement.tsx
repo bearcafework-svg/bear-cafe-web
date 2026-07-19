@@ -19,10 +19,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
   Users, UserPlus, Shield, Settings, Activity, Clock, Trash2, Edit2, 
   ArrowUpDown, Plus, Calendar, Save, History, Search, CheckCircle, Loader2, GripVertical,
-  Pencil, Copy, PlusCircle, MinusCircle, RotateCcw
+  Pencil, Copy, ChevronsUpDown, Check
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -154,31 +156,43 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     is_active: true
   });
 
-  // Discord Members Search State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [discordSearchResults, setDiscordSearchResults] = useState<DiscordUserSearch[]>([]);
-  const [searchingDiscord, setSearchingDiscord] = useState(false);
+  // Discord Members Search State (Combobox matching /role-transfer behavior)
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [profileSearchQuery, setProfileSearchQuery] = useState('');
+  const [profileComboboxOpen, setProfileComboboxOpen] = useState(false);
   const [selectedDiscordUser, setSelectedDiscordUser] = useState<DiscordUserSearch | null>(null);
 
   // Table filtering
   const [filterQuery, setFilterQuery] = useState('');
 
-  // Edit Points Dialog States (similar to redeem codes)
-  const [editPointsMember, setEditPointsMember] = useState<StaffMember | null>(null);
-  const [editPointsAction, setEditPointsAction] = useState<'add' | 'sub' | 'set'>('add');
-  const [editPointsAmount, setEditPointsAmount] = useState<string>('');
-  const [editPointsSaving, setEditPointsSaving] = useState<boolean>(false);
-
   const [submittingMember, setSubmittingMember] = useState(false);
   const [submittingPos, setSubmittingPos] = useState(false);
   const [submittingLevel, setSubmittingLevel] = useState(false);
 
+  // Load profiles on mount
   useEffect(() => {
+    async function loadProfiles() {
+      setLoadingProfiles(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, discord_id, username, discord_username, avatar_url')
+          .order('username');
+        if (error) throw error;
+        setProfiles(data || []);
+      } catch (e) {
+        console.error('Error loading profiles:', e);
+      } finally {
+        setLoadingProfiles(false);
+      }
+    }
+    loadProfiles();
     fetchInitialData();
   }, []);
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  const fetchInitialData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const [posRes, lvlRes, memRes, ptsRes] = await Promise.all([
         supabase.from('staff_positions').select('*').order('display_order', { ascending: true }),
@@ -205,23 +219,49 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       const discordIds = memberList.map(m => m.discord_id);
       
       if (discordIds.length > 0) {
-        const { data: profiles, error: pError } = await supabase
-          .functions.invoke('discord-users', { body: { ids: discordIds } });
-        
-        if (!pError && profiles?.profiles) {
-          const mappedMembers = memberList.map(m => ({
+        // Query profiles first for local cache to avoid slow edge function call
+        const { data: dbProfiles, error: dbProfError } = await supabase
+          .from('profiles')
+          .select('discord_id, username, discord_username, avatar_url')
+          .in('discord_id', discordIds);
+          
+        const localProfileMap = new Map();
+        if (!dbProfError && dbProfiles) {
+          dbProfiles.forEach(p => {
+            localProfileMap.set(p.discord_id, {
+              username: p.discord_username || p.username,
+              display_name: p.username,
+              avatar_url: p.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"
+            });
+          });
+        }
+
+        const missingDiscordIds = discordIds.filter(id => !localProfileMap.has(id));
+
+        let apiProfilesMap: Record<string, any> = {};
+        if (missingDiscordIds.length > 0) {
+          const { data: profiles, error: pError } = await supabase
+            .functions.invoke('discord-users', { body: { ids: missingDiscordIds } });
+          
+          if (!pError && profiles?.profiles) {
+            apiProfilesMap = profiles.profiles;
+          }
+        }
+
+        const mappedMembers = memberList.map(m => {
+          const prof = localProfileMap.get(m.discord_id) || (apiProfilesMap[m.discord_id] ? {
+            username: apiProfilesMap[m.discord_id].username,
+            display_name: apiProfilesMap[m.discord_id].display_name,
+            avatar_url: apiProfilesMap[m.discord_id].avatar_url
+          } : null);
+
+          return {
             ...m,
             points: pointsMap.get(m.discord_id) || 0,
-            discord_user: profiles.profiles[m.discord_id] ? {
-              username: profiles.profiles[m.discord_id].username,
-              display_name: profiles.profiles[m.discord_id].display_name,
-              avatar_url: profiles.profiles[m.discord_id].avatar_url
-            } : null
-          }));
-          setMembers(mappedMembers);
-        } else {
-          setMembers(memberList.map(m => ({ ...m, points: pointsMap.get(m.discord_id) || 0 })));
-        }
+            discord_user: prof
+          };
+        });
+        setMembers(mappedMembers);
       } else {
         setMembers(memberList.map(m => ({ ...m, points: pointsMap.get(m.discord_id) || 0 })));
       }
@@ -230,23 +270,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       toast({ title: 'เกิดข้อผิดพลาดในการดึงข้อมูล', description: e.message, variant: 'destructive' });
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Search discord member via Deno Edge function
-  const handleDiscordSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setSearchingDiscord(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('search-discord-members', {
-        body: { query: searchQuery.trim(), limit: 15 }
-      });
-      if (error) throw error;
-      setDiscordSearchResults(data?.members || []);
-    } catch (e: any) {
-      toast({ title: 'ค้นหาสมาชิกไม่สำเร็จ', description: e.message, variant: 'destructive' });
-    } finally {
-      setSearchingDiscord(false);
     }
   };
 
@@ -399,8 +422,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   const handleOpenAddMember = () => {
     setSelectedMember(null);
     setSelectedDiscordUser(null);
-    setSearchQuery('');
-    setDiscordSearchResults([]);
+    setProfileSearchQuery('');
+    setProfileComboboxOpen(false);
     setMemberPoints(0);
     setMemberForm({
       discord_id: '',
@@ -476,75 +499,13 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       const { data, error } = await supabase.functions.invoke('manage-staff', { body: payload });
       if (error) throw error;
 
-      // Save/Upsert points
-      const discordId = selectedMember ? selectedMember.discord_id : selectedDiscordUser?.id;
-      if (discordId) {
-        const { error: pointsErr } = await supabase
-          .from('user_points')
-          .upsert({
-            discord_id: discordId,
-            points: memberPoints
-          });
-        if (pointsErr) throw pointsErr;
-      }
-
       toast({ title: selectedMember ? 'อัปเดตข้อมูลทีมงานสำเร็จ' : 'เพิ่มทีมงานสำเร็จ' });
       setMemberDialogOpen(false);
-      fetchInitialData();
+      fetchInitialData(true);
     } catch (e: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: e.message || e, variant: 'destructive' });
     } finally {
       setSubmittingMember(false);
-    }
-  };
-
-  const handleOpenEditPoints = (member: StaffMember) => {
-    setEditPointsMember(member);
-    setEditPointsAction('add');
-    setEditPointsAmount('');
-  };
-
-  const handleEditPointsSubmit = async () => {
-    if (!editPointsMember) return;
-    const amt = Number(editPointsAmount) || 0;
-    if (editPointsAction !== 'set' && amt <= 0) {
-      toast({ title: 'กรุณากรอกจำนวนที่มากกว่า 0', variant: 'destructive' });
-      return;
-    }
-
-    let newPoints = editPointsMember.points || 0;
-    if (editPointsAction === 'add') {
-      newPoints += amt;
-    } else if (editPointsAction === 'sub') {
-      newPoints -= amt;
-    } else if (editPointsAction === 'set') {
-      newPoints = 0;
-    }
-
-    setEditPointsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('user_points')
-        .upsert({
-          discord_id: editPointsMember.discord_id,
-          points: newPoints,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'discord_id' });
-
-      if (error) throw error;
-
-      toast({
-        title: 'อัปเดตแต้มสตาฟสำเร็จ',
-        description: `${editPointsMember.nickname || editPointsMember.discord_id}: ${(editPointsMember.points || 0).toLocaleString()} → ${newPoints.toLocaleString()}`
-      });
-      
-      setMemberPoints(newPoints);
-      setEditPointsMember(null);
-      fetchInitialData();
-    } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาดในการแก้ไขแต้ม', description: e.message, variant: 'destructive' });
-    } finally {
-      setEditPointsSaving(false);
     }
   };
 
@@ -731,6 +692,39 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     });
   }, [members, filterQuery]);
 
+  // Filter and map profiles for selection in "Add Staff" Combobox
+  const filteredProfiles = useMemo(() => {
+    const q = profileSearchQuery.toLowerCase().trim();
+    // Exclude existing staff members to avoid duplicates
+    const existingStaffDiscordIds = new Set(members.map(m => m.discord_id));
+    return profiles.filter(p => {
+      if (existingStaffDiscordIds.has(p.discord_id)) return false;
+      if (!q) return true;
+      return (
+        p.username.toLowerCase().includes(q) ||
+        p.discord_id.includes(q) ||
+        (p.discord_username ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [profiles, profileSearchQuery, members]);
+
+  const handleSelectProfile = (discordId: string) => {
+    const selected = profiles.find(p => p.discord_id === discordId);
+    if (selected) {
+      setSelectedDiscordUser({
+        id: selected.discord_id,
+        username: selected.discord_username || selected.username,
+        display_name: selected.username,
+        avatar_url: selected.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"
+      });
+      setMemberForm(prev => ({
+        ...prev,
+        discord_id: selected.discord_id,
+        nickname: prev.nickname || selected.username
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -834,21 +828,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                             </Badge>
                           </TableCell>
                           <TableCell className="font-bold text-base text-amber-600 dark:text-amber-400">
-                            <div className="flex items-center gap-1.5">
-                              <span>{(m.points || 0).toLocaleString()} แต้ม</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditPoints(m);
-                                }}
-                                title="จัดการแต้มสะสม"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
+                            {(m.points || 0).toLocaleString()} แต้ม
                           </TableCell>
                           <TableCell className="text-sm">
                             <div>
@@ -1084,39 +1064,70 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
             {!selectedMember ? (
               <div className="space-y-2">
                 <Label className="text-xs">ค้นหาบัญชี Discord สมาชิก</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="พิมพ์ Username ค้นหา..."
-                    className="h-9 border-latte/40 rounded-xl"
-                    onKeyDown={e => e.key === 'Enter' && handleDiscordSearch()}
-                  />
-                  <Button onClick={handleDiscordSearch} disabled={searchingDiscord} className="h-9 gap-1 rounded-xl">
-                    {searchingDiscord ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    ค้นหา
-                  </Button>
-                </div>
-                {discordSearchResults.length > 0 && (
-                  <div className="border border-latte/30 rounded-xl max-h-40 overflow-y-auto p-1 bg-background/50 space-y-1">
-                    {discordSearchResults.map(res => (
-                      <button
-                        key={res.id}
-                        onClick={() => setSelectedDiscordUser(res)}
-                        className={`w-full flex items-center gap-2 p-1.5 rounded-lg text-left text-xs transition-colors ${selectedDiscordUser?.id === res.id ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-cream/10'}`}
-                      >
-                        <img src={res.avatar_url} className="w-5 h-5 rounded-full" />
-                        <span>{res.display_name} ({res.username})</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {selectedDiscordUser && (
-                  <div className="flex items-center gap-2 p-2 bg-cream/10 border border-latte/20 rounded-xl text-xs">
-                    <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                    <span>สมาชิกที่เลือก: <strong>{selectedDiscordUser.display_name}</strong></span>
-                  </div>
-                )}
+                <Popover open={profileComboboxOpen} onOpenChange={setProfileComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={profileComboboxOpen}
+                      className="w-full justify-between h-9 border-latte/40 rounded-xl font-normal">
+                      {selectedDiscordUser ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img src={selectedDiscordUser.avatar_url} alt="" className="w-5 h-5 rounded-full shrink-0" />
+                          <span className="truncate">{selectedDiscordUser.display_name}</span>
+                          <span className="text-xs text-muted-foreground font-mono shrink-0">@{selectedDiscordUser.username}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">เลือกผู้ใช้ Discord...</span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[380px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <div className="flex items-center border-b px-3">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <input
+                          className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+                          placeholder="ค้นหาชื่อหรือ Discord ID..."
+                          value={profileSearchQuery}
+                          onChange={(e) => setProfileSearchQuery(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <CommandList>
+                        <CommandEmpty>
+                          {loadingProfiles ? 'กำลังโหลด...' : 'ไม่พบผู้ใช้'}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredProfiles.slice(0, 50).map(profile => (
+                            <CommandItem
+                              key={profile.id}
+                              value={profile.discord_id}
+                              onSelect={() => {
+                                handleSelectProfile(profile.discord_id);
+                                setProfileComboboxOpen(false);
+                                setProfileSearchQuery('');
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Check className={cn("mr-1 h-4 w-4", selectedDiscordUser?.id === profile.discord_id ? "opacity-100" : "opacity-0")} />
+                              {profile.avatar_url ? (
+                                <img src={profile.avatar_url} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs shrink-0">👤</div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium truncate">{profile.username}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{profile.discord_id}</p>
+                                {profile.discord_username && (
+                                  <p className="text-[10px] text-muted-foreground">@{profile.discord_username}</p>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             ) : (
               <div className="flex items-center gap-3 p-2 bg-cream/10 border border-latte/20 rounded-xl">
@@ -1144,22 +1155,8 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">แต้มสะสม (Points)</Label>
-                <div className="flex items-center gap-2">
-                  <div className="h-9 px-3 flex items-center bg-muted/40 border border-latte/40 rounded-xl text-sm font-bold text-amber-700 dark:text-amber-400 w-full">
-                    {memberPoints.toLocaleString()} แต้ม
-                  </div>
-                  {selectedMember && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 text-xs gap-1 border-latte/40 rounded-xl shrink-0"
-                      onClick={() => {
-                        handleOpenEditPoints(selectedMember);
-                      }}
-                    >
-                      <Pencil className="w-3.5 h-3.5" /> จัดการแต้ม
-                    </Button>
-                  )}
+                <div className="h-9 px-3 flex items-center bg-muted/40 border border-latte/40 rounded-xl text-sm font-bold text-amber-700 dark:text-amber-400 w-full">
+                  {memberPoints.toLocaleString()} แต้ม
                 </div>
               </div>
             </div>
@@ -1541,55 +1538,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Edit Points Dialog */}
-      <Dialog open={!!editPointsMember} onOpenChange={open => { if (!open) setEditPointsMember(null); }}>
-        <DialogContent className="max-w-md border-latte/40 rounded-2xl shadow-xl">
-          <DialogHeader>
-            <DialogTitle>แก้ไขแต้มทีมงาน</DialogTitle>
-            <DialogDescription>
-              <span className="font-mono text-xs">@{editPointsMember?.discord_user?.username || editPointsMember?.discord_id}</span> ({editPointsMember?.nickname || 'ไม่มีชื่อเล่น'}) — แต้มปัจจุบัน:{' '}
-              <span className={cn('font-bold', (editPointsMember?.points ?? 0) < 0 ? 'text-destructive' : '')}>{(editPointsMember?.points ?? 0).toLocaleString()}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="flex gap-2">
-              <Button variant={editPointsAction === 'add' ? 'default' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('add')}>
-                <PlusCircle className="w-4 h-4" /> เพิ่ม
-              </Button>
-              <Button variant={editPointsAction === 'sub' ? 'default' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('sub')}>
-                <MinusCircle className="w-4 h-4" /> ลด
-              </Button>
-              <Button variant={editPointsAction === 'set' ? 'destructive' : 'outline'} className="flex-1 gap-1 rounded-xl" onClick={() => setEditPointsAction('set')}>
-                <RotateCcw className="w-4 h-4" /> รีเซ็ต (0)
-              </Button>
-            </div>
-            {editPointsAction !== 'set' && (
-              <div className="space-y-2">
-                <Label>จำนวนแต้ม</Label>
-                <Input type="number" min="1" value={editPointsAmount} onChange={e => setEditPointsAmount(e.target.value)} placeholder="กรอกจำนวนแต้มที่ต้องการปรับ" className="rounded-xl border-latte/40" />
-              </div>
-            )}
-            {editPointsMember && editPointsAction !== 'set' && editPointsAmount && Number(editPointsAmount) > 0 && (
-              <p className="text-sm text-muted-foreground">
-                ผลลัพธ์: {(editPointsMember.points || 0).toLocaleString()} {editPointsAction === 'add' ? '+' : '−'} {Number(editPointsAmount).toLocaleString()} ={' '}
-                <span className="font-bold">
-                  {(editPointsAction === 'add' ? (editPointsMember.points || 0) + Number(editPointsAmount) : (editPointsMember.points || 0) - Number(editPointsAmount)).toLocaleString()}
-                </span>
-              </p>
-            )}
-            {editPointsAction === 'set' && (
-              <p className="text-sm text-destructive font-medium">แต้มสะสมจะถูกปรับเป็น 0 ทันที</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditPointsMember(null)} className="rounded-xl">ยกเลิก</Button>
-            <Button onClick={handleEditPointsSubmit} disabled={editPointsSaving} className="gap-2 rounded-xl">
-              {editPointsSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              ยืนยัน
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }
