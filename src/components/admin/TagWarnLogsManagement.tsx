@@ -183,7 +183,14 @@ export function TagWarnLogsManagement() {
   const [webhookEnabled, setWebhookEnabled] = useState(true);
 
   // layout settings
-  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>('cozy');
+  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>(() => {
+    return (localStorage.getItem('tag_layout_view') as 'cozy' | 'list' | 'compact') || 'cozy';
+  });
+
+  const handleSetLayoutView = (view: 'cozy' | 'list' | 'compact') => {
+    setLayoutView(view);
+    localStorage.setItem('tag_layout_view', view);
+  };
 
   // template manager
   const [templates, setTemplates] = useState<any[]>([]);
@@ -733,33 +740,48 @@ export function TagWarnLogsManagement() {
         </div>
         <div className="flex items-center flex-wrap gap-2">
           {/* Layout Setting Selectors */}
-          <div className="flex items-center border border-latte/40 bg-background/50 rounded-xl p-0.5 mr-1 shrink-0">
+          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-latte/15 mr-1 shrink-0">
             <Button
               variant="ghost"
-              size="icon"
-              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'cozy' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
-              onClick={() => setLayoutView('cozy')}
-              title="แบบ Cozy (การ์ด)"
+              size="sm"
+              className={cn(
+                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                layoutView === 'cozy'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => handleSetLayoutView('cozy')}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
+              แบบการ์ด
             </Button>
             <Button
               variant="ghost"
-              size="icon"
-              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'list' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
-              onClick={() => setLayoutView('list')}
-              title="แบบ รายการ (List)"
+              size="sm"
+              className={cn(
+                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                layoutView === 'list'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => handleSetLayoutView('list')}
             >
               <List className="h-3.5 w-3.5" />
+              แบบรายการ
             </Button>
             <Button
               variant="ghost"
-              size="icon"
-              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'compact' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
-              onClick={() => setLayoutView('compact')}
-              title="แบบ กระชับ (Compact)"
+              size="sm"
+              className={cn(
+                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                layoutView === 'compact'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => handleSetLayoutView('compact')}
             >
               <Menu className="h-3.5 w-3.5" />
+              แบบกระชับ
             </Button>
           </div>
 
@@ -1234,6 +1256,98 @@ export function TagWarnLogsManagement() {
                   </Card>
                 );
               })}
+            </div>
+          )}
+
+          {layoutView === 'compact' && (
+            <div className="border border-latte/40 rounded-2xl bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-cream/10 dark:bg-card/40 border-b border-latte/45 text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">
+                      <th className="py-3 px-4 font-mono w-16">เลขเคส</th>
+                      <th className="py-3 px-4">ผู้ถูกเตือน (Member)</th>
+                      <th className="py-3 px-4">ผู้เตือน (Barista)</th>
+                      <th className="py-3 px-4 max-w-xs">รายละเอียดการเตือน</th>
+                      <th className="py-3 px-4">บทลงโทษ</th>
+                      <th className="py-3 px-4">วันที่ทำรายการ</th>
+                      <th className="py-3 px-4">หลักฐาน</th>
+                      <th className="py-3 px-4 text-right">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedRecords.map((r, idx) => {
+                      const cancelled = isCancelled(r);
+                      const pendingApproval = r._cancelStatus === 'pending';
+                      const allImages = [r.image_url, r.image_url_2].filter(Boolean) as string[];
+                      const barista = resolveDisplayName(r.barista_id);
+                      const member = resolveDisplayName(r.member_id);
+                      const memberName = /^User-\d+$/i.test(member.name) ? (r.member_id ?? '-') : member.name;
+
+                      return (
+                        <tr key={r.id} className={cn("border-b border-border/20 text-xs hover:bg-muted/10 transition-colors", (cancelled || pendingApproval) && "opacity-60 bg-muted/5")}>
+                          <td className="py-3 px-4 font-mono font-bold">
+                            #{r.sequence ?? idx + 1}
+                            {cancelled && <span className="ml-1 text-[9px] text-destructive font-semibold">(ยกเลิก)</span>}
+                            {pendingApproval && <span className="ml-1 text-[9px] text-amber-600 font-semibold">(รออนุมัติ)</span>}
+                          </td>
+                          <td className="py-3 px-4 font-semibold">{member.discord_username || memberName}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{barista.discord_username || barista.name}</td>
+                          <td className="py-3 px-4 truncate max-w-[200px]" title={r.message ?? ''}>{r.message || '-'}</td>
+                          <td className="py-3 px-4">
+                            {r.punish ? (
+                              <Badge variant="outline" className={cn("text-[9px] font-bold py-0 px-2 rounded-full border", getPunishBadgeStyle(r.punish))}>
+                                {formatPunishLabel(r.punish)}
+                              </Badge>
+                            ) : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{formatTimestamp(r.log_timestamp || r.created_at)}</td>
+                          <td className="py-3 px-4">
+                            {allImages.length > 0 ? (
+                              <div className="flex gap-0.5">
+                                {allImages.map((imgUrl, imgIdx) => (
+                                  <button
+                                    key={imgIdx}
+                                    className="w-8 h-6 border border-border/85 rounded bg-muted/20 overflow-hidden text-[9px] font-mono hover:border-primary transition-all shrink-0"
+                                    onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                                  >
+                                    รูป {imgIdx + 1}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-0.5">
+                              {webhookEnabled && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500" onClick={() => setSendTarget(r)} title="ส่งแจ้งเตือน Discord">
+                                  <Mail className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
+                                <History className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {user?.is_owner && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(r)} title="ลบข้อมูล">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {!cancelled && !pendingApproval && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setCancelTarget(r)} title="ยกเลิกเคส">
+                                  <Ban className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

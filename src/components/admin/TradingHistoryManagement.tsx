@@ -1385,7 +1385,7 @@ export function TradingHistoryManagement() {
                   onClick={() => handleSetLayoutView('cozy')}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
-                  Cozy
+                  แบบการ์ด
                 </Button>
                 <Button
                   variant="ghost"
@@ -1399,7 +1399,7 @@ export function TradingHistoryManagement() {
                   onClick={() => handleSetLayoutView('list')}
                 >
                   <List className="h-3.5 w-3.5" />
-                  List
+                  แบบรายการ
                 </Button>
                 <Button
                   variant="ghost"
@@ -1413,7 +1413,7 @@ export function TradingHistoryManagement() {
                   onClick={() => handleSetLayoutView('compact')}
                 >
                   <Menu className="h-3.5 w-3.5" />
-                  Compact
+                  แบบกระชับ
                 </Button>
               </div>
             </div>
