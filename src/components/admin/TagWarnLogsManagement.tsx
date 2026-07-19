@@ -34,6 +34,7 @@ import {
   MessageSquare, Gavel, X, ChevronLeft, ChevronRight,
   EyeOff, Eye, Loader2, Plus, UploadCloud, Trash2,
   Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send, Search,
+  LayoutGrid, List, Menu, History,
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { cn } from '@/lib/utils';
@@ -180,6 +181,145 @@ export function TagWarnLogsManagement() {
 
   // webhook toggle
   const [webhookEnabled, setWebhookEnabled] = useState(true);
+
+  // layout settings
+  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>('cozy');
+
+  // template manager
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [templateForm, setTemplateForm] = useState({ title: '', message: '' });
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // case change logs
+  const [selectedCaseLogs, setSelectedCaseLogs] = useState<any[]>([]);
+  const [loadingCaseLogs, setLoadingCaseLogs] = useState(false);
+  const [isCaseLogsOpen, setIsCaseLogsOpen] = useState(false);
+  const [caseLogsTarget, setCaseLogsTarget] = useState<WarnRecord | null>(null);
+
+  // fetch templates
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tag_warn_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // template select helper
+  const handleSelectTemplate = (templateMsg: string, target: 'add' | 'edit') => {
+    if (target === 'add') {
+      setNewWarn(prev => ({
+        ...prev,
+        message: prev.message ? `${prev.message}\n${templateMsg}` : templateMsg
+      }));
+    } else {
+      setEditForm(prev => ({
+        ...prev,
+        message: prev.message ? `${prev.message}\n${templateMsg}` : templateMsg
+      }));
+    }
+  };
+
+  // template save/edit/delete handlers
+  const handleSaveTemplate = async () => {
+    if (!templateForm.title.trim() || !templateForm.message.trim()) {
+      toast({ title: 'กรุณากรอกข้อมูลให้ครบถ้วน', variant: 'destructive' });
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      if (editingTemplate) {
+        const { error } = await supabase
+          .from('tag_warn_templates')
+          .update({
+            title: templateForm.title.trim(),
+            message: templateForm.message.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', editingTemplate.id);
+        if (error) throw error;
+        toast({ title: 'แก้ไขข้อความเทมเพลตสำเร็จ' });
+      } else {
+        const { error } = await supabase
+          .from('tag_warn_templates')
+          .insert({
+            title: templateForm.title.trim(),
+            message: templateForm.message.trim(),
+            created_by: user?.username || 'Admin',
+          });
+        if (error) throw error;
+        toast({ title: 'เพิ่มข้อความเทมเพลตสำเร็จ' });
+      }
+      setTemplateForm({ title: '', message: '' });
+      setEditingTemplate(null);
+      await fetchTemplates();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการบันทึกเทมเพลต', description: err.message, variant: 'destructive' });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleStartEditTemplate = (tpl: any) => {
+    setEditingTemplate(tpl);
+    setTemplateForm({ title: tpl.title, message: tpl.message });
+  };
+
+  const handleCancelEditTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateForm({ title: '', message: '' });
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (!confirm('ยืนยันที่จะลบข้อความเทมเพลตนี้ใช่หรือไม่?')) return;
+    try {
+      const { error } = await supabase
+        .from('tag_warn_templates')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      toast({ title: 'ลบเทมเพลตสำเร็จ' });
+      await fetchTemplates();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการลบเทมเพลต', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // case change logs helpers
+  const fetchCaseLogs = async (caseId: string) => {
+    setLoadingCaseLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from('tag_warn_case_logs')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setSelectedCaseLogs(data || []);
+    } catch (err) {
+      console.error('Error fetching case logs:', err);
+    } finally {
+      setLoadingCaseLogs(false);
+    }
+  };
+
+  const handleOpenCaseLogs = (record: WarnRecord) => {
+    setCaseLogsTarget(record);
+    setSelectedCaseLogs([]);
+    setIsCaseLogsOpen(true);
+    fetchCaseLogs(record.id);
+  };
 
   // ── Derived: preview URLs (revoke on change) ──────────────────────────────
   const previewUrls = useMemo(
@@ -477,6 +617,18 @@ export function TagWarnLogsManagement() {
         .update({ message: editForm.message, punish: editForm.punish })
         .eq('id', editTarget.id);
       if (editErr) throw editErr;
+
+      // Insert case log for tracking edits
+      await supabase.from('tag_warn_case_logs').insert({
+        case_id: editTarget.id,
+        operator_id: user?.discord_id || user?.id || 'unknown',
+        operator_name: user?.username || 'Unknown',
+        operator_avatar: user?.avatar_url || null,
+        before_data: { message: editTarget.message, punish: editTarget.punish },
+        after_data: { message: editForm.message, punish: editForm.punish },
+        details: `แก้ไขข้อความเตือน หรือบทลงโทษ`,
+      });
+
       toast({ title: 'แก้ไขข้อมูลสำเร็จ' });
       setEditTarget(null);
       await fetchData();
@@ -574,14 +726,55 @@ export function TagWarnLogsManagement() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">ประวัติแท็กเตือน</h2>
+          <h2 className="text-lg font-semibold text-[#8C6239] dark:text-[#EAD8C8]">ประวัติแท็กเตือน</h2>
           <p className="text-xs text-muted-foreground">
             {filteredRecords.length}/{records.length} รายการ • หน้า {currentPage}/{totalPages}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
+          {/* Layout Setting Selectors */}
+          <div className="flex items-center border border-latte/40 bg-background/50 rounded-xl p-0.5 mr-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'cozy' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
+              onClick={() => setLayoutView('cozy')}
+              title="แบบ Cozy (การ์ด)"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'list' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
+              onClick={() => setLayoutView('list')}
+              title="แบบ รายการ (List)"
+            >
+              <List className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-7 w-7 rounded-lg transition-colors hover:bg-cream/10", layoutView === 'compact' && "bg-[#8C6239]/10 text-[#8C6239] dark:text-[#EAD8C8] dark:bg-[#EAD8C8]/10")}
+              onClick={() => setLayoutView('compact')}
+              title="แบบ กระชับ (Compact)"
+            >
+              <Menu className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1 border-latte/40 hover:bg-cream/10 rounded-xl"
+            onClick={() => { setIsTemplateManagerOpen(true); fetchTemplates(); }}
+          >
+            <MessageSquare className="h-4 w-4 text-[#8C6239] dark:text-[#EAD8C8]" />
+            จัดการข้อความ
+          </Button>
+
           {user?.is_owner && (
-            <div className="flex items-center gap-2 mr-2 border-r pr-4">
+            <div className="flex items-center gap-2 mr-2 border-r border-latte/20 pr-4">
               <Switch checked={webhookEnabled} onCheckedChange={toggleWebhook} id="webhook-toggle" />
               <Label htmlFor="webhook-toggle" className="text-xs flex items-center gap-1 cursor-pointer select-none">
                 {webhookEnabled ? <Bell className="h-3 w-3 text-green-500" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
@@ -589,7 +782,7 @@ export function TagWarnLogsManagement() {
               </Label>
             </div>
           )}
-          <Badge variant="outline" className="text-xs text-muted-foreground gap-1.5">
+          <Badge variant="outline" className="text-xs text-muted-foreground gap-1.5 border-latte/40 rounded-xl">
             <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
             อัปเดตอัตโนมัติ
           </Badge>
@@ -618,7 +811,23 @@ export function TagWarnLogsManagement() {
                   <Input id="memberId" value={newWarn.memberId} onChange={(e) => setNewWarn({ ...newWarn, memberId: e.target.value })} placeholder="ไอดีสมาชิกที่ถูกเตือน" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="warnMsg">ข้อความเตือน</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="warnMsg">ข้อความเตือน</Label>
+                    {templates.length > 0 && (
+                      <Select onValueChange={(v) => handleSelectTemplate(v, 'add')}>
+                        <SelectTrigger className="h-7 text-xs w-[180px] bg-primary/5 border-primary/20 text-primary rounded-lg font-semibold">
+                          <SelectValue placeholder="เลือกจากเทมเพลต" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templates.map(tpl => (
+                            <SelectItem key={tpl.id} value={tpl.message} className="text-xs font-medium">
+                              {tpl.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
                   <Textarea id="warnMsg" value={newWarn.message} onChange={(e) => setNewWarn({ ...newWarn, message: e.target.value })} placeholder="ระบุรายละเอียดการเตือน..." className="min-h-[80px]" />
                 </div>
                 <div className="space-y-2">
@@ -736,159 +945,297 @@ export function TagWarnLogsManagement() {
         </div>
       </div>
 
-      {/* Card Grid */}
+      {/* Records Layout Views */}
       {filteredRecords.length === 0 ? (
         <div className="py-16 text-center text-muted-foreground">ไม่พบรายการ</div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {paginatedRecords.map((r, idx) => {
-              const cancelled = isCancelled(r);
-              const pendingApproval = r._cancelStatus === 'pending';
-              const showBlur = r._showBlur ?? false;
-              const allImages = [r.image_url, r.image_url_2].filter(Boolean) as string[];
-              const barista = resolveDisplayName(r.barista_id);
-              const member = resolveDisplayName(r.member_id);
-              const memberName = /^User-\d+$/i.test(member.name) ? (r.member_id ?? '-') : member.name;
+          {layoutView === 'cozy' && (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {paginatedRecords.map((r, idx) => {
+                const cancelled = isCancelled(r);
+                const pendingApproval = r._cancelStatus === 'pending';
+                const showBlur = r._showBlur ?? false;
+                const allImages = [r.image_url, r.image_url_2].filter(Boolean) as string[];
+                const barista = resolveDisplayName(r.barista_id);
+                const member = resolveDisplayName(r.member_id);
+                const memberName = /^User-\d+$/i.test(member.name) ? (r.member_id ?? '-') : member.name;
 
-              return (
-                <Card key={r.id} className="overflow-hidden transition-all relative">
-                  <CardContent className="p-0">
-                    <div className={cn('h-1.5', cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80')} />
+                return (
+                  <Card key={r.id} className="overflow-hidden transition-all relative">
+                    <CardContent className="p-0">
+                      <div className={cn('h-1.5', cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80')} />
 
-                    {/* overlay — pending */}
-                    {pendingApproval && showBlur && (
-                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
-                        <Loader2 className="h-6 w-6 animate-spin text-amber-500 mb-2" />
-                        <Badge variant="outline" className="mb-2 text-amber-600 border-amber-500/60">กำลังรอการอนุมัติ</Badge>
-                        <p className="text-xs text-muted-foreground text-center">คำขอยกเลิกถูกส่งไปหน้า "รายงาน" แล้ว</p>
-                        <Button variant="outline" size="sm" className="gap-1 text-xs mt-3" onClick={() => toggleBlur(r.id)}>
-                          <Eye className="h-3 w-3" /> ดูรายละเอียด
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* overlay — cancelled */}
-                    {cancelled && showBlur && (
-                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm rounded-lg p-4 text-center">
-                        <Badge variant="destructive" className="mb-3 gap-1 text-sm"><X className="h-3.5 w-3.5" /> ยกเลิกเคสแล้ว</Badge>
-                        <div className="space-y-1.5 mb-4 text-xs text-muted-foreground">
-                          {r._requestedBy && <p className="flex items-center justify-center gap-1"><User className="h-3 w-3 text-orange-500" />ผู้ขอ: <span className="font-medium text-foreground">{r._requestedBy}</span></p>}
-                          {r._cancelledAt && <p className="flex items-center justify-center gap-1"><Clock className="h-3 w-3" />เมื่อ: {r._cancelledAt}</p>}
-                        </div>
-                        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => toggleBlur(r.id)}>
-                          <Eye className="h-3 w-3" /> ดูรายละเอียด
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className={cn('p-4 space-y-3', (cancelled || pendingApproval) && !showBlur && 'opacity-60')}>
-                      {/* header row */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={cancelled ? 'outline' : 'secondary'} className="gap-1 text-xs font-mono">
-                            <Hash className="h-3 w-3" />{r.sequence ?? idx + 1}
-                          </Badge>
-                          {cancelled && !showBlur && <Badge variant="destructive" className="gap-1 text-xs"><X className="h-3 w-3" /> ยกเลิกแล้ว</Badge>}
-                          {pendingApproval && !showBlur && <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">รออนุมัติ</Badge>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {webhookEnabled && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => setSendTarget(r)} title="ส่งแจ้งเตือน Discord">
-                              <Mail className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
-                            <Pencil className="h-3.5 w-3.5" />
+                      {/* overlay — pending */}
+                      {pendingApproval && showBlur && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg p-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-amber-500 mb-2" />
+                          <Badge variant="outline" className="mb-2 text-amber-600 border-amber-500/60">กำลังรอการอนุมัติ</Badge>
+                          <p className="text-xs text-muted-foreground text-center">คำขอยกเลิกถูกส่งไปหน้า "รายงาน" แล้ว</p>
+                          <Button variant="outline" size="sm" className="gap-1 text-xs mt-3" onClick={() => toggleBlur(r.id)}>
+                            <Eye className="h-3 w-3" /> ดูรายละเอียด
                           </Button>
-                          {(cancelled || pendingApproval) && !showBlur && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleBlur(r.id)} title="ซ่อน">
-                              <EyeOff className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {user?.is_owner && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(r)} title="ลบข้อมูลถาวร">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp || r.created_at)}
-                      </div>
-
-                      {/* barista & member */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
-                          <Avatar className="h-7 w-7 shrink-0">
-                            {barista.avatar && <AvatarImage src={barista.avatar} />}
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary"><Shield className="h-3.5 w-3.5" /></AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Barista</p>
-                            {barista.discord_username
-                              ? <><p className="text-xs font-semibold truncate">{barista.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{barista.name}</p></>
-                              : <p className="text-xs font-medium truncate">{barista.name}</p>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
-                          <Avatar className="h-7 w-7 shrink-0">
-                            {member.avatar && <AvatarImage src={member.avatar} />}
-                            <AvatarFallback className="text-xs bg-destructive/10 text-destructive"><User className="h-3.5 w-3.5" /></AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Member</p>
-                            {member.discord_username
-                              ? <><p className="text-xs font-semibold truncate">{member.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{memberName}</p></>
-                              : <p className="text-xs font-medium break-all">{memberName}</p>}
-                          </div>
-                        </div>
-                      </div>
-
-                      {r.message && (
-                        <div className="flex gap-2 rounded-md bg-muted/30 p-2">
-                          <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-                          <p className="text-sm leading-snug max-h-24 overflow-y-auto pr-1 break-words">{r.message}</p>
                         </div>
                       )}
 
-                      {r.punish && (
-                        <div className="flex items-center gap-2">
-                          <Gavel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <Badge variant="outline" className={cn("text-[11px] font-semibold px-2.5 py-0.5 rounded-full border", getPunishBadgeStyle(r.punish))}>
-                            {formatPunishLabel(r.punish)}
-                          </Badge>
+                      {/* overlay — cancelled */}
+                      {cancelled && showBlur && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm rounded-lg p-4 text-center">
+                          <Badge variant="destructive" className="mb-3 gap-1 text-sm"><X className="h-3.5 w-3.5" /> ยกเลิกเคสแล้ว</Badge>
+                          <div className="space-y-1.5 mb-4 text-xs text-muted-foreground">
+                            {r._requestedBy && <p className="flex items-center justify-center gap-1"><User className="h-3 w-3 text-orange-500" />ผู้ขอ: <span className="font-medium text-foreground">{r._requestedBy}</span></p>}
+                            {r._cancelledAt && <p className="flex items-center justify-center gap-1"><Clock className="h-3 w-3" />เมื่อ: {r._cancelledAt}</p>}
+                          </div>
+                          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => toggleBlur(r.id)}>
+                            <Eye className="h-3 w-3" /> ดูรายละเอียด
+                          </Button>
                         </div>
                       )}
 
-                      {allImages.length > 0 && (
-                        <div className={cn('grid gap-2', allImages.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
-                          {allImages.map((imgUrl, imgIdx) => (
-                            <div
-                              key={imgIdx}
-                              className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
-                              onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
-                            >
-                              <img src={imgUrl} alt={`หลักฐาน ${imgIdx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <div className={cn('p-4 space-y-3', (cancelled || pendingApproval) && !showBlur && 'opacity-60')}>
+                        {/* header row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={cancelled ? 'outline' : 'secondary'} className="gap-1 text-xs font-mono">
+                              <Hash className="h-3 w-3" />{r.sequence ?? idx + 1}
+                            </Badge>
+                            {cancelled && !showBlur && <Badge variant="destructive" className="gap-1 text-xs"><X className="h-3 w-3" /> ยกเลิกแล้ว</Badge>}
+                            {pendingApproval && !showBlur && <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">รออนุมัติ</Badge>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {webhookEnabled && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => setSendTarget(r)} title="ส่งแจ้งเตือน Discord">
+                                <Mail className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
+                              <History className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {(cancelled || pendingApproval) && !showBlur && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleBlur(r.id)} title="ซ่อน">
+                                <EyeOff className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {user?.is_owner && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(r)} title="ลบข้อมูลถาวร">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />{formatTimestamp(r.log_timestamp || r.created_at)}
+                        </div>
+
+                        {/* barista & member */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
+                            <Avatar className="h-7 w-7 shrink-0">
+                              {barista.avatar && <AvatarImage src={barista.avatar} />}
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary"><Shield className="h-3.5 w-3.5" /></AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Barista</p>
+                              {barista.discord_username
+                                ? <><p className="text-xs font-semibold truncate">{barista.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{barista.name}</p></>
+                                : <p className="text-xs font-medium truncate">{barista.name}</p>}
                             </div>
-                          ))}
+                          </div>
+                          <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
+                            <Avatar className="h-7 w-7 shrink-0">
+                              {member.avatar && <AvatarImage src={member.avatar} />}
+                              <AvatarFallback className="text-xs bg-destructive/10 text-destructive"><User className="h-3.5 w-3.5" /></AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Member</p>
+                              {member.discord_username
+                                ? <><p className="text-xs font-semibold truncate">{member.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{memberName}</p></>
+                                : <p className="text-xs font-medium break-all">{memberName}</p>}
+                            </div>
+                          </div>
                         </div>
-                      )}
 
-                      {!cancelled && !pendingApproval && (
-                        <div className="pt-1 border-t border-border/50">
-                          <Button variant="destructive" size="sm" className="h-7 gap-1 text-xs" onClick={() => setCancelTarget(r)}>
-                            <Ban className="h-3 w-3" /> Cancel Case
-                          </Button>
+                        {r.message && (
+                          <div className="flex gap-2 rounded-md bg-muted/30 p-2">
+                            <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+                            <p className="text-sm leading-snug max-h-24 overflow-y-auto pr-1 break-words">{r.message}</p>
+                          </div>
+                        )}
+
+                        {r.punish && (
+                          <div className="flex items-center gap-2">
+                            <Gavel className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <Badge variant="outline" className={cn("text-[11px] font-semibold px-2.5 py-0.5 rounded-full border", getPunishBadgeStyle(r.punish))}>
+                              {formatPunishLabel(r.punish)}
+                            </Badge>
+                          </div>
+                        )}
+
+                        {allImages.length > 0 && (
+                          <div className={cn('grid gap-2', allImages.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+                            {allImages.map((imgUrl, imgIdx) => (
+                              <div
+                                key={imgIdx}
+                                className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
+                                onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                              >
+                                <img src={imgUrl} alt={`หลักฐาน ${imgIdx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {!cancelled && !pendingApproval && (
+                          <div className="pt-1 border-t border-border/50">
+                            <Button variant="destructive" size="sm" className="h-7 gap-1 text-xs" onClick={() => setCancelTarget(r)}>
+                              <Ban className="h-3 w-3" /> Cancel Case
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {layoutView === 'list' && (
+            <div className="space-y-3">
+              {paginatedRecords.map((r, idx) => {
+                const cancelled = isCancelled(r);
+                const pendingApproval = r._cancelStatus === 'pending';
+                const showBlur = r._showBlur ?? false;
+                const allImages = [r.image_url, r.image_url_2].filter(Boolean) as string[];
+                const barista = resolveDisplayName(r.barista_id);
+                const member = resolveDisplayName(r.member_id);
+                const memberName = /^User-\d+$/i.test(member.name) ? (r.member_id ?? '-') : member.name;
+
+                return (
+                  <Card key={r.id} className="overflow-hidden transition-all relative">
+                    <div className={cn('h-1', cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80')} />
+                    
+                    {/* Blur Overlays */}
+                    {pendingApproval && showBlur && (
+                      <div className="absolute inset-0 z-10 flex items-center justify-between bg-background/80 backdrop-blur-sm px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                          <Badge variant="outline" className="text-amber-600 border-amber-500/60 text-xs">กำลังรอการอนุมัติยกเลิก</Badge>
                         </div>
-                      )}
+                        <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => toggleBlur(r.id)}>
+                          <Eye className="h-3 w-3" /> ดูข้อมูล
+                        </Button>
+                      </div>
+                    )}
+                    {cancelled && showBlur && (
+                      <div className="absolute inset-0 z-10 flex items-center justify-between bg-background/90 backdrop-blur-sm px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="gap-1 text-xs"><X className="h-3 w-3" /> ยกเลิกเคสแล้ว</Badge>
+                          <span className="text-xs text-muted-foreground">โดย {r._requestedBy} • {r._cancelledAt}</span>
+                        </div>
+                        <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => toggleBlur(r.id)}>
+                          <Eye className="h-3 w-3" /> ดูข้อมูล
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className={cn("p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4", (cancelled || pendingApproval) && !showBlur && 'opacity-60')}>
+                      {/* Left: Sequence and User Avatars */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Badge variant={cancelled ? 'outline' : 'secondary'} className="font-mono text-xs h-7 w-12 flex items-center justify-center shrink-0">
+                          #{r.sequence ?? idx + 1}
+                        </Badge>
+                        
+                        {/* Barista & Member Stack */}
+                        <div className="flex items-center -space-x-2 shrink-0">
+                          <Avatar className="h-8 w-8 border-2 border-background ring-1 ring-primary/20 shrink-0" title={`Barista: ${barista.name}`}>
+                            {barista.avatar && <AvatarImage src={barista.avatar} />}
+                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">☕</AvatarFallback>
+                          </Avatar>
+                          <Avatar className="h-8 w-8 border-2 border-background ring-1 ring-destructive/20 shrink-0" title={`Member: ${memberName}`}>
+                            {member.avatar && <AvatarImage src={member.avatar} />}
+                            <AvatarFallback className="text-[10px] bg-destructive/10 text-destructive">👤</AvatarFallback>
+                          </Avatar>
+                        </div>
+
+                        <div className="min-w-0 font-medium">
+                          <p className="text-xs font-bold leading-tight truncate">
+                            {member.discord_username || memberName}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground leading-none">
+                            เตือนโดย: {barista.discord_username || barista.name}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Middle: Warning message & Punishment */}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {r.message && (
+                          <p className="text-sm font-semibold truncate max-w-xl text-foreground" title={r.message}>
+                            {r.message}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          <span>{formatTimestamp(r.log_timestamp || r.created_at)}</span>
+                          {r.punish && (
+                            <Badge variant="outline" className={cn("text-[9px] font-semibold py-0 px-2 rounded-full border shrink-0 scale-95 origin-left", getPunishBadgeStyle(r.punish))}>
+                              {formatPunishLabel(r.punish)}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Images and Actions */}
+                      <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+                        {allImages.length > 0 && (
+                          <div className="flex gap-1 shrink-0">
+                            {allImages.map((imgUrl, imgIdx) => (
+                              <div
+                                key={imgIdx}
+                                className="relative cursor-pointer overflow-hidden rounded-md border border-border w-12 h-8 hover:ring-2 hover:ring-primary/40 transition-all bg-muted/20 shrink-0"
+                                onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                              >
+                                <img src={imgUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1 border-l border-latte/20 pl-3">
+                          {webhookEnabled && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => setSendTarget(r)} title="ส่งแจ้งเตือน Discord">
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {user?.is_owner && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(r)} title="ลบเคส">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {!cancelled && !pendingApproval && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5" onClick={() => setCancelTarget(r)} title="ยกเลิกเคส">
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -975,7 +1322,23 @@ export function TagWarnLogsManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>ข้อความเตือน</Label>
+              <div className="flex items-center justify-between">
+                <Label>ข้อความเตือน</Label>
+                {templates.length > 0 && (
+                  <Select onValueChange={(v) => handleSelectTemplate(v, 'edit')}>
+                    <SelectTrigger className="h-7 text-xs w-[180px] bg-primary/5 border-primary/20 text-primary rounded-lg font-semibold">
+                      <SelectValue placeholder="เลือกจากเทมเพลต" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map(tpl => (
+                        <SelectItem key={tpl.id} value={tpl.message} className="text-xs font-medium">
+                          {tpl.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
               <Textarea value={editForm.message} onChange={(e) => setEditForm({ ...editForm, message: e.target.value })} className="min-h-[80px]" />
             </div>
             <div className="space-y-2">
@@ -1034,6 +1397,149 @@ export function TagWarnLogsManagement() {
               {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />} ยืนยันการลบ
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Manager Dialog */}
+      <Dialog open={isTemplateManagerOpen} onOpenChange={setIsTemplateManagerOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border-latte/45 bg-cream/10 dark:bg-card/95">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#8C6239] dark:text-[#EAD8C8]">
+              <MessageSquare className="h-5 w-5" /> จัดการข้อความเทมเพลต
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              สร้าง แก้ไข หรือลบข้อความเทมเพลตสำหรับใช้ในการกรอกข้อความเตือน
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Form */}
+          <div className="p-4 rounded-xl border border-latte/40 bg-muted/20 space-y-3">
+            <h4 className="text-sm font-bold text-[#8C6239] dark:text-[#EAD8C8]">{editingTemplate ? 'แก้ไขเทมเพลต' : 'เพิ่มเทมเพลตใหม่'}</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">หัวข้อ (Title)</Label>
+                <Input
+                  value={templateForm.title}
+                  onChange={(e) => setTemplateForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="เช่น เตือนพฤติกรรมไม่เหมาะสม"
+                  className="h-9 rounded-xl border-latte/40"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">ข้อความเตือน (Message)</Label>
+                <Textarea
+                  value={templateForm.message}
+                  onChange={(e) => setTemplateForm(prev => ({ ...prev, message: e.target.value }))}
+                  placeholder="รายละเอียดข้อความที่จะแทรกลงในช่องข้อความเตือน..."
+                  className="min-h-[80px] border-latte/40 rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              {editingTemplate && (
+                <Button variant="ghost" size="sm" onClick={handleCancelEditTemplate} className="hover:bg-cream/10">
+                  ยกเลิกแก้ไข
+                </Button>
+              )}
+              <Button size="sm" onClick={handleSaveTemplate} disabled={savingTemplate} className="gap-1 bg-green-600 hover:bg-green-700">
+                {savingTemplate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                {editingTemplate ? 'บันทึกการแก้ไข' : 'เพิ่มเทมเพลต'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Templates list */}
+          <div className="space-y-2 mt-4">
+            <h4 className="text-sm font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการเทมเพลตทั้งหมด ({templates.length})</h4>
+            {templates.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">ยังไม่มีข้อความเทมเพลตในระบบ</p>
+            ) : (
+              <div className="space-y-2">
+                {templates.map(tpl => (
+                  <div key={tpl.id} className="p-3 border border-latte/30 rounded-xl bg-background/50 hover:bg-background/80 transition-colors flex justify-between items-start gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-sm font-bold text-foreground">{tpl.title}</p>
+                      <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">{tpl.message}</p>
+                      <p className="text-[10px] text-muted-foreground pt-1">
+                        สร้างโดย {tpl.created_by} • {formatTimestamp(tpl.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleStartEditTemplate(tpl)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteTemplate(tpl.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Case Logs Dialog */}
+      <Dialog open={isCaseLogsOpen} onOpenChange={setIsCaseLogsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl border-latte/45 bg-cream/10 dark:bg-card/95">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#8C6239] dark:text-[#EAD8C8]">
+              <History className="h-5 w-5 text-primary" /> ประวัติการแก้ไขเคส #{caseLogsTarget?.sequence}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ดูรายละเอียดการแก้ไขข้อมูลของเคสนี้
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {loadingCaseLogs ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : selectedCaseLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">เคสนี้ยังไม่เคยถูกแก้ไขประวัติ</p>
+            ) : (
+              <div className="space-y-4">
+                {selectedCaseLogs.map((log) => (
+                  <div key={log.id} className="p-3 border border-latte/30 rounded-xl bg-card shadow-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          {log.operator_avatar && <AvatarImage src={log.operator_avatar} />}
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">👤</AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-bold">{log.operator_name}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+                    </div>
+                    <div className="text-xs text-foreground bg-muted/30 p-2 rounded-lg font-semibold">
+                      รายละเอียด: {log.details}
+                    </div>
+                    
+                    {log.before_data && log.after_data && (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40 text-[11px]">
+                        <div className="space-y-1">
+                          <span className="font-bold text-destructive">ก่อนแก้:</span>
+                          <div className="p-1.5 bg-red-500/5 border border-red-500/10 rounded text-[10px] space-y-1 text-muted-foreground">
+                            <p><strong>ข้อความ:</strong> {log.before_data.message || '-'}</p>
+                            <p><strong>บทลงโทษ:</strong> {log.before_data.punish || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="font-bold text-green-600 dark:text-green-400">หลังแก้:</span>
+                          <div className="p-1.5 bg-green-500/5 border border-green-500/10 rounded text-[10px] space-y-1">
+                            <p><strong>ข้อความ:</strong> {log.after_data.message || '-'}</p>
+                            <p><strong>บทลงโทษ:</strong> {log.after_data.punish || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

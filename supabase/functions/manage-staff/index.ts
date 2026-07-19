@@ -333,7 +333,7 @@ Deno.serve(async (req): Promise<Response> => {
               await sendLevelUpNotification(
                 botToken,
                 discord_id,
-                newLevel.discord_role_id || '0',
+                newPosition.discord_role_id || '0',
                 operatorDiscordId || '0',
                 avatarUrl
               );
@@ -341,7 +341,7 @@ Deno.serve(async (req): Promise<Response> => {
               await sendLevelDownNotification(
                 botToken,
                 discord_id,
-                newLevel.discord_role_id || '0',
+                newPosition.discord_role_id || '0',
                 operatorDiscordId || '0',
                 avatarUrl
               );

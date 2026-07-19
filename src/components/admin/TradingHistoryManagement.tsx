@@ -54,6 +54,9 @@ import {
   Bell,
   BellOff,
   List,
+  LayoutGrid,
+  Menu,
+  History,
   PieChart,
   Trash2,
   Pencil,
@@ -215,6 +218,22 @@ export function TradingHistoryManagement() {
   const [editLoading, setEditLoading] = useState(false);
   const [embedTarget, setEmbedTarget] = useState<UnifiedRecord | null>(null);
   const [isSendingEmbed, setIsSendingEmbed] = useState(false);
+
+  // Layout view settings
+  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>(() => {
+    return (localStorage.getItem('trading_layout_view') as 'cozy' | 'list' | 'compact') || 'cozy';
+  });
+
+  const handleSetLayoutView = (view: 'cozy' | 'list' | 'compact') => {
+    setLayoutView(view);
+    localStorage.setItem('trading_layout_view', view);
+  };
+
+  // Case edit logs states
+  const [isCaseLogsOpen, setIsCaseLogsOpen] = useState(false);
+  const [caseLogsTarget, setCaseLogsTarget] = useState<UnifiedRecord | null>(null);
+  const [selectedCaseLogs, setSelectedCaseLogs] = useState<any[]>([]);
+  const [loadingCaseLogs, setLoadingCaseLogs] = useState(false);
 
   // Webhook toggle
   const [webhookEnabled, setWebhookEnabled] = useState(true);
@@ -659,10 +678,58 @@ export function TradingHistoryManagement() {
   };
 
   // ── Edit ──
+  const handleOpenCaseLogs = async (record: UnifiedRecord) => {
+    setCaseLogsTarget(record);
+    setIsCaseLogsOpen(true);
+    setLoadingCaseLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from('trading_history_case_logs')
+        .select('*')
+        .eq('record_id', record.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setSelectedCaseLogs(data || []);
+    } catch (err: any) {
+      toast({ title: 'ดึงข้อมูลประวัติไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoadingCaseLogs(false);
+    }
+  };
+
   const handleEditSave = async () => {
     if (!editTarget) return;
     setEditLoading(true);
     try {
+      // 1. Fetch current operator's profile
+      let opName = user?.discord_id || 'System';
+      let opAvatar = '';
+      if (user?.discord_id) {
+        const { data: profile } = await supabase.from('profiles').select('username, avatar_url').eq('discord_id', user.discord_id).single();
+        if (profile) {
+          opName = profile.username || user.discord_id;
+          opAvatar = profile.avatar_url || '';
+        }
+      }
+
+      // 2. Prepare before and after state diff
+      const oldVal = {
+        amount: editTarget.total_amount,
+        transaction: editTarget.transaction_date,
+        type_bill: editTarget.type_bill
+      };
+      const newVal = {
+        amount: editTarget.source === 'legacy' ? (parseFloat(editForm.amount) || 0) : editTarget.total_amount,
+        transaction: editForm.transaction,
+        type_bill: editForm.type_bill
+      };
+
+      const detailParts: string[] = [];
+      if (oldVal.amount !== newVal.amount) detailParts.push(`ยอดเงิน: ${oldVal.amount} -> ${newVal.amount}`);
+      if (oldVal.transaction !== newVal.transaction) detailParts.push(`วันที่: ${oldVal.transaction || '-'} -> ${newVal.transaction || '-'}`);
+      if (oldVal.type_bill !== newVal.type_bill) detailParts.push(`ประเภท: ${oldVal.type_bill || '-'} -> ${newVal.type_bill || '-'}`);
+
+      // 3. Update database record
       if (editTarget.source === 'legacy') {
         const { error } = await supabase.from('trading_history').update({
           amount: parseFloat(editForm.amount) || 0,
@@ -677,6 +744,21 @@ export function TradingHistoryManagement() {
         }).eq('id', editTarget.id);
         if (error) throw error;
       }
+
+      // 4. Log the update to trading_history_case_logs
+      if (detailParts.length > 0) {
+        await supabase.from('trading_history_case_logs').insert({
+          record_id: editTarget.id,
+          record_source: editTarget.source,
+          operator_id: user?.discord_id || 'unknown',
+          operator_name: opName,
+          operator_avatar: opAvatar,
+          before_data: oldVal,
+          after_data: newVal,
+          details: `แก้ไขข้อมูล (${detailParts.join(', ')})`
+        });
+      }
+
       toast({ title: 'บันทึกเรียบร้อย', className: 'bg-success text-success-foreground' });
       setEditTarget(null);
       fetchData();
@@ -1287,6 +1369,56 @@ export function TradingHistoryManagement() {
 
         {/* ── Data Tab ── */}
         <TabsContent value="data" className="space-y-4 mt-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-semibold">แสดงผล:</span>
+              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-latte/15">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                    layoutView === 'cozy'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => handleSetLayoutView('cozy')}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Cozy
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                    layoutView === 'list'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => handleSetLayoutView('list')}
+                >
+                  <List className="h-3.5 w-3.5" />
+                  List
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
+                    layoutView === 'compact'
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => handleSetLayoutView('compact')}
+                >
+                  <Menu className="h-3.5 w-3.5" />
+                  Compact
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="p-4 rounded-2xl border border-border/40 bg-card/60 shadow-sm space-y-3">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               <Search className="w-3.5 h-3.5 text-primary" /> ค้นหาและกรองบิล
@@ -1350,162 +1482,371 @@ export function TradingHistoryManagement() {
             </div>
           ) : (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {paginatedRecords.map(r => (
-                  <Card key={r.id} className={`relative overflow-hidden transition-all duration-200 hover:shadow-md ${r.source === 'new' ? 'border-primary/20' : ''}`}>
-                    <CardContent className="p-4 space-y-3">
-                      {/* Date row + source badge + actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>{formatTransactionDate(r.transaction_date)}</span>
-                          {r.source === 'new'
-                            ? <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/40 text-primary">ใหม่</Badge>
-                            : <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground">เก่า</Badge>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
-                            onClick={e => { e.stopPropagation(); setEmbedTarget(r); }} title="ส่ง Thank you embed">
-                            <Mail className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                            onClick={e => {
-                              e.stopPropagation();
-                              setEditTarget(r);
-                              let formattedDate = '';
-                              if (r.transaction_date) {
-                                const parsed = parseTransactionDate(r.transaction_date);
-                                if (parsed) {
-                                  formattedDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-                                }
-                              }
-                              setEditForm({
-                                amount: String(r.total_amount),
-                                transaction: formattedDate,
-                                type_bill: r.type_bill ?? 'ธนาคารทั่วไป'
-                              });
-                            }} title="แก้ไขข้อมูล">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          {user?.is_owner && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              onClick={e => { e.stopPropagation(); setDeleteTarget(r); }} title="ลบข้อมูล">
-                              <Trash2 className="h-3.5 w-3.5" />
+              {layoutView === 'cozy' && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {paginatedRecords.map(r => (
+                    <Card key={r.id} className={`relative overflow-hidden transition-all duration-200 hover:shadow-md ${r.source === 'new' ? 'border-primary/20' : ''}`}>
+                      <CardContent className="p-4 space-y-3">
+                        {/* Date row + source badge + actions */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{formatTransactionDate(r.transaction_date)}</span>
+                            {r.source === 'new'
+                              ? <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/40 text-primary">ใหม่</Badge>
+                              : <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground">เก่า</Badge>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
+                              onClick={e => { e.stopPropagation(); setEmbedTarget(r); }} title="ส่ง Thank you embed">
+                              <Mail className="h-3.5 w-3.5" />
                             </Button>
-                          )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary"
+                              onClick={e => { e.stopPropagation(); handleOpenCaseLogs(r); }} title="ประวัติการแก้ไข">
+                              <History className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setEditTarget(r);
+                                let formattedDate = '';
+                                if (r.transaction_date) {
+                                  const parsed = parseTransactionDate(r.transaction_date);
+                                  if (parsed) {
+                                    formattedDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+                                  }
+                                }
+                                setEditForm({
+                                  amount: String(r.total_amount),
+                                  transaction: formattedDate,
+                                  type_bill: r.type_bill ?? 'ธนาคารทั่วไป'
+                                });
+                              }} title="แก้ไขข้อมูล">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {user?.is_owner && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                onClick={e => { e.stopPropagation(); setDeleteTarget(r); }} title="ลบข้อมูล">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Staff */}
-                      {r.staff_id && (
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ดำเนินการ</span>
-                          <UserBadge id={r.staff_id} />
-                        </div>
-                      )}
-
-                      {/* Member */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ซื้อ</span>
-                        <UserBadge id={r.member_id} />
-                      </div>
-
-                      {/* Amount / bill type / salmon */}
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <CreditCard className="w-3.5 h-3.5 text-primary" />
-                          <span className="text-sm font-bold text-primary">{formatCurrency(r.total_amount)} บาท</span>
-                        </div>
-                        {r.type_bill && <Badge variant="secondary" className="text-[10px]">{r.type_bill}</Badge>}
-                        <div className="flex items-center gap-1 text-xs text-honey font-semibold">
-                          <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /><span>{computeSalmonDelta(r.total_amount)}</span>
-                        </div>
-                      </div>
-
-                      {/* ── Item list ── */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                          <Package className="w-3 h-3" /> สินค้า
-                        </div>
-                        {r.source === 'legacy' && r.item && (
-                          <p className="text-xs text-foreground break-words">{r.item}</p>
-                        )}
-                        {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
-                          <div className={cn("space-y-1.5", r.purchase_items.length > 2 && "max-h-[140px] overflow-y-auto pr-1 custom-scrollbar")}>
-                            {r.purchase_items.map(item => {
-                              const catProduct = catalog.find(c => c.id === item.product_id);
-                              const role = catProduct?.role_id ? discordRolesMap.get(catProduct.role_id) : null;
-                              return (
-                                <div key={item.id} className="text-xs">
-                                  {item.is_promotion ? (
-                                    <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 space-y-0.5">
-                                      <div className="flex items-center gap-1 font-medium flex-wrap">
-                                        <div className="w-4 h-4 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
-                                          {role?.emoji ? (
-                                            <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
-                                          ) : (
-                                            <Tag className="h-3 w-3 text-amber-600" />
-                                          )}
-                                        </div>
-                                        <span className="truncate max-w-[150px]">{item.product_display_name}</span>
-                                        <Badge className="text-[9px] h-4 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-0 ml-1">โปรโมชัน</Badge>
-                                      </div>
-                                      {item.original_price != null && (
-                                        <div className="text-[10px] text-muted-foreground font-medium">
-                                          ราคาเต็ม <span className="line-through">฿{formatCurrency(item.original_price)}</span>
-                                          {' → '}
-                                          <span className="font-semibold text-foreground">จ่ายจริง ฿{formatCurrency(item.price_paid)}</span>
-                                        </div>
-                                      )}
-                                      {item.original_price == null && (
-                                        <div className="text-foreground font-semibold">฿{formatCurrency(item.price_paid)}</div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-between py-0.5 border-b border-border/10 last:border-b-0">
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <div className="w-4.5 h-4.5 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
-                                          {role?.emoji ? (
-                                            <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
-                                          ) : (
-                                            <Package className="w-3 h-3 text-muted-foreground" />
-                                          )}
-                                        </div>
-                                        <span className="text-foreground truncate">{item.product_display_name}</span>
-                                      </div>
-                                      <span className="font-medium text-primary">฿{formatCurrency(item.price_paid)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                        {/* Staff */}
+                        {r.staff_id && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ดำเนินการ</span>
+                            <UserBadge id={r.staff_id} />
                           </div>
                         )}
-                        {r.source === 'new' && (!r.purchase_items || r.purchase_items.length === 0) && (
-                          <p className="text-xs text-muted-foreground">ยังไม่มีรายการสินค้า</p>
-                        )}
-                      </div>
 
-                      {/* Timestamp */}
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                        <Clock className="w-3 h-3" />
-                        <span>เวลาที่ทำรายการ: {formatThaiDate(r.log_timestamp)}</span>
-                      </div>
-
-                      {/* Slips */}
-                      {(r.slip_url || r.slip_url_2) && (
-                        <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                          {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => (
-                            <button key={i} onClick={() => setPreviewImage(url!)} className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer">
-                              <img src={url!} alt={`บิล ${i+1}`} className="w-full h-32 object-cover" loading="lazy" />
-                            </button>
-                          ))}
+                        {/* Member */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ซื้อ</span>
+                          <UserBadge id={r.member_id} />
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+
+                        {/* Amount / bill type / salmon */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-sm font-bold text-primary">{formatCurrency(r.total_amount)} บาท</span>
+                          </div>
+                          {r.type_bill && <Badge variant="secondary" className="text-[10px]">{r.type_bill}</Badge>}
+                          <div className="flex items-center gap-1 text-xs text-honey font-semibold">
+                            <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="Salmon" /><span>{computeSalmonDelta(r.total_amount)}</span>
+                          </div>
+                        </div>
+
+                        {/* ── Item list ── */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                            <Package className="w-3 h-3" /> สินค้า
+                          </div>
+                          {r.source === 'legacy' && r.item && (
+                            <p className="text-xs text-foreground break-words">{r.item}</p>
+                          )}
+                          {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
+                            <div className={cn("space-y-1.5", r.purchase_items.length > 2 && "max-h-[140px] overflow-y-auto pr-1 custom-scrollbar")}>
+                              {r.purchase_items.map(item => {
+                                const catProduct = catalog.find(c => c.id === item.product_id);
+                                const role = catProduct?.role_id ? discordRolesMap.get(catProduct.role_id) : null;
+                                return (
+                                  <div key={item.id} className="text-xs">
+                                    {item.is_promotion ? (
+                                      <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 space-y-0.5">
+                                        <div className="flex items-center gap-1 font-medium flex-wrap">
+                                          <div className="w-4 h-4 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                            {role?.emoji ? (
+                                              <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
+                                            ) : (
+                                              <Tag className="h-3 w-3 text-amber-600" />
+                                            )}
+                                          </div>
+                                          <span className="truncate max-w-[150px]">{item.product_display_name}</span>
+                                          <Badge className="text-[9px] h-4 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-0 ml-1">โปรโมชัน</Badge>
+                                        </div>
+                                        {item.original_price != null && (
+                                          <div className="text-[10px] text-muted-foreground font-medium">
+                                            ราคาเต็ม <span className="line-through">฿{formatCurrency(item.original_price)}</span>
+                                            {' → '}
+                                            <span className="font-semibold text-foreground">จ่ายจริง ฿{formatCurrency(item.price_paid)}</span>
+                                          </div>
+                                        )}
+                                        {item.original_price == null && (
+                                          <div className="text-foreground font-semibold">฿{formatCurrency(item.price_paid)}</div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between py-0.5 border-b border-border/10 last:border-b-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <div className="w-4.5 h-4.5 rounded bg-secondary/50 flex items-center justify-center border border-border/40 shrink-0">
+                                            {role?.emoji ? (
+                                              <IconDisplay icon={role.emoji} fallback="🎭" size="xs" />
+                                            ) : (
+                                              <Package className="w-3 h-3 text-muted-foreground" />
+                                            )}
+                                          </div>
+                                          <span className="text-foreground truncate">{item.product_display_name}</span>
+                                        </div>
+                                        <span className="font-medium text-primary">฿{formatCurrency(item.price_paid)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {r.source === 'new' && (!r.purchase_items || r.purchase_items.length === 0) && (
+                            <p className="text-xs text-muted-foreground">ยังไม่มีรายการสินค้า</p>
+                          )}
+                        </div>
+
+                        {/* Timestamp */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                          <Clock className="w-3 h-3" />
+                          <span>เวลาที่ทำรายการ: {formatThaiDate(r.log_timestamp)}</span>
+                        </div>
+
+                        {/* Slips */}
+                        {(r.slip_url || r.slip_url_2) && (
+                          <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => (
+                              <button key={i} onClick={() => setPreviewImage(url!)} className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer">
+                                <img src={url!} alt={`บิล ${i+1}`} className="w-full h-32 object-cover" loading="lazy" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {layoutView === 'list' && (
+                <div className="space-y-3">
+                  {paginatedRecords.map(r => {
+                    const slips = [r.slip_url, r.slip_url_2].filter(Boolean) as string[];
+                    const member = resolveDisplayName(r.member_id);
+                    const staff = resolveDisplayName(r.staff_id || '');
+                    return (
+                      <Card key={r.id} className={cn("overflow-hidden hover:shadow-sm transition-all relative", r.source === 'new' && 'border-primary/20')}>
+                        <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          {/* Left: Date & Member/Staff avatars stack */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="min-w-0">
+                              <p className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {formatTransactionDate(r.transaction_date)}
+                                {r.source === 'new'
+                                  ? <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-primary/30 text-primary">ใหม่</Badge>
+                                  : <Badge variant="outline" className="text-[8px] h-3.5 px-1 text-muted-foreground">เก่า</Badge>}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 min-w-0 font-medium">
+                                <div className="flex -space-x-1.5 shrink-0">
+                                  <Avatar className="h-7 w-7 border-2 border-background shrink-0" title={`ผู้ซื้อ: ${member.name}`}>
+                                    {member.avatar && <AvatarImage src={member.avatar} />}
+                                    <AvatarFallback className="text-[9px] bg-primary/10 text-primary">👤</AvatarFallback>
+                                  </Avatar>
+                                  {r.staff_id && (
+                                    <Avatar className="h-7 w-7 border-2 border-background shrink-0" title={`ผู้ดำเนินการ: ${staff.name}`}>
+                                      {staff.avatar && <AvatarImage src={staff.avatar} />}
+                                      <AvatarFallback className="text-[9px] bg-secondary/15 text-foreground">☕</AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                </div>
+                                <div className="min-w-0 leading-tight">
+                                  <p className="text-xs font-bold truncate max-w-[120px]">{member.discord_username || member.name}</p>
+                                  {r.staff_id && <p className="text-[9px] text-muted-foreground truncate max-w-[120px]">โดย: {staff.discord_username || staff.name}</p>}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Middle: Items & Amount */}
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-primary flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/15">
+                                ฿{formatCurrency(r.total_amount)}
+                              </span>
+                              {r.type_bill && <Badge variant="secondary" className="text-[9px] h-4.5 px-1.5">{r.type_bill}</Badge>}
+                              <span className="text-[10px] text-honey font-semibold flex items-center gap-0.5">
+                                <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="" />
+                                +{computeSalmonDelta(r.total_amount)}
+                              </span>
+                            </div>
+                            {r.source === 'legacy' && r.item && (
+                              <p className="text-xs text-foreground truncate max-w-xl" title={r.item}>{r.item}</p>
+                            )}
+                            {r.source === 'new' && r.purchase_items && r.purchase_items.length > 0 && (
+                              <p className="text-xs text-foreground truncate max-w-xl" title={r.purchase_items.map(i => i.product_display_name).join(', ')}>
+                                {r.purchase_items.map(i => i.is_promotion ? `${i.product_display_name} (โปร)` : i.product_display_name).join(', ')}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Right: Slip previews and actions */}
+                          <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+                            {slips.length > 0 && (
+                              <div className="flex gap-1 shrink-0">
+                                {slips.map((url, i) => (
+                                  <button key={i} onClick={() => setPreviewImage(url)} className="w-10 h-7 rounded border bg-muted/20 overflow-hidden hover:border-primary/40 transition-all shrink-0">
+                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center gap-1 border-l border-latte/15 pl-3">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10"
+                                onClick={() => setEmbedTarget(r)} title="ส่ง Thank you embed">
+                                <Mail className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() => {
+                                  setEditTarget(r);
+                                  let formattedDate = '';
+                                  if (r.transaction_date) {
+                                    const parsed = parseTransactionDate(r.transaction_date);
+                                    if (parsed) {
+                                      formattedDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+                                    }
+                                  }
+                                  setEditForm({
+                                    amount: String(r.total_amount),
+                                    transaction: formattedDate,
+                                    type_bill: r.type_bill ?? 'ธนาคารทั่วไป'
+                                  });
+                                }} title="แก้ไขข้อมูล">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              {user?.is_owner && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                                  onClick={() => setDeleteTarget(r)} title="ลบข้อมูล">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {layoutView === 'compact' && (
+                <div className="border border-latte/40 rounded-2xl bg-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="bg-cream/10 dark:bg-card/40 border-b border-latte/45 text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">
+                          <th className="py-3 px-4 font-mono">วันที่ทำรายการ</th>
+                          <th className="py-3 px-4">ผู้ซื้อ (Member)</th>
+                          <th className="py-3 px-4">ผู้ดำเนินการ (Staff)</th>
+                          <th className="py-3 px-4">สินค้า</th>
+                          <th className="py-3 px-4">ยอดเงิน</th>
+                          <th className="py-3 px-4">ประเภทบิล</th>
+                          <th className="py-3 px-4">สลิป</th>
+                          <th className="py-3 px-4 text-right">จัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedRecords.map(r => {
+                          const member = resolveDisplayName(r.member_id);
+                          const staff = resolveDisplayName(r.staff_id || '');
+                          const slips = [r.slip_url, r.slip_url_2].filter(Boolean) as string[];
+                          return (
+                            <tr key={r.id} className="border-b border-border/10 hover:bg-muted/10 transition-colors">
+                              <td className="py-2.5 px-4 font-mono font-medium">{formatTransactionDate(r.transaction_date)}</td>
+                              <td className="py-2.5 px-4 font-semibold">{member.discord_username || member.name}</td>
+                              <td className="py-2.5 px-4 text-muted-foreground">{r.staff_id ? (staff.discord_username || staff.name) : '-'}</td>
+                              <td className="py-2.5 px-4 max-w-xs truncate" title={r.source === 'legacy' ? (r.item || '') : r.purchase_items?.map(i => i.product_display_name).join(', ')}>
+                                {r.source === 'legacy' ? (r.item || '-') : r.purchase_items?.map(i => i.product_display_name).join(', ') || '-'}
+                              </td>
+                              <td className="py-2.5 px-4 font-bold text-primary">฿{formatCurrency(r.total_amount)}</td>
+                              <td className="py-2.5 px-4">{r.type_bill || '-'}</td>
+                              <td className="py-2.5 px-4">
+                                {slips.length > 0 ? (
+                                  <div className="flex gap-0.5">
+                                    {slips.map((url, i) => (
+                                      <button key={i} onClick={() => setPreviewImage(url)} className="w-8 h-5 border border-border rounded text-[9px] font-mono bg-muted/10 hover:border-primary transition-all">
+                                        รูป {i+1}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="py-2.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500"
+                                    onClick={() => setEmbedTarget(r)} title="ส่ง Thank you embed">
+                                    <Mail className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                    onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
+                                    <History className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                    onClick={() => {
+                                      setEditTarget(r);
+                                      let formattedDate = '';
+                                      if (r.transaction_date) {
+                                        const parsed = parseTransactionDate(r.transaction_date);
+                                        if (parsed) {
+                                          formattedDate = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+                                        }
+                                      }
+                                      setEditForm({
+                                        amount: String(r.total_amount),
+                                        transaction: formattedDate,
+                                        type_bill: r.type_bill ?? 'ธนาคารทั่วไป'
+                                      });
+                                    }} title="แก้ไขข้อมูล">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {user?.is_owner && (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() => setDeleteTarget(r)} title="ลบข้อมูล">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 pt-2">
                   <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p-1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -1646,6 +1987,71 @@ export function TradingHistoryManagement() {
               {isSendingEmbed ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} ส่ง embed
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Case Logs Dialog */}
+      <Dialog open={isCaseLogsOpen} onOpenChange={setIsCaseLogsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl border-latte/45 bg-cream/10 dark:bg-card/95">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#8C6239] dark:text-[#EAD8C8]">
+              <History className="h-5 w-5 text-primary" /> ประวัติการแก้ไขบิล
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ดูรายละเอียดประวัติการแก้ไขข้อมูลของบิลนี้
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {loadingCaseLogs ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : selectedCaseLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">บิลนี้ยังไม่เคยถูกแก้ไขประวัติ</p>
+            ) : (
+              <div className="space-y-4">
+                {selectedCaseLogs.map((log) => (
+                  <div key={log.id} className="p-3 border border-latte/30 rounded-xl bg-card shadow-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          {log.operator_avatar && <AvatarImage src={log.operator_avatar} />}
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">👤</AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-bold">{log.operator_name}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{formatThaiDate(log.created_at)}</span>
+                    </div>
+                    <div className="text-xs text-foreground bg-muted/30 p-2 rounded-lg font-semibold">
+                      รายละเอียด: {log.details}
+                    </div>
+                    
+                    {log.before_data && log.after_data && (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40 text-[11px]">
+                        <div className="space-y-1">
+                          <span className="font-bold text-destructive font-semibold">ก่อนแก้:</span>
+                          <div className="p-1.5 bg-red-500/5 border border-red-500/10 rounded text-[10px] space-y-1 text-muted-foreground">
+                            <p><strong>ยอดเงิน:</strong> ฿{formatCurrency(log.before_data.amount)}</p>
+                            <p><strong>วันที่:</strong> {formatTransactionDate(log.before_data.transaction)}</p>
+                            <p><strong>ประเภทบิล:</strong> {log.before_data.type_bill || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="font-bold text-green-600 dark:text-green-400 font-semibold">หลังแก้:</span>
+                          <div className="p-1.5 bg-green-500/5 border border-green-500/10 rounded text-[10px] space-y-1">
+                            <p><strong>ยอดเงิน:</strong> ฿{formatCurrency(log.after_data.amount)}</p>
+                            <p><strong>วันที่:</strong> {formatTransactionDate(log.after_data.transaction)}</p>
+                            <p><strong>ประเภทบิล:</strong> {log.after_data.type_bill || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
