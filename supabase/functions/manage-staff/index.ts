@@ -163,6 +163,23 @@ Deno.serve(async (req): Promise<Response> => {
           after_data: newMember
         });
 
+        // Send Discord notification asynchronously or safely catch errors
+        try {
+          const avatarUrl = await getDiscordMemberAvatar(botToken, guildId, discord_id);
+          await sendAddStaffNotification(
+            botToken,
+            discord_id,
+            nickname || '',
+            joined_at || new Date().toISOString(),
+            intern_start_at,
+            intern_end_at,
+            position.discord_role_id || '0',
+            avatarUrl
+          );
+        } catch (notifErr) {
+          console.error('Failed to send add staff notification:', notifErr);
+        }
+
         return new Response(
           JSON.stringify({ success: true, member: newMember }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -308,6 +325,30 @@ Deno.serve(async (req): Promise<Response> => {
             reason: level_change_reason || 'เปลี่ยนระดับทีมงาน'
           }).select('id').single();
           if (levelHistory) levelHistoryId = levelHistory.id;
+
+          // Send Discord notification for level change (Upgrade/Downgrade)
+          try {
+            const avatarUrl = await getDiscordMemberAvatar(botToken, guildId, discord_id);
+            if (isUpgrade) {
+              await sendLevelUpNotification(
+                botToken,
+                discord_id,
+                newLevel.discord_role_id || '0',
+                operatorDiscordId || '0',
+                avatarUrl
+              );
+            } else if (isDowngrade) {
+              await sendLevelDownNotification(
+                botToken,
+                discord_id,
+                newLevel.discord_role_id || '0',
+                operatorDiscordId || '0',
+                avatarUrl
+              );
+            }
+          } catch (notifErr) {
+            console.error('Failed to send level change notification:', notifErr);
+          }
         }
 
         // Status changed
@@ -430,4 +471,186 @@ async function removeDiscordRole(botToken: string, guildId: string, userId: stri
     const text = await res.text();
     throw new Error(`Failed to remove role ${roleId}: ${res.status} ${text}`);
   }
+}
+
+// Helper to get Discord member's avatar URL (checks guild member first, then user, fallbacks to default)
+async function getDiscordMemberAvatar(botToken: string, guildId: string, userId: string): Promise<string> {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+      headers: { 'Authorization': `Bot ${botToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.avatar) {
+        const ext = data.avatar.startsWith('a_') ? 'gif' : 'png';
+        return `https://cdn.discordapp.com/guilds/${guildId}/users/${userId}/avatars/${data.avatar}.${ext}`;
+      }
+      if (data.user?.avatar) {
+        const ext = data.user.avatar.startsWith('a_') ? 'gif' : 'png';
+        return `https://cdn.discordapp.com/avatars/${userId}/${data.user.avatar}.${ext}`;
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching member avatar:', e);
+  }
+  return "https://cdn.discordapp.com/embed/avatars/0.png";
+}
+
+// Generic channel message sender using bot token
+async function sendDiscordChannelMessage(botToken: string, channelId: string, payload: any) {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${botToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Failed to send Discord message to channel ${channelId}: ${res.status} ${text}`);
+    }
+  } catch (err) {
+    console.error(`Error sending Discord message:`, err);
+  }
+}
+
+// Notification payload when adding staff
+async function sendAddStaffNotification(
+  botToken: string,
+  userId: string,
+  nickname: string,
+  joinedAt: string,
+  internStart: string | null,
+  internEnd: string | null,
+  roleId: string,
+  avatarUrl: string
+) {
+  const channelId = "1524123413122125964";
+  const joinedUnix = Math.floor(new Date(joinedAt).getTime() / 1000);
+  const startStr = internStart ? `<t:${Math.floor(new Date(internStart).getTime() / 1000)}:f>` : '-';
+  const endStr = internEnd ? `<t:${Math.floor(new Date(internEnd).getTime() / 1000)}:f>` : '-';
+
+  const content = `## <:bear9:1148271110132072598> ︲__\` 𝖭𝖾𝗐 𝗌𝗍𝖺𝖿𝖿 ₊ กำเนิดพี่เลี้ยงหมีตัวใหม่ 𓂃 \`__\n-# <@&1144697989986791576> <@&1360874841317576886> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`𝐦𝐬𝐠\`__ : หวัดดีเราชื่อ **'${nickname}'** (<t:${joinedUnix}:R>) <:cuteplant:1152834055528783872>\n  -  __\`𝐬𝐭𝐚𝐫𝐭\`__ : ${startStr}\n  -  __\`𝐞𝐧𝐝\`__ : ${endStr}\n\n-# กำลังติดต่อพี่สตาฟ <@&${roleId}> ให้คุณ สามารถนั่งรอได้ที่ https://discord.com/channels/1144251788493602848/1524123213884293211`;
+
+  const payload = {
+    "flags": 32768,
+    "components": [
+      {
+        "type": 17,
+        "components": [
+          {
+            "type": 9,
+            "components": [
+              {
+                "type": 10,
+                "content": content
+              }
+            ],
+            "accessory": {
+              "type": 11,
+              "media": {
+                "url": avatarUrl
+              }
+            }
+          },
+          {
+            "type": 14,
+            "spacing": 2
+          }
+        ]
+      }
+    ]
+  };
+
+  await sendDiscordChannelMessage(botToken, channelId, payload);
+}
+
+// Notification payload when promoting staff (Level Up)
+async function sendLevelUpNotification(
+  botToken: string,
+  userId: string,
+  roleId: string,
+  operatorId: string,
+  avatarUrl: string
+) {
+  const channelId = "1524123413122125964";
+  const content = `## <:95323thumbs:1310598361459462175>︲__\` 𝖲𝗍𝖺𝗍𝗎𝗌 ₊ พี่เลี้ยงหมีเลื่อนขั้นแล้ว 𓂃 \`__\n-# <@&1144697989986791576> <@&1360874841317576886> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`ตำแหน่ง\`__: <@&${roleId}>\n  - __\`อนุมัติโดย\`__: <@${operatorId}> <:cuteplant:1152834055528783872>`;
+
+  const payload = {
+    "flags": 32768,
+    "components": [
+      {
+        "type": 17,
+        "components": [
+          {
+            "type": 9,
+            "components": [
+              {
+                "type": 10,
+                "content": content
+              }
+            ],
+            "accessory": {
+              "type": 11,
+              "media": {
+                "url": avatarUrl
+              }
+            }
+          },
+          {
+            "type": 14,
+            "spacing": 2
+          }
+        ]
+      }
+    ]
+  };
+
+  await sendDiscordChannelMessage(botToken, channelId, payload);
+}
+
+// Notification payload when demoting staff (Level Down)
+async function sendLevelDownNotification(
+  botToken: string,
+  userId: string,
+  roleId: string,
+  operatorId: string,
+  avatarUrl: string
+) {
+  const channelId = "1524123413122125964";
+  const content = `## <:2531thumbsdown:1310598359152857199>︲__\` 𝖲𝗍𝖺𝗍𝗎𝗌 ₊ คำเตือน! คุณถูกลดขั้น 𓂃 \`__\n-# <@&1144697989986791576> <@&1360874841317576886> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`ตำแหน่ง\`__: <@&${roleId}>\n  - __\`อนุมัติโดย\`__: <@${operatorId}> <:cuteplant:1152834055528783872>`;
+
+  const payload = {
+    "flags": 32768,
+    "components": [
+      {
+        "type": 17,
+        "components": [
+          {
+            "type": 9,
+            "components": [
+              {
+                "type": 10,
+                "content": content
+              }
+            ],
+            "accessory": {
+              "type": 11,
+              "media": {
+                "url": avatarUrl
+              }
+            }
+          },
+          {
+            "type": 14,
+            "spacing": 2
+          }
+        ]
+      }
+    ]
+  };
+
+  await sendDiscordChannelMessage(botToken, channelId, payload);
 }

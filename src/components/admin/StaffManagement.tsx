@@ -135,8 +135,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     level_change_reason: ''
   });
 
-  const [memberPoints, setMemberPoints] = useState<number>(0);
-
   const [posForm, setPosForm] = useState({
     id: '',
     name: '',
@@ -194,15 +192,14 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   const fetchInitialData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const [posRes, lvlRes, memRes, ptsRes] = await Promise.all([
+      const [posRes, lvlRes, memRes] = await Promise.all([
         supabase.from('staff_positions').select('*').order('display_order', { ascending: true }),
         supabase.from('staff_levels').select('*').order('name', { ascending: true }),
         supabase.from('staff_members').select(`
           *,
           staff_positions(*),
           staff_levels(*)
-        `),
-        supabase.from('user_points').select('discord_id, points')
+        `)
       ]);
 
       if (posRes.error) throw posRes.error;
@@ -211,8 +208,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
       setPositions(posRes.data || []);
       setLevels(lvlRes.data || []);
-
-      const pointsMap = new Map((ptsRes.data || []).map(p => [p.discord_id, p.points]));
 
       // Fetch Discord User Details (Avatar / Username) for each member
       const memberList: StaffMember[] = memRes.data || [];
@@ -257,13 +252,12 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
           return {
             ...m,
-            points: pointsMap.get(m.discord_id) || 0,
             discord_user: prof
           };
         });
         setMembers(mappedMembers);
       } else {
-        setMembers(memberList.map(m => ({ ...m, points: pointsMap.get(m.discord_id) || 0 })));
+        setMembers(memberList.map(m => ({ ...m })));
       }
     } catch (e: any) {
       console.error(e);
@@ -424,7 +418,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     setSelectedDiscordUser(null);
     setProfileSearchQuery('');
     setProfileComboboxOpen(false);
-    setMemberPoints(0);
     setMemberForm({
       discord_id: '',
       nickname: '',
@@ -448,7 +441,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       display_name: member.discord_user.display_name,
       avatar_url: member.discord_user.avatar_url
     } : null);
-    setMemberPoints(member.points || 0);
     
     setMemberForm({
       discord_id: member.discord_id,
@@ -780,7 +772,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                       <TableHead className="text-sm font-bold">ชื่อเล่น</TableHead>
                       <TableHead className="text-sm font-bold">ตำแหน่ง</TableHead>
                       <TableHead className="text-sm font-bold">ระดับ</TableHead>
-                      <TableHead className="text-sm font-bold">แต้มสะสม</TableHead>
                       <TableHead className="text-sm font-bold">วันเดือนปีเปิด / อายุงาน</TableHead>
                       <TableHead className="text-sm font-bold">การฝึกงาน</TableHead>
                       <TableHead className="text-right pr-6 text-sm font-bold">จัดการ</TableHead>
@@ -788,9 +779,9 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.map(m => {
                       const isIntern = m.intern_start_at !== null;
                       const hasColor = m.staff_positions?.color;
@@ -826,9 +817,6 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                             <Badge variant="outline" className="text-sm font-medium border-latte/60 py-1 px-2.5">
                               {m.staff_levels?.name || 'ไม่มี'}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="font-bold text-base text-amber-600 dark:text-amber-400">
-                            {(m.points || 0).toLocaleString()} แต้ม
                           </TableCell>
                           <TableCell className="text-sm">
                             <div>
@@ -1143,22 +1131,14 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">ชื่อเล่น</Label>
-                <Input
-                  value={memberForm.nickname}
-                  onChange={e => setMemberForm(prev => ({ ...prev, nickname: e.target.value }))}
-                  placeholder="เช่น พี่หมี"
-                  className="h-9 border-latte/40 rounded-xl"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">แต้มสะสม (Points)</Label>
-                <div className="h-9 px-3 flex items-center bg-muted/40 border border-latte/40 rounded-xl text-sm font-bold text-amber-700 dark:text-amber-400 w-full">
-                  {memberPoints.toLocaleString()} แต้ม
-                </div>
-              </div>
+            <div className="space-y-1">
+              <Label className="text-xs">ชื่อเล่น</Label>
+              <Input
+                value={memberForm.nickname}
+                onChange={e => setMemberForm(prev => ({ ...prev, nickname: e.target.value }))}
+                placeholder="เช่น พี่หมี"
+                className="h-9 border-latte/40 rounded-xl"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
