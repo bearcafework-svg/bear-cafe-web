@@ -1,4 +1,5 @@
 import {
+  CalendarColorIcon,
   StrawberryColorIcon,
   TearTicketColorIcon,
   TicketColorIcon,
@@ -171,7 +172,7 @@ export function CheckinBigRewardPreview({
                 aria-label="เปิดปฏิทินเช็กอิน"
                 className="shrink-0 text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:text-[hsl(var(--mocha))] dark:text-[#6B6B6B] dark:hover:text-[#E9E6E2]"
               >
-                <Calendar className="h-5 w-5" />
+                <CalendarColorIcon size={20} />
               </button>
             )}
           </div>

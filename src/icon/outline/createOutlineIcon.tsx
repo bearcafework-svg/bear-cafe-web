@@ -30,11 +30,17 @@ export function createOutlineIcon(
   return Icon;
 }
 
-/** Wrap SVG children in a standard 24×24 outline icon root. Stroke widths stay as authored. */
-export function outlineSvgRoot(children: ReactElement['props']['children']): ReactElement {
+/**
+ * Wrap SVG children in a standard outline icon root. Stroke widths stay as authored.
+ * Defaults to the 24×24 canvas; pass a custom viewBox (e.g. '0 0 20 20') for other canvases.
+ */
+export function outlineSvgRoot(
+  children: ReactElement['props']['children'],
+  viewBox: string = ICON_VIEW_BOX,
+): ReactElement {
   return (
     <svg
-      viewBox={ICON_VIEW_BOX}
+      viewBox={viewBox}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="block"

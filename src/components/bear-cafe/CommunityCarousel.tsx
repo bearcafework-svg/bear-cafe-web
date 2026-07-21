@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { CakeColorIcon } from '@/icon/outline';
 
 interface ServerCategory {
   id: string;
@@ -157,7 +158,7 @@ export function CommunityCarousel() {
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 flex-1 min-w-0">
           <h2 className="text-base font-bold text-foreground leading-snug">
-            🐻 เบื่อ ๆ ไม่มีที่ไป? ลองแวะมาหาคอมมูที่เข้ากับคุณดูสิ!
+            <CakeColorIcon size={20} /> เบื่อ ๆ ไม่มีที่ไป? ลองแวะมาหาคอมมูที่เข้ากับคุณดูสิ!
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             รวมเซิร์ฟเวอร์หลากหลายสไตล์มากถึง{' '}

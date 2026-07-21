@@ -2,10 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "next-themes";
 import { LoadingPage } from "@/components/bear-cafe/LoadingBear";
+import { CozyAppShell } from "@/components/bear-cafe/CozyAppShell";
+import { HomePageSkeleton } from "@/components/bear-cafe/HomePageSkeleton";
+import { GachaPageSkeleton, PointsPageSkeleton } from "@/components/bear-cafe/PageSkeletons";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
@@ -53,10 +56,29 @@ function ProtectedRoute({ children, requireOwner = false }: { children: React.Re
   return <>{children}</>;
 }
 
-function AppRoutes() {
-  const { isAuthenticated, isLoading } = useAuth();
+// Routes with a content-shaped skeleton during the auth gate. Only the content
+// section is skeletonized — the real CozySidebar renders next to it via
+// CozyAppShell. Every other pathname keeps the generic LoadingPage.
+const GATE_CONTENT_SKELETONS: Record<string, () => JSX.Element> = {
+  '/': HomePageSkeleton,
+  '/gacha': GachaPageSkeleton,
+  '/points': PointsPageSkeleton,
+};
 
-  if (isLoading) return <LoadingPage />;
+export function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    const ContentSkeleton = GATE_CONTENT_SKELETONS[location.pathname];
+    return ContentSkeleton ? (
+      <CozyAppShell>
+        <ContentSkeleton />
+      </CozyAppShell>
+    ) : (
+      <LoadingPage />
+    );
+  }
 
   return (
     <Routes>
