@@ -1,0 +1,97 @@
+import { createOutlineIcon, outlineSvgRoot } from './createOutlineIcon';
+
+export const CoffeeBeanPiecesColorIcon = createOutlineIcon('CoffeeBeanPiecesColorIcon', () =>
+  outlineSvgRoot(
+    <>
+      <path d="M6 2H7V3H6V2Z" fill="#41332F"/>
+      <path d="M7 2H8V3H7V2Z" fill="#C29170"/>
+      <path d="M5 3H6V4H5V3Z" fill="#41332F"/>
+      <path d="M17 17H18V18H17V17Z" fill="#41332F"/>
+      <path d="M12 8H13V9H12V8Z" fill="#41332F"/>
+      <path d="M11 9H12V10H11V9Z" fill="#41332F"/>
+      <path d="M5 9H6V10H5V9Z" fill="#41332F"/>
+      <path d="M12 2H13V3H12V2Z" fill="#41332F"/>
+      <path d="M12 12H13V13H12V12Z" fill="#41332F"/>
+      <path d="M6 3H7V4H6V3Z" fill="#C29170"/>
+      <path d="M5 4H6V5H5V4Z" fill="#C29170"/>
+      <path d="M12 13H13V14H12V13Z" fill="#C29170"/>
+      <path d="M5 13H6V14H5V13Z" fill="#C29170"/>
+      <path d="M6 4H7V5H6V4Z" fill="#9B6D56"/>
+      <path d="M15 12H16V13H15V12Z" fill="#9B6D56"/>
+      <path d="M16 17H17V18H16V17Z" fill="#9B6D56"/>
+      <path d="M2 16H3V17H2V16Z" fill="#9B6D56"/>
+      <path d="M4 13H5V14H4V13Z" fill="#9B6D56"/>
+      <path d="M7 3H8V4H7V3Z" fill="#9B6D56"/>
+      <path d="M10 2H11V3H10V2Z" fill="#745542"/>
+      <path d="M14 14H15V15H14V14Z" fill="#745542"/>
+      <path d="M3 13H4V14H3V13Z" fill="#745542"/>
+      <path d="M5 14H6V15H5V14Z" fill="#745542"/>
+      <path d="M3 16H4V17H3V16Z" fill="#745542"/>
+      <path d="M15 13H16V14H15V13Z" fill="#745542"/>
+      <path d="M13 15H14V16H13V15Z" fill="#745542"/>
+      <path d="M5 7H6V8H5V7Z" fill="#745542"/>
+      <path d="M5 8H6V9H5V8Z" fill="#68443E"/>
+      <path d="M12 3H13V4H12V3Z" fill="#68443E"/>
+      <path d="M16 12H17V13H16V12Z" fill="#68443E"/>
+      <path d="M13 17H14V18H13V17Z" fill="#68443E"/>
+      <path d="M11 8H12V9H11V8Z" fill="#9B6D56"/>
+      <path d="M6 8H7V9H6V8Z" fill="#38251E"/>
+      <path d="M10 4H11V5H10V4Z" fill="#38251E"/>
+      <path d="M11 3H12V4H11V3Z" fill="#38251E"/>
+      <path d="M17 12H18V13H17V12Z" fill="#38251E"/>
+      <path d="M16 13H17V14H16V13Z" fill="#38251E"/>
+      <path d="M15 14H16V15H15V14Z" fill="#38251E"/>
+      <path d="M14 15H15V16H14V15Z" fill="#38251E"/>
+      <path d="M13 16H14V17H13V16Z" fill="#38251E"/>
+      <path d="M5 16H6V17H5V16Z" fill="#38251E"/>
+      <path d="M4 15H5V16H4V15Z" fill="#38251E"/>
+      <path d="M3 14H4V15H3V14Z" fill="#38251E"/>
+      <path d="M2 13H3V14H2V13Z" fill="#38251E"/>
+      <path d="M12 17H13V18H12V17Z" fill="#38251E"/>
+      <path d="M6 7H7V8H6V7Z" fill="#462F27"/>
+      <path d="M12 16H13V17H12V16Z" fill="#462F27"/>
+      <path d="M17 13H18V14H17V13Z" fill="#462F27"/>
+      <path d="M16 14H17V15H16V14Z" fill="#462F27"/>
+      <path d="M14 16H15V17H14V16Z" fill="#462F27"/>
+      <path d="M4 16H5V17H4V16Z" fill="#462F27"/>
+      <path d="M3 15H4V16H3V15Z" fill="#462F27"/>
+      <path d="M4 14H5V15H4V14Z" fill="#462F27"/>
+      <path d="M5 15H6V16H5V15Z" fill="#462F27"/>
+      <path d="M15 15H16V16H15V15Z" fill="#462F27"/>
+      <path d="M7 8H8V9H7V8Z" fill="#462F27"/>
+      <path d="M9 7H10V8H9V7Z" fill="#462F27"/>
+      <path d="M11 4H12V5H11V4Z" fill="#462F27"/>
+      <path d="M6 9H7V10H6V9Z" fill="#462F27"/>
+      <path d="M11 2H12V3H11V2Z" fill="#462F27"/>
+      <path d="M10 3H11V4H10V3Z" fill="#462F27"/>
+      <path d="M9 4H10V5H9V4Z" fill="#462F27"/>
+      <path d="M8 5H9V6H8V5Z" fill="#462F27"/>
+      <path d="M2 13H1V14V15V16V17H2V16V15V14V13Z" fill="#41332F"/>
+      <path d="M3 17H2V18H3H4H5H6V17H5H4H3Z" fill="#41332F"/>
+      <path d="M7 13H6V14V15V16V17H7V16V15V14V13Z" fill="#41332F"/>
+      <path d="M3 12H2V13H3H4H5H6V12H5H4H3Z" fill="#41332F"/>
+      <path d="M3 15V14H2V15V16H3V15Z" fill="#745542"/>
+      <path d="M12 14V13H11V14V15V16V17V18H12V17V16V15V14Z" fill="#41332F"/>
+      <path d="M13 18H12V19H13H14H15H16H17V18H16H15H14H13Z" fill="#41332F"/>
+      <path d="M19 12V13V14V15V16V17H18V16V15V14V13V12H19Z" fill="#41332F"/>
+      <path d="M13 11H14H15H16H17H18V12H17H16H15H14H13V11Z" fill="#41332F"/>
+      <path d="M13 12V13H14H15V12H14H13Z" fill="#C29170"/>
+      <path d="M13 13V14H12V15V16H13V15H14V14H15V13H14H13Z" fill="#9B6D56"/>
+      <path d="M18 14H17V15V16V17H18V16V15V14Z" fill="#9B6D56"/>
+      <path d="M17 15H16V16H15V17H14V18H15H16V17H17V16V15Z" fill="#745542"/>
+      <path d="M13 7V6H12V7V8H13V7Z" fill="#9B6D56"/>
+      <path d="M8 3V4H7V5H6V6V7H7H8V6V5H9V4H10V3H9H8Z" fill="#745542"/>
+      <path d="M8 2V3H9H10V2H9H8Z" fill="#9B6D56"/>
+      <path d="M5 5V6V7H6V6V5H5Z" fill="#9B6D56"/>
+      <path d="M5 4H4V5V6V7V8V9H5V8V7V6V5V4Z" fill="#41332F"/>
+      <path d="M7 10H6V11H7H8H9H10H11V10H10H9H8H7Z" fill="#41332F"/>
+      <path d="M14 3V4V5V6V7V8H13V7V6V5V4V3H14Z" fill="#41332F"/>
+      <path d="M13 5V4H12V5H11V6V7H10V8H9H8V9H7V10H8H9V9H10H11V8H12V7V6H13V5Z" fill="#745542"/>
+      <path d="M8 2H7V1H8H9H10H11H12V2H11H10H9H8Z" fill="#41332F"/>
+      <path d="M10 6V5H9V6H8V7H7V8H8H9V7H10V6Z" fill="#38251E"/>
+      <path d="M11 5H10V6V7H11V6V5Z" fill="#462F27"/>
+      <path d="M10 9H9V10H10H11V9H10Z" fill="#9B6D56"/>
+    </>,
+    '0 0 20 20',
+  ),
+);

@@ -2,13 +2,12 @@ import { motion } from 'framer-motion';
 import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { PageBackHeader } from '@/components/bear-cafe/PageBackHeader';
-import { useAuth } from '@/lib/auth-context';
 
 export default function GachaPage() {
-  const { isLoading } = useAuth();
-
+  // Auth loading is handled by the AppRoutes gate (GachaPageSkeleton), so the
+  // page only mounts once auth has resolved.
   return (
-    <CozyAppShell isLoading={isLoading}>
+    <CozyAppShell>
       <main className="mx-auto min-h-dvh w-full max-w-2xl min-w-0 px-4 py-6 pt-16 sm:px-6 sm:py-8 lg:pt-8 pb-12">
         <motion.div
           initial={{ opacity: 0, y: 14 }}

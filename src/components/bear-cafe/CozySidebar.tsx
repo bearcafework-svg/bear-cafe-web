@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from 'next-themes';
-import { LogIn, Settings } from 'lucide-react';
+import { FileTextIcon, LogIn, Settings } from 'lucide-react';
 import { BearLogo } from './BearLogo';
 import { useUserBalances } from '@/hooks/useUserBalances';
 import {
@@ -9,6 +9,14 @@ import {
   StrawberryColorIcon,
   TicketColorIcon,
   TearTicketColorIcon,
+  CardColorIcon,
+  HoneyDipperColorIcon,
+  GreenTeaCupColorIcon,
+  TeaBagColorIcon,
+  TeaBagPackagingColorIcon,
+  SugarCubesColorIcon,
+  TeaInfuserColorIcon,
+  GreenTeaCupArtIcon,
 } from '@/icon/outline';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -24,6 +32,7 @@ interface NavItemConfig {
   onClick?: () => void;
   matchPath?: string;
   requireAuth?: boolean;
+  icon?: React.ReactNode;
 }
 
 interface NavItemProps extends NavItemConfig {
@@ -190,14 +199,14 @@ export function CozySidebar() {
   const authHref = (path: string) => (isAuthenticated ? path : '/login');
 
   const serviceItems: NavItemConfig[] = [
-    { label: 'หน้าหลัก', href: '/', matchPath: '/' },
-    { label: 'กาชา', href: '/gacha', matchPath: '/gacha' },
-    { label: 'กรอกโค้ด', href: authHref('/points'), matchPath: '/points', requireAuth: true },
+    { label: 'หน้าหลัก', href: '/', matchPath: '/', icon: <CaffeLatteIcon size={20} /> },
+    { label: 'กาชา', href: '/gacha', matchPath: '/gacha', icon: <CardColorIcon size={20} /> },
+    { label: 'กรอกโค้ด', href: authHref('/points'), matchPath: '/points', requireAuth: true, icon: <HoneyDipperColorIcon size={20} /> },
   ];
 
   const usageItems: NavItemConfig[] = [
-    { label: 'กระเป๋าเก็บของ', href: authHref('/inventory'), matchPath: '/inventory', requireAuth: true },
-    { label: 'ข้อตกลง', href: NOTION_RULES_URL, external: true },
+    { label: 'กระเป๋าเก็บของ', href: authHref('/inventory'), matchPath: '/inventory', requireAuth: true, icon: <TeaBagPackagingColorIcon size={20} /> },
+    { label: 'ข้อตกลง', href: NOTION_RULES_URL, external: true, icon: <GreenTeaCupArtIcon size={20} /> },
   ];
 
   return (
@@ -224,6 +233,7 @@ export function CozySidebar() {
               key={item.label}
               {...item}
               isActive={item.matchPath ? isActive(item.matchPath) : false}
+              icon={item.icon}
             />
           ))}
         </NavSection>
@@ -239,6 +249,7 @@ export function CozySidebar() {
           <NavItem
             label="สลับธีม"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            icon={<SugarCubesColorIcon size={20} />}
           />
         </NavSection>
       </nav>
@@ -258,6 +269,7 @@ export function CozySidebar() {
           <NavItem
             label="ออกจากระบบ"
             onClick={logout}
+            icon={<TeaInfuserColorIcon size={20} />}
           />
         ) : (
           <Link

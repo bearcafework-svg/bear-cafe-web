@@ -19,7 +19,7 @@ import {
 } from '@/lib/checkin';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { CaffeLatteIcon } from '@/icon/outline';
+import { CaffeLatteArtIcon, CaffeLatteIcon } from '@/icon/outline';
 import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
 
 export function DailyCheckInCard() {
@@ -165,7 +165,7 @@ export function DailyCheckInCard() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0 space-y-2">
             <div className="flex items-center gap-3">
-              <CaffeLatteIcon size={{ mobile: 30, desktop: 38 }} />
+              <CaffeLatteArtIcon size={{ mobile: 30, desktop: 38 }} />
               <h3 className="truncate bear-h3-bold text-[hsl(var(--mocha))] dark:text-[#E9E6E2] md:bear-h1-bold">
                 เช็กอิน {computeCheckinStreak(completedDays, todayDay)} วัน ติดต่อกัน!
               </h3>
