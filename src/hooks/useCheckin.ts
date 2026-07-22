@@ -206,7 +206,7 @@ export function useCheckin(discordId: string | undefined) {
           void refresh();
         }
 
-        // MVP reconcile gates (big_reward_granted / role_grant_error) wired in T3.1 — not here.
+        // MVP reconcile gates (big_reward_granted / role_grant_error) live in useCheckinFlow.
         return {
           ok: true,
           cycle,
