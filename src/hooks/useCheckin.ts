@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { readFunctionsErrorPayload } from '@/lib/function-error';
 import { getCheckinToday, type CheckinDailyReward, type CheckinStatus } from '@/lib/checkin';
+import {
+  checkinPublicStatusQueryKey,
+  checkinStatusQueryKey,
+  fetchCheckinStatus,
+} from '@/lib/checkin-status-cache';
+
+/** FE Design Doc § staleTime / gc — auth + guest check-in status. */
+const CHECKIN_STATUS_STALE_TIME = 60_000;
 
 async function fetchPublicDailyRewards(): Promise<CheckinDailyReward[]> {
   const { year, month } = getCheckinToday();
@@ -48,71 +57,70 @@ function publicCheckinStatus(
   };
 }
 
+async function fetchPublicCheckinStatus(): Promise<CheckinStatus> {
+  const [daily_rewards, big_reward] = await Promise.all([
+    fetchPublicDailyRewards(),
+    fetchPublicBigReward(),
+  ]);
+  return publicCheckinStatus(daily_rewards, big_reward);
+}
+
 export type CheckinActionResult =
   | { ok: true; reward?: Record<string, unknown>; big_reward_granted?: boolean }
   | { ok: false; error: string };
 
 export function useCheckin(discordId: string | undefined) {
-  const [status, setStatus] = useState<CheckinStatus | null>(null);
-  // Always start loading so guest public rewards and auth status share one
-  // skeleton→content swap (avoids empty day cells popping in reward icons).
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [acting, setActing] = useState(false);
-  // Only the first fetch (and discordId identity changes) drive the card
-  // skeleton — claim/makeup refreshes update in place with no day-row flash.
-  const isInitialLoad = useRef(true);
+
+  const authQuery = useQuery({
+    queryKey: checkinStatusQueryKey(discordId ?? ''),
+    queryFn: async () => {
+      try {
+        return await fetchCheckinStatus(discordId!);
+      } catch (err) {
+        console.error('Failed to fetch check-in status:', err);
+        throw err;
+      }
+    },
+    enabled: Boolean(discordId),
+    staleTime: CHECKIN_STATUS_STALE_TIME,
+  });
+
+  const guestQuery = useQuery({
+    queryKey: checkinPublicStatusQueryKey(),
+    queryFn: async () => {
+      try {
+        return await fetchPublicCheckinStatus();
+      } catch (err) {
+        console.error('Failed to fetch check-in rewards:', err);
+        throw err;
+      }
+    },
+    enabled: !discordId,
+    staleTime: CHECKIN_STATUS_STALE_TIME,
+  });
+
+  const activeQuery = discordId ? authQuery : guestQuery;
+  // Initial pending / no-data only — never claim or background isFetching flash.
+  const loading = activeQuery.isPending;
+  const status = activeQuery.data ?? null;
 
   const getAuthHeaders = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.access_token) return null;
     return { Authorization: `Bearer ${session.access_token}` };
   }, []);
 
   const refresh = useCallback(async () => {
-    if (isInitialLoad.current) setLoading(true);
-    try {
-      if (!discordId) {
-        const [daily_rewards, big_reward] = await Promise.all([
-          fetchPublicDailyRewards(),
-          fetchPublicBigReward(),
-        ]);
-        setStatus(publicCheckinStatus(daily_rewards, big_reward));
-        return;
-      }
-
-      const headers = await getAuthHeaders();
-      if (!headers) throw new Error('missing_auth');
-
-      const { data, error } = await supabase.functions.invoke('get-checkin-status', {
-        headers,
-        body: { discord_id: discordId },
-      });
-
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error ?? 'fetch_failed');
-
-      setStatus({
-        cycle: data.cycle,
-        daily_rewards: data.daily_rewards ?? [],
-        big_reward: data.big_reward ?? null,
-        makeup_window_open: Boolean(data.makeup_window_open),
-      });
-    } catch (err) {
-      console.error(
-        discordId ? 'Failed to fetch check-in status:' : 'Failed to fetch check-in rewards:',
-        err,
-      );
-      setStatus(null);
-    } finally {
-      setLoading(false);
-      isInitialLoad.current = false;
+    if (discordId) {
+      await queryClient.refetchQueries({ queryKey: checkinStatusQueryKey(discordId) });
+      return;
     }
-  }, [discordId, getAuthHeaders]);
-
-  useEffect(() => {
-    isInitialLoad.current = true;
-    void refresh();
-  }, [refresh]);
+    await queryClient.refetchQueries({ queryKey: checkinPublicStatusQueryKey() });
+  }, [discordId, queryClient]);
 
   const invokeAction = useCallback(
     async (fn: string, body: Record<string, unknown>): Promise<CheckinActionResult> => {
@@ -134,6 +142,7 @@ export function useCheckin(discordId: string | undefined) {
         }
         if (!data?.ok) return { ok: false, error: data?.error ?? 'action_failed' };
 
+        // Phase 2 (T2.1) removes this mandatory refresh in favor of hybrid patch.
         await refresh();
         return {
           ok: true,
