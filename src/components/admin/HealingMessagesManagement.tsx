@@ -17,7 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const MIN_LEN = 10;
-const MAX_LEN = 100;
+const MAX_LEN = 150;
 
 type Status = 'pending' | 'approved' | 'rejected';
 

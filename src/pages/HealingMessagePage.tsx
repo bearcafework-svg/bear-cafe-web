@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 
 const MIN_LEN = 10;
-const MAX_LEN = 100;
+const MAX_LEN = 150;
 
 type HealingMessageStatus = 'pending' | 'approved' | 'rejected';
 

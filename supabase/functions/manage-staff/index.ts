@@ -195,8 +195,8 @@ Deno.serve(async (req): Promise<Response> => {
         }
 
         return new Response(
-          JSON.stringify({ 
-            error: 'discord_role_assignment_failed', 
+          JSON.stringify({
+            error: 'discord_role_assignment_failed',
             message: `ไม่สามารถปรับเปลี่ยนยศใน Discord ได้: ${discordError.message}. โรลแบ็กข้อมูลทั้งหมดแล้ว`
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -282,7 +282,7 @@ Deno.serve(async (req): Promise<Response> => {
         // Position changed
         if (beforeMember.position_id !== position_id) {
           if (oldPosition?.discord_role_id) {
-            await removeDiscordRole(botToken, guildId, discord_id, oldPosition.discord_role_id).catch(() => {});
+            await removeDiscordRole(botToken, guildId, discord_id, oldPosition.discord_role_id).catch(() => { });
           }
           if (newPosition.discord_role_id) {
             await addDiscordRole(botToken, guildId, discord_id, newPosition.discord_role_id);
@@ -298,7 +298,7 @@ Deno.serve(async (req): Promise<Response> => {
         // Level changed
         if (beforeMember.level_id !== level_id) {
           if (oldLevel?.discord_role_id) {
-            await removeDiscordRole(botToken, guildId, discord_id, oldLevel.discord_role_id).catch(() => {});
+            await removeDiscordRole(botToken, guildId, discord_id, oldLevel.discord_role_id).catch(() => { });
           }
           if (newLevel.discord_role_id) {
             await addDiscordRole(botToken, guildId, discord_id, newLevel.discord_role_id);
@@ -421,8 +421,8 @@ Deno.serve(async (req): Promise<Response> => {
         }
 
         return new Response(
-          JSON.stringify({ 
-            error: 'discord_role_update_failed', 
+          JSON.stringify({
+            error: 'discord_role_update_failed',
             message: `ไม่สามารถอัปเดตยศใน Discord ได้: ${discordError.message}. โรลแบ็กข้อมูลในระบบแล้ว`
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -527,7 +527,7 @@ async function sendAddStaffNotification(
   roleId: string,
   avatarUrl: string
 ) {
-  const channelId = "1524123413122125964";
+  const channelId = "1524123372210880664";
   const joinedUnix = Math.floor(new Date(joinedAt).getTime() / 1000);
   const startStr = internStart ? `<t:${Math.floor(new Date(internStart).getTime() / 1000)}:f>` : '-';
   const endStr = internEnd ? `<t:${Math.floor(new Date(internEnd).getTime() / 1000)}:f>` : '-';
@@ -575,7 +575,7 @@ async function sendLevelUpNotification(
   operatorId: string,
   avatarUrl: string
 ) {
-  const channelId = "1524123413122125964";
+  const channelId = "1524123372210880664";
   const content = `## <:95323thumbs:1310598361459462175>︲__\` 𝖲𝗍𝖺𝗍𝗎𝗌 ₊ พี่เลี้ยงหมีเลื่อนขั้นแล้ว 𓂃 \`__\n-# <@&1144697989986791576> <@&1360874841317576886> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`ตำแหน่ง\`__: <@&${roleId}>\n  - __\`อนุมัติโดย\`__: <@${operatorId}> <:cuteplant:1152834055528783872>`;
 
   const payload = {
@@ -619,7 +619,7 @@ async function sendLevelDownNotification(
   operatorId: string,
   avatarUrl: string
 ) {
-  const channelId = "1524123413122125964";
+  const channelId = "1524123372210880664";
   const content = `## <:2531thumbsdown:1310598359152857199>︲__\` 𝖲𝗍𝖺𝗍𝗎𝗌 ₊ คำเตือน! คุณถูกลดขั้น 𓂃 \`__\n-# <@&1144697989986791576> <@&1360874841317576886> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`ตำแหน่ง\`__: <@&${roleId}>\n  - __\`อนุมัติโดย\`__: <@${operatorId}> <:cuteplant:1152834055528783872>`;
 
   const payload = {

@@ -796,45 +796,126 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                               />
                               <div className="flex flex-col min-w-0">
                                 <span className="font-bold text-base truncate">{m.discord_user?.display_name || 'Loading...'}</span>
-                                <span className="text-xs text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <span className="text-xs text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(m.discord_id);
+                                      toast({ title: 'คัดลอก ID สมาชิกสำเร็จ', description: `ID: ${m.discord_id}` });
+                                    }}
+                                    title="คัดลอก Discord ID ของสมาชิก"
+                                  >
+                                    <Copy className="w-2.5 h-2.5" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="font-semibold text-base">{m.nickname || '-'}</TableCell>
                           <TableCell>
-                            <Badge 
-                              className="text-sm font-semibold py-1 px-2.5"
-                              style={{ 
-                                backgroundColor: hasColor ? `${hasColor}15` : 'rgba(var(--primary), 0.1)',
-                                color: hasColor || 'var(--primary)',
-                                border: `1px solid ${hasColor}30`
-                              }}
-                            >
-                              {m.staff_positions?.name || 'ไม่มี'}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge 
+                                className="text-sm font-semibold py-1 px-2.5"
+                                style={{ 
+                                  backgroundColor: hasColor ? `${hasColor}15` : 'rgba(var(--primary), 0.1)',
+                                  color: hasColor || 'var(--primary)',
+                                  border: `1px solid ${hasColor}30`
+                                }}
+                              >
+                                {m.staff_positions?.name || 'ไม่มี'}
+                              </Badge>
+                              {m.staff_positions?.discord_role_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(m.staff_positions!.discord_role_id);
+                                    toast({ title: 'คัดลอก Role ID ตำแหน่งสำเร็จ', description: `Role ID: ${m.staff_positions!.discord_role_id}` });
+                                  }}
+                                  title={`คัดลอก Role ID ตำแหน่ง: ${m.staff_positions.discord_role_id}`}
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-sm font-medium border-latte/60 py-1 px-2.5">
-                              {m.staff_levels?.name || 'ไม่มี'}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge variant="outline" className="text-sm font-medium border-latte/60 py-1 px-2.5">
+                                {m.staff_levels?.name || 'ไม่มี'}
+                              </Badge>
+                              {m.staff_levels?.discord_role_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(m.staff_levels!.discord_role_id!);
+                                    toast({ title: 'คัดลอก Role ID ระดับสำเร็จ', description: `Role ID: ${m.staff_levels!.discord_role_id}` });
+                                  }}
+                                  title={`คัดลอก Role ID ระดับ: ${m.staff_levels.discord_role_id}`}
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm">
-                            <div>
-                              {(() => {
-                                const today = new Date();
-                                let dateToUse = new Date(m.joined_at);
-                                if (m.intern_start_at) {
-                                  const isPassed = m.intern_end_at ? new Date(m.intern_end_at) <= today : false;
-                                  if (isPassed) {
-                                    dateToUse = new Date(m.intern_start_at);
-                                  }
+                            {(() => {
+                              const today = new Date();
+                              let dateToUse = new Date(m.joined_at);
+                              if (m.intern_start_at) {
+                                const isPassed = m.intern_end_at ? new Date(m.intern_end_at) <= today : false;
+                                if (isPassed) {
+                                  dateToUse = new Date(m.intern_start_at);
                                 }
-                                return dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-                              })()}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-0.5 font-medium">
-                              อายุงาน: {calculateDuration(m)}
-                            </div>
+                              }
+                              const unixTimestamp = Math.floor(dateToUse.getTime() / 1000);
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <span>{dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(String(unixTimestamp));
+                                        toast({ title: 'คัดลอก Unix Timestamp วันเปิด/เริ่มงานสำเร็จ', description: `ค่าที่คัดลอก: ${unixTimestamp}` });
+                                      }}
+                                      title="คัดลอก Unix Timestamp วันเปิด/เริ่มงาน"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                    </Button>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-0.5 font-medium flex items-center gap-1">
+                                    <span>อายุงาน: {calculateDuration(m)}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const joinedUnix = Math.floor(new Date(m.joined_at).getTime() / 1000);
+                                        navigator.clipboard.writeText(String(joinedUnix));
+                                        toast({ title: 'คัดลอก Unix Timestamp วันเข้าทีมงานสำเร็จ', description: `ค่าที่คัดลอก: ${joinedUnix}` });
+                                      }}
+                                      title="คัดลอก Unix Timestamp ของวันเข้าทีมงาน (joined_at)"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                    </Button>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-sm">
                             {isIntern ? (
@@ -957,7 +1038,24 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                                 >
                                   {pos.name}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground">Role ID: {pos.discord_role_id}</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">Role ID: {pos.discord_role_id}</span>
+                                  {pos.discord_role_id && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(pos.discord_role_id);
+                                        toast({ title: 'คัดลอก Role ID ตำแหน่งสำเร็จ', description: `Role ID: ${pos.discord_role_id}` });
+                                      }}
+                                      title="คัดลอก Role ID"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <Badge variant={pos.is_active ? 'success' : 'secondary'} className="text-[9px] scale-90">
@@ -1007,7 +1105,24 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-sm">{lvl.name}</span>
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">Role ID: {lvl.discord_role_id || 'ไม่ผูกยศ'}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Role ID: {lvl.discord_role_id || 'ไม่ผูกยศ'}</Badge>
+                            {lvl.discord_role_id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(lvl.discord_role_id!);
+                                  toast({ title: 'คัดลอก Role ID ระดับสำเร็จ', description: `Role ID: ${lvl.discord_role_id}` });
+                                }}
+                                title="คัดลอก Role ID"
+                              >
+                                <Copy className="w-2.5 h-2.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-2 items-center text-[10px] text-muted-foreground">
                           <span>เลื่อนขึ้น: <strong className="text-green-600 dark:text-green-400">{nextLvl ? nextLvl.name : 'ไม่มี'}</strong></span>
