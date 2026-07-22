@@ -1,9 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import type { CheckinCycle, CheckinStatus } from '@/lib/checkin';
 import {
+  checkinPublicStatusQueryKey,
+  checkinStatusQueryKey,
   needsCheckinStatusReconcile,
   patchCheckinStatusCycle,
 } from '@/lib/checkin-status-cache';
+
+describe('checkin status query keys', () => {
+  it('returns auth key as [checkin-status, discordId]', () => {
+    expect(checkinStatusQueryKey('user-1')).toEqual(['checkin-status', 'user-1']);
+  });
+
+  it('returns public key as [checkin-status, public]', () => {
+    expect(checkinPublicStatusQueryKey()).toEqual(['checkin-status', 'public']);
+  });
+});
 
 /** Fixtures for planned hybrid patch merge (FE Design Doc § Patch merge function). */
 function makePrevStatus(overrides?: Partial<CheckinStatus>): CheckinStatus {
