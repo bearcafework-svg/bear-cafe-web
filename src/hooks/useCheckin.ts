@@ -2,11 +2,17 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { readFunctionsErrorPayload } from '@/lib/function-error';
-import { getCheckinToday, type CheckinDailyReward, type CheckinStatus } from '@/lib/checkin';
+import {
+  getCheckinToday,
+  type CheckinCycle,
+  type CheckinDailyReward,
+  type CheckinStatus,
+} from '@/lib/checkin';
 import {
   checkinPublicStatusQueryKey,
   checkinStatusQueryKey,
   fetchCheckinStatus,
+  patchCheckinStatusCycle,
 } from '@/lib/checkin-status-cache';
 
 /** FE Design Doc § staleTime / gc — auth + guest check-in status. */
@@ -66,8 +72,28 @@ async function fetchPublicCheckinStatus(): Promise<CheckinStatus> {
 }
 
 export type CheckinActionResult =
-  | { ok: true; reward?: Record<string, unknown>; big_reward_granted?: boolean }
+  | {
+      ok: true;
+      /** Present when edge contract held; absent on soft-failure (ok without cycle). */
+      cycle?: CheckinCycle;
+      reward?: Record<string, unknown>;
+      big_reward_granted?: boolean;
+      points_spent?: number;
+      points_now?: unknown;
+    }
   | { ok: false; error: string };
+
+function isCheckinCycle(value: unknown): value is CheckinCycle {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as Record<string, unknown>;
+  return (
+    typeof c.year === 'number' &&
+    typeof c.month === 'number' &&
+    Array.isArray(c.completed_days) &&
+    Array.isArray(c.makeup_days) &&
+    typeof c.big_reward_claimed === 'boolean'
+  );
+}
 
 export function useCheckin(discordId: string | undefined) {
   const queryClient = useQueryClient();
@@ -142,12 +168,52 @@ export function useCheckin(discordId: string | undefined) {
         }
         if (!data?.ok) return { ok: false, error: data?.error ?? 'action_failed' };
 
-        // Phase 2 (T2.1) removes this mandatory refresh in favor of hybrid patch.
-        await refresh();
+        const reward =
+          data.reward && typeof data.reward === 'object'
+            ? (data.reward as Record<string, unknown>)
+            : undefined;
+        const big_reward_granted =
+          typeof data.big_reward_granted === 'boolean' ? data.big_reward_granted : undefined;
+        const points_spent =
+          typeof data.points_spent === 'number' ? data.points_spent : undefined;
+        const points_now = data.points_now;
+
+        // Soft-failure: ok without cycle — show success UI from reward if possible;
+        // force reconcile; do not speculative-complete the day (Design Doc § CheckinActionResult).
+        if (!isCheckinCycle(data.cycle)) {
+          console.error('checkin action missing cycle; forcing status reconcile', {
+            fn,
+            error: 'missing_cycle',
+          });
+          void refresh();
+          return {
+            ok: true,
+            reward,
+            big_reward_granted,
+            points_spent,
+            points_now,
+          };
+        }
+
+        const cycle = data.cycle;
+        const key = checkinStatusQueryKey(discordId);
+        const prev = queryClient.getQueryData<CheckinStatus>(key);
+        const next = patchCheckinStatusCycle(prev, cycle);
+        if (next) {
+          queryClient.setQueryData(key, next);
+        } else {
+          // No cached prev — do not invent incomplete entries; force reconcile.
+          void refresh();
+        }
+
+        // MVP reconcile gates (big_reward_granted / role_grant_error) wired in T3.1 — not here.
         return {
           ok: true,
-          reward: data.reward,
-          big_reward_granted: data.big_reward_granted,
+          cycle,
+          reward,
+          big_reward_granted,
+          points_spent,
+          points_now,
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'action_failed';
@@ -156,7 +222,7 @@ export function useCheckin(discordId: string | undefined) {
         setActing(false);
       }
     },
-    [discordId, getAuthHeaders, refresh],
+    [discordId, getAuthHeaders, queryClient, refresh],
   );
 
   const performCheckin = useCallback(

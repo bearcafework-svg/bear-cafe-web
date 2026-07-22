@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
@@ -273,5 +273,219 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
     // Warm cache within staleTime — no second cold get-checkin-status
     expect(mockInvoke.mock.calls.length).toBe(invokeCountAfterFirst);
     expect(queryClient.getQueryData(checkinStatusQueryKey('user-1'))).toBeDefined();
+  });
+});
+
+const patchedCycle = {
+  year: 2026,
+  month: 7,
+  completed_days: [1, 2],
+  makeup_days: [],
+  big_reward_claimed: false,
+};
+
+function authStatusInvokeResult(overrides?: Record<string, unknown>) {
+  return {
+    data: {
+      ok: true,
+      cycle: authStatus.cycle,
+      daily_rewards: authStatus.daily_rewards,
+      big_reward: {
+        reward_type: 'role',
+        reward_amount: null,
+        role_id: 'role-big',
+        description: 'Big',
+      },
+      makeup_window_open: true,
+      ...overrides,
+    },
+    error: null,
+  };
+}
+
+describe('useCheckin hybrid patch invokeAction (T2.1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+    });
+  });
+
+  it('patches shared RQ cycle on happy-path claim without get-checkin-status', async () => {
+    mockInvoke.mockResolvedValueOnce(authStatusInvokeResult());
+
+    const { queryClient, Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCheckin('user-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const statusCallsAfterLoad = mockInvoke.mock.calls.filter(
+      ([fn]) => fn === 'get-checkin-status',
+    ).length;
+
+    mockInvoke.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        reward: { reward_type: 'points', reward_amount: 10 },
+        cycle: patchedCycle,
+        big_reward_granted: false,
+      },
+      error: null,
+    });
+
+    const actionResult = await act(async () => result.current.performCheckin(2));
+
+    expect(actionResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        cycle: patchedCycle,
+        big_reward_granted: false,
+      }),
+    );
+
+    const cached = queryClient.getQueryData<CheckinStatus>(checkinStatusQueryKey('user-1'));
+    expect(cached?.cycle).toEqual(patchedCycle);
+    // Siblings preserved (ADR / patchCheckinStatusCycle)
+    expect(cached?.daily_rewards).toEqual(authStatus.daily_rewards);
+    expect(cached?.big_reward).toEqual({
+      reward_type: 'role',
+      reward_amount: null,
+      role_id: 'role-big',
+      description: 'Big',
+    });
+    expect(cached?.makeup_window_open).toBe(true);
+
+    const statusCallsAfterAction = mockInvoke.mock.calls.filter(
+      ([fn]) => fn === 'get-checkin-status',
+    ).length;
+    expect(statusCallsAfterAction).toBe(statusCallsAfterLoad);
+
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'perform-checkin',
+      expect.objectContaining({
+        body: { discord_id: 'user-1', day_number: 2 },
+      }),
+    );
+  });
+
+  it('does not patch cache when action returns ok:false', async () => {
+    mockInvoke.mockResolvedValueOnce(authStatusInvokeResult());
+
+    const { queryClient, Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCheckin('user-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const before = queryClient.getQueryData<CheckinStatus>(checkinStatusQueryKey('user-1'));
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { ok: false, error: 'already_checked_in' },
+      error: null,
+    });
+
+    const actionResult = await act(async () => result.current.performCheckin(1));
+    expect(actionResult).toEqual({ ok: false, error: 'already_checked_in' });
+    expect(queryClient.getQueryData(checkinStatusQueryKey('user-1'))).toEqual(before);
+  });
+
+  it('soft-fails when ok without cycle: force reconcile, no speculative complete', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockInvoke.mockResolvedValueOnce(authStatusInvokeResult());
+
+    const { queryClient, Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCheckin('user-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const before = queryClient.getQueryData<CheckinStatus>(checkinStatusQueryKey('user-1'));
+
+    mockInvoke
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          reward: { reward_type: 'points', reward_amount: 10 },
+          big_reward_granted: false,
+          // cycle intentionally missing
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce(authStatusInvokeResult());
+
+    const actionResult = await act(async () => result.current.performCheckin(2));
+
+    expect(actionResult.ok).toBe(true);
+    if (actionResult.ok) {
+      expect(actionResult.cycle).toBeUndefined();
+      expect(actionResult.reward).toEqual({ reward_type: 'points', reward_amount: 10 });
+    }
+
+    // No speculative day complete from missing cycle
+    expect(
+      queryClient.getQueryData<CheckinStatus>(checkinStatusQueryKey('user-1'))?.cycle
+        .completed_days,
+    ).toEqual(before?.cycle.completed_days);
+
+    await waitFor(() => {
+      expect(
+        mockInvoke.mock.calls.filter(([fn]) => fn === 'get-checkin-status').length,
+      ).toBeGreaterThan(1);
+    });
+
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls.flat().map(String).join(' ');
+    expect(logged).not.toMatch(/Bearer|token/i);
+    errorSpy.mockRestore();
+  });
+
+  it('returns makeup points fields and clears acting without awaiting status RTT', async () => {
+    mockInvoke.mockResolvedValueOnce(authStatusInvokeResult());
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCheckin('user-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let resolveAction: (value: unknown) => void;
+    const actionPending = new Promise((resolve) => {
+      resolveAction = resolve;
+    });
+    mockInvoke.mockImplementationOnce(() => actionPending);
+
+    let settled: Awaited<ReturnType<typeof result.current.performMakeupCheckin>> | undefined;
+    const actionPromise = result.current.performMakeupCheckin(1, 2026, 7).then((r) => {
+      settled = r;
+      return r;
+    });
+
+    await waitFor(() => expect(result.current.acting).toBe(true));
+
+    await act(async () => {
+      resolveAction!({
+        data: {
+          ok: true,
+          reward: { reward_type: 'points', reward_amount: 10 },
+          cycle: { ...patchedCycle, makeup_days: [1], completed_days: [] },
+          big_reward_granted: false,
+          points_spent: 50,
+          points_now: { points: 100 },
+        },
+        error: null,
+      });
+      await actionPromise;
+    });
+
+    expect(settled).toEqual(
+      expect.objectContaining({
+        ok: true,
+        points_spent: 50,
+        points_now: { points: 100 },
+        cycle: expect.objectContaining({ makeup_days: [1] }),
+      }),
+    );
+    await waitFor(() => expect(result.current.acting).toBe(false));
+    // Happy path: no get-checkin-status after the initial load
+    expect(mockInvoke.mock.calls.filter(([fn]) => fn === 'get-checkin-status')).toHaveLength(1);
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'perform-makeup-checkin',
+      expect.objectContaining({
+        body: { discord_id: 'user-1', day_number: 1, year: 2026, month: 7 },
+      }),
+    );
   });
 });
