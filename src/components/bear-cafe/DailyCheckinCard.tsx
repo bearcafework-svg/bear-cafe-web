@@ -6,7 +6,10 @@ import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
 import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
 import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
 import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
-import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
+import {
+  CheckInDayCard,
+  CheckInDayCardSkeleton,
+} from '@/components/bear-cafe/CheckInDayCard';
 import {
   computeCheckinStreak,
   getCheckinClaimButtonLabel,
@@ -19,8 +22,26 @@ import {
 } from '@/lib/checkin';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { CaffeLatteArtIcon, CaffeLatteIcon } from '@/icon/outline';
+import { CaffeLatteArtIcon } from '@/icon/outline';
 import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
+
+function BigRewardPreviewSkeleton() {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      <div className="flex flex-col items-start gap-3">
+        <div className="flex w-full flex-1 items-center justify-between gap-3">
+          <div className="h-5 w-48 animate-pulse rounded-full bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A] sm:w-64" />
+          <div className="h-5 w-5 shrink-0 animate-pulse rounded-md bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A]" />
+        </div>
+        <div className="flex w-full flex-1 items-center justify-between gap-3">
+          <div className="h-4 w-full max-w-sm animate-pulse rounded-full bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A]" />
+          <div className="h-4 w-10 shrink-0 animate-pulse rounded-full bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A]" />
+        </div>
+      </div>
+      <div className="h-2 w-full animate-pulse rounded-full bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A]" />
+    </div>
+  );
+}
 
 export function DailyCheckInCard() {
   const navigate = useNavigate();
@@ -45,6 +66,8 @@ export function DailyCheckInCard() {
     bigReward,
     bigRewardClaimed,
   } = useCheckinFlow(user?.discord_id);
+
+  const showSkeleton = loading;
 
   const [selectedDay, setSelectedDay] = useState(() => Math.min(getCheckinToday().day, 28));
   const [weekIndex, setWeekIndex] = useState(() => getCheckinWeekIndex(todayDay));
@@ -80,12 +103,9 @@ export function DailyCheckInCard() {
   );
 
   const renderDayRow = (days: number[], skeletonCount: number) => {
-    if (loading) {
+    if (showSkeleton) {
       return Array.from({ length: skeletonCount }).map((_, i) => (
-        <div
-          key={i}
-          className="h-14 min-w-[2.75rem] flex-1 animate-pulse rounded-xl bg-[hsl(var(--latte)/0.45)] dark:bg-[#1A1A1A] sm:h-[4.5rem] sm:rounded-2xl md:h-[5.5rem] lg:h-[5.75rem]"
-        />
+        <CheckInDayCardSkeleton key={i} />
       ));
     }
 
@@ -167,7 +187,8 @@ export function DailyCheckInCard() {
             <div className="flex items-center gap-3">
               <CaffeLatteArtIcon size={{ mobile: 30, desktop: 38 }} />
               <h3 className="truncate bear-h3-bold text-[hsl(var(--mocha))] dark:text-[#E9E6E2] md:bear-h1-bold">
-                เช็กอิน {computeCheckinStreak(completedDays, todayDay)} วัน ติดต่อกัน!
+                เช็กอิน {showSkeleton ? '—' : computeCheckinStreak(completedDays, todayDay)} วัน
+                ติดต่อกัน!
               </h3>
             </div>
             <p className="bear-body-small-medium text-[hsl(var(--bear-brown)/0.55)] dark:text-[#6B6B6B] md:bear-body-small-medium">
@@ -183,7 +204,7 @@ export function DailyCheckInCard() {
           <button
             type="button"
             aria-label="หน้าก่อนหน้า"
-            disabled={mobilePageIndex === 0}
+            disabled={showSkeleton || mobilePageIndex === 0}
             onClick={() => setMobilePageIndex((p) => Math.max(0, p - 1))}
             className={navButtonClass}
           >
@@ -195,7 +216,7 @@ export function DailyCheckInCard() {
           <button
             type="button"
             aria-label="หน้าถัดไป"
-            disabled={mobilePageIndex >= 6}
+            disabled={showSkeleton || mobilePageIndex >= 6}
             onClick={() => setMobilePageIndex((p) => Math.min(6, p + 1))}
             className={navButtonClass}
           >
@@ -207,7 +228,7 @@ export function DailyCheckInCard() {
           <button
             type="button"
             aria-label="สัปดาห์ก่อนหน้า"
-            disabled={weekIndex === 0}
+            disabled={showSkeleton || weekIndex === 0}
             onClick={() => setWeekIndex((w) => Math.max(0, w - 1))}
             className={navButtonClass}
           >
@@ -219,7 +240,7 @@ export function DailyCheckInCard() {
           <button
             type="button"
             aria-label="สัปดาห์ถัดไป"
-            disabled={weekIndex >= 3}
+            disabled={showSkeleton || weekIndex >= 3}
             onClick={() => setWeekIndex((w) => Math.min(3, w + 1))}
             className={navButtonClass}
           >
@@ -227,21 +248,25 @@ export function DailyCheckInCard() {
           </button>
         </div>
 
-        {status?.makeup_window_open && isAuthenticated && (
+        {!showSkeleton && status?.makeup_window_open && isAuthenticated && (
           <p className="mb-3 text-center text-[11px] text-[#9A7331] dark:text-[#D7A042]">
             ช่วงเติมเช็กอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
           </p>
         )}
 
-        <CheckinBigRewardPreview
-          inline
-          bigReward={bigReward}
-          completedDays={completedDays.size}
-          claimed={bigRewardClaimed}
-          roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
-          roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
-          onCalendarClick={() => navigate('/full-checkin-calendar')}
-        />
+        {showSkeleton ? (
+          <BigRewardPreviewSkeleton />
+        ) : (
+          <CheckinBigRewardPreview
+            inline
+            bigReward={bigReward}
+            completedDays={completedDays.size}
+            claimed={bigRewardClaimed}
+            roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
+            roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
+            onCalendarClick={() => navigate('/full-checkin-calendar')}
+          />
+        )}
       </div>
 
       <CheckinMakeupConfirmModal

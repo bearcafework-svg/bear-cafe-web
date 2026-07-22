@@ -59,6 +59,7 @@ describe('AppRoutes auth-loading gate (AC-001 / AC-002)', () => {
     ['/', 'กำลังโหลดหน้าหลัก'],
     ['/gacha', 'กำลังโหลดหน้ากาชา'],
     ['/points', 'กำลังโหลดหน้ากรอกโค้ด'],
+    ['/full-checkin-calendar', 'กำลังโหลดปฏิทินเช็กอิน'],
   ])(
     'renders the content skeleton with the real sidebar while auth is loading on %s',
     (pathname, label) => {

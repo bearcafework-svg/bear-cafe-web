@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils';
 import { SkeletonBlock, SKELETON_CARD_SURFACE } from '@/components/bear-cafe/SkeletonBlock';
+import { CheckInDayCardSkeleton } from '@/components/bear-cafe/CheckInDayCard';
 
 /**
  * Auth-gate loading skeleton for the home route (`/`) — content section only.
- * Rendered by the AppRoutes gate inside CozyAppShell while `useAuth().isLoading`
+ * Rendered by CozyGateLayout inside CozyAppShell while `useAuth().isLoading`
  * is true, so the real sidebar (no skeleton) stays visible next to it.
  * Design Doc: docs/design/home-loading-skeleton-design.md (§ Main Components — HomePageSkeleton)
  * UI Spec: docs/ui-spec/home-loading-skeleton-ui-spec.md
@@ -38,17 +39,12 @@ function WelcomeBannerSkeleton() {
   );
 }
 
-/** Day-cell placeholder row; heights/radii follow the live loading day cells. */
+/** Day-cell placeholder row — shared CheckInDayCardSkeleton. */
 function DayCellRow({ count }: { count: number }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <SkeletonBlock
-          key={i}
-          // Height/radius progression copied from DailyCheckinCard.tsx:87 loading
-          // cells (skeleton fills + Figma rounded-[20px] at xl differ by design).
-          className="h-14 min-w-[2.75rem] flex-1 rounded-xl sm:h-[4.5rem] sm:rounded-2xl md:h-[5.5rem] lg:h-[5.75rem] xl:rounded-[20px]"
-        />
+        <CheckInDayCardSkeleton key={i} />
       ))}
     </>
   );
