@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { CozyFeatureCards } from '@/components/bear-cafe/CozyFeatureCards';
 import { CommunityCarousel } from '@/components/bear-cafe/CommunityCarousel';
 import { motion } from 'framer-motion';
+
 
 type WelcomeMessage = { line1: string; line2?: string };
 
@@ -87,24 +87,19 @@ function DisplayWelcomeMessage() {
 }
 
 export default function Index() {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
   const displayName = user?.discord_username ?? user?.username ?? 'เพื่อน';
 
+  // Shell is provided by CozyGateLayout so auth-skeleton → content does not remount it.
   return (
-    <CozyAppShell
-      isLoading={isLoading}
-      contentClassName="min-h-screen"
-      overlays={
-        <>
-          <GreenTeaWarningPopup userId={user?.id} />
-        </>
-      }
-    >
+    <>
+      <GreenTeaWarningPopup userId={user?.id} />
+
       <main className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 px-4 py-6 pt-16 sm:gap-8 sm:px-6 sm:py-8 lg:pt-8 lg:gap-10 min-h-svh">
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0.92, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
+          transition={{ duration: 0.35 }}
           className="relative h-[180px] overflow-hidden rounded-2xl bg-cover bg-center bg-no-repeat sm:h-[220px] sm:rounded-[20px] lg:h-[264px]"
           style={{
             backgroundImage:
@@ -120,24 +115,24 @@ export default function Index() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0.92, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
+          transition={{ duration: 0.35 }}
           className="space-y-2"
         >
           <CozyFeatureCards />
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0.92, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.45 }}
+          transition={{ delay: 0.12, duration: 0.35 }}
         >
           <CommunityCarousel />
         </motion.div>
       </main>
 
       <CozyPageFooter />
-    </CozyAppShell>
+    </>
   );
 }

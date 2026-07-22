@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
-import { CheckInDayCard } from '@/components/bear-cafe/CheckInDayCard';
+import { CheckInDayCard, CheckInDayCardSkeleton } from '@/components/bear-cafe/CheckInDayCard';
 import { CheckinSelectedDayReward } from '@/components/bear-cafe/CheckinSelectedDayReward';
 import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
 import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
@@ -18,7 +17,6 @@ import {
   formatSelectedDayRewardSubtitle,
   getCheckinClaimButtonLabel,
   getCheckinDayState,
-  getCheckinToday,
 } from '@/lib/checkin';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
@@ -28,11 +26,9 @@ import { BrokenHeartIcon, Calendar2Icon, FireIcon } from '@/icon/inline';
 const ALL_CHECKIN_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 export default function FullCheckInCalendar() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { points } = useUserBalances(user?.discord_id);
-
-
 
   const {
     status,
@@ -88,16 +84,12 @@ export default function FullCheckInCalendar() {
     selectedState,
   );
 
+  // Shell + auth skeleton are owned by CozyGateLayout (App.tsx) so the sidebar
+  // does not remount between skeleton and content.
   return (
-    <CozyAppShell
-      isLoading={isLoading}
-      contentClassName="min-h-screen"
-      overlays={
-        <>
-          <GreenTeaWarningPopup userId={user?.id} />
-        </>
-      }
-    >
+    <>
+      <GreenTeaWarningPopup userId={user?.id} />
+
       <main className="mx-auto flex w-full min-w-0 flex-col gap-5 px-4 py-6 pt-16 sm:gap-8 sm:px-6 sm:py-8 lg:pt-8 lg:gap-10 min-h-svh">
         <div>
           <button
@@ -126,10 +118,7 @@ export default function FullCheckInCalendar() {
               <div className="grid grid-cols-4 md:grid-cols-7 gap-0.5 min-[375px]:gap-1 sm:gap-2 md:gap-3 min-w-[18.5rem] sm:min-w-0 w-full [&_button]:min-w-0">
                 {loading
                   ? Array.from({ length: 28 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="aspect-square min-h-[4.5rem] animate-pulse rounded-lg bg-[#EDE4D4] dark:bg-[#1A1A1A] sm:rounded-2xl"
-                    />
+                    <CheckInDayCardSkeleton key={i} />
                   ))
                   : ALL_CHECKIN_DAYS.map((day) => {
                     const state = getCheckinDayState(
@@ -293,6 +282,6 @@ export default function FullCheckInCalendar() {
       />
       <CheckinMakeupSuccessModal data={makeupSuccessModal} onClose={closeMakeupSuccessModal} />
       <CheckinRewardModal reward={rewardModal} onClose={closeRewardModal} />
-    </CozyAppShell>
+    </>
   );
 }

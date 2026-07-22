@@ -5,7 +5,29 @@ import {
   TicketColorIcon,
 } from '@/icon/outline';
 import { CheckinRoleIcon } from '@/components/bear-cafe/CheckinRoleIcon';
+import { SkeletonBlock } from '@/components/bear-cafe/SkeletonBlock';
 import type { CheckinDailyReward, CheckinDayState } from '@/lib/checkin';
+
+/** Shared day-cell height so skeleton placeholders and live cards share one box. */
+export const CHECKIN_DAY_CELL_HEIGHT =
+  'min-h-14 sm:min-h-[4.5rem] md:min-h-[5.5rem] lg:min-h-[5.75rem]';
+
+/**
+ * Fresh day-cell skeleton used by `/` (DailyCheckInCard + HomePageSkeleton)
+ * and `/full-checkin-calendar` (page + auth-gate skeleton). One solid tile
+ * matching live CheckInDayCard box size — full width/height of the cell.
+ */
+export function CheckInDayCardSkeleton({ className }: { className?: string }) {
+  return (
+    <SkeletonBlock
+      className={cn(
+        'min-w-[2.75rem] flex-1 self-stretch w-full rounded-lg sm:rounded-2xl lg:rounded-[20px]',
+        CHECKIN_DAY_CELL_HEIGHT,
+        className,
+      )}
+    />
+  );
+}
 
 export function DayRewardDisplay({
   reward,
@@ -102,6 +124,8 @@ export function CheckInDayCard({
 
   const cardClass = cn(
     'flex flex-1 flex-col items-center justify-center border rounded-lg sm:rounded-2xl lg:rounded-[20px] transition-all duration-200',
+    'min-w-[2.75rem]',
+    CHECKIN_DAY_CELL_HEIGHT,
     'gap-1 py-2 px-1 sm:gap-2 sm:py-3 sm:px-2 md:gap-3 md:py-4 md:px-3 lg:gap-5 lg:py-5 lg:px-4',
     !disabled && 'cursor-pointer hover:scale-[1.01] active:scale-[0.98]',
     disabled && 'cursor-default',

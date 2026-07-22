@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { readFunctionsErrorPayload } from '@/lib/function-error';
 import { getCheckinToday, type CheckinDailyReward, type CheckinStatus } from '@/lib/checkin';
@@ -54,8 +54,13 @@ export type CheckinActionResult =
 
 export function useCheckin(discordId: string | undefined) {
   const [status, setStatus] = useState<CheckinStatus | null>(null);
-  const [loading, setLoading] = useState(Boolean(discordId));
+  // Always start loading so guest public rewards and auth status share one
+  // skeleton→content swap (avoids empty day cells popping in reward icons).
+  const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  // Only the first fetch (and discordId identity changes) drive the card
+  // skeleton — claim/makeup refreshes update in place with no day-row flash.
+  const isInitialLoad = useRef(true);
 
   const getAuthHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -64,22 +69,17 @@ export function useCheckin(discordId: string | undefined) {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!discordId) {
-      try {
+    if (isInitialLoad.current) setLoading(true);
+    try {
+      if (!discordId) {
         const [daily_rewards, big_reward] = await Promise.all([
           fetchPublicDailyRewards(),
           fetchPublicBigReward(),
         ]);
         setStatus(publicCheckinStatus(daily_rewards, big_reward));
-      } catch (err) {
-        console.error('Failed to fetch check-in rewards:', err);
-        setStatus(null);
+        return;
       }
-      return;
-    }
 
-    setLoading(true);
-    try {
       const headers = await getAuthHeaders();
       if (!headers) throw new Error('missing_auth');
 
@@ -98,15 +98,20 @@ export function useCheckin(discordId: string | undefined) {
         makeup_window_open: Boolean(data.makeup_window_open),
       });
     } catch (err) {
-      console.error('Failed to fetch check-in status:', err);
+      console.error(
+        discordId ? 'Failed to fetch check-in status:' : 'Failed to fetch check-in rewards:',
+        err,
+      );
       setStatus(null);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   }, [discordId, getAuthHeaders]);
 
   useEffect(() => {
-    refresh();
+    isInitialLoad.current = true;
+    void refresh();
   }, [refresh]);
 
   const invokeAction = useCallback(

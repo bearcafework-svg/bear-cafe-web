@@ -75,7 +75,8 @@ export function CheckinBigRewardPreview({
       <div
         className={cn(
           inline
-            ? 'px-0 py-0'
+            ? // Match loaded inline preview height so skeleton → empty doesn't collapse.
+              'flex min-h-[4.75rem] items-center justify-center px-0 py-0'
             : 'rounded-[20px] border border-[#F4EEE5] bg-[#FAF2E4] px-3 py-3 dark:border-[#242424] dark:bg-[#121212]',
           className,
         )}

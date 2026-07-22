@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
-import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { PageBackHeader } from '@/components/bear-cafe/PageBackHeader';
 import { StrawberryJar } from '@/components/bear-cafe/StrawberryJar';
@@ -25,13 +24,14 @@ export default function PointsPage() {
     closeRewardPopup,
   } = useRedeemCode(user?.discord_id);
 
+  // Shell + auth/maintenance skeleton are owned by PointsGateRoute (App.tsx).
   return (
-    <CozyAppShell>
+    <>
       <main className="mx-auto w-full max-w-2xl min-w-0 px-4 py-6 pt-16 sm:px-6 sm:py-8 lg:pt-8 pb-12 space-y-6">
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0.92, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.35 }}
         >
           <PageBackHeader
             title="กรอกโค้ด"
@@ -40,9 +40,9 @@ export default function PointsPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0.92, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.4 }}
+          transition={{ delay: 0.06, duration: 0.35 }}
           className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-card shadow-sm px-4 py-5 sm:px-6 sm:py-6"
         >
           <div className="flex items-center justify-between mb-1">
@@ -59,9 +59,9 @@ export default function PointsPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0.92, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.16, duration: 0.4 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
           className={cn(
             'rounded-3xl shadow-md border border-[hsl(var(--latte)/0.5)]',
             'border-b-4 border-b-[hsl(var(--bear-brown)/0.35)]',
@@ -122,6 +122,6 @@ export default function PointsPage() {
         onOpenChange={closeRewardPopup}
         reward={rewardPopup}
       />
-    </CozyAppShell>
+    </>
   );
 }
