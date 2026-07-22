@@ -30,7 +30,7 @@
 // Pass criteria: All verification points hold for claim and makeup happy-path fixtures
 //
 // ---------------------------------------------------------------------------
-// INT-2 Shared RQ status identity — Home + Full Calendar dual mount
+// INT-2 Shared RQ status identity — Home + Full Calendar dual mount  [IMPLEMENTED]
 // ---------------------------------------------------------------------------
 // AC-FE-009: "When status is patched or reconciled, both DailyCheckinCard and FullCheckInCalendar shall observe the same authoritative status for that discord_id."
 // AC-FE-008 (in-process proof of shared key; navigation warm-cache reserved for fixture-e2e): shared key identity enables warm Home ↔ Calendar
@@ -51,7 +51,7 @@
 // Pass criteria: Dual-mount assertions pass with one QueryClient
 //
 // ---------------------------------------------------------------------------
-// INT-3 MVP reconcile gates only — big_reward_granted / role_grant_error
+// INT-3 MVP reconcile gates only — big_reward_granted / role_grant_error  [IMPLEMENTED]
 // ---------------------------------------------------------------------------
 // AC-FE-006: "When action success indicates big_reward_granted === true or role_grant_error on reward, the system shall show success UI first (modal/toast), then require a non-blocking targeted reconcile that includes get-checkin-status; happy path without those flags must not await status."
 // AC-BE-006 / AC-BE-007 / AC-BE-010 (flags contract + no new triggers): role_grant_error nested under reward; big_reward_granted boolean; no extra MVP trigger keys
@@ -78,7 +78,11 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement, type ReactNode } from 'react';
-import { checkinStatusQueryKey } from '@/lib/checkin-status-cache';
+import {
+  checkinStatusQueryKey,
+  needsCheckinStatusReconcile,
+  patchCheckinStatusCycle,
+} from '@/lib/checkin-status-cache';
 import { getCheckinToday, type CheckinDailyReward, type CheckinStatus } from '@/lib/checkin';
 import {
   FIXTURE_CLAIM_DAY,
@@ -90,6 +94,9 @@ import {
   happyPathClaimOk,
   happyPathMakeupOk,
   memberCheckinStatusBeforeClaim,
+  mvpControlClaimOk,
+  mvpFixtureABigRewardGranted,
+  mvpFixtureBRoleGrantError,
 } from '../../tests/e2e/fixtures/checkin-flow-optimization';
 import { createCheckinInvokeRouter } from '../../tests/e2e/fixtures/checkin-invoke-mock';
 
@@ -99,6 +106,12 @@ const invokeRouter = createCheckinInvokeRouter();
 
 /** When set, delays perform-* invoke resolution so `acting` can be observed mid-flight. */
 let actionInvokeGate: Promise<void> | null = null;
+/**
+ * When set (and armed after a perform-* success), delays get-checkin-status so INT-3
+ * can prove success UI is not blocked on reconcile.
+ */
+let reconcileInvokeGate: Promise<void> | null = null;
+let postActionReconcileGateArmed = false;
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -114,7 +127,24 @@ vi.mock('@/integrations/supabase/client', () => ({
         ) {
           await actionInvokeGate;
         }
-        return invokeRouter.invoke(fn, options);
+        const resultPromise = invokeRouter.invoke(fn, options);
+        if (fn === 'perform-checkin' || fn === 'perform-makeup-checkin') {
+          // Arm after action invoke starts so the subsequent reconcile status call is gated
+          const result = await resultPromise;
+          postActionReconcileGateArmed = true;
+          return result;
+        }
+        if (
+          reconcileInvokeGate &&
+          postActionReconcileGateArmed &&
+          fn === 'get-checkin-status'
+        ) {
+          // Count the call immediately; delay resolution so success UI can settle first
+          const pending = resultPromise;
+          await reconcileInvokeGate;
+          return pending;
+        }
+        return resultPromise;
       },
     },
     from: vi.fn(),
@@ -133,6 +163,7 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+import { toast } from 'sonner';
 import { useCheckinFlow } from './useCheckinFlow';
 
 const { year, month } = getCheckinToday();
@@ -181,6 +212,38 @@ function makeupOkAligned() {
   };
 }
 
+/** INT-3 Fixture A — big_reward_granted (aligned to Bangkok period). */
+function claimOkBigRewardGrantedAligned() {
+  return {
+    ...mvpFixtureABigRewardGranted,
+    cycle: buildCheckinCycle({
+      ...mvpFixtureABigRewardGranted.cycle,
+      year,
+      month,
+    }),
+  };
+}
+
+/** INT-3 Fixture B — reward.role_grant_error (aligned to Bangkok period). */
+function claimOkRoleGrantErrorAligned() {
+  return {
+    ...mvpFixtureBRoleGrantError,
+    cycle: buildCheckinCycle({
+      ...mvpFixtureBRoleGrantError.cycle,
+      year,
+      month,
+    }),
+  };
+}
+
+/** INT-3 Fixture C / control — neither MVP flag. */
+function claimOkControlAligned() {
+  return {
+    ...mvpControlClaimOk,
+    cycle: claimOkAligned().cycle,
+  };
+}
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -201,7 +264,11 @@ function rewardForDay(status: CheckinStatus, day: number): CheckinDailyReward | 
 
 function wireHappyPathRouter(opts: {
   status: CheckinStatus;
-  claimOk?: ReturnType<typeof claimOkAligned>;
+  claimOk?:
+    | ReturnType<typeof claimOkAligned>
+    | ReturnType<typeof claimOkBigRewardGrantedAligned>
+    | ReturnType<typeof claimOkRoleGrantErrorAligned>
+    | ReturnType<typeof claimOkControlAligned>;
   makeupOk?: ReturnType<typeof makeupOkAligned>;
 }) {
   invokeRouter.setHandlers({
@@ -226,6 +293,8 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
     vi.clearAllMocks();
     invokeRouter.reset();
     actionInvokeGate = null;
+    reconcileInvokeGate = null;
+    postActionReconcileGateArmed = false;
     mockGetSession.mockResolvedValue({
       data: { session: { access_token: 'fixture-access-token' } },
     });
@@ -416,5 +485,255 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
 
     expect(happyPathMakeupOk.points_spent).toBe(5);
     expect(buildPointsReward(makeupDay)).toEqual(happyPathMakeupOk.reward);
+  });
+});
+
+describe('INT-2 Shared RQ status identity — Home + Full Calendar dual mount', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invokeRouter.reset();
+    actionInvokeGate = null;
+    reconcileInvokeGate = null;
+    postActionReconcileGateArmed = false;
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'fixture-access-token' } },
+    });
+  });
+
+  it('Home + Calendar share checkinStatusQueryKey; one patch updates both; no second cold status within staleTime', async () => {
+    const status = statusSeedForToday();
+    const patchedCompleted = [FIXTURE_CLAIM_DAY];
+    const patchedMakeup = [FIXTURE_MAKEUP_DAY];
+
+    wireHappyPathRouter({ status });
+
+    const { queryClient, Wrapper } = createWrapper();
+
+    // Home surface (DailyCheckinCard → useCheckinFlow)
+    const { result: home } = renderHook(() => useCheckinFlow(fixtureDiscordId), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(home.current.loading).toBe(false));
+
+    const statusCallsAfterHome = invokeRouter.countCalls('get-checkin-status');
+    expect(statusCallsAfterHome).toBeGreaterThanOrEqual(1);
+    // Both mounts resolve status from ['checkin-status', discordId]
+    expect(checkinStatusQueryKey(fixtureDiscordId)).toEqual([
+      'checkin-status',
+      fixtureDiscordId,
+    ]);
+    expect(
+      queryClient.getQueryData<CheckinStatus>(checkinStatusQueryKey(fixtureDiscordId)),
+    ).toBeDefined();
+
+    // Full Calendar surface — same QueryClient / shared RQ identity
+    const { result: calendar } = renderHook(() => useCheckinFlow(fixtureDiscordId), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(calendar.current.loading).toBe(false));
+
+    // No second cold get-checkin-status within staleTime for second mount
+    expect(invokeRouter.countCalls('get-checkin-status')).toBe(statusCallsAfterHome);
+    expect([...home.current.completedDays]).toEqual([]);
+    expect([...calendar.current.completedDays]).toEqual([]);
+
+    const patchedCycle = buildCheckinCycle({
+      year,
+      month,
+      completed_days: patchedCompleted,
+      makeup_days: patchedMakeup,
+      big_reward_claimed: false,
+    });
+
+    // Single patch — must be visible on both mounts (fails if either still forks local useState)
+    await act(() => {
+      const key = checkinStatusQueryKey(fixtureDiscordId);
+      const prev = queryClient.getQueryData<CheckinStatus>(key);
+      const next = patchCheckinStatusCycle(prev, patchedCycle);
+      expect(next).toBeDefined();
+      queryClient.setQueryData(key, next);
+    });
+
+    await waitFor(() => {
+      expect(home.current.completedDays.has(FIXTURE_CLAIM_DAY)).toBe(true);
+      expect(calendar.current.completedDays.has(FIXTURE_CLAIM_DAY)).toBe(true);
+    });
+
+    expect(home.current.completedDays.has(FIXTURE_MAKEUP_DAY)).toBe(true);
+    expect(calendar.current.completedDays.has(FIXTURE_MAKEUP_DAY)).toBe(true);
+    expect([...home.current.completedDays].sort((a, b) => a - b)).toEqual(
+      [...calendar.current.completedDays].sort((a, b) => a - b),
+    );
+
+    const cached = queryClient.getQueryData<CheckinStatus>(
+      checkinStatusQueryKey(fixtureDiscordId),
+    );
+    expect(cached?.cycle.completed_days).toEqual(patchedCompleted);
+    expect(cached?.cycle.makeup_days).toEqual(patchedMakeup);
+
+    // Patch does not require another cold status fetch for either mount to observe it
+    expect(invokeRouter.countCalls('get-checkin-status')).toBe(statusCallsAfterHome);
+  });
+});
+
+describe('INT-3 MVP reconcile gates only — big_reward_granted / role_grant_error', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invokeRouter.reset();
+    actionInvokeGate = null;
+    reconcileInvokeGate = null;
+    postActionReconcileGateArmed = false;
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: 'fixture-access-token' } },
+    });
+  });
+
+  it('needsCheckinStatusReconcile: true only for MVP A/B triggers (exclusivity / no expand)', () => {
+    // Binding: contract_schema — assert only the two frozen triggers (+ control)
+    expect(needsCheckinStatusReconcile(claimOkBigRewardGrantedAligned())).toBe(true);
+    expect(needsCheckinStatusReconcile(claimOkRoleGrantErrorAligned())).toBe(true);
+    expect(needsCheckinStatusReconcile(claimOkControlAligned())).toBe(false);
+    expect(needsCheckinStatusReconcile(mvpFixtureABigRewardGranted)).toBe(true);
+    expect(needsCheckinStatusReconcile(mvpFixtureBRoleGrantError)).toBe(true);
+    expect(needsCheckinStatusReconcile(mvpControlClaimOk)).toBe(false);
+  });
+
+  it('A: big_reward_granted → ≥1 get-checkin-status via refetchQueries; success UI not blocked on reconcile', async () => {
+    const status = statusSeedForToday();
+    const claimDay = FIXTURE_CLAIM_DAY;
+    const selectedReward = rewardForDay(status, claimDay) ?? {
+      day_number: claimDay,
+      reward_type: 'points' as const,
+      reward_amount: 20,
+      role_id: null,
+      makeup_cost: 5,
+      is_active: true,
+    };
+    const claimOk = claimOkBigRewardGrantedAligned();
+
+    let releaseReconcile: () => void;
+    reconcileInvokeGate = new Promise<void>((resolve) => {
+      releaseReconcile = resolve;
+    });
+
+    wireHappyPathRouter({ status, claimOk });
+
+    const { queryClient, Wrapper } = createWrapper();
+    const refetchSpy = vi.spyOn(queryClient, 'refetchQueries');
+
+    const { result } = renderHook(() => useCheckinFlow(fixtureDiscordId), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const statusCallsAfterLoad = invokeRouter.countCalls('get-checkin-status');
+
+    await act(async () => {
+      await result.current.handleClaimSelected(claimDay, 'today', selectedReward);
+    });
+
+    // Success UI first — modal + toast + balances — without awaiting reconcile Promise
+    expect(result.current.rewardModal).not.toBeNull();
+    expect(toast.success).toHaveBeenCalled();
+    expect(mockInvalidateBalances).toHaveBeenCalledWith(fixtureDiscordId);
+    await waitFor(() => expect(result.current.acting).toBe(false));
+
+    // Gate fired: ≥1 get-checkin-status via refetchQueries (not invalidateQueries-only)
+    expect(invokeRouter.countCalls('get-checkin-status')).toBeGreaterThan(statusCallsAfterLoad);
+    expect(refetchSpy).toHaveBeenCalledWith({
+      queryKey: checkinStatusQueryKey(fixtureDiscordId),
+    });
+
+    // Release pending reconcile so the background promise settles
+    await act(async () => {
+      releaseReconcile!();
+    });
+  });
+
+  it('B: reward.role_grant_error → ≥1 get-checkin-status via refetchQueries; success UI first', async () => {
+    const status = statusSeedForToday();
+    const claimDay = FIXTURE_CLAIM_DAY;
+    const selectedReward = rewardForDay(status, claimDay) ?? {
+      day_number: claimDay,
+      reward_type: 'role' as const,
+      reward_amount: null,
+      role_id: 'fixture-day-role',
+      makeup_cost: 5,
+      is_active: true,
+    };
+    const claimOk = claimOkRoleGrantErrorAligned();
+
+    let releaseReconcile: () => void;
+    reconcileInvokeGate = new Promise<void>((resolve) => {
+      releaseReconcile = resolve;
+    });
+
+    wireHappyPathRouter({ status, claimOk });
+
+    const { queryClient, Wrapper } = createWrapper();
+    const refetchSpy = vi.spyOn(queryClient, 'refetchQueries');
+
+    const { result } = renderHook(() => useCheckinFlow(fixtureDiscordId), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const statusCallsAfterLoad = invokeRouter.countCalls('get-checkin-status');
+
+    await act(async () => {
+      await result.current.handleClaimSelected(claimDay, 'today', selectedReward);
+    });
+
+    expect(result.current.rewardModal).not.toBeNull();
+    expect(toast.error).toHaveBeenCalled();
+    expect(mockInvalidateBalances).toHaveBeenCalledWith(fixtureDiscordId);
+    await waitFor(() => expect(result.current.acting).toBe(false));
+
+    expect(invokeRouter.countCalls('get-checkin-status')).toBeGreaterThan(statusCallsAfterLoad);
+    expect(refetchSpy).toHaveBeenCalledWith({
+      queryKey: checkinStatusQueryKey(fixtureDiscordId),
+    });
+
+    await act(async () => {
+      releaseReconcile!();
+    });
+  });
+
+  it('C: neither MVP flag → 0 get-checkin-status after action (exclusive gate / always-reconcile barred)', async () => {
+    const status = statusSeedForToday();
+    const claimDay = FIXTURE_CLAIM_DAY;
+    const selectedReward = rewardForDay(status, claimDay) ?? {
+      day_number: claimDay,
+      reward_type: 'points' as const,
+      reward_amount: 20,
+      role_id: null,
+      makeup_cost: 5,
+      is_active: true,
+    };
+    const claimOk = claimOkControlAligned();
+
+    wireHappyPathRouter({ status, claimOk });
+
+    const { queryClient, Wrapper } = createWrapper();
+    const refetchSpy = vi.spyOn(queryClient, 'refetchQueries');
+
+    const { result } = renderHook(() => useCheckinFlow(fixtureDiscordId), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const statusCallsAfterLoad = invokeRouter.countCalls('get-checkin-status');
+
+    await act(async () => {
+      await result.current.handleClaimSelected(claimDay, 'today', selectedReward);
+    });
+
+    expect(result.current.rewardModal).not.toBeNull();
+    expect(mockInvalidateBalances).toHaveBeenCalledWith(fixtureDiscordId);
+    await waitFor(() => expect(result.current.acting).toBe(false));
+
+    // Control: 0 status attributable to action — proves gate exclusivity
+    expect(invokeRouter.countCalls('get-checkin-status')).toBe(statusCallsAfterLoad);
+    expect(refetchSpy).not.toHaveBeenCalled();
   });
 });
