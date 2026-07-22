@@ -5,6 +5,7 @@ import {
   checkinStatusQueryKey,
   needsCheckinStatusReconcile,
   patchCheckinStatusCycle,
+  roleInfoQueryKey,
 } from '@/lib/checkin-status-cache';
 
 describe('checkin status query keys', () => {
@@ -14,6 +15,10 @@ describe('checkin status query keys', () => {
 
   it('returns public key as [checkin-status, public]', () => {
     expect(checkinPublicStatusQueryKey()).toEqual(['checkin-status', 'public']);
+  });
+
+  it('returns role-info key as [role-info, roleId] (FR-6)', () => {
+    expect(roleInfoQueryKey('role-1')).toEqual(['role-info', 'role-1']);
   });
 });
 

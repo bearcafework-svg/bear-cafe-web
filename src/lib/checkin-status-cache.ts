@@ -11,6 +11,11 @@ export function checkinPublicStatusQueryKey() {
   return ['checkin-status', 'public'] as const;
 }
 
+/** FR-6 Should — progressive role-meta by role_id. */
+export function roleInfoQueryKey(roleId: string) {
+  return ['role-info', roleId] as const;
+}
+
 /** hybrid_patch_from_action_response_only — cycle only; preserve siblings */
 export function patchCheckinStatusCycle(
   prev: CheckinStatus | undefined,
