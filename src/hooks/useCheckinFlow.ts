@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useCheckin, type CheckinActionResult } from '@/hooks/useCheckin';
@@ -14,9 +15,12 @@ import {
 import {
   buildMakeupModalData,
   buildRewardModalData,
-  type RoleMeta,
 } from '@/lib/checkin-modal-data';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  checkinStatusQueryKey,
+  needsCheckinStatusReconcile,
+} from '@/lib/checkin-status-cache';
+import { useRoleInfo } from '@/hooks/useRoleInfo';
 import { toast } from 'sonner';
 import { useInvalidateUserBalances } from '@/hooks/useUserBalances';
 
@@ -31,6 +35,7 @@ export function useCheckinFlow(
 ) {
   const { includeBigRewardRole = true } = options;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
   const { status, loading, acting, performCheckin, performMakeupCheckin } = useCheckin(discordId);
   const invalidateBalances = useInvalidateUserBalances();
@@ -38,7 +43,6 @@ export function useCheckinFlow(
   const [rewardModal, setRewardModal] = useState<CheckinRewardModalData | null>(null);
   const [makeupModal, setMakeupModal] = useState<CheckinMakeupConfirmModalData | null>(null);
   const [makeupSuccessModal, setMakeupSuccessModal] = useState<CheckinMakeupSuccessModalData | null>(null);
-  const [roleMeta, setRoleMeta] = useState<Record<string, RoleMeta>>({});
 
   const { year, month, day: todayDay } = getCheckinToday();
 
@@ -57,52 +61,30 @@ export function useCheckinFlow(
     return map;
   }, [status]);
 
-  // Prefetch Discord role icons/names for reward display
-  useEffect(() => {
-    const roleIds = [
-      ...new Set(
-        status?.daily_rewards
-          .filter((r) => r.reward_type === 'role' && r.role_id)
-          .map((r) => r.role_id as string),
-      ),
-    ];
+  // FR-6: RQ-by-role_id progressive fill — claim not gated on icons (AC-FE-012–013)
+  const roleIdsForMeta = useMemo(() => {
+    const ids =
+      status?.daily_rewards
+        .filter((r) => r.reward_type === 'role' && r.role_id)
+        .map((r) => r.role_id as string) ?? [];
     if (includeBigRewardRole && status?.big_reward?.role_id) {
-      roleIds.push(status.big_reward.role_id);
+      ids.push(status.big_reward.role_id);
     }
-    const uniqueRoleIds = [...new Set(roleIds)];
-    if (uniqueRoleIds.length === 0) return;
-
-    let cancelled = false;
-    void (async () => {
-      const entries = await Promise.all(
-        uniqueRoleIds.map(async (roleId) => {
-          try {
-            const { data: roleInfo } = await supabase.functions.invoke('get-role-info', {
-              body: { role_id: roleId },
-            });
-            if (roleInfo && !roleInfo.error) {
-              const icon = roleInfo.icon || roleInfo.unicode_emoji;
-              return [roleId, { icon: icon || undefined, name: roleInfo.name }] as const;
-            }
-          } catch {
-            /* non-blocking */
-          }
-          return null;
-        }),
-      );
-
-      if (!cancelled) {
-        setRoleMeta((prev) => ({
-          ...prev,
-          ...Object.fromEntries(entries.filter(Boolean) as [string, RoleMeta][]),
-        }));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    return ids;
   }, [status?.daily_rewards, status?.big_reward?.role_id, includeBigRewardRole]);
+
+  const roleMeta = useRoleInfo(roleIdsForMeta);
+  const scheduleMvpReconcile = useCallback(
+    (result: Extract<CheckinActionResult, { ok: true }>) => {
+      if (!discordId || !needsCheckinStatusReconcile(result)) return;
+      const gate =
+        result.big_reward_granted === true ? 'big_reward_granted' : 'role_grant_error';
+      // Design Doc § Logging — gate name only; never tokens/session
+      console.info('checkin status reconcile', { gate });
+      void queryClient.refetchQueries({ queryKey: checkinStatusQueryKey(discordId) });
+    },
+    [discordId, queryClient],
+  );
 
   const handleActionResult = useCallback(
     (result: CheckinActionResult, selectedReward: CheckinDailyReward | undefined) => {
@@ -112,6 +94,7 @@ export function useCheckinFlow(
         return;
       }
 
+      // Success UI first (modal + toasts + balances) — reconcile is non-blocking (D003 / AC-FE-006)
       setRewardModal(buildRewardModalData(result, selectedReward, roleMeta));
       invalidateBalances(discordId);
 
@@ -122,8 +105,10 @@ export function useCheckinFlow(
       if (result.big_reward_granted) {
         toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
       }
+
+      scheduleMvpReconcile(result);
     },
-    [roleMeta, invalidateBalances, discordId],
+    [roleMeta, invalidateBalances, discordId, scheduleMvpReconcile],
   );
 
   const openMakeupConfirmModal = useCallback(
@@ -155,7 +140,19 @@ export function useCheckinFlow(
     if (result.big_reward_granted) {
       toast.success('ครบ 28 วัน! ได้รับรางวัลใหญ่แล้ว ✨');
     }
-  }, [makeupModal, performMakeupCheckin, year, month, rewardsByDay, roleMeta, invalidateBalances, discordId]);
+
+    scheduleMvpReconcile(result);
+  }, [
+    makeupModal,
+    performMakeupCheckin,
+    year,
+    month,
+    rewardsByDay,
+    roleMeta,
+    invalidateBalances,
+    discordId,
+    scheduleMvpReconcile,
+  ]);
 
   const handleClaimSelected = useCallback(
     async (

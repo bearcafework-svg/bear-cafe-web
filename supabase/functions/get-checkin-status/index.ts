@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { getCheckinToday } from "../_shared/checkin-date.ts";
 
 const corsHeaders = {
@@ -37,27 +37,33 @@ Deno.serve(async (req): Promise<Response> => {
 
     const { year, month, day: currentDay } = getCheckinToday();
 
-    const { data: cycle } = await sb
-      .from("checkin_cycles")
-      .select("id, year, month, completed_days, makeup_days, big_reward_claimed")
-      .eq("discord_id", discord_id)
-      .eq("year", year)
-      .eq("month", month)
-      .maybeSingle();
-
-    const { data: dailyRewards } = await sb
-      .from("checkin_daily_rewards")
-      .select("day_number, reward_type, reward_amount, role_id, makeup_cost, is_active")
-      .eq("year", year)
-      .eq("month", month)
-      .order("day_number");
-
-    const { data: bigReward } = await sb
-      .from("checkin_big_reward")
-      .select("reward_type, reward_amount, role_id, description")
-      .eq("year", year)
-      .eq("month", month)
-      .maybeSingle();
+    // Independent PostgREST selects — parallelize after auth (FR-7 / AC-BE-001).
+    // Per-query errors stay soft ({ data } only), matching prior sequential semantics.
+    const [
+      { data: cycle },
+      { data: dailyRewards },
+      { data: bigReward },
+    ] = await Promise.all([
+      sb
+        .from("checkin_cycles")
+        .select("id, year, month, completed_days, makeup_days, big_reward_claimed")
+        .eq("discord_id", discord_id)
+        .eq("year", year)
+        .eq("month", month)
+        .maybeSingle(),
+      sb
+        .from("checkin_daily_rewards")
+        .select("day_number, reward_type, reward_amount, role_id, makeup_cost, is_active")
+        .eq("year", year)
+        .eq("month", month)
+        .order("day_number"),
+      sb
+        .from("checkin_big_reward")
+        .select("reward_type, reward_amount, role_id, description")
+        .eq("year", year)
+        .eq("month", month)
+        .maybeSingle(),
+    ]);
 
     const makeupWindowOpen = currentDay > 1;
 
