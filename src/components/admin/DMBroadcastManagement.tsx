@@ -282,16 +282,26 @@ export function DMBroadcastManagement() {
   const fetchMemberSubscriptions = useCallback(async () => {
     try {
       setLoadingMembers(true);
-      const { data: rawSubs, error: subErr } = await supabase
+      let rawSubs: any[] | null = null;
+      
+      const { data, error: subErr } = await supabase
         .from('dms_options' as any)
-        .select('user_id, option_value, updated_at');
+        .select('user_id, option_value, created_at');
 
-      if (subErr) throw subErr;
+      if (subErr) {
+        console.warn('Fallback selecting dms_options without created_at:', subErr.message);
+        const { data: fallbackData } = await supabase
+          .from('dms_options' as any)
+          .select('user_id, option_value');
+        rawSubs = fallbackData || [];
+      } else {
+        rawSubs = data || [];
+      }
 
       const grouped: { [userId: string]: { options: string[]; updatedAt: string } } = {};
       (rawSubs || []).forEach((row: any) => {
         if (!grouped[row.user_id]) {
-          grouped[row.user_id] = { options: [], updatedAt: row.updated_at };
+          grouped[row.user_id] = { options: [], updatedAt: row.created_at || new Date().toISOString() };
         }
         grouped[row.user_id].options.push(row.option_value);
       });
@@ -302,15 +312,19 @@ export function DMBroadcastManagement() {
       if (uids.length > 0) {
         for (let i = 0; i < uids.length; i += 100) {
           const chunk = uids.slice(i, i + 100);
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('discord_id, username, discord_username')
-            .in('discord_id', chunk);
+          try {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('discord_id, username, discord_username')
+              .in('discord_id', chunk);
 
-          if (profiles) {
-            profiles.forEach(p => {
-              profilesMap[p.discord_id] = { username: p.username, discord_username: p.discord_username };
-            });
+            if (profiles) {
+              profiles.forEach(p => {
+                profilesMap[p.discord_id] = { username: p.username, discord_username: p.discord_username };
+              });
+            }
+          } catch (pErr) {
+            console.error('Error fetching profile chunk:', pErr);
           }
         }
       }
