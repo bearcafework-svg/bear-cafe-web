@@ -62,53 +62,59 @@ export function GreenTeaWarningPopup({ userId }: GreenTeaWarningPopupProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="z-[100] max-w-[92vw] sm:max-w-[460px] border border-border bg-card p-0 text-card-foreground shadow-2xl">
-        <div className="relative px-5 pb-5 pt-6">
-          {/* Icon */}
+      <DialogContent className="z-[100] max-w-[94vw] sm:max-w-[520px] rounded-3xl border border-amber-500/20 bg-card p-0 text-card-foreground shadow-2xl overflow-hidden">
+        <div className="relative px-6 pb-6 pt-7 space-y-4">
+          {/* Glowing Header Icon */}
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
-            className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted"
+            className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border-2 border-emerald-500/30 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
           >
             <img
               src={iconSrc}
               alt="ถ้วยชาเขียว"
-              className="h-8 w-8 object-contain"
+              className="h-12 w-12 object-contain drop-shadow-md"
             />
           </motion.div>
 
-          {/* Title */}
-          <h2 className="text-center text-base font-bold text-foreground">คุณมียศ ถ้วยชาเขียว</h2>
-          <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-            คุณเคยถูกเตือนจากการกระทำที่ไม่เหมาะสม กรุณาระมัดระวังการกระทำ
-            ในครั้งถัดไป หากมีการเตือนเพิ่มเติมอีก <span className="text-destructive">อาจถูกระงับการใช้งานเว็บไซต์</span>
-          </p>
+          {/* Title & Description */}
+          <div className="text-center space-y-2">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight flex items-center justify-center gap-2">
+              🍵 คุณมียศ ถ้วยชาเขียว
+            </h2>
+            <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground max-w-md mx-auto">
+              คุณเคยถูกเตือนจากการกระทำที่ไม่เหมาะสม กรุณาระมัดระวังการกระทำในครั้งถัดไป 
+              หากมีการเตือนเพิ่มเติมอีก <span className="font-semibold text-destructive underline underline-offset-2">อาจถูกระงับการใช้งานเว็บไซต์</span>
+            </p>
+          </div>
 
           {/* Section label */}
-          <motion.p
+          <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="mt-4 mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground"
+            className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-muted-foreground pt-1"
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-4 w-4 text-emerald-500" />
             <span>รายละเอียดการเตือนล่าสุด</span>
-          </motion.p>
+          </motion.div>
 
           {/* Warn details card */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="rounded-xl border border-border bg-muted/50 p-3"
+            className="rounded-2xl border border-border bg-muted/60 p-4 space-y-3 shadow-inner"
           >
             {/* Timestamp + Punish badge */}
-            <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-              <Clock className="h-3.5 w-3.5 shrink-0" />
-              <span>{formatThaiDate(latestRecord.timestamp)}</span>
+            <div className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+                <span>{formatThaiDate(latestRecord.timestamp, true)}</span>
+              </div>
               {latestRecord.punish && (
-                <span className="ml-auto rounded-full border border-green-600/40 bg-green-950/30 px-2 py-0.5 text-[10px] font-medium text-green-400 dark:border-green-500/30 dark:bg-green-900/20 dark:text-green-300">
+                <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                   {latestRecord.punish}
                 </span>
               )}
@@ -116,18 +122,18 @@ export function GreenTeaWarningPopup({ userId }: GreenTeaWarningPopupProps) {
 
             {/* Message */}
             {latestRecord.message && (
-              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+              <p className="text-xs sm:text-sm leading-relaxed text-foreground font-medium bg-background/80 p-3 rounded-xl border border-border/50">
                 {latestRecord.message}
               </p>
             )}
 
             {/* Evidence image */}
             {latestRecord.image_url && (
-              <div className="overflow-hidden rounded-lg border border-border bg-background/50">
+              <div className="overflow-hidden rounded-xl border border-border bg-background/50">
                 <img
                   src={latestRecord.image_url}
                   alt="หลักฐาน"
-                  className="max-h-[320px] w-full object-contain"
+                  className="max-h-[340px] w-full object-contain"
                   loading="lazy"
                 />
               </div>
@@ -137,9 +143,9 @@ export function GreenTeaWarningPopup({ userId }: GreenTeaWarningPopupProps) {
           {/* Acknowledge button */}
           <Button
             onClick={() => setOpen(false)}
-            className="mt-4 h-9 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            className="h-11 w-full rounded-xl bg-primary text-base font-bold text-primary-foreground hover:bg-primary/90 shadow-md transition-all cursor-pointer"
           >
-            รับทราบ
+            รับทราบการเตือน
           </Button>
         </div>
       </DialogContent>

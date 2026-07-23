@@ -42,9 +42,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
           // member_count is available when the bot has GUILD_MEMBERS intent
           // or via the roles endpoint with counts
           result.total = role.member_count ?? null;
+          result.role_name = role.name ?? null;
           result.members = []; // no member list — count only
         } else {
           result.total = null;
+          result.role_name = null;
           result.members = [];
         }
       } else {

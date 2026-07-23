@@ -770,11 +770,11 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
   const [roleTotal, setRoleTotal] = useState<number | null>(null);
   const [channelName, setChannelName] = useState<string | null>(null);
+  const [discordRoleName, setDiscordRoleName] = useState<string | null>(contract.role_name);
   const [loadingExtra, setLoadingExtra] = useState(false);
 
   useEffect(() => {
     if (contract.type !== 'personal_role') return;
-    if (roleTotal !== null) return;
 
     async function fetchExtra() {
       setLoadingExtra(true);
@@ -801,6 +801,19 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
         if (data.total != null) setRoleTotal(data.total);
         if (data.channel_name) setChannelName(data.channel_name);
+        if (data.role_name) {
+          setDiscordRoleName(data.role_name);
+          // Sync with DB if role_name changed or was empty
+          if (contract.role_name !== data.role_name) {
+            (supabase as any)
+              .from('contracts')
+              .update({ role_name: data.role_name })
+              .eq('id', contract.id)
+              .then(() => {
+                contract.role_name = data.role_name;
+              });
+          }
+        }
       } catch { /* silent */ } finally {
         setLoadingExtra(false);
       }
@@ -850,25 +863,25 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const isEvalType = contract.type === 'house' || contract.type === 'ad';
 
   const cardBorder =
-    !isEvalType ? 'border-[#F4EEE5]' :
-      isExpired ? 'border-red-200 shadow-red-50/20' :
-        isUrgent ? 'border-rose-200 shadow-rose-50/20' :
-          isWarning ? 'border-amber-200' :
-            'border-[#F4EEE5]';
+    !isEvalType ? 'border-[#F4EEE5] dark:border-[#382F28]' :
+      isExpired ? 'border-red-300 dark:border-red-900/60 shadow-red-50/30' :
+        isUrgent ? 'border-rose-300 dark:border-rose-900/60 shadow-rose-50/30' :
+          isWarning ? 'border-amber-300 dark:border-amber-900/60' :
+            'border-[#F4EEE5] dark:border-[#382F28]';
 
   const cardBackground =
     !isEvalType ? 'bg-white dark:bg-[#1E1B18]' :
-      isExpired ? 'bg-red-50/10 dark:bg-red-950/5' :
-        isUrgent ? 'bg-rose-50/15 dark:bg-rose-950/5' :
-          isWarning ? 'bg-amber-50/10 dark:bg-amber-950/5' :
+      isExpired ? 'bg-red-50/20 dark:bg-red-950/20' :
+        isUrgent ? 'bg-rose-50/25 dark:bg-rose-950/20' :
+          isWarning ? 'bg-amber-50/20 dark:bg-amber-950/20' :
             'bg-white dark:bg-[#1E1B18]';
 
   const statusBadgeColor =
-    !isEvalType ? 'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20' :
-      isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400' :
-        isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 animate-pulse' :
-          isWarning ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#3E2E16] dark:text-amber-400' :
-            'bg-[#50A582]/10 text-[#50A582] border-[#50A582]/20';
+    !isEvalType ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400' :
+      isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 font-bold' :
+        isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 font-bold animate-pulse' :
+          isWarning ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 font-semibold' :
+            'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400';
 
   const statusText =
     !isEvalType ? 'ปกติ' :
@@ -886,8 +899,8 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
     contract.type === 'house'
       ? 'bg-[#8B5E3C]/10 text-[#8B5E3C] border-[#8B5E3C]/20 dark:bg-[#36261A]/40 dark:text-[#B8956A]'
       : contract.type === 'personal_role'
-        ? 'bg-[#D97706]/10 text-[#A66E2E] border-[#FAE3C1] dark:bg-[#3A2208]/30 dark:text-[#E9A84E]'
-        : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/30 dark:text-[#A5B4FC]';
+        ? 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/30 dark:bg-[#3A2208]/40 dark:text-[#E9A84E]'
+        : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/40 dark:text-[#A5B4FC]';
 
   const TypeIcon = typeIconsMap[contract.type as ContractType] || HelpCircle;
   const iconUrl = typeIcons[contract.type as ContractType];
@@ -938,49 +951,51 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   return (
     <>
       <div className={cn(
-        'group relative rounded-2xl border-2 p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.002]',
+        'group relative rounded-3xl border-2 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.002]',
         cardBorder,
         cardBackground
       )}>
-        {/* Left Side: Avatar + Details */}
+        {/* Left Side: Avatar + Main Content Details */}
         <div className="flex items-start gap-4 flex-1 min-w-0">
-          <div className="shrink-0 w-12 h-12 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] relative overflow-hidden">
+          <div className="shrink-0 w-14 h-14 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] relative overflow-hidden shadow-inner">
             {iconUrl ? (
               <img src={iconUrl} alt={contract.type} className="w-full h-full object-cover"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
-              <TypeIcon className="w-5.5 h-5.5 text-[#827160] dark:text-[#A89889]" />
+              <TypeIcon className="w-6 h-6 text-[#827160] dark:text-[#A89889]" />
             )}
           </div>
 
-          <div className="space-y-2 flex-1 min-w-0">
+          <div className="space-y-3 flex-1 min-w-0">
             {/* Top row: Badges, ID, Copy button */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono font-bold text-xs bg-[#FAF5EE] dark:bg-[#2B231D] px-2 py-0.5 rounded-lg text-[#8C6239] dark:text-[#B8956A] border border-[#EFE7DC] dark:border-[#3E3229] flex items-center gap-1">
-                {contract.member_id}
+              <span className="font-mono font-bold text-xs bg-[#FAF5EE] dark:bg-[#2B231D] px-2.5 py-1 rounded-xl text-[#8C6239] dark:text-[#B8956A] border border-[#EFE7DC] dark:border-[#3E3229] flex items-center gap-1.5 shadow-sm">
+                <span>ID: {contract.member_id}</span>
                 <button
                   onClick={copyToClipboard}
                   title="คัดลอก Member ID"
                   className="text-muted-foreground hover:text-[#8C6239] transition-colors p-0.5 cursor-pointer"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                 </button>
               </span>
               {discordName && (
-                <span className="text-xs font-semibold text-[#827160] dark:text-[#A89889]">@{discordName}</span>
+                <span className="text-xs font-bold text-[#64748B] dark:text-[#94A3B8] bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                  @{discordName}
+                </span>
               )}
-              <Badge variant="outline" className={cn('text-[10px] px-2 rounded-full font-medium', typeBadgeStyle)}>
+              <Badge variant="outline" className={cn('text-xs px-2.5 py-0.5 rounded-full font-bold', typeBadgeStyle)}>
                 {typeLabel}
               </Badge>
             </div>
 
             {/* Middle Row: Details depending on type */}
             {(contract.type === 'house' || contract.type === 'ad') && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
                   {contract.type === 'ad' && contract.package_name && (
-                    <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 dark:border-[#6366F1]/30 text-xs px-2.5 py-0.5 rounded-xl font-bold flex items-center gap-1">
-                      <Megaphone className="w-3.5 h-3.5 text-[#6366F1] fill-[#6366F1]/10" />
+                    <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 dark:border-[#6366F1]/30 text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm">
+                      <Megaphone className="w-3.5 h-3.5 text-[#6366F1]" />
                       {contract.package_name}
                     </Badge>
                   )}
@@ -990,38 +1005,40 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
                       href={contract.room_link}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/5 transition-colors font-semibold"
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] dark:text-[#D4B28C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/10 transition-all font-bold shadow-sm"
                     >
                       <Link className="w-3.5 h-3.5 shrink-0" />
                       {loadingHouseChannel ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <span>{houseChannelName ?? 'ดูห้องในเซิร์ฟเวอร์'}</span>
                       )}
                     </a>
                   ) : contract.type === 'house' ? (
-                    <span className="text-xs text-muted-foreground italic">ไม่มีลิ้งก์ห้อง</span>
+                    <span className="text-xs text-muted-foreground italic bg-muted/40 px-2.5 py-1 rounded-xl border border-border/40">ไม่มีลิงก์ห้อง</span>
                   ) : null}
 
                   {/* Date range display */}
-                  <span className="text-xs text-muted-foreground flex items-center gap-1 ml-1 font-medium">
-                    <Calendar className="w-3.5 h-3.5" />
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-semibold bg-background/60 dark:bg-card/60 px-2.5 py-1 rounded-xl border border-border/50">
+                    <Calendar className="w-3.5 h-3.5 text-[#8C6239]" />
                     <span>{formatDateThai(contract.start_at)}</span>
-                    <ArrowRight className="w-3 h-3 mx-0.5" />
+                    <ArrowRight className="w-3 h-3 text-muted-foreground" />
                     <span>{contract.end_at ? formatDateThai(contract.end_at) : 'ไม่ระบุ'}</span>
                   </span>
                 </div>
 
                 {/* Cozy Lease Timeline Progress Bar */}
                 {contract.end_at && (
-                  <div className="space-y-1 max-w-md pt-0.5">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-muted-foreground">ระยะเวลาสัญญา</span>
-                      <span className="font-semibold text-[#827160]">
+                  <div className="space-y-1.5 max-w-lg pt-1">
+                    <div className="flex justify-between items-center text-xs font-semibold">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> ระยะเวลาสัญญา
+                      </span>
+                      <span className={cn('font-bold', isExpired ? 'text-red-500' : 'text-[#827160] dark:text-[#C5B4A5]')}>
                         {isExpired ? 'หมดอายุสัญญาแล้ว' : `${Math.round(progressPercent)}% ผ่านไป`}
                       </span>
                     </div>
-                    <div className="w-full bg-[#EFE8DD] dark:bg-[#302720] h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-[#EFE8DD] dark:bg-[#302720] h-2 rounded-full overflow-hidden shadow-inner">
                       <div
                         className={cn('h-full transition-all duration-500 rounded-full', progressBarColor)}
                         style={{ width: `${progressPercent}%` }}
@@ -1033,12 +1050,12 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
             )}
 
             {contract.type === 'personal_role' && (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {contract.role_name && (
-                    <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#4E3F30] dark:text-[#E8E1D9] border border-[#EFE8DD] dark:border-[#382F28] text-xs px-2.5 py-0.5 rounded-xl font-bold flex items-center gap-1">
-                      <Star className="w-3 h-3 text-[#D97706] fill-[#D97706]" />
-                      {contract.role_name}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {(discordRoleName || contract.role_name) && (
+                    <Badge variant="secondary" className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs px-3 py-1 rounded-xl font-extrabold flex items-center gap-1.5 shadow-sm">
+                      <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      {discordRoleName || contract.role_name}
                     </Badge>
                   )}
 
@@ -1047,37 +1064,37 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
                       href={contract.room_link}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/5 transition-colors font-semibold"
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] dark:text-[#D4B28C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/10 transition-all font-bold shadow-sm"
                     >
-                      <Hash className="w-3.5 h-3.5 shrink-0" />
+                      <Hash className="w-3.5 h-3.5 shrink-0 text-[#8B5E3C]" />
                       {loadingExtra ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <span>{channelName ?? 'ดูห้อง'}</span>
+                        <span>{channelName ?? 'ดูห้องในดิส'}</span>
                       )}
                     </a>
                   )}
 
                   {loadingExtra && roleTotal === null ? (
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" />โหลดจำนวนคน...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />กำลังโหลดสิทธิ์ผู้ใช้...
                     </span>
                   ) : roleTotal !== null ? (
                     <span className={cn(
-                      'text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border',
+                      'text-xs font-extrabold px-3 py-1 rounded-xl flex items-center gap-1.5 border shadow-sm',
                       roleTotal > 5
-                        ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20'
+                        ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-300'
+                        : 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
                     )}>
-                      <Users className="w-3 h-3 shrink-0" />
+                      <Users className="w-3.5 h-3.5 shrink-0" />
                       <span>{roleTotal} / 5 คน</span>
-                      {roleTotal > 5 && <span className="animate-pulse">(เกินสิทธิ์!)</span>}
+                      {roleTotal > 5 && <span className="animate-pulse text-red-600">(เกินสิทธิ์!)</span>}
                     </span>
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-medium">
-                  <Clock className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
                   <span>เริ่มเมื่อ: {formatDateThai(contract.start_at)}</span>
                   <span>•</span>
                   <span>{formatElapsed(contract.start_at)}</span>
@@ -1086,14 +1103,14 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
             )}
 
             {/* Operator and Edit history triggers */}
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap pt-0.5">
-              <span>ลงทะเบียนโดย: <span className="font-semibold text-foreground">{contract.operator_name ?? '—'}</span></span>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap pt-1 font-medium border-t border-border/40">
+              <span>ผู้บันทึก: <span className="font-bold text-foreground">{contract.operator_name ?? '—'}</span></span>
               {contract.edit_log && contract.edit_log.length > 0 && (
                 <>
                   <span>•</span>
                   <button
                     onClick={() => onShowLogs(contract)}
-                    className="flex items-center gap-1 text-[#8C6239] hover:underline cursor-pointer font-medium"
+                    className="flex items-center gap-1.5 text-[#8C6239] dark:text-[#B8956A] hover:underline cursor-pointer font-bold"
                   >
                     <History className="w-3.5 h-3.5" />
                     ประวัติการแก้ไข ({contract.edit_log.length})
@@ -1105,18 +1122,18 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
         </div>
 
         {/* Right Side: Status & Action triggers */}
-        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-[#F4EEE5] dark:border-[#2D2520] shrink-0">
-          <div className="flex flex-col items-start md:items-end gap-1.5">
-            <Badge className={cn('text-[10px] font-bold px-2.5 py-0.5 border rounded-full', statusBadgeColor)}>
+        <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-3 border-t lg:border-t-0 pt-3 lg:pt-0 border-[#F4EEE5] dark:border-[#2D2520] shrink-0 min-w-[160px]">
+          <div className="flex flex-col items-start lg:items-end gap-1.5">
+            <Badge className={cn('text-xs font-bold px-3 py-1 border rounded-full shadow-sm', statusBadgeColor)}>
               {statusText}
             </Badge>
 
             {contract.type === 'house' && contract.end_at && (
               <span className={cn(
-                'text-xs font-semibold',
-                isExpired ? 'text-red-500' :
-                  isUrgent ? 'text-rose-500' :
-                    isWarning ? 'text-amber-500' :
+                'text-xs font-bold',
+                isExpired ? 'text-red-600' :
+                  isUrgent ? 'text-rose-600' :
+                    isWarning ? 'text-amber-600' :
                       'text-muted-foreground'
               )}>
                 {formatRemaining(contract.end_at)}
