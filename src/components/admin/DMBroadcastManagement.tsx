@@ -8,13 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
   Send, Users, Mail, AlertCircle, Play, Square, RefreshCw, XCircle, 
-  CheckCircle, Shield, FileText, CheckCircle2, ChevronDown, ChevronUp,
-  MessageSquare, Eye, Search
+  CheckCircle, Shield, FileText, ChevronDown, ChevronUp,
+  Search, Eye, Trash2, ChevronLeft, ChevronRight, Activity, Database, Sparkles
 } from 'lucide-react';
 
 interface CampaignQueue {
@@ -41,6 +42,22 @@ interface CampaignLog {
   sent_at: string | null;
 }
 
+interface SystemLog {
+  id: number;
+  queue_id: string | null;
+  level: string;
+  message_th: string;
+  created_at: string;
+}
+
+interface MemberSub {
+  userId: string;
+  username: string | null;
+  discordUsername: string | null;
+  options: string[];
+  updatedAt: string;
+}
+
 interface DiscordPreviewProps {
   inputMode: 'text' | 'json';
   textContent: string;
@@ -54,8 +71,6 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
   let selectMenuOptions: any[] = [];
   let selectPlaceholder = '🐻︲เลือกการแจ้งเตือนที่ต้องการ';
   let parseError: string | null = null;
-  let embeds: any[] = [];
-  let buttons: any[] = [];
 
   if (inputMode === 'text') {
     content = textContent;
@@ -63,19 +78,14 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
     try {
       if (jsonContent.trim()) {
         const parsed = JSON.parse(jsonContent);
-        // Discord Webhook standard format
         if (parsed.content) content = parsed.content;
-        if (parsed.embeds) embeds = parsed.embeds;
 
-        // Custom Component v2 format
         const data = parsed.data || parsed;
         if (data.components) {
           data.components.forEach((row: any) => {
             if (row.type === 1) {
               row.components?.forEach((comp: any) => {
-                if (comp.type === 2) {
-                  buttons.push(comp);
-                } else if (comp.type === 3) {
+                if (comp.type === 3) {
                   selectMenuOptions = comp.options || [];
                   if (comp.placeholder) selectPlaceholder = comp.placeholder;
                 }
@@ -91,9 +101,7 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
                   textBlocks.push(child.content);
                 } else if (child.type === 1) {
                   child.components?.forEach((comp: any) => {
-                    if (comp.type === 2) {
-                      buttons.push(comp);
-                    } else if (comp.type === 3) {
+                    if (comp.type === 3) {
                       selectMenuOptions = comp.options || [];
                       if (comp.placeholder) selectPlaceholder = comp.placeholder;
                     }
@@ -109,129 +117,70 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
     }
   }
 
-  // Simple formatter for Discord markdown (bold, subtext, headers, emojis)
   const formatMarkdown = (text: string) => {
     if (!text) return '';
     let html = text;
-    // Remove custom emojis syntax <:name:id>
     html = html.replace(/<a?:[a-zA-Z0-9_]+:(\d+)>/g, (match) => {
       const nameMatch = match.match(/:([a-zA-Z0-9_]+):/);
-      const name = nameMatch ? nameMatch[1] : 'emoji';
-      return `:${name}:`;
+      return `:${nameMatch ? nameMatch[1] : 'emoji'}:`;
     });
-    // Replace headers
     html = html.replace(/^##\s+(.*)$/gm, '<h3 class="text-sm font-bold text-white mt-1 mb-1">$1</h3>');
     html = html.replace(/^#\s+(.*)$/gm, '<h2 class="text-base font-bold text-white mt-1 mb-1">$1</h2>');
-    // Replace subtext
-    html = html.replace(/^-#\s+(.*)$/gm, '<span class="text-[10px] text-zinc-400 block mt-0.5">$1</span>');
-    // Replace bold
+    html = html.replace(/^-#\s+(.*)$/gm, '<span class="text-[11px] text-zinc-400 block mt-0.5">$1</span>');
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // Replace underline
     html = html.replace(/__(.*?)__/g, '<u>$1</u>');
-    // Replace inline code
-    html = html.replace(/`(.*?)`/g, '<code class="bg-[#1e1f22] px-1 py-0.5 rounded text-[11px] font-mono">$1</code>');
-    // Replace newline
+    html = html.replace(/`(.*?)`/g, '<code class="bg-[#1e1f22] px-1 py-0.5 rounded text-xs font-mono">$1</code>');
     html = html.replace(/\\n/g, '<br />');
 
-    return <div dangerouslySetInnerHTML={{ __html: html }} className="space-y-1 text-xs sm:text-sm text-[#dbdee1] leading-relaxed break-words whitespace-pre-wrap" />;
+    return <div dangerouslySetInnerHTML={{ __html: html }} className="space-y-1 text-sm text-[#dbdee1] leading-relaxed break-words whitespace-pre-wrap" />;
   };
 
   return (
     <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden h-full flex flex-col">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+      <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+        <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
           <Eye className="w-4 h-4 text-indigo-500 shrink-0" />
-          หน้าต่างพรีวิว (Discohook Style)
+          หน้าต่างแสดงตัวอย่าง (Discord Live Preview)
         </CardTitle>
-        <CardDescription className="text-[10px]">แสดงตัวอย่างจำลองบนระบบแชท Discord</CardDescription>
+        <CardDescription className="text-xs">แสดงตัวอย่างรูปแบบข้อความเสมือนบนแอปพลิเคชัน Discord</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col justify-start py-2">
+      <CardContent className="flex-1 flex flex-col justify-start p-4">
         {parseError ? (
-          <div className="flex-1 min-h-[220px] border border-dashed border-red-300 bg-red-50/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-            <XCircle className="w-8 h-8 text-red-500 mb-2 shrink-0" />
-            <p className="text-xs font-bold text-red-500">รูปแบบ JSON ไม่ถูกต้อง</p>
-            <p className="text-[10px] text-muted-foreground mt-1 max-w-[200px] font-mono leading-tight break-all">{parseError}</p>
-          </div>
-        ) : !content && !mediaUrl && textBlocks.length === 0 && embeds.length === 0 ? (
-          <div className="flex-1 min-h-[220px] border border-dashed border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl p-4 flex flex-col items-center justify-center text-center text-muted-foreground">
-            <MessageSquare className="w-8 h-8 opacity-40 mb-2 shrink-0" />
-            <p className="text-xs">พิมพ์ข้อความหรือวาง JSON เพื่อดูพรีวิว</p>
+          <div className="flex-1 min-h-[250px] border border-dashed border-red-300 bg-red-50/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+            <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+            <p className="text-sm font-semibold text-red-500">รูปแบบ JSON ไม่ถูกต้อง</p>
+            <p className="text-xs text-red-400 mt-1 font-mono">{parseError}</p>
           </div>
         ) : (
-          <div className="bg-[#313338] text-[#dbdee1] rounded-2xl p-3 border border-[#1e1f22] text-left font-sans flex items-start gap-3 shadow-md max-w-full overflow-hidden">
-            <div className="w-8 h-8 rounded-full bg-[#5865f2] flex items-center justify-center shrink-0 text-white font-bold select-none text-xs">
+          <div className="bg-[#313338] rounded-2xl p-4 text-[#dbdee1] flex items-start gap-3 shadow-inner border border-zinc-700/50">
+            <div className="w-10 h-10 rounded-full bg-[#5865f2] shrink-0 flex items-center justify-center font-bold text-white text-base shadow">
               🐻
             </div>
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center gap-1 leading-none">
-                <span className="font-semibold text-white text-xs hover:underline cursor-pointer">Bearcafe Bot</span>
-                <span className="bg-[#5865f2] text-white text-[8px] font-bold px-0.5 py-0.2 rounded leading-none shrink-0">BOT</span>
-                <span className="text-[9px] text-zinc-400 font-medium ml-1 shrink-0">วันนี้ 12:00</span>
+            <div className="flex-1 space-y-2 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-white">Bear Cafe Bot</span>
+                <Badge className="bg-[#5865f2] hover:bg-[#5865f2] text-[10px] h-4 px-1 rounded font-normal text-white">BOT</Badge>
+                <span className="text-[11px] text-zinc-400">วันนี้ เวลา 00:00</span>
               </div>
-              
+
               {content && formatMarkdown(content)}
 
-              {textBlocks.map((block, idx) => (
-                <div key={idx} className="space-y-1">
-                  {formatMarkdown(block)}
+              {mediaUrl && (
+                <div className="rounded-xl overflow-hidden max-w-sm border border-zinc-700 mt-2">
+                  <img src={mediaUrl} alt="Discord Attachment" className="w-full object-cover max-h-60" />
                 </div>
+              )}
+
+              {textBlocks.length > 0 && textBlocks.map((txt, idx) => (
+                <div key={idx} className="mt-2 text-sm">{formatMarkdown(txt)}</div>
               ))}
 
-              {mediaUrl && (
-                <div className="mt-1 rounded-lg overflow-hidden border border-zinc-700 max-w-xs select-none shrink-0">
-                  <img src={mediaUrl} alt="attachment" className="w-full h-auto object-cover max-h-48" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-                </div>
-              )}
-
-              {embeds.map((emb, idx) => {
-                const embedColor = emb.color 
-                  ? `#${Number(emb.color).toString(16).padStart(6, '0')}`
-                  : '#1e1f22';
-                return (
-                  <div 
-                    key={idx} 
-                    className="mt-1 bg-[#2b2d31] rounded border-l-4 p-2.5 max-w-md space-y-1"
-                    style={{ borderLeftColor: embedColor }}
-                  >
-                    {emb.title && <h4 className="font-bold text-xs text-white">{emb.title}</h4>}
-                    {emb.description && <div className="text-[11px] text-[#dbdee1] leading-normal whitespace-pre-wrap">{emb.description}</div>}
-                    {emb.image?.url && (
-                      <div className="mt-1.5 rounded overflow-hidden select-none">
-                        <img src={emb.image.url} alt="embed" className="w-full h-auto object-cover max-h-36" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
               {selectMenuOptions.length > 0 && (
-                <div className="mt-2 max-w-xs shrink-0">
-                  <div className="bg-[#1e1f22] border border-[#2b2d31] rounded px-2 py-1.5 text-[10px] flex items-center justify-between cursor-pointer select-none">
-                    <span className="text-zinc-400 font-medium truncate mr-2">{selectPlaceholder}</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <div className="mt-3 bg-[#2b2d31] border border-zinc-700 rounded-xl p-2.5 space-y-1 max-w-md">
+                  <div className="text-xs text-zinc-400 flex items-center justify-between font-medium">
+                    <span>{selectPlaceholder}</span>
+                    <ChevronDown className="w-4 h-4" />
                   </div>
-                </div>
-              )}
-
-              {buttons.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2 max-w-xs shrink-0">
-                  {buttons.map((btn, idx) => {
-                    const btnStyle = 
-                      btn.style === 1 ? 'bg-[#5865f2] hover:bg-[#4752c4] text-white border-0' :
-                      btn.style === 3 ? 'bg-[#248046] hover:bg-[#1a6535] text-white border-0' :
-                      btn.style === 4 ? 'bg-[#da373c] hover:bg-[#a92b2f] text-white border-0' :
-                      'bg-[#4e5058] hover:bg-[#6d6f78] text-white border-0';
-                    return (
-                      <button 
-                        key={idx} 
-                        type="button" 
-                        className={cn("px-2 py-1 rounded text-[10px] font-semibold select-none flex items-center gap-1 transition-colors leading-tight cursor-default", btnStyle)}
-                      >
-                        {btn.emoji?.name && <span>{btn.emoji.name}</span>}
-                        {btn.label && <span>{btn.label}</span>}
-                      </button>
-                    );
-                  })}
                 </div>
               )}
             </div>
@@ -245,19 +194,20 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
 export function DMBroadcastManagement() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  
-  // Subscription stats
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [activeTab, setActiveTab] = useState('composer');
+
+  // Stats
   const [subStats, setSubStats] = useState({
     totalSubs: 0,
     options: {
-      '49B40A9yBS': 0, // กิจกรรม
-      'JNySCX80ja': 0, // ประกาศสำคัญ
-      'DsMHlVrjze': 0, // ข่าวสารทั่วไป
-      '6io1xnaMWJ': 0  // โปรโมชันและโฆษณา
+      '49B40A9yBS': 0,
+      'JNySCX80ja': 0,
+      'DsMHlVrjze': 0,
+      '6io1xnaMWJ': 0
     }
   });
 
-  // Reachability stats
   const [dmStatusStats, setDmStatusStats] = useState({
     open: 0,
     closed: 0,
@@ -267,25 +217,40 @@ export function DMBroadcastManagement() {
   // Campaigns list
   const [campaigns, setCampaigns] = useState<CampaignQueue[]>([]);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  
+  // Paginated Campaign Logs
   const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalCount, setLogsTotalCount] = useState(0);
+  const logsPageSize = 20;
+
+  // Paginated Member Subscriptions
+  const [memberSubs, setMemberSubs] = useState<MemberSub[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [filterOption, setFilterOption] = useState<string>('all');
+  const [memberPage, setMemberPage] = useState(1);
+  const memberPageSize = 15;
+
+  // System Logs & DB Cleaner
+  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
+  const [cleaningLogs, setCleaningLogs] = useState(false);
 
   // Composer Form
   const [composerTitle, setComposerTitle] = useState('');
   const [targetType, setTargetType] = useState<'all' | 'option' | 'test'>('option');
   const [targetOption, setTargetOption] = useState('49B40A9yBS');
   const [testUserId, setTestUserId] = useState('');
-  const [logSearchQuery, setLogSearchQuery] = useState('');
   const [tokenType, setTokenType] = useState<'token1' | 'token2'>('token1');
   const [inputMode, setInputMode] = useState<'text' | 'json'>('text');
   const [textContent, setTextContent] = useState('');
-  
+  const [submitting, setSubmitting] = useState(false);
+
   // Safety & Deduplication Controls
   const [excludePreviousSuccess, setExcludePreviousSuccess] = useState(true);
-  const [safetyMode, setSafetyMode] = useState<'safe' | 'balanced' | 'custom'>('safe');
-  const [minDelaySec, setMinDelaySec] = useState(15);
-  const [maxDelaySec, setMaxDelaySec] = useState(35);
-  const [hourlyLimit, setHourlyLimit] = useState(50);
+  const [safetyMode, setSafetyMode] = useState<'safe' | 'balanced'>('safe');
   const [jsonContent, setJsonContent] = useState(`{
   "data": {
     "flags": 32768,
@@ -304,281 +269,223 @@ export function DMBroadcastManagement() {
             ]
           },
           {
-            "type": 14,
-            "spacing": 2
-          },
-          {
             "type": 10,
-            "content": "## <:bee20000:1256669436350562355>︲__\` 𝖭𝗈𝗍𝗂𝖿𝗂𝖼𝖺𝗍𝗂𝗈𝗇𝗌 ₊ เลือกการแจ้งเตือนที่ต้องการ 𓂃 \`__\\n-# เลือกรับการแจ้งเตือนเฉพาะหัวข้อที่คุณสนใจ เพื่อไม่ให้พลาดข่าวสารสำคัญและลดการแจ้งเตือนที่ไม่จำเป็น <:cuteplant:1152834055528783872>\\n"
-          },
-          {
-            "type": 1,
-            "components": [
-              {
-                "type": 3,
-                "options": [
-                  {
-                    "label": "กิจกรรม",
-                    "value": "49B40A9yBS",
-                    "description": "ลุ้นของรางวัล อีเวนต์ และกิจกรรมพิเศษ",
-                    "emoji": {
-                      "name": "🎉"
-                    }
-                  },
-                  {
-                    "label": "ประกาศสำคัญ",
-                    "value": "JNySCX80ja",
-                    "description": "ข่าวสำคัญที่อาจส่งผลต่อการใช้งานเซิร์ฟเวอร์",
-                    "emoji": {
-                      "name": "📢"
-                    }
-                  },
-                  {
-                    "label": "ข่าวสารทั่วไป",
-                    "value": "DsMHlVrjze",
-                    "description": "อัปเดตฟีเจอร์และความเคลื่อนไหวของ Bear Cafe",
-                    "emoji": {
-                      "name": "📑"
-                    }
-                  },
-                  {
-                    "label": "โปรโมชันและโฆษณา",
-                    "value": "6io1xnaMWJ",
-                    "description": "โปรโมชัน และสิทธิพิเศษสำหรับสมาชิก",
-                    "emoji": {
-                      "name": "🎁"
-                    }
-                  }
-                ],
-                "placeholder": "🐻︲เลือกการแจ้งเตือนที่ต้องการ",
-                "flows": {},
-                "custom_id": "p_324120127182213152",
-                "min_values": 0,
-                "max_values": 4
-              }
-            ]
-          },
-          {
-            "type": 14,
-            "spacing": 2
-          },
-          {
-            "type": 1,
-            "components": [
-              {
-                "type": 2,
-                "style": 5,
-                "label": "กลับไปคาเฟ่หมี",
-                "url": "https://discord.gg/bearcafe"
-              },
-              {
-                "type": 2,
-                "style": 5,
-                "label": "ไปหน้าตั้งค่าแจ้งเตือน",
-                "url": "https://discord.com/channels/1144251788493602848/1526842327790780476"
-              }
-            ]
+            "content": "## <:bee20000:1256669436350562355>︲__\` 𝖭𝗈𝗍𝗂𝖿𝗂𝖼𝖺𝗍𝗂𝗈𝗇𝗌 ₊ เลือกการแจ้งเตือนที่ต้องการ 𓂃 \`__\\n-# เลือกรับการแจ้งเตือนเฉพาะหัวข้อที่คุณสนใจ เพื่อไม่ให้พลาดข่าวสารสำคัญ <:cuteplant:1152834055528783872>\\n"
           }
         ]
       }
     ]
-  },
-  "_id": "SxhRPO1xeN"
+  }
 }`);
-  const [submitting, setSubmitting] = useState(false);
 
-  // Member subscriptions list states
-  const [memberSubs, setMemberSubs] = useState<any[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterOption, setFilterOption] = useState<string>('all');
-
+  // Fetch Subscribers List
   const fetchMemberSubscriptions = useCallback(async () => {
-    setLoadingMembers(true);
     try {
-      const { data: optionsData, error: optionsErr } = await supabase
+      setLoadingMembers(true);
+      const { data: rawSubs, error: subErr } = await supabase
         .from('dms_options' as any)
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('user_id, option_value, updated_at');
 
-      if (optionsErr) throw optionsErr;
-      if (!optionsData) return;
+      if (subErr) throw subErr;
 
-      // Group options by user_id
-      const grouped: Record<string, { userId: string; options: string[]; updatedAt: string }> = {};
-      optionsData.forEach((item: any) => {
-        const uid = item.user_id;
-        if (!uid) return;
-        if (!grouped[uid]) {
-          grouped[uid] = {
-            userId: uid,
-            options: [],
-            updatedAt: item.created_at
-          };
+      const grouped: { [userId: string]: { options: string[]; updatedAt: string } } = {};
+      (rawSubs || []).forEach((row: any) => {
+        if (!grouped[row.user_id]) {
+          grouped[row.user_id] = { options: [], updatedAt: row.updated_at };
         }
-        if (!grouped[uid].options.includes(item.option_value)) {
-          grouped[uid].options.push(item.option_value);
-        }
-        if (new Date(item.created_at) > new Date(grouped[uid].updatedAt)) {
-          grouped[uid].updatedAt = item.created_at;
-        }
+        grouped[row.user_id].options.push(row.option_value);
       });
 
-      const uniqueUids = Object.keys(grouped);
+      const uids = Object.keys(grouped);
+      const profilesMap: { [userId: string]: { username: string | null; discord_username: string | null } } = {};
 
-      // Fetch profiles mapping
-      const profilesMap: Record<string, { username: string; discord_username: string | null }> = {};
-      if (uniqueUids.length > 0) {
-        const chunkSize = 100;
-        for (let i = 0; i < uniqueUids.length; i += chunkSize) {
-          const chunk = uniqueUids.slice(i, i + chunkSize);
-          const { data: profilesData, error: profilesErr } = await (supabase as any)
+      if (uids.length > 0) {
+        for (let i = 0; i < uids.length; i += 100) {
+          const chunk = uids.slice(i, i + 100);
+          const { data: profiles } = await supabase
             .from('profiles')
             .select('discord_id, username, discord_username')
             .in('discord_id', chunk);
 
-          if (!profilesErr && profilesData) {
-            profilesData.forEach((p: any) => {
-              profilesMap[p.discord_id] = {
-                username: p.username,
-                discord_username: p.discord_username ?? null
-              };
+          if (profiles) {
+            profiles.forEach(p => {
+              profilesMap[p.discord_id] = { username: p.username, discord_username: p.discord_username };
             });
           }
         }
       }
 
-      // Map results
-      const list = uniqueUids.map(uid => {
-        const profile = profilesMap[uid];
-        return {
-          userId: uid,
-          username: profile?.username ?? null,
-          discordUsername: profile?.discord_username ?? null,
-          options: grouped[uid].options,
-          updatedAt: grouped[uid].updatedAt
-        };
-      });
+      const list = uids.map(uid => ({
+        userId: uid,
+        username: profilesMap[uid]?.username ?? null,
+        discordUsername: profilesMap[uid]?.discord_username ?? null,
+        options: grouped[uid].options,
+        updatedAt: grouped[uid].updatedAt
+      }));
 
       setMemberSubs(list);
     } catch (e) {
-      console.error('Error fetching member subscriptions:', e);
+      console.error('Error fetching member subs:', e);
     } finally {
       setLoadingMembers(false);
     }
   }, []);
 
-  // Fetch all stats and campaigns list
-  const fetchDashboardData = useCallback(async () => {
+  // Fetch Thai System Logs
+  const fetchSystemLogs = useCallback(async () => {
     try {
-      fetchMemberSubscriptions();
+      const { data, error } = await supabase
+        .from('dm_broadcast_system_logs' as any)
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        setSystemLogs(data as SystemLog[]);
+      }
+    } catch (e) {
+      console.error('Error fetching system logs:', e);
+    }
+  }, []);
+
+  // Fetch Dashboard Stats & Campaigns (Silent Update)
+  const fetchDashboardData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
       // 1. Fetch Subscription Stats
-      const { data: rawSubs, error: subErr } = await supabase
+      const { data: rawSubs } = await supabase
         .from('dms_options' as any)
         .select('user_id, option_value');
 
-      if (!subErr && rawSubs) {
-        const counts = {
-          '49B40A9yBS': 0,
-          'JNySCX80ja': 0,
-          'DsMHlVrjze': 0,
-          '6io1xnaMWJ': 0
-        };
+      if (rawSubs) {
+        const counts = { '49B40A9yBS': 0, 'JNySCX80ja': 0, 'DsMHlVrjze': 0, '6io1xnaMWJ': 0 };
         const uniqueUsers = new Set<string>();
         rawSubs.forEach((item: any) => {
-          if (item.user_id) {
-            uniqueUsers.add(item.user_id);
-          }
-          if (item.option_value in counts) {
-            counts[item.option_value as keyof typeof counts]++;
-          }
+          if (item.user_id) uniqueUsers.add(item.user_id);
+          if (item.option_value in counts) counts[item.option_value as keyof typeof counts]++;
         });
-        setSubStats({
-          totalSubs: uniqueUsers.size,
-          options: counts
-        });
+        setSubStats({ totalSubs: uniqueUsers.size, options: counts });
       }
 
       // 2. Fetch Reachability Stats
-      const { data: rawStatuses, error: statusErr } = await supabase
+      const { data: rawStatuses } = await supabase
         .from('member_dm_status' as any)
         .select('dm_status');
 
-      if (!statusErr && rawStatuses) {
+      if (rawStatuses) {
         const counts = { open: 0, closed: 0, unknown: 0 };
         rawStatuses.forEach((item: any) => {
-          if (item.dm_status in counts) {
-            counts[item.dm_status as keyof typeof counts]++;
-          }
+          if (item.dm_status in counts) counts[item.dm_status as keyof typeof counts]++;
         });
         setDmStatusStats(counts);
       }
 
       // 3. Fetch Campaigns Queue
-      const { data: rawQueues, error: queueErr } = await supabase
+      const { data: rawQueues } = await supabase
         .from('dm_broadcast_queues' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!queueErr && rawQueues) {
+      if (rawQueues) {
         setCampaigns(rawQueues as CampaignQueue[]);
       }
 
     } catch (e) {
       console.error('Error fetching dashboard data:', e);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, []);
 
-  // 1. Initial fetch on mount
+  // Initial Load
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    fetchDashboardData(false);
+    fetchMemberSubscriptions();
+    fetchSystemLogs();
+  }, [fetchDashboardData, fetchMemberSubscriptions, fetchSystemLogs]);
 
-  // 2. Poll active campaigns counts every 5 seconds for live progress
+  // Silent Auto-Refresh Polling (No UI flicker)
   useEffect(() => {
-    const hasActive = campaigns.some(c => c.status === 'processing' || c.status === 'pending' || c.status === 'paused');
-    if (!hasActive) return;
-
+    if (!autoRefresh) return;
     const interval = setInterval(() => {
-      fetchDashboardData();
+      fetchDashboardData(true);
+      fetchSystemLogs();
       if (expandedCampaignId) {
-        fetchCampaignLogs(expandedCampaignId);
+        fetchCampaignLogs(expandedCampaignId, logsPage);
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [campaigns, expandedCampaignId, fetchDashboardData]);
+  }, [autoRefresh, expandedCampaignId, logsPage, fetchDashboardData, fetchSystemLogs]);
 
-  // Fetch logs for specific campaign (errors & status)
-  const fetchCampaignLogs = async (queueId: string) => {
+  // Fetch Paginated Logs for Campaign
+  const fetchCampaignLogs = async (queueId: string, page = 1) => {
     setLoadingLogs(true);
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * logsPageSize;
+      const to = from + logsPageSize - 1;
+
+      let query = supabase
         .from('dm_broadcast_logs' as any)
-        .select('*')
-        .eq('queue_id', queueId)
-        .order('sent_at', { ascending: false });
+        .select('*', { count: 'exact' })
+        .eq('queue_id', queueId);
+
+      if (logSearchQuery.trim()) {
+        query = query.or(`user_id.ilike."%${logSearchQuery}%",username.ilike."%${logSearchQuery}%"`);
+      }
+
+      const { data, count, error } = await query
+        .order('id', { ascending: true })
+        .range(from, to);
 
       if (error) throw error;
       setCampaignLogs((data || []) as CampaignLog[]);
+      setLogsTotalCount(count || 0);
+      setLogsPage(page);
     } catch (e) {
       console.error('Error fetching campaign logs:', e);
-      toast({ title: 'ผิดพลาด', description: 'ไม่สามารถดึงข้อมูลประวัติการส่งได้', variant: 'destructive' });
     } finally {
       setLoadingLogs(false);
     }
   };
 
-  // Expand campaign details
   const handleToggleExpand = (campaignId: string) => {
     if (expandedCampaignId === campaignId) {
       setExpandedCampaignId(null);
       setCampaignLogs([]);
     } else {
       setExpandedCampaignId(campaignId);
-      fetchCampaignLogs(campaignId);
+      setLogsPage(1);
+      fetchCampaignLogs(campaignId, 1);
+    }
+  };
+
+  // Retry Failed Items Only
+  const handleRetryFailedCampaign = async (campaignId: string) => {
+    try {
+      setLoading(true);
+      const { error: logErr } = await supabase
+        .from('dm_broadcast_logs' as any)
+        .update({ status: 'pending', error_message: null, sent_at: null })
+        .eq('queue_id', campaignId)
+        .eq('status', 'failed');
+
+      if (logErr) throw logErr;
+
+      const { error: queueErr } = await supabase
+        .from('dm_broadcast_queues' as any)
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .eq('id', campaignId);
+
+      if (queueErr) throw queueErr;
+
+      toast({ title: 'เริ่มส่งซ่อมรายการล้มเหลวเรียบร้อยแล้วค่ะ', description: 'ระบบเปลี่ยนรายการที่ล้มเหลวกลับเข้าสู่คิวส่งต่อทันที' });
+      fetchDashboardData(true);
+      if (expandedCampaignId === campaignId) fetchCampaignLogs(campaignId, 1);
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -591,64 +498,44 @@ export function DMBroadcastManagement() {
         .eq('id', campaignId);
 
       if (error) throw error;
-      
-      toast({ title: 'ยกเลิกแคมเปญแล้ว', description: 'ระบบระงับคิวส่งบอร์ดแคสต์นี้เรียบร้อยแล้วค่ะ' });
-      fetchDashboardData();
+      toast({ title: 'ยกเลิกแคมเปญแล้วค่ะ' });
+      fetchDashboardData(true);
     } catch (e) {
-      toast({ title: 'ผิดพลาด', description: 'ไม่สามารถยกเลิกแคมเปญได้', variant: 'destructive' });
+      toast({ title: 'ผิดพลาด', description: 'ไม่สามารถยกเลิกได้', variant: 'destructive' });
     }
   };
 
-  // Retry Failed Campaign Items Only
-  const handleRetryFailedCampaign = async (campaignId: string) => {
+  // Clean Old Completed Logs (Tool for 88.4K records cleanup)
+  const handleCleanOldLogs = async () => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้าง Log แคมเปญเก่าที่ส่งเสร็จสิ้นแล้วเกิน 14 วัน? การดำเนินการนี้จะช่วยคืนพื้นที่ DB')) return;
+
+    setCleaningLogs(true);
     try {
-      setLoading(true);
-      // 1. Reset logs with status 'failed' to 'pending'
-      const { error: logErr } = await supabase
-        .from('dm_broadcast_logs' as any)
-        .update({
-          status: 'pending',
-          error_message: null,
-          sent_at: null
-        })
-        .eq('queue_id', campaignId)
-        .eq('status', 'failed');
-
-      if (logErr) throw logErr;
-
-      // 2. Set campaign queue status back to 'pending'
-      const { error: queueErr } = await supabase
-        .from('dm_broadcast_queues' as any)
-        .update({
-          status: 'pending',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', campaignId);
-
-      if (queueErr) throw queueErr;
-
-      toast({
-        title: 'เริ่มส่งซ่อมรายการล้มเหลวเรียบร้อยแล้วค่ะ',
-        description: 'ระบบรีเซ็ตรายการล้มเหลวกลับเข้าสู่คิว และแจ้งให้บอทเริ่มประมวลผลต่อทันที'
-      });
-
-      fetchDashboardData();
-      if (expandedCampaignId === campaignId) {
-        fetchCampaignLogs(campaignId);
-      }
+      const { data, error } = await supabase.rpc('clean_old_dm_broadcast_logs', { days_older: 14 });
+      if (error) throw error;
+      toast({ title: 'ล้าง Log เก่าสำเร็จแล้วค่ะ', description: `ทำการลบ Log ซากแคมเปญเก่าเรียบร้อยแล้วจำนวน ${data || 0} รายการ` });
+      fetchDashboardData(true);
     } catch (e: any) {
-      console.error('Error retrying failed campaign:', e);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: e.message || 'ไม่สามารถสั่งส่งซ่อมรายการล้มเหลวได้',
-        variant: 'destructive'
-      });
+      toast({ title: 'ล้าง Log ไม่สำเร็จ', description: e.message || 'ไม่สามารถเรียกใช้ฟังก์ชั่นล้าง Log ได้', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setCleaningLogs(false);
     }
   };
 
-  // Submit new Campaign
+  // Clear System Logs UI
+  const handleClearSystemLogs = async () => {
+    try {
+      const { error } = await supabase.from('dm_broadcast_system_logs' as any).delete().neq('id', 0);
+      if (!error) {
+        setSystemLogs([]);
+        toast({ title: 'ล้างประวัติการทำงานสำเร็จค่ะ' });
+      }
+    } catch (e) {
+      toast({ title: 'เกิดข้อผิดพลาดในการล้าง log', variant: 'destructive' });
+    }
+  };
+
+  // Submit New Campaign
   const handleSubmitCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composerTitle.trim()) {
@@ -667,7 +554,7 @@ export function DMBroadcastManagement() {
       try {
         payload = JSON.parse(jsonContent);
       } catch (err) {
-        toast({ title: 'รูปแบบ JSON ไม่ถูกต้อง', description: 'กรุณาตรวจสอบวงเล็บหรือเครื่องหมายคำพูดคู่', variant: 'destructive' });
+        toast({ title: 'รูปแบบ JSON ไม่ถูกต้อง', variant: 'destructive' });
         return;
       }
     }
@@ -677,56 +564,22 @@ export function DMBroadcastManagement() {
       return;
     }
 
-    // Attach Safety & Anti-Spam Options
     const optionsObj = {
       exclude_previous_success: excludePreviousSuccess,
-      min_delay_sec: safetyMode === 'safe' ? 15 : safetyMode === 'balanced' ? 5 : minDelaySec,
-      max_delay_sec: safetyMode === 'safe' ? 35 : safetyMode === 'balanced' ? 15 : maxDelaySec,
-      hourly_limit: safetyMode === 'safe' ? 50 : safetyMode === 'balanced' ? 100 : hourlyLimit,
+      min_delay_sec: safetyMode === 'safe' ? 15 : 5,
+      max_delay_sec: safetyMode === 'safe' ? 35 : 15,
+      hourly_limit: safetyMode === 'safe' ? 50 : 100,
       consecutive_failure_limit: 5
     };
 
-    payload = {
-      ...payload,
-      options: optionsObj
-    };
-
+    payload = { ...payload, options: optionsObj };
     setSubmitting(true);
 
     let targetVal = null;
     if (targetType === 'option') {
       targetVal = targetOption;
     } else if (targetType === 'test') {
-      const inputs = testUserId.split(',').map(s => s.trim()).filter(Boolean);
-      const resolvedIds: string[] = [];
-
-      for (const input of inputs) {
-        try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('discord_id')
-            .or(`discord_id.eq."${input}",username.ilike."${input}",discord_username.ilike."${input}"`)
-            .maybeSingle();
-
-          if (profileData) {
-            resolvedIds.push(profileData.discord_id);
-          } else {
-            if (/^\d+$/.test(input)) {
-              resolvedIds.push(input);
-            } else {
-              toast({ title: `ไม่พบผู้ใช้: ${input}`, variant: 'destructive' });
-              setSubmitting(false);
-              return;
-            }
-          }
-        } catch (e) {
-          console.error(e);
-          if (/^\d+$/.test(input)) {
-            resolvedIds.push(input);
-          }
-        }
-      }
-      targetVal = resolvedIds.join(',');
+      targetVal = testUserId.split(',').map(s => s.trim()).filter(Boolean).join(',');
     }
 
     try {
@@ -742,15 +595,13 @@ export function DMBroadcastManagement() {
         });
 
       if (error) throw error;
-
       toast({ title: 'สร้างแคมเปญสำเร็จ', description: 'ระบบนำเข้าคิวเพื่อเตรียมส่งเรียบร้อยแล้วค่ะ' });
       setComposerTitle('');
       setTextContent('');
-      setTestUserId('');
-      fetchDashboardData();
-
-    } catch (err: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: err.message || 'ไม่สามารถส่งแคมเปญได้', variant: 'destructive' });
+      setActiveTab('campaigns');
+      fetchDashboardData(true);
+    } catch (e: any) {
+      toast({ title: 'ผิดพลาด', description: e.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -759,30 +610,26 @@ export function DMBroadcastManagement() {
   const getStatusBadge = (c: CampaignQueue) => {
     switch (c.status) {
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">รอดำเนินการ</Badge>;
+        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 font-bold">รอเข้าคิว</Badge>;
       case 'paused':
-        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 animate-pulse">⏳ จำกัดความเร็ว (รอส่งต่อ)</Badge>;
+        return <Badge variant="outline" className="bg-amber-500/15 text-amber-700 border-amber-500/40 animate-pulse font-bold">⏸️ พักส่งชั่วคราว</Badge>;
       case 'processing':
-        const processed = c.sent_count + c.failed_count;
-        if (processed === 0) {
-          return <Badge variant="outline" className="bg-sky-500/10 text-sky-500 border-sky-500/30 animate-pulse">🤖 ล็อกอินเข้าบอทเรียบร้อย</Badge>;
-        } else {
-          return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 animate-pulse">📡 กำลังกระจายข่าวสาร...</Badge>;
-        }
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 animate-pulse font-bold">📡 กำลังกระจายข่าวสาร...</Badge>;
       case 'completed':
-        return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">สำเร็จเสร็จสิ้น</Badge>;
+        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-bold">✓ สำเร็จเสร็จสิ้น</Badge>;
       case 'cancelled':
-        return <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30">ถูกยกเลิก</Badge>;
+        return <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30 font-bold">ถูกยกเลิก</Badge>;
       default:
         return <Badge variant="secondary">{c.status}</Badge>;
     }
   };
 
+  // Paginated Subscribers Filtering
   const filteredMemberSubs = memberSubs.filter(sub => {
-    if (searchQuery) {
-      const matchUserId = sub.userId.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchUsername = (sub.username ?? '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchDiscord = (sub.discordUsername ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+    if (memberSearchQuery) {
+      const matchUserId = sub.userId.toLowerCase().includes(memberSearchQuery.toLowerCase());
+      const matchUsername = (sub.username ?? '').toLowerCase().includes(memberSearchQuery.toLowerCase());
+      const matchDiscord = (sub.discordUsername ?? '').toLowerCase().includes(memberSearchQuery.toLowerCase());
       if (!matchUserId && !matchUsername && !matchDiscord) return false;
     }
     if (filterOption !== 'all') {
@@ -791,564 +638,620 @@ export function DMBroadcastManagement() {
     return true;
   });
 
+  const totalMemberPages = Math.ceil(filteredMemberSubs.length / memberPageSize) || 1;
+  const paginatedMembers = filteredMemberSubs.slice((memberPage - 1) * memberPageSize, memberPage * memberPageSize);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       
-      {/* 1. Statistics Cards */}
+      {/* Top Header & Overview */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border border-[#EAD8C8] dark:border-[#2D2520] p-5 rounded-3xl shadow-sm">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2.5">
+            <Send className="w-6 h-6 text-primary" /> ระบบกระจายข่าวสารบอท DM (DM Broadcast)
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            ส่งข้อความข่าวสารหาผู้ใช้งาน Discord แบบรายบุคคลผ่านระบบคิวพร้อมกลไกป้องกัน Spam & Quarantine
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <Button
+            size="sm"
+            variant={autoRefresh ? 'default' : 'outline'}
+            className={cn("rounded-xl text-xs gap-1.5 font-bold", autoRefresh && "bg-emerald-600 hover:bg-emerald-700 text-white")}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            <Activity className={cn("w-3.5 h-3.5", autoRefresh && "animate-spin")} />
+            {autoRefresh ? 'Auto-Refresh (เปิด)' : 'Auto-Refresh (ปิด)'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520]"
+            onClick={() => fetchDashboardData(false)}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> ดึงข้อมูลสด
+          </Button>
+        </div>
+      </div>
+
+      {/* 1. Statistics Cards Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Total stats */}
-        <Card className="border-border/60 shadow-sm bg-card">
+        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" /> สมาชิกที่รับแจ้งเตือนทั้งหมด
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> สมาชิกที่สมัครรับข่าวสาร
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{subStats.totalSubs}</div>
-            <p className="text-xs text-muted-foreground mt-1">ยอดรวมสมาชิกที่เลือกช่องทางรับข่าวสาร</p>
+            <div className="text-2xl font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.totalSubs} คน</div>
+            <p className="text-[11px] text-muted-foreground mt-1">ยอดผู้ใช้ที่เลือกช่องทางรับข่าวสาร</p>
           </CardContent>
         </Card>
 
-        {/* Categories break downs */}
-        <Card className="border-border/60 shadow-sm bg-card col-span-1 md:col-span-2 lg:col-span-2">
+        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl col-span-1 md:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">สัดส่วนผู้รับข่าวสารแยกตามหัวข้อ</CardTitle>
+            <CardTitle className="text-xs font-semibold text-muted-foreground">สัดส่วนตามหมวดหมู่ข่าวสาร</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground flex items-center gap-1">🎉 กิจกรรม</div>
-              <div className="text-lg font-bold">{subStats.options['49B40A9yBS']} คน</div>
+          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-muted-foreground">🎉 กิจกรรม</span>
+              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['49B40A9yBS']} คน</div>
             </div>
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground flex items-center gap-1">📢 ประกาศสำคัญ</div>
-              <div className="text-lg font-bold">{subStats.options['JNySCX80ja']} คน</div>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-muted-foreground">📢 ประกาศสำคัญ</span>
+              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['JNySCX80ja']} คน</div>
             </div>
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground flex items-center gap-1">📑 ข่าวสารทั่วไป</div>
-              <div className="text-lg font-bold">{subStats.options['DsMHlVrjze']} คน</div>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-muted-foreground">📑 ข่าวสารทั่วไป</span>
+              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['DsMHlVrjze']} คน</div>
             </div>
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground flex items-center gap-1">🎁 โปรโมชันและโฆษณา</div>
-              <div className="text-lg font-bold">{subStats.options['6io1xnaMWJ']} คน</div>
+            <div className="space-y-0.5">
+              <span className="text-[11px] text-muted-foreground">🎁 โปรโมชัน</span>
+              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['6io1xnaMWJ']} คน</div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Reachability stats */}
-        <Card className="border-border/60 shadow-sm bg-card">
+        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Mail className="w-4 h-4 text-emerald-500" /> สถานะช่องทางการส่ง DM
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+              <Mail className="w-4 h-4 text-emerald-500" /> สถานะช่องทาง DM
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-emerald-500 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> เปิดรับ DM:</span>
-              <span className="font-semibold">{dmStatusStats.open}</span>
+          <CardContent className="space-y-1 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">เปิดรับ DM:</span>
+              <span className="font-bold">{dmStatusStats.open}</span>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-destructive flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /> ปิดรับ DM:</span>
-              <span className="font-semibold">{dmStatusStats.closed}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> ยังไม่ทดสอบ:</span>
-              <span className="font-semibold">{dmStatusStats.unknown}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-rose-600 dark:text-rose-400 font-medium">ปิดรับ DM:</span>
+              <span className="font-bold">{dmStatusStats.closed}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 2. Composer, Preview, and Campaigns list side-by-side */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      {/* Main Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         
-        {/* Left Column: Campaign Composer */}
-        <div className="lg:col-span-4 flex flex-col">
-          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl h-full flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg text-[#8C6239] dark:text-[#EAD8C8] font-bold">
-                <Send className="w-5 h-5 text-primary" /> สร้างการส่งบรอดแคสต์
-              </CardTitle>
-              <CardDescription className="text-xs">สร้างแคมเปญส่งข้อความ DM หาผู้ใช้งานที่กำหนดผ่านระบบ Queue</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between py-2">
-              <form onSubmit={handleSubmitCampaign} className="space-y-4">
-                
-                {/* Campaign Title */}
-                <div className="space-y-1">
-                  <Label htmlFor="title" className="text-xs font-semibold text-[#827160]">ชื่อแคมเปญ (อ้างอิงภายใน)</Label>
-                  <Input 
-                    id="title"
-                    placeholder="เช่น ประกันกิจกรรมกิลด์ 15 เม.ย."
-                    value={composerTitle}
-                    onChange={(e) => setComposerTitle(e.target.value)}
-                    required
-                    className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD] h-9"
-                  />
-                </div>
+        <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-2 md:grid-cols-4 h-auto gap-1">
+          <TabsTrigger value="composer" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Send className="w-4 h-4 text-primary" /> 1. สร้างแคมเปญ
+          </TabsTrigger>
+          <TabsTrigger value="campaigns" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Activity className="w-4 h-4 text-indigo-500" /> 2. ประวัติและสถานะคิว ({campaigns.length})
+          </TabsTrigger>
+          <TabsTrigger value="subscribers" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Users className="w-4 h-4 text-emerald-500" /> 3. ผู้รับข่าวสาร ({filteredMemberSubs.length})
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Database className="w-4 h-4 text-amber-500" /> 4. บันทึกบอท & DB
+          </TabsTrigger>
+        </TabsList>
 
-                {/* Target Audience Selector */}
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-[#827160]">กลุ่มเป้าหมายผู้รับสาร</Label>
-                  <Select value={targetType} onValueChange={(val: 'all' | 'option' | 'test') => setTargetType(val)}>
-                    <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="option">แยกตามหมวดหมู่การติดตาม</SelectItem>
-                      <SelectItem value="all">ส่งหาสมาชิกทุกคน (ทั้งหมด)</SelectItem>
-                      <SelectItem value="test">🧪 ส่งทดสอบเฉพาะบุคคล (ระบุ ID)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* TAB 1: Composer & Live Preview */}
+        <TabsContent value="composer" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            
+            {/* Left Col: Composer Form */}
+            <div className="lg:col-span-7 flex flex-col">
+              <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl flex-1 flex flex-col">
+                <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" /> กรอกข้อมูลบรอดแคสต์
+                  </CardTitle>
+                  <CardDescription className="text-xs">ตั้งชื่อ เลือกกลุ่มเป้าหมาย ข้อความข่าวสาร และกำหนดระดับความปลอดภัย</CardDescription>
+                </CardHeader>
+                <CardContent className="p-5 flex-1 flex flex-col justify-between">
+                  <form onSubmit={handleSubmitCampaign} className="space-y-4">
+                    
+                    {/* Campaign Title */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="title" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ชื่อแคมเปญ (อ้างอิงภายใน)</Label>
+                      <Input 
+                        id="title"
+                        placeholder="เช่น ประกาศกิจกรรมกิลด์ 15 เม.ย."
+                        value={composerTitle}
+                        onChange={(e) => setComposerTitle(e.target.value)}
+                        required
+                        className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"
+                      />
+                    </div>
 
-                {/* Option Selector (Conditional) */}
-                {targetType === 'option' && (
-                  <div className="space-y-1">
-                    <Label htmlFor="option" className="text-xs font-semibold text-[#827160]">หมวดหมู่ข่าวสาร</Label>
-                    <Select value={targetOption} onValueChange={setTargetOption}>
-                      <SelectTrigger id="option" className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
-                        <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
-                        <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
-                        <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Target Audience */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">กลุ่มเป้าหมายผู้รับสาร</Label>
+                        <Select value={targetType} onValueChange={(val: 'all' | 'option' | 'test') => setTargetType(val)}>
+                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="option">🏷️ แยกตามหมวดหมู่ข่าวสาร</SelectItem>
+                            <SelectItem value="all">👥 สมาชิกทุกคนในเซิร์ฟเวอร์</SelectItem>
+                            <SelectItem value="test">🧪 ทดสอบเฉพาะบุคคล (ป้อน ID)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                {/* Test User ID Input (Conditional) */}
-                {targetType === 'test' && (
-                  <div className="space-y-1 animate-in fade-in duration-200">
-                    <Label htmlFor="testUserId" className="text-xs font-semibold text-[#827160]">Discord User ID สำหรับส่งทดสอบ</Label>
-                    <Input 
-                      id="testUserId"
-                      placeholder="ป้อน Discord User ID (เช่น 944920660759707658)"
-                      value={testUserId}
-                      onChange={(e) => setTestUserId(e.target.value)}
-                      required
-                      className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD] h-9 focus-visible:ring-offset-0 text-xs"
-                    />
-                    <span className="text-[10px] text-muted-foreground block leading-tight">หากมีหลายคนให้คั่นด้วยเครื่องหมายจุลภาค ( , )</span>
-                  </div>
-                )}
+                      {/* Option Category */}
+                      {targetType === 'option' && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">หมวดหมู่ข่าวสาร</Label>
+                          <Select value={targetOption} onValueChange={setTargetOption}>
+                            <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
+                              <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
+                              <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
+                              <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                {/* Token Selector */}
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-[#827160]">บอทที่ใช้ส่งข้อความ (Credentials)</Label>
-                  <Select value={tokenType} onValueChange={(val: 'token1' | 'token2') => setTokenType(val)}>
-                    <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="token1">Token 1 (บอทหลัก)</SelectItem>
-                      <SelectItem value="token2">Token 2 (บอทสำรอง)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      {/* Bot Credentials */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">บอทที่ใช้ส่ง (Credentials)</Label>
+                        <Select value={tokenType} onValueChange={(val: 'token1' | 'token2') => setTokenType(val)}>
+                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="token1">Token 1 (บอทหลัก)</SelectItem>
+                            <SelectItem value="token2">Token 2 (บอทสำรอง)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-                {/* Safety & Anti-Spam Options */}
-                <div className="p-3 bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="dedup" className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5 cursor-pointer">
-                      <Shield className="w-3.5 h-3.5 text-emerald-500" /> ข้ามคนที่เคยส่งสำเร็จแล้ว (กันส่งซ้ำ)
-                    </Label>
-                    <input 
-                      id="dedup"
-                      type="checkbox"
-                      checked={excludePreviousSuccess}
-                      onChange={(e) => setExcludePreviousSuccess(e.target.checked)}
-                      className="w-4 h-4 accent-[#8C6239] rounded cursor-pointer"
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-[#827160]">ความเร็วส่งและระยะหน่วง (Safety Velocity)</Label>
-                    <Select value={safetyMode} onValueChange={(val: 'safe' | 'balanced') => setSafetyMode(val)}>
-                      <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="safe">🛡️ Safe Mode (สุ่มหน่วง 15-35 วิ | 50 ข้อความ/ชม.)</SelectItem>
-                        <SelectItem value="balanced">⚡ Balanced Mode (สุ่มหน่วง 5-15 วิ | 100 ข้อความ/ชม.)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                    {/* Test User ID Input */}
+                    {targetType === 'test' && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="testUserId" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">Discord User ID สำหรับทดสอบ</Label>
+                        <Input 
+                          id="testUserId"
+                          placeholder="ป้อน Discord User ID (เช่น 944920660759707658)"
+                          value={testUserId}
+                          onChange={(e) => setTestUserId(e.target.value)}
+                          required
+                          className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-xs rounded-xl h-9"
+                        />
+                      </div>
+                    )}
 
-                {/* Input Mode Selector */}
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-[#827160]">รูปแบบเนื้อหาข้อความ</Label>
-                  <div className="flex gap-2">
-                    <Button 
-                      type="button"
-                      variant={inputMode === 'text' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1 rounded-xl text-xs"
-                      onClick={() => setInputMode('text')}
-                    >
-                      <FileText className="w-3.5 h-3.5 mr-1" /> ข้อความธรรมดา
+                    {/* Safety & Deduplication Options Box */}
+                    <div className="p-4 bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="dedup" className="text-xs sm:text-sm font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2 cursor-pointer">
+                          <Shield className="w-4 h-4 text-emerald-500" /> ข้ามคนที่เคยส่งสำเร็จแล้ว (กันส่งซ้ำ 100%)
+                        </Label>
+                        <input 
+                          id="dedup"
+                          type="checkbox"
+                          checked={excludePreviousSuccess}
+                          onChange={(e) => setExcludePreviousSuccess(e.target.checked)}
+                          className="w-4 h-4 accent-[#8C6239] rounded cursor-pointer"
+                        />
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-[#827160]">ระดับความเร็วส่งและระยะหน่วง (Safety Velocity)</Label>
+                        <Select value={safetyMode} onValueChange={(val: 'safe' | 'balanced') => setSafetyMode(val)}>
+                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-xs rounded-xl h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="safe">🛡️ Safe Mode (สุ่มหน่วง 15-35 วิ | โควตา 50 ข้อความ/ชม.)</SelectItem>
+                            <SelectItem value="balanced">⚡ Balanced Mode (สุ่มหน่วง 5-15 วิ | โควตา 100 ข้อความ/ชม.)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Format Selector */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">รูปแบบเนื้อหาข้อความ</Label>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button"
+                          variant={inputMode === 'text' ? 'default' : 'outline'}
+                          size="sm"
+                          className="flex-1 rounded-xl text-xs font-semibold"
+                          onClick={() => setInputMode('text')}
+                        >
+                          <FileText className="w-3.5 h-3.5 mr-1" /> ข้อความธรรมดา (Markdown)
+                        </Button>
+                        <Button 
+                          type="button"
+                          variant={inputMode === 'json' ? 'default' : 'outline'}
+                          size="sm"
+                          className="flex-1 rounded-xl text-xs font-semibold"
+                          onClick={() => setInputMode('json')}
+                        >
+                          <Shield className="w-3.5 h-3.5 mr-1" /> Component JSON (Discohook)
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Content Textarea */}
+                    {inputMode === 'text' ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="textContent" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ข้อความข่าวสาร</Label>
+                        <Textarea 
+                          id="textContent"
+                          placeholder="พิมพ์ข่าวสารที่คุณต้องการส่งที่นี่..."
+                          className="h-36 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl"
+                          value={textContent}
+                          onChange={(e) => setTextContent(e.target.value)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="jsonContent" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">JSON Payload (Discord Component format)</Label>
+                        <Textarea 
+                          id="jsonContent"
+                          placeholder="วาง JSON รูปแบบ Component v2 ที่นี่..."
+                          className="h-36 font-mono text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] rounded-xl"
+                          value={jsonContent}
+                          onChange={(e) => setJsonContent(e.target.value)}
+                        />
+                      </div>
+                    )}
+
+                    <Button type="submit" className="w-full rounded-2xl h-11 gap-2 bg-[#8C6239] hover:bg-[#74502D] text-white font-bold text-sm shadow-sm" disabled={submitting}>
+                      {submitting ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <Play className="w-4 h-4 text-white" />}
+                      นำส่งเข้าคิวออกอากาศ
                     </Button>
-                    <Button 
-                      type="button"
-                      variant={inputMode === 'json' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1 rounded-xl text-xs"
-                      onClick={() => setInputMode('json')}
-                    >
-                      <Shield className="w-3.5 h-3.5 mr-1" /> Component JSON
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Content Box */}
-                {inputMode === 'text' ? (
-                  <div className="space-y-1">
-                    <Label htmlFor="textContent" className="text-xs font-semibold text-[#827160]">ข้อความข่าวสาร</Label>
-                    <Textarea 
-                      id="textContent"
-                      placeholder="พิมพ์ข่าวสารที่คุณต้องการส่งที่นี่..."
-                      className="h-32 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD] text-xs"
-                      value={textContent}
-                      onChange={(e) => setTextContent(e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <Label htmlFor="jsonContent" className="text-xs font-semibold text-[#827160]">JSON Payload (Discord format)</Label>
-                    <Textarea 
-                      id="jsonContent"
-                      placeholder="วาง JSON รูปแบบ Component v2 ที่นี่..."
-                      className="h-32 font-mono text-[10px] border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
-                      value={jsonContent}
-                      onChange={(e) => setJsonContent(e.target.value)}
-                    />
-                  </div>
-                )}
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
 
-                {/* Submit Campaign Button */}
-                <Button type="submit" className="w-full rounded-xl gap-2 mt-2 bg-[#8C6239] hover:bg-[#74502D] text-white" disabled={submitting}>
-                  {submitting ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <Play className="w-4 h-4 text-white" />}
-                  นำส่งเข้าคิวออกอากาศ
-                </Button>
+            {/* Right Col: Live Preview */}
+            <div className="lg:col-span-5 flex flex-col">
+              <DiscordPreview inputMode={inputMode} textContent={textContent} jsonContent={jsonContent} />
+            </div>
 
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+          </div>
+        </TabsContent>
 
-        {/* Middle Column: Discord Preview */}
-        <div className="lg:col-span-4 flex flex-col">
-          <DiscordPreview 
-            inputMode={inputMode} 
-            textContent={textContent} 
-            jsonContent={jsonContent} 
-          />
-        </div>
-
-        {/* Right Column: Active & Past Campaigns */}
-        <div className="lg:col-span-4 flex flex-col">
-          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl h-full flex flex-col overflow-hidden">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-[#8C6239] dark:text-[#EAD8C8] font-bold">ประวัติและสถานะการบรอดแคสต์</CardTitle>
-              <CardDescription className="text-xs">แสดงรายการคิวการส่งและแสดงความคืบหน้าแบบ Real-time</CardDescription>
+        {/* TAB 2: Campaigns History & Paginated Logs */}
+        <TabsContent value="campaigns" className="space-y-6">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
+            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+              <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการแคมเปญทั้งหมด ({campaigns.length})</CardTitle>
+              <CardDescription className="text-xs">แสดงแคมเปญการส่งบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนแบบแบ่งหน้า</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col overflow-y-auto max-h-[600px] py-2 pr-1.5 scrollbar-thin">
+            <CardContent className="p-4 space-y-4">
               {campaigns.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-xs">
-                  ยังไม่มีการบรอดแคสต์ใดๆ ถูกสร้างขึ้น
-                </div>
+                <div className="text-center py-12 text-muted-foreground text-sm">ยังไม่มีแคมเปญบรอดแคสต์ใดๆ ถูกสร้างขึ้น</div>
               ) : (
-                <div className="space-y-4">
-                  {campaigns.map((c) => {
-                    const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
-                    const isExpanded = expandedCampaignId === c.id;
-                    const statusBorderClass = 
-                      c.status === 'pending' ? 'border-l-4 border-l-amber-500' : 
-                      c.status === 'processing' ? 'border-l-4 border-l-blue-500' : 
-                      c.status === 'paused' ? 'border-l-4 border-l-amber-400' : 
-                      c.status === 'completed' ? 'border-l-4 border-l-emerald-500' : 
-                      'border-l-4 border-l-red-500';
+                campaigns.map((c) => {
+                  const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
+                  const isExpanded = expandedCampaignId === c.id;
+                  const totalLogPages = Math.ceil(logsTotalCount / logsPageSize) || 1;
 
-                    const filteredLogs = campaignLogs.filter(log => 
-                      log.user_id.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                      (log.username || '').toLowerCase().includes(logSearchQuery.toLowerCase())
-                    );
-
-                    return (
-                      <Card key={c.id} className={cn("border border-[#EAD8C8] dark:border-[#2D2520] overflow-hidden shadow-xs bg-white dark:bg-[#1E1B18] transition-all duration-200", statusBorderClass)}>
-                        <CardContent className="p-3.5 space-y-3">
-                          
-                          {/* Queue Header info */}
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="space-y-1 max-w-[70%]">
-                              <h3 className="font-bold text-xs text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-1.5 flex-wrap">
-                                {c.title}
-                              </h3>
-                              <div className="flex flex-wrap gap-1 items-center">
-                                <Badge variant="outline" className="text-[8px] py-0 px-1 border-[#EAD8C8] bg-amber-500/5 text-amber-600 dark:border-[#2D2520] dark:text-amber-400 font-semibold">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
-                                <span className="text-[9px] text-muted-foreground">
-                                  {new Date(c.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
-                                </span>
-                              </div>
+                  return (
+                    <Card key={c.id} className="border border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] rounded-2xl overflow-hidden shadow-xs">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="space-y-1">
+                            <h3 className="font-bold text-sm text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                              {c.title}
+                            </h3>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
+                              <span>สร้างเมื่อ: {new Date(c.created_at).toLocaleString('th-TH')}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 ml-auto">
-                              {getStatusBadge(c)}
-                              
-                              {/* Retry Failed button if has failures and not processing */}
-                              {c.failed_count > 0 && c.status !== 'processing' && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 font-bold border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
-                                  onClick={() => handleRetryFailedCampaign(c.id)}
-                                  title="ส่งซ่อมเฉพาะรายการที่ล้มเหลวอีกครั้ง"
-                                >
-                                  <RefreshCw className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> ส่งซ่อม ({c.failed_count})
-                                </Button>
-                              )}
-
-                              {/* Cancel button if running */}
-                              {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive" 
-                                  className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 font-bold"
-                                  onClick={() => handleCancelCampaign(c.id)}
-                                >
-                                  <Square className="w-2.5 h-2.5 text-white" /> หยุดส่ง
-                                </Button>
-                              )}
-
-                              {/* Details toggle button */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] hover:bg-[#FAF6F0]/20"
-                                onClick={() => handleToggleExpand(c.id)}
-                              >
-                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(c)}
+                            
+                            {c.failed_count > 0 && c.status !== 'processing' && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 font-bold" onClick={() => handleRetryFailedCampaign(c.id)}>
+                                <RefreshCw className="w-3 h-3" /> ส่งซ่อม ({c.failed_count})
                               </Button>
-                            </div>
-                          </div>
-
-                          {/* Target Info */}
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                            <span>ผู้รับสาร:</span>
-                            {c.target_type === 'all' ? (
-                              <Badge variant="outline" className="text-[9px] font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30">👥 สมาชิกทุกคน</Badge>
-                            ) : c.target_type === 'test' ? (
-                              <Badge variant="outline" className="text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/30">🧪 ทดสอบเฉพาะบุคคล ({c.target_value})</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[9px] font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30">
-                                🏷️ {c.target_value === '49B40A9yBS' && 'กิจกรรม'}
-                                {c.target_value === 'JNySCX80ja' && 'ประกาศสำคัญ'}
-                                {c.target_value === 'DsMHlVrjze' && 'ข่าวสารทั่วไป'}
-                                {c.target_value === '6io1xnaMWJ' && 'โปรโมชันและโฆษณา'}
-                              </Badge>
                             )}
-                          </div>
 
-                          {/* Progress Panel */}
-                          <div className="space-y-1.5 bg-[#FAF6F0]/50 dark:bg-[#25201C]/50 p-2.5 rounded-2xl border border-[#F0E8DC] dark:border-[#2D2520]">
-                            <div className="flex justify-between items-center text-[9px] text-[#8C6239] dark:text-[#EAD8C8]">
-                              <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
-                              <div className="flex gap-2 font-semibold">
-                                <span className="text-emerald-500">สำเร็จ: {c.sent_count}</span>
-                                <span className="text-rose-500">ล้มเหลว: {c.failed_count}</span>
+                            {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
+                              <Button size="sm" variant="destructive" className="h-7 text-xs font-bold gap-1" onClick={() => handleCancelCampaign(c.id)}>
+                                <Square className="w-3 h-3 text-white" /> หยุดส่ง
+                              </Button>
+                            )}
+
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => handleToggleExpand(c.id)}>
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              {isExpanded ? 'ซ่อน Log' : 'ดู Log รายคน'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="space-y-1.5 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
+                          <div className="flex justify-between items-center text-xs text-[#8C6239] dark:text-[#EAD8C8]">
+                            <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
+                            <div className="flex gap-3 font-semibold text-xs">
+                              <span className="text-emerald-600 dark:text-emerald-400">สำเร็จ: {c.sent_count}</span>
+                              <span className="text-rose-600 dark:text-rose-400">ล้มเหลว: {c.failed_count}</span>
+                            </div>
+                          </div>
+                          <Progress value={percent} className="h-2 bg-muted [&>div]:bg-emerald-500" />
+                        </div>
+
+                        {/* Paginated Logs Area (Expanded) */}
+                        {isExpanded && (
+                          <div className="pt-3 border-t border-border/40 space-y-3">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                              <h4 className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+                                <AlertCircle className="w-4 h-4 text-muted-foreground" /> ผลการจัดส่งรายคน (หน้า {logsPage} / {totalLogPages})
+                              </h4>
+                              
+                              <div className="relative w-full sm:w-60">
+                                <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+                                <Input
+                                  value={logSearchQuery}
+                                  onChange={(e) => setLogSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && fetchCampaignLogs(c.id, 1)}
+                                  placeholder="ค้นหา User ID หรือชื่อ..."
+                                  className="pl-8 h-7 text-xs rounded-xl"
+                                />
                               </div>
                             </div>
-                            <Progress 
-                              value={percent} 
-                              className={cn(
-                                "h-1.5 bg-muted",
-                                c.status === 'completed' && "[&>div]:bg-emerald-500",
-                                c.status === 'processing' && "[&>div]:bg-blue-500 animate-pulse",
-                                c.status === 'paused' && "[&>div]:bg-amber-400 animate-pulse",
-                                c.status === 'cancelled' && "[&>div]:bg-red-400",
-                                c.status === 'pending' && "[&>div]:bg-amber-400"
-                              )}
-                            />
-                          </div>
 
-                          {/* Detailed Logs area (Expanded) */}
-                          {isExpanded && (
-                            <div className="pt-3 border-t border-border/40 space-y-2 animate-in fade-in duration-200">
-                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
-                                <h4 className="text-[10px] font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" /> รายละเอียดผลการจัดส่ง (DMs Logs)
-                                </h4>
-                                
-                                {/* Inner Search */}
-                                <div className="relative w-full sm:w-44 shrink-0">
-                                  <Search className="absolute left-2.5 top-1.5 w-3 h-3 text-muted-foreground" />
-                                  <Input
-                                    value={logSearchQuery}
-                                    onChange={(e) => setLogSearchQuery(e.target.value)}
-                                    placeholder="ค้นหา ID หรือชื่อ..."
-                                    className="pl-7 pr-2 h-6 text-[9px] rounded-lg bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520] focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
-                                  />
-                                </div>
-                              </div>
-
-                              {loadingLogs ? (
-                                <div className="text-center py-6 text-[10px] text-muted-foreground animate-pulse">กำลังโหลดบันทึกการส่ง...</div>
-                              ) : c.status === 'pending' ? (
-                                <div className="text-center py-6 text-[10px] text-amber-500 bg-amber-500/5 rounded-xl border border-amber-500/10">คิวกำลังรอเตรียมระบบและรายชื่อเป้าหมายจากบอท...</div>
-                              ) : filteredLogs.length === 0 ? (
-                                <div className="text-center py-6 text-[10px] text-muted-foreground border border-dashed rounded-xl">ไม่พบข้อมูลผลลัพธ์การส่งที่ตรงกัน</div>
-                              ) : (
-                                <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-white dark:bg-[#1E1B18]">
-                                  <Table>
-                                    <TableHeader className="bg-[#FAF6F0]/40 dark:bg-[#25201C]/40">
-                                      <TableRow className="h-7 border-b border-[#EAD8C8] dark:border-[#2D2520]">
-                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">User ID</TableHead>
-                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">ชื่อ</TableHead>
-                                        <TableHead className="text-[9px] h-7 py-1 px-2 font-bold text-[#8C6239] dark:text-[#EAD8C8]">ผลลัพธ์</TableHead>
+                            {loadingLogs ? (
+                              <div className="text-center py-6 text-xs text-muted-foreground animate-pulse">กำลังโหลดบันทึก...</div>
+                            ) : campaignLogs.length === 0 ? (
+                              <div className="text-center py-6 text-xs text-muted-foreground border border-dashed rounded-xl">ไม่พบรายการ Log</div>
+                            ) : (
+                              <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-xl overflow-hidden bg-white dark:bg-[#1E1B18]">
+                                <Table>
+                                  <TableHeader className="bg-[#FAF6F0]/40 dark:bg-[#25201C]/40">
+                                    <TableRow className="h-8">
+                                      <TableHead className="text-xs font-bold">User ID</TableHead>
+                                      <TableHead className="text-xs font-bold">ชื่อสมาชิก</TableHead>
+                                      <TableHead className="text-xs font-bold">สถานะการส่ง</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {campaignLogs.map((log) => (
+                                      <TableRow key={log.id} className="h-8 text-xs">
+                                        <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id}</TableCell>
+                                        <TableCell className="truncate max-w-[120px]">{log.username || '-'}</TableCell>
+                                        <TableCell>
+                                          {log.status === 'success' ? (
+                                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">สำเร็จ</Badge>
+                                          ) : log.status === 'failed' ? (
+                                            <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]" title={log.error_message || ''}>
+                                              ล้มเหลว ({log.error_message || 'Closed DM'})
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600">รอส่ง</Badge>
+                                          )}
+                                        </TableCell>
                                       </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {filteredLogs.map((log) => (
-                                        <TableRow key={log.id} className="h-7 text-[10px] border-b border-[#EAD8C8]/60 dark:border-[#2D2520]/60 hover:bg-[#FAF6F0]/10 dark:hover:bg-[#25201C]/10">
-                                          <TableCell className="font-mono text-[9px] py-1 px-2 max-w-[90px] truncate" title={log.user_id}>{log.user_id}</TableCell>
-                                          <TableCell className="py-1 px-2 truncate max-w-[80px]" title={log.username || ''}>{log.username || '-'}</TableCell>
-                                          <TableCell className="py-1 px-2">
-                                            <div className="flex flex-col gap-0.5">
-                                              {log.status === 'success' ? (
-                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[8px] py-0 px-1 leading-none w-fit font-bold">สำเร็จ</Badge>
-                                              ) : log.status === 'failed' ? (
-                                                <div className="space-y-0.5">
-                                                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-[8px] py-0 px-1 leading-none w-fit font-bold">ล้มเหลว</Badge>
-                                                  {log.error_message && (
-                                                    <span className="block text-[8px] text-rose-500 dark:text-rose-400 font-sans leading-tight" title={log.error_message}>
-                                                      {log.error_message}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              ) : (
-                                                <Badge variant="outline" className="text-[8px] py-0 px-1 leading-none w-fit bg-amber-500/5 text-amber-600 border-amber-500/15">รอคิว</Badge>
-                                              )}
-                                            </div>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )}
 
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                            {/* Pagination Controls for Logs */}
+                            <div className="flex justify-between items-center pt-2">
+                              <span className="text-xs text-muted-foreground">รวมทั้งหมด {logsTotalCount} รายการ</span>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage <= 1} onClick={() => fetchCampaignLogs(c.id, logsPage - 1)}>
+                                  <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage >= totalLogPages} onClick={() => fetchCampaignLogs(c.id, logsPage + 1)}>
+                                  ถัดไป <ChevronRight className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
 
-      {/* 3. Member Subscriptions Directory */}
-      <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden mt-6">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-wrap">
-            <div className="space-y-1">
-              <CardTitle className="text-lg text-[#8C6239] dark:text-[#EAD8C8] font-bold flex items-center gap-2">
-                <Users className="w-5 h-5 text-indigo-500" />
-                รายชื่อสมาชิกและสิทธิ์การรับข่าวสาร
-              </CardTitle>
-              <CardDescription className="text-xs">แสดงรายการผู้ใช้ที่ยินยอมรับข่าวสารแยกตามหมวดหมู่</CardDescription>
-            </div>
-            
-            {/* Search and Filters */}
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:flex-initial sm:w-60">
-                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-9 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
-                  placeholder="ค้นหาผู้ใช้ หรือ Member ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        {/* TAB 3: Subscribers List (Paginated) */}
+        <TabsContent value="subscribers" className="space-y-6">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
+            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายชื่อสมาชิกผู้รับข่าวสาร ({filteredMemberSubs.length} คน)</CardTitle>
+                <CardDescription className="text-xs">แสดงรายชื่อผู้ใช้งานที่เลือกสมัครรับแจ้งเตือนแยกตามหมวดหมู่</CardDescription>
               </div>
-              <Select value={filterOption} onValueChange={setFilterOption}>
-                <SelectTrigger className="w-40 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl h-9 focus:ring-[#FAC4CD]">
-                  <SelectValue placeholder="เลือกหมวดหมู่" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
-                  <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
-                  <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
-                  <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-2">
-          {loadingMembers ? (
-            <div className="text-center py-12 text-muted-foreground animate-pulse text-xs">กำลังโหลดรายชื่อสมาชิก...</div>
-          ) : filteredMemberSubs.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-xs border border-dashed border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl bg-[#FAF6F0]/20 dark:bg-muted/5">
-              ไม่พบรายชื่อสมาชิกที่ค้นหา
-            </div>
-          ) : (
-            <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl overflow-hidden shadow-xs bg-white dark:bg-[#1E1B18]">
-              <Table>
-                <TableHeader className="bg-[#FAF6F0]/50 dark:bg-[#25201C]/50">
-                  <TableRow className="border-b border-[#EAD8C8] dark:border-[#2D2520]">
-                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">สมาชิก</TableHead>
-                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">หัวข้อข่าวสารที่ติดตาม</TableHead>
-                    <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] py-3.5 px-4">ลงทะเบียนล่าสุด</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMemberSubs.map((sub) => (
-                    <TableRow key={sub.userId} className="border-b border-[#EAD8C8]/60 dark:border-[#2D2520]/60 hover:bg-[#FAF6F0]/20 dark:hover:bg-[#25201C]/20 transition-colors text-xs sm:text-sm">
-                      <TableCell className="py-3 px-4 font-sans">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9]">
-                            {sub.username ? `@${sub.username}` : (sub.discordUsername ? `@${sub.discordUsername}` : 'Unknown Member')}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-mono">{sub.userId}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {sub.options.map((opt: string) => {
-                            let label = '';
-                            let badgeStyle = '';
-                            if (opt === '49B40A9yBS') {
-                              label = '🎉 กิจกรรม';
-                              badgeStyle = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30';
-                            } else if (opt === 'JNySCX80ja') {
-                              label = '📢 ประกาศสำคัญ';
-                              badgeStyle = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30';
-                            } else if (opt === 'DsMHlVrjze') {
-                              label = '📑 ข่าวสารทั่วไป';
-                              badgeStyle = 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30';
-                            } else if (opt === '6io1xnaMWJ') {
-                              label = '🎁 โปรโมชันและโฆษณา';
-                              badgeStyle = 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30';
-                            }
-                            return (
-                              <Badge key={opt} variant="outline" className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold border", badgeStyle)}>
-                                {label}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 px-4 text-xs text-muted-foreground">
-                        {new Date(sub.updatedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-56">
+                  <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    className="pl-9 h-9 text-xs rounded-xl"
+                    placeholder="ค้นหาชื่อ หรือ User ID..."
+                    value={memberSearchQuery}
+                    onChange={(e) => { setMemberSearchQuery(e.target.value); setMemberPage(1); }}
+                  />
+                </div>
+                <Select value={filterOption} onValueChange={(val) => { setFilterOption(val); setMemberPage(1); }}>
+                  <SelectTrigger className="w-36 h-9 text-xs rounded-xl"><SelectValue placeholder="หมวดหมู่" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทั้งหมด</SelectItem>
+                    <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
+                    <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
+                    <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
+                    <SelectItem value="6io1xnaMWJ">🎁 โปรโมชัน</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              {loadingMembers ? (
+                <div className="text-center py-12 text-muted-foreground animate-pulse text-xs">กำลังโหลดรายชื่อสมาชิก...</div>
+              ) : paginatedMembers.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-xs border border-dashed rounded-2xl">ไม่พบรายชื่อสมาชิกที่ค้นหา</div>
+              ) : (
+                <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl overflow-hidden bg-white dark:bg-[#1E1B18]">
+                  <Table>
+                    <TableHeader className="bg-[#FAF6F0]/50 dark:bg-[#25201C]/50">
+                      <TableRow>
+                        <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">สมาชิก</TableHead>
+                        <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">หมวดหมู่ที่ติดตาม</TableHead>
+                        <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">ลงทะเบียนเมื่อ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedMembers.map((sub) => (
+                        <TableRow key={sub.userId} className="text-xs">
+                          <TableCell className="py-3 px-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9]">
+                                {sub.username ? `@${sub.username}` : (sub.discordUsername ? `@${sub.discordUsername}` : 'Unknown Member')}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">{sub.userId}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1">
+                              {sub.options.map((opt) => (
+                                <Badge key={opt} variant="outline" className="text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                                  {opt === '49B40A9yBS' && '🎉 กิจกรรม'}
+                                  {opt === 'JNySCX80ja' && '📢 ประกาศสำคัญ'}
+                                  {opt === 'DsMHlVrjze' && '📑 ข่าวสารทั่วไป'}
+                                  {opt === '6io1xnaMWJ' && '🎁 โปรโมชัน'}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-xs text-muted-foreground">
+                            {new Date(sub.updatedAt).toLocaleString('th-TH', { dateStyle: 'medium' })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
 
+              {/* Pagination Controls */}
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-xs text-muted-foreground">หน้า {memberPage} จาก {totalMemberPages} (รวม {filteredMemberSubs.length} รายการ)</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl" disabled={memberPage <= 1} onClick={() => setMemberPage(m => m - 1)}>
+                    <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl" disabled={memberPage >= totalMemberPages} onClick={() => setMemberPage(m => m + 1)}>
+                    ถัดไป <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 4: Live Bot Logs & DB Cleanup Tool */}
+        <TabsContent value="logs" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            
+            {/* DB Log Cleanup Tool */}
+            <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
+              <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                    <Database className="w-5 h-5 text-amber-500" /> เครื่องมือจัดการพื้นที่ฐานข้อมูล (Database Log Cleaner)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    ล้างซาก Log แคมเปญเก่าที่ส่งเสร็จสิ้นแล้วเพื่อคืนสปีดและความเบาให้ฐานข้อมูล Supabase
+                  </CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="rounded-xl text-xs gap-1.5 font-bold"
+                  onClick={handleCleanOldLogs}
+                  disabled={cleaningLogs}
+                >
+                  {cleaningLogs ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  🗑️ ล้าง Log แคมเปญเก่า (เก่ากว่า 14 วัน)
+                </Button>
+              </CardHeader>
+            </Card>
+
+            {/* Thai Live Console Logs */}
+            <Card className="border-[#EAD8C8] bg-[#1E1B18] text-[#EAD8C8] shadow-md rounded-3xl overflow-hidden">
+              <CardHeader className="pb-3 border-b border-[#2D2520] flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base font-bold flex items-center gap-2 text-emerald-400">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    📟 บันทึกการทำงานระบบบอทภาษาไทย (Live Bot Status Logs)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-zinc-400">
+                    แสดงสถานะการทำงานสดจากบอทเป็นภาษาไทยแบบ Real-time (เก็บบันทึกล่าสุดไม่เกิน 500 แถว)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" className="h-7 text-xs border-[#2D2520] bg-[#25201C] text-zinc-300" onClick={fetchSystemLogs}>
+                    <RefreshCw className="w-3 h-3 mr-1" /> รีเฟรช
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-rose-400 hover:bg-rose-950/30" onClick={handleClearSystemLogs}>
+                    ล้างหน้าจอ
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 font-mono text-xs max-h-80 overflow-y-auto space-y-1.5 scrollbar-thin">
+                {systemLogs.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-500 text-xs italic">
+                    ยังไม่มีบันทึกสถานะจากบอท (บอทจะส่งรายงานสถานะภาษาไทยมาที่นี่เมื่อเริ่มทำงาน)
+                  </div>
+                ) : (
+                  systemLogs.map((log) => {
+                    const colorClass =
+                      log.level === 'error' ? 'text-rose-400 bg-rose-950/20 p-1 rounded border border-rose-900/30 font-bold' :
+                      log.level === 'warn' ? 'text-amber-300' :
+                      log.level === 'success' ? 'text-emerald-400 font-bold' :
+                      'text-zinc-300';
+
+                    return (
+                      <div key={log.id} className={cn("leading-relaxed flex items-start gap-2", colorClass)}>
+                        <span className="select-none text-zinc-500 shrink-0 text-[10px]">
+                          {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                        <span>{log.message_th}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
+        </TabsContent>
+
+      </Tabs>
     </div>
   );
 }
