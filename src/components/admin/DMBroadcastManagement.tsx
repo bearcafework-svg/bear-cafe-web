@@ -279,6 +279,13 @@ export function DMBroadcastManagement() {
   const [tokenType, setTokenType] = useState<'token1' | 'token2'>('token1');
   const [inputMode, setInputMode] = useState<'text' | 'json'>('text');
   const [textContent, setTextContent] = useState('');
+  
+  // Safety & Deduplication Controls
+  const [excludePreviousSuccess, setExcludePreviousSuccess] = useState(true);
+  const [safetyMode, setSafetyMode] = useState<'safe' | 'balanced' | 'custom'>('safe');
+  const [minDelaySec, setMinDelaySec] = useState(15);
+  const [maxDelaySec, setMaxDelaySec] = useState(35);
+  const [hourlyLimit, setHourlyLimit] = useState(50);
   const [jsonContent, setJsonContent] = useState(`{
   "data": {
     "flags": 32768,
@@ -592,6 +599,55 @@ export function DMBroadcastManagement() {
     }
   };
 
+  // Retry Failed Campaign Items Only
+  const handleRetryFailedCampaign = async (campaignId: string) => {
+    try {
+      setLoading(true);
+      // 1. Reset logs with status 'failed' to 'pending'
+      const { error: logErr } = await supabase
+        .from('dm_broadcast_logs' as any)
+        .update({
+          status: 'pending',
+          error_message: null,
+          sent_at: null
+        })
+        .eq('queue_id', campaignId)
+        .eq('status', 'failed');
+
+      if (logErr) throw logErr;
+
+      // 2. Set campaign queue status back to 'pending'
+      const { error: queueErr } = await supabase
+        .from('dm_broadcast_queues' as any)
+        .update({
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
+
+      if (queueErr) throw queueErr;
+
+      toast({
+        title: 'เริ่มส่งซ่อมรายการล้มเหลวเรียบร้อยแล้วค่ะ',
+        description: 'ระบบรีเซ็ตรายการล้มเหลวกลับเข้าสู่คิว และแจ้งให้บอทเริ่มประมวลผลต่อทันที'
+      });
+
+      fetchDashboardData();
+      if (expandedCampaignId === campaignId) {
+        fetchCampaignLogs(campaignId);
+      }
+    } catch (e: any) {
+      console.error('Error retrying failed campaign:', e);
+      toast({
+        title: 'เกิดข้อผิดพลาด',
+        description: e.message || 'ไม่สามารถสั่งส่งซ่อมรายการล้มเหลวได้',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Submit new Campaign
   const handleSubmitCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -620,6 +676,20 @@ export function DMBroadcastManagement() {
       toast({ title: 'กรุณากรอก Discord User ID สำหรับทดสอบ', variant: 'destructive' });
       return;
     }
+
+    // Attach Safety & Anti-Spam Options
+    const optionsObj = {
+      exclude_previous_success: excludePreviousSuccess,
+      min_delay_sec: safetyMode === 'safe' ? 15 : safetyMode === 'balanced' ? 5 : minDelaySec,
+      max_delay_sec: safetyMode === 'safe' ? 35 : safetyMode === 'balanced' ? 15 : maxDelaySec,
+      hourly_limit: safetyMode === 'safe' ? 50 : safetyMode === 'balanced' ? 100 : hourlyLimit,
+      consecutive_failure_limit: 5
+    };
+
+    payload = {
+      ...payload,
+      options: optionsObj
+    };
 
     setSubmitting(true);
 
@@ -874,6 +944,33 @@ export function DMBroadcastManagement() {
                   </Select>
                 </div>
 
+                {/* Safety & Anti-Spam Options */}
+                <div className="p-3 bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="dedup" className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5 cursor-pointer">
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" /> ข้ามคนที่เคยส่งสำเร็จแล้ว (กันส่งซ้ำ)
+                    </Label>
+                    <input 
+                      id="dedup"
+                      type="checkbox"
+                      checked={excludePreviousSuccess}
+                      onChange={(e) => setExcludePreviousSuccess(e.target.checked)}
+                      className="w-4 h-4 accent-[#8C6239] rounded cursor-pointer"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-[#827160]">ความเร็วส่งและระยะหน่วง (Safety Velocity)</Label>
+                    <Select value={safetyMode} onValueChange={(val: 'safe' | 'balanced') => setSafetyMode(val)}>
+                      <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="safe">🛡️ Safe Mode (สุ่มหน่วง 15-35 วิ | 50 ข้อความ/ชม.)</SelectItem>
+                        <SelectItem value="balanced">⚡ Balanced Mode (สุ่มหน่วง 5-15 วิ | 100 ข้อความ/ชม.)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 {/* Input Mode Selector */}
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-[#827160]">รูปแบบเนื้อหาข้อความ</Label>
@@ -993,6 +1090,19 @@ export function DMBroadcastManagement() {
                             <div className="flex items-center gap-1.5 ml-auto">
                               {getStatusBadge(c)}
                               
+                              {/* Retry Failed button if has failures and not processing */}
+                              {c.failed_count > 0 && c.status !== 'processing' && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-6.5 px-2 rounded-lg text-[9px] gap-1 shrink-0 font-bold border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                                  onClick={() => handleRetryFailedCampaign(c.id)}
+                                  title="ส่งซ่อมเฉพาะรายการที่ล้มเหลวอีกครั้ง"
+                                >
+                                  <RefreshCw className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> ส่งซ่อม ({c.failed_count})
+                                </Button>
+                              )}
+
                               {/* Cancel button if running */}
                               {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
                                 <Button 
