@@ -86,6 +86,9 @@ serve(async (req) => {
     finalCap = Math.max(Number(finalCap) || DEFAULT_CAP, DEFAULT_CAP);
 
     if (action === 'get') {
+      if (currentPoints > finalCap) {
+        currentPoints = finalCap;
+      }
       await supabaseAdmin.from('user_points').upsert({ 
         discord_id: discordId, 
         points: currentPoints, 

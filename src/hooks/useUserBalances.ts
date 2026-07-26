@@ -78,12 +78,21 @@ export async function fetchUserBalances(discordId: string): Promise<UserBalances
     .eq('discord_id', discordId)
     .maybeSingle();
 
-  const points = synced?.points ?? data?.points ?? 0;
+  let points = synced?.points ?? data?.points ?? 0;
   const storedCap = synced?.maxCap ?? data?.max_cap;
+  const maxCap = resolveMaxCap(storedCap, points);
+
+  if (points > maxCap) {
+    points = maxCap;
+    void supabase
+      .from('user_points')
+      .update({ points: maxCap })
+      .eq('discord_id', discordId);
+  }
 
   return {
     points,
-    maxCap: resolveMaxCap(storedCap, points),
+    maxCap,
     ticketPoint: data?.ticket_point ?? 0,
     ticketPiecePoint: data?.ticket_piece_point ?? 0,
   };

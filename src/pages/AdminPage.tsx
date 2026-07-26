@@ -42,6 +42,8 @@ import { HealingMessagesManagement } from '@/components/admin/HealingMessagesMan
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
 import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
+import { BeesManagement } from '@/components/admin/BeesManagement';
+
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
 import { NonTransferableRolesManagement } from '@/components/admin/NonTransferableRolesManagement';
@@ -113,6 +115,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'dm-broadcast': Send,
   'manage-staff': Users,
   'sticky-messages': Pin,
+  'bees': Coffee,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -375,6 +378,8 @@ export default function AdminPage() {
         case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
         case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
+        case 'bees': return canAccessPage('bees') ? <BeesManagement /> : null;
+
         default: return null;
       }
     } catch (error) {

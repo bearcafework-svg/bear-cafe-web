@@ -63,6 +63,10 @@ import {
   Mail,
   Tag,
   Search,
+  Gift,
+  Maximize2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -94,6 +98,7 @@ interface UnifiedRecord {
   id: string;
   source: 'legacy' | 'new';          // 'legacy' = trading_history, 'new' = orders
   member_id: string;
+  recipient_id?: string | null;
   staff_id: string | null;
   transaction_date: string | null;    // YYYY-MM-DD (legacy uses transaction field)
   total_amount: number;
@@ -242,10 +247,30 @@ export function TradingHistoryManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [newBill, setNewBill] = useState({
+    purchaseType: 'self' as 'self' | 'gift',
     memberId: '',
+    recipientId: '',
     transactionDate: '',
     billType: 'ธนาคารทั่วไป',
   });
+
+  // Full Slip Mode toggle (global & per-card)
+  const [fullSlipMode, setFullSlipMode] = useState<boolean>(() => {
+    return localStorage.getItem('trading_full_slip_mode') === 'true';
+  });
+  const handleToggleFullSlipMode = (val: boolean) => {
+    setFullSlipMode(val);
+    localStorage.setItem('trading_full_slip_mode', String(val));
+  };
+  const [expandedCardSlips, setExpandedCardSlips] = useState<Set<string>>(new Set());
+  const toggleCardSlip = (recordId: string) => {
+    setExpandedCardSlips(prev => {
+      const next = new Set(prev);
+      if (next.has(recordId)) next.delete(recordId);
+      else next.add(recordId);
+      return next;
+    });
+  };
   // 2 separate item lists: class_role (max 1) and others (multi)
   const [selectedClassItem, setSelectedClassItem] = useState<SelectedItem | null>(null);
   const [selectedOtherItems, setSelectedOtherItems] = useState<SelectedItem[]>([]);
@@ -260,6 +285,7 @@ export function TradingHistoryManagement() {
   // ── Filters ──
   const [serviceQuery, setServiceQuery] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
+  const [recipientQuery, setRecipientQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
   const [billTypeQuery, setBillTypeQuery] = useState('');
   const [periodMode, setPeriodMode] = useState<'day' | 'month' | 'year'>('day');
@@ -398,6 +424,7 @@ export function TradingHistoryManagement() {
         id: r.id,
         source: 'new',
         member_id: r.member_id,
+        recipient_id: r.recipient_id ?? null,
         staff_id: r.staff_id ?? null,
         transaction_date: r.transaction_date ?? null,
         total_amount: r.total_amount ?? 0,
@@ -425,7 +452,7 @@ export function TradingHistoryManagement() {
         return new Date(b.log_timestamp).getTime() - new Date(a.log_timestamp).getTime();
       });
 
-      const allIds = merged.flatMap(r => [r.staff_id, r.member_id].filter(Boolean) as string[]);
+      const allIds = merged.flatMap(r => [r.staff_id, r.member_id, r.recipient_id].filter(Boolean) as string[]);
       fetchProfiles(allIds);
       fetchSalmonPoints([...new Set(merged.map(r => r.member_id).filter(Boolean))]);
       setRecords(merged);
@@ -555,6 +582,10 @@ export function TradingHistoryManagement() {
       toast({ title: 'กรุณากรอกข้อมูลให้ครบ', description: 'ต้องมีสินค้าอย่างน้อย 1 รายการ และรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
       return;
     }
+    if (newBill.purchaseType === 'gift' && !newBill.recipientId.trim()) {
+      toast({ title: 'กรุณากรอก Member ID (ผู้รับ)', description: 'เนื่องจากเลือกประเภทการซื้อเป็น "ซื้อให้คนอื่น"', variant: 'destructive' });
+      return;
+    }
     // Validate prices
     for (const item of allSelectedItems) {
       if (!item.price_paid || parseFloat(item.price_paid) < 0) {
@@ -579,9 +610,12 @@ export function TradingHistoryManagement() {
         imageUrls.push(supabase.storage.from('slip-images').getPublicUrl(fileName).data.publicUrl);
       }
 
+      const recipientIdToInsert = newBill.purchaseType === 'gift' ? newBill.recipientId.trim() : null;
+
       // 2. Insert order (total_amount will be set by trigger after purchase_items insert)
       const { data: orderData, error: orderError } = await (supabase as any).from('orders').insert({
         member_id: newBill.memberId.trim(),
+        recipient_id: recipientIdToInsert,
         staff_id: user?.discord_id ?? null,
         transaction_date: newBill.transactionDate,
         total_amount: 0, // trigger will update this
@@ -616,14 +650,15 @@ export function TradingHistoryManagement() {
         if (billType === 'ธนาคารทั่วไป') thumbnailUrl = 'https://cdn.discordapp.com/attachments/1144675871798591569/1410542166232531024/bank.png';
         else if (billType === 'ทรูมันนี่') thumbnailUrl = 'https://cdn.discordapp.com/attachments/1144675871798591569/1410542166664806510/truemoney.png';
 
-        const description = `## <:Service:1395695113258274887>︲__\` มีการส่งบิลใหม่! \`__\n<:line:1144701793989840997>\n- __\`ผู้ดำเนินการ\`__: <@${buyerId}>\n- __\`ผู้ซื้อ\`__: <@${newBill.memberId}> - \`${newBill.memberId}\`\n- __\`เวลา\`__: ${discordTimestamp}\n- __\`ยอดรวม\`__: ${computedTotalAmount} บาท\n- __\`ประเภทบิล\`__: ${billType}\n- __\`สินค้า\`__: ${productList}`.trim();
+        const giftLine = recipientIdToInsert ? `\n- __\`ผู้รับ (ของขวัญ)\`__: <@${recipientIdToInsert}> - \`${recipientIdToInsert}\`` : '';
+        const description = `## <:Service:1395695113258274887>︲__\` มีการส่งบิลใหม่! \`__\n<:line:1144701793989840997>\n- __\`ผู้ดำเนินการ\`__: <@${buyerId}>\n- __\`ผู้ซื้อ\`__: <@${newBill.memberId}> - \`${newBill.memberId}\`${giftLine}\n- __\`เวลา\`__: ${discordTimestamp}\n- __\`ยอดรวม\`__: ${computedTotalAmount} บาท\n- __\`ประเภทบิล\`__: ${billType}\n- __\`สินค้า\`__: ${productList}`.trim();
 
         await fetch(DISCORD_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: '⊹ ꒰ แจ้งเตือนบิลใหม่ ꒱ 💸',
-            content: `<@${buyerId}> <@${newBill.memberId}>`,
+            content: `<@${buyerId}> <@${newBill.memberId}>${recipientIdToInsert ? ` <@${recipientIdToInsert}>` : ''}`,
             embeds: [{ description, color: 0xffdf8f, thumbnail: thumbnailUrl ? { url: thumbnailUrl } : undefined, image: imageUrls[0] ? { url: imageUrls[0] } : undefined }],
           }),
         });
@@ -631,7 +666,7 @@ export function TradingHistoryManagement() {
 
       toast({ title: 'สร้างบิลสำเร็จ', className: 'bg-success text-success-foreground' });
       setIsAddDialogOpen(false);
-      setNewBill({ memberId: '', transactionDate: '', billType: 'ธนาคารทั่วไป' });
+      setNewBill({ purchaseType: 'self', memberId: '', recipientId: '', transactionDate: '', billType: 'ธนาคารทั่วไป' });
       setSelectedClassItem(null);
       setSelectedOtherItems([]);
       setSelectedFiles([]);
@@ -823,6 +858,11 @@ export function TradingHistoryManagement() {
       r.member_id.toLowerCase().includes(memberQuery.toLowerCase()) ||
       memResolved.name.toLowerCase().includes(memberQuery.toLowerCase()) ||
       (memResolved.discord_username ?? '').toLowerCase().includes(memberQuery.toLowerCase());
+    const recResolved = resolveDisplayName(r.recipient_id ?? '');
+    const recMatch = !recipientQuery.trim() ||
+      (r.recipient_id ?? '').toLowerCase().includes(recipientQuery.toLowerCase()) ||
+      recResolved.name.toLowerCase().includes(recipientQuery.toLowerCase()) ||
+      (recResolved.discord_username ?? '').toLowerCase().includes(recipientQuery.toLowerCase());
     const typeMatch = !billTypeQuery.trim() || (r.type_bill ?? '').toLowerCase().includes(billTypeQuery.toLowerCase());
     const dateMatch = !dateQuery || (() => {
       const d = parseTransactionDate(r.transaction_date);
@@ -839,8 +879,8 @@ export function TradingHistoryManagement() {
       if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
       return yyyy === selectedPeriod;
     })();
-    return svcMatch && memMatch && typeMatch && dateMatch && periodMatch;
-  }), [records, serviceQuery, memberQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
+    return svcMatch && memMatch && recMatch && typeMatch && dateMatch && periodMatch;
+  }), [records, serviceQuery, memberQuery, recipientQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
   const paginatedRecords = useMemo(() => {
@@ -1005,28 +1045,97 @@ export function TradingHistoryManagement() {
               </DialogHeader>
 
               <div className="space-y-5 py-2">
-                {/* Member / date / bill type */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-muted/40 p-4 rounded-2xl border border-border/40">
-                  <div className="space-y-1">
-                    <Label htmlFor="memberId" className="text-xs font-semibold">Member ID (ผู้ซื้อ) *</Label>
-                    <Input id="memberId" value={newBill.memberId} onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))} placeholder="Discord ID" className="h-9 text-xs rounded-xl" />
+                {/* Member / purchase type / date / bill type */}
+                <div className="space-y-4 bg-muted/30 p-4 rounded-2xl border border-border/40 shadow-sm">
+                  {/* Header Row: Title & Segmented Purchase Type Toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-border/20">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-bold text-foreground">ข้อมูลการชำระเงิน & รูปแบบบิล</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-muted/80 p-1 rounded-xl border border-border/40 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setNewBill(p => ({ ...p, purchaseType: 'self' }))}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                          newBill.purchaseType === 'self'
+                            ? 'bg-primary text-primary-foreground shadow-sm font-bold'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        ซื้อให้ตัวเอง
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewBill(p => ({ ...p, purchaseType: 'gift' }))}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                          newBill.purchaseType === 'gift'
+                            ? 'bg-primary text-primary-foreground shadow-sm font-bold'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <Gift className="w-3.5 h-3.5" />
+                        ซื้อให้คนอื่น (ของขวัญ)
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="txDate" className="text-xs font-semibold">วันทำรายการ *</Label>
-                    <DatePicker
-                      value={newBill.transactionDate}
-                      onChange={date => setNewBill(p => ({ ...p, transactionDate: date }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">ประเภทบิล</Label>
-                    <Select value={newBill.billType} onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}>
-                      <SelectTrigger className="h-9 text-xs rounded-xl"><SelectValue /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
-                        <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  {/* Form Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="memberId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                        <User className="w-3.5 h-3.5 text-primary" /> Member ID (ผู้ซื้อ) *
+                      </Label>
+                      <Input
+                        id="memberId"
+                        value={newBill.memberId}
+                        onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))}
+                        placeholder="Discord ID ผู้โอนเงิน"
+                        className="h-9 text-xs rounded-xl bg-background border-border/50 focus:ring-primary/20"
+                      />
+                    </div>
+
+                    {newBill.purchaseType === 'gift' && (
+                      <div className="space-y-1">
+                        <Label htmlFor="recipientId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                          <User className="w-3.5 h-3.5 text-primary" /> Member ID (ผู้รับ) *
+                        </Label>
+                        <Input
+                          id="recipientId"
+                          value={newBill.recipientId}
+                          onChange={e => setNewBill(p => ({ ...p, recipientId: e.target.value }))}
+                          placeholder="Discord ID ของผู้รับ"
+                          className="h-9 text-xs rounded-xl bg-background border-border/50 focus:ring-primary/20"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <Label htmlFor="txDate" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                        <Calendar className="w-3.5 h-3.5 text-primary" /> วันทำรายการ *
+                      </Label>
+                      <DatePicker
+                        value={newBill.transactionDate}
+                        onChange={date => setNewBill(p => ({ ...p, transactionDate: date }))}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                        <CreditCard className="w-3.5 h-3.5 text-primary" /> ประเภทบิล
+                      </Label>
+                      <Select value={newBill.billType} onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}>
+                        <SelectTrigger className="h-9 text-xs rounded-xl bg-background border-border/50"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
+                          <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
 
@@ -1416,6 +1525,23 @@ export function TradingHistoryManagement() {
                   แบบกระชับ
                 </Button>
               </div>
+
+              {/* Toggle image mode button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-8 px-3 rounded-xl text-xs font-semibold gap-1.5 transition-all border',
+                  fullSlipMode
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 font-bold shadow-sm'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => handleToggleFullSlipMode(!fullSlipMode)}
+                title="เปิด/ปิดการแสดงภาพสลิปแบบเต็มรูปในบัตร"
+              >
+                <Maximize2 className="h-3.5 w-3.5 text-amber-500" />
+                {fullSlipMode ? 'แสดงสลิปเต็มรูป (เปิดอยู่)' : 'แสดงสลิปเต็มรูป'}
+              </Button>
             </div>
           </div>
 
@@ -1423,7 +1549,7 @@ export function TradingHistoryManagement() {
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               <Search className="w-3.5 h-3.5 text-primary" /> ค้นหาและกรองบิล
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div className="space-y-1">
                 <Label className="text-[10px] font-semibold text-muted-foreground">ผู้ดำเนินการ</Label>
                 <Input
@@ -1439,6 +1565,15 @@ export function TradingHistoryManagement() {
                   value={memberQuery}
                   onChange={e => { setMemberQuery(e.target.value); setCurrentPage(1); }}
                   placeholder="ค้นหาผู้ซื้อ..."
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-semibold text-muted-foreground">ผู้รับ (Recipient ID)</Label>
+                <Input
+                  value={recipientQuery}
+                  onChange={e => { setRecipientQuery(e.target.value); setCurrentPage(1); }}
+                  placeholder="ค้นหาผู้รับ..."
                   className="h-9 text-xs rounded-xl bg-background"
                 />
               </div>
@@ -1541,10 +1676,19 @@ export function TradingHistoryManagement() {
                           </div>
                         )}
 
-                        {/* Member */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ซื้อ</span>
-                          <UserBadge id={r.member_id} />
+                        {/* Member & Recipient */}
+                        <div className="grid grid-cols-1 gap-2">
+                          <div className="space-y-1">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้ซื้อ</span>
+                            <UserBadge id={r.member_id} />
+                          </div>
+
+                          {r.recipient_id && r.recipient_id !== r.member_id && (
+                            <div className="space-y-1">
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ผู้รับ (ของขวัญ)</span>
+                              <UserBadge id={r.recipient_id} />
+                            </div>
+                          )}
                         </div>
 
                         {/* Amount / bill type / salmon */}
@@ -1631,12 +1775,47 @@ export function TradingHistoryManagement() {
 
                         {/* Slips */}
                         {(r.slip_url || r.slip_url_2) && (
-                          <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                            {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => (
-                              <button key={i} onClick={() => setPreviewImage(url!)} className="block w-full rounded-lg overflow-hidden border border-border hover:border-primary/40 transition-colors cursor-pointer">
-                                <img src={url!} alt={`บิล ${i+1}`} className="w-full h-32 object-cover" loading="lazy" />
+                          <div className="space-y-1.5 pt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                                <UploadCloud className="w-3 h-3 text-primary" /> สลิปการโอน
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleCardSlip(r.id)}
+                                className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
+                              >
+                                {expandedCardSlips.has(r.id) ? <EyeOff className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                                {expandedCardSlips.has(r.id) ? 'ย่อภาพ' : 'ขยายภาพเต็ม'}
                               </button>
-                            ))}
+                            </div>
+                            <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                              {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => {
+                                const isFull = fullSlipMode || expandedCardSlips.has(r.id);
+                                return (
+                                  <div key={i} className="relative group rounded-xl overflow-hidden border border-border bg-muted/20">
+                                    <img
+                                      src={url!}
+                                      alt={`บิล ${i+1}`}
+                                      className={cn(
+                                        "w-full transition-all duration-200 cursor-pointer",
+                                        isFull ? "max-h-[500px] object-contain bg-black/10 p-1" : "h-32 object-cover"
+                                      )}
+                                      onClick={() => setPreviewImage(url!)}
+                                      loading="lazy"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewImage(url!)}
+                                      className="absolute top-1.5 right-1.5 p-1 bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 shadow-sm"
+                                      title="ดูรูปภาพขนาดเต็ม"
+                                    >
+                                      <Maximize2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </CardContent>
@@ -1692,6 +1871,11 @@ export function TradingHistoryManagement() {
                                 ฿{formatCurrency(r.total_amount)}
                               </span>
                               {r.type_bill && <Badge variant="secondary" className="text-[9px] h-4.5 px-1.5">{r.type_bill}</Badge>}
+                              {r.recipient_id && r.recipient_id !== r.member_id && (
+                                <Badge variant="secondary" className="text-[9px] h-4.5 px-1.5 font-medium">
+                                  ซื้อให้: {resolveDisplayName(r.recipient_id).discord_username || resolveDisplayName(r.recipient_id).name}
+                                </Badge>
+                              )}
                               <span className="text-[10px] text-honey font-semibold flex items-center gap-0.5">
                                 <img src={fishIcon} className="w-3.5 h-3.5 object-contain" alt="" />
                                 +{computeSalmonDelta(r.total_amount)}

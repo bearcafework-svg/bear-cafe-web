@@ -7,9 +7,9 @@ export const DEFAULT_POINTS_CAP = 750;
  */
 export function resolveMaxCap(
   storedCap: number | null | undefined,
-  points: number,
+  _points?: number,
 ): number {
   const base =
     storedCap != null && storedCap > 0 ? storedCap : DEFAULT_POINTS_CAP;
-  return Math.max(base, DEFAULT_POINTS_CAP, points);
+  return Math.max(base, DEFAULT_POINTS_CAP);
 }

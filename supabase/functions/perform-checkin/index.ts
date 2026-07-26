@@ -106,14 +106,23 @@ Deno.serve(async (req): Promise<Response> => {
 
       const { data: up } = await sb
         .from("user_points")
-        .select(col)
+        .select("points, max_cap, ticket_point, ticket_piece_point")
         .eq("discord_id", discord_id)
         .maybeSingle();
 
       const current = (up as unknown as Record<string, number>)?.[col] ?? 0;
+      let nextPoints = current + amount;
+
+      if (col === "points") {
+        const maxCap = (up as unknown as Record<string, number>)?.max_cap && (up as unknown as Record<string, number>).max_cap > 0
+          ? (up as unknown as Record<string, number>).max_cap
+          : 750;
+        if (nextPoints > maxCap) nextPoints = maxCap;
+      }
+
       await sb
         .from("user_points")
-        .update({ [col]: current + amount })
+        .update({ [col]: nextPoints })
         .eq("discord_id", discord_id);
     } else if (reward.reward_type === "role" && reward.role_id) {
       rewardSnapshot.role_id = reward.role_id;
