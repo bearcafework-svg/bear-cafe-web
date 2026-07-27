@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; icon: string; }
@@ -885,81 +886,82 @@ export default function DiscordServersPage() {
           </motion.p>
         </div>
 
+        {/* UI Design Switcher (Kawaii Shop vs Classic Grid) */}
         {/* Featured Carousel */}
         <FeaturedCarousel servers={featuredServers} onClickJoin={handleClickJoin} />
 
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-8">
-          <div className="flex gap-2 sm:gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="ค้นหาเซิร์ฟเวอร์..." className="pl-10 rounded-xl bg-white/50 dark:bg-card/50 border-latte/30 dark:border-coffee/30 h-9 sm:h-10 text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
-            <div className="flex gap-1.5 items-center">
-              <Button variant={sortMode === 'recent' ? 'default' : 'outline'} onClick={() => setSortMode('recent')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                <Clock className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ล่าสุด</span>
-              </Button>
-              <Button variant={sortMode === 'popular' ? 'default' : 'outline'} onClick={() => setSortMode('popular')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                <MousePointerClick className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ยอดนิยม</span>
-              </Button>
-              <Button variant={sortMode === 'rating' ? 'default' : 'outline'} onClick={() => setSortMode('rating')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                <Star className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">คะแนน</span>
-              </Button>
-            </div>
-          </div>
+              <div className="flex gap-2 sm:gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="ค้นหาเซิร์ฟเวอร์..." className="pl-10 rounded-xl bg-white/50 dark:bg-card/50 border-latte/30 dark:border-coffee/30 h-9 sm:h-10 text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                </div>
+                <div className="flex gap-1.5 items-center">
+                  <Button variant={sortMode === 'recent' ? 'default' : 'outline'} onClick={() => setSortMode('recent')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
+                    <Clock className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ล่าสุด</span>
+                  </Button>
+                  <Button variant={sortMode === 'popular' ? 'default' : 'outline'} onClick={() => setSortMode('popular')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
+                    <MousePointerClick className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ยอดนิยม</span>
+                  </Button>
+                  <Button variant={sortMode === 'rating' ? 'default' : 'outline'} onClick={() => setSortMode('rating')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
+                    <Star className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">คะแนน</span>
+                  </Button>
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
-              <Button variant={selectedCategory === 'all' ? 'default' : 'outline'} onClick={() => setSelectedCategory('all')} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">ทั้งหมด</Button>
-              {categories.map((cat) => (
-                <Button key={cat.id} variant={selectedCategory === cat.id ? 'default' : 'outline'} onClick={() => setSelectedCategory(cat.id)} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">
-                  {cat.icon} {cat.name}
-                </Button>
-              ))}
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
+                  <Button variant={selectedCategory === 'all' ? 'default' : 'outline'} onClick={() => setSelectedCategory('all')} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">ทั้งหมด</Button>
+                  {categories.map((cat) => (
+                    <Button key={cat.id} variant={selectedCategory === cat.id ? 'default' : 'outline'} onClick={() => setSelectedCategory(cat.id)} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">
+                      {cat.icon} {cat.name}
+                    </Button>
+                  ))}
+                </div>
+                {user && (
+                  <div className="flex items-center gap-1.5 shrink-0 bg-white/50 dark:bg-card/50 rounded-full px-2.5 py-1.5 border border-border/40">
+                    <Switch checked={showMyOnly} onCheckedChange={setShowMyOnly} className="scale-75" />
+                    <span className="text-[10px] sm:text-xs text-muted-foreground font-medium whitespace-nowrap">ของฉัน</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {user && (
-              <div className="flex items-center gap-1.5 shrink-0 bg-white/50 dark:bg-card/50 rounded-full px-2.5 py-1.5 border border-border/40">
-                <Switch checked={showMyOnly} onCheckedChange={setShowMyOnly} className="scale-75" />
-                <span className="text-[10px] sm:text-xs text-muted-foreground font-medium whitespace-nowrap">ของฉัน</span>
+
+            {/* Server Grid */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse text-sm">กำลังโหลดเซิร์ฟเวอร์น่าสนใจ...</p>
+              </div>
+            ) : filteredServers.length === 0 ? (
+              <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30">
+                <Search className="w-10 h-10 text-muted-foreground opacity-30 mx-auto mb-3" />
+                <h3 className="text-lg sm:text-xl font-bold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
+                <p className="text-muted-foreground text-sm mb-4">ลองเปลี่ยนคำค้นหา หรือหมวดหมู่ดูนะคะ</p>
+                <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
+                {filteredServers.map((server, index) => (
+                  <motion.div key={server.id} className="h-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
+                    <ServerCard
+                      server={server}
+                      user={user}
+                      userId={userId}
+                      getCategoryName={getCategoryName}
+                      getTimeSince={getTimeSince}
+                      handleClickJoin={handleClickJoin}
+                      handleBump={handleBump}
+                      bumpingId={bumpingId}
+                      handleRated={handleRated}
+                      onRefresh={handleRefreshServer}
+                      refreshingId={refreshingId}
+                    />
+                  </motion.div>
+                ))}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Server Grid */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <p className="text-muted-foreground animate-pulse text-sm">กำลังโหลดเซิร์ฟเวอร์น่าสนใจ...</p>
-          </div>
-        ) : filteredServers.length === 0 ? (
-          <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30">
-            <Search className="w-10 h-10 text-muted-foreground opacity-30 mx-auto mb-3" />
-            <h3 className="text-lg sm:text-xl font-bold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
-            <p className="text-muted-foreground text-sm mb-4">ลองเปลี่ยนคำค้นหา หรือหมวดหมู่ดูนะคะ</p>
-            <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
-            {filteredServers.map((server, index) => (
-              <motion.div key={server.id} className="h-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
-                <ServerCard
-                  server={server}
-                  user={user}
-                  userId={userId}
-                  getCategoryName={getCategoryName}
-                  getTimeSince={getTimeSince}
-                  handleClickJoin={handleClickJoin}
-                  handleBump={handleBump}
-                  bumpingId={bumpingId}
-                  handleRated={handleRated}
-                  onRefresh={handleRefreshServer}
-                  refreshingId={refreshingId}
-                />
-              </motion.div>
-            ))}
-          </div>
-        )}
 
         {/* Owner expired servers section — visible only to the server owner (Req 2.3, 4.3, 4.4, 5.1, 5.2, 5.6) */}
         {isAuthenticated && ownerExpiredServers.length > 0 && (
