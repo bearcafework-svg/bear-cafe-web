@@ -426,7 +426,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       joined_at: new Date().toISOString().split('T')[0],
       intern_start_at: '',
       intern_end_at: '',
-      notes: '',
+      notes: 'ยินดีต้อนรับนะ ขอให้เธอได้เจอเพื่อนดี ๆ มีความสุข สนุกกับทุกช่วงเวลา และสมหวังในทุกสิ่งที่ตั้งใจ <a:bearg23:1396016002818506754>',
       status: 'Active',
       level_change_reason: ''
     });
@@ -1329,11 +1329,19 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
             )}
 
             <div className="space-y-1">
-              <Label className="text-xs">หมายเหตุ</Label>
+              <div className="flex justify-between items-center">
+                <Label className="text-xs">ข้อความต้อนรับ</Label>
+                <span className="text-[10px] text-muted-foreground">{memberForm.notes.length}/100</span>
+              </div>
               <Textarea
                 value={memberForm.notes}
-                onChange={e => setMemberForm(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="ข้อมูลเพิ่มเติมสำหรับผู้ใช้คนนี้..."
+                onChange={e => {
+                  if (e.target.value.length <= 100) {
+                    setMemberForm(prev => ({ ...prev, notes: e.target.value }));
+                  }
+                }}
+                maxLength={100}
+                placeholder="กรอกข้อความต้อนรับ..."
                 className="border-latte/40 rounded-xl h-16"
               />
             </div>
