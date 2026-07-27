@@ -426,7 +426,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       joined_at: new Date().toISOString().split('T')[0],
       intern_start_at: '',
       intern_end_at: '',
-      notes: 'ยินดีต้อนรับนะ ขอให้เธอได้เจอเพื่อนดี ๆ มีความสุข สนุกกับทุกช่วงเวลา และสมหวังในทุกสิ่งที่ตั้งใจ <a:bearg23:1396016002818506754>',
+      notes: 'ยินดีต้อนรับนะ ขอให้เธอได้เจอเพื่อนดี ๆ มีความสุข สนุกกับทุกช่วงเวลา และสมหวังในทุกสิ่งที่ตั้งใจ',
       status: 'Active',
       level_change_reason: ''
     });
