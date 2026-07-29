@@ -67,6 +67,16 @@ import {
   Maximize2,
   Eye,
   EyeOff,
+  Download,
+  Copy,
+  Crown,
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  Flame,
+  Award,
+  Check,
+  FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -152,6 +162,10 @@ interface SelectedItem {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatCurrency(val: number): string {
+  return (val || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
 function toUnicodeNumber(n: number): string {
   const unicodeDigits = ['𝟢','𝟣','𝟤','𝟥','𝟦','𝟧','𝟨','𝟩','𝟪','𝟫'];
@@ -288,8 +302,7 @@ export function TradingHistoryManagement() {
   const [recipientQuery, setRecipientQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
   const [billTypeQuery, setBillTypeQuery] = useState('');
-  const [periodMode, setPeriodMode] = useState<'day' | 'month' | 'year'>('day');
-  const [selectedPeriod, setSelectedPeriod] = useState('');
+  const [selectedYear, setSelectedYear] = useState<string>(() => new Date().getFullYear().toString());
 
   // ── Load webhook setting ──
   useEffect(() => {
@@ -869,18 +882,8 @@ export function TradingHistoryManagement() {
       if (!d) return false;
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` === dateQuery;
     })();
-    const periodMatch = !selectedPeriod || selectedPeriod === 'all' || (() => {
-      const d = parseTransactionDate(r.transaction_date);
-      if (!d) return false;
-      const yyyy = String(d.getFullYear());
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      if (periodMode === 'day') return `${yyyy}-${mm}-${dd}` === selectedPeriod;
-      if (periodMode === 'month') return `${yyyy}-${mm}` === selectedPeriod;
-      return yyyy === selectedPeriod;
-    })();
-    return svcMatch && memMatch && recMatch && typeMatch && dateMatch && periodMatch;
-  }), [records, serviceQuery, memberQuery, recipientQuery, billTypeQuery, dateQuery, selectedPeriod, periodMode, resolveDisplayName]);
+    return svcMatch && memMatch && recMatch && typeMatch && dateMatch;
+  }), [records, serviceQuery, memberQuery, recipientQuery, billTypeQuery, dateQuery, resolveDisplayName]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / ITEMS_PER_PAGE));
   const paginatedRecords = useMemo(() => {
@@ -888,6 +891,230 @@ export function TradingHistoryManagement() {
     return filteredRecords.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredRecords, currentPage]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [totalPages, currentPage]);
+
+  // ── 12-Month Stats & Analytics ──
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    yearsSet.add(new Date().getFullYear().toString());
+    records.forEach(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (d) yearsSet.add(d.getFullYear().toString());
+    });
+    return Array.from(yearsSet).sort().reverse();
+  }, [records]);
+
+  const year12MonthStats = useMemo(() => {
+    const shortMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const fullMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+    const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+      monthIndex: i,
+      monthNum: i + 1,
+      monthName: shortMonths[i],
+      fullMonthName: fullMonths[i],
+      amount: 0,
+      count: 0,
+    }));
+
+    const currentYearStr = selectedYear;
+
+    const recordsInYear = records.filter(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      return d && d.getFullYear().toString() === currentYearStr;
+    });
+
+    recordsInYear.forEach(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return;
+      const m = d.getMonth();
+      if (m >= 0 && m < 12) {
+        monthlyData[m].amount += r.total_amount;
+        monthlyData[m].count += 1;
+      }
+    });
+
+    const yearTotalAmount = recordsInYear.reduce((s, r) => s + r.total_amount, 0);
+    const yearTotalBills = recordsInYear.length;
+    const yearAOV = yearTotalBills > 0 ? yearTotalAmount / yearTotalBills : 0;
+
+    let maxAmount = 0;
+    let peakMonthObj: typeof monthlyData[0] | null = null;
+    monthlyData.forEach(m => {
+      if (m.amount > maxAmount) {
+        maxAmount = m.amount;
+        peakMonthObj = m;
+      }
+    });
+
+    const activeMonths = monthlyData.filter(m => m.amount > 0).length;
+    const monthlyAvgAmount = activeMonths > 0 ? yearTotalAmount / activeMonths : 0;
+
+    let bankAmount = 0, bankCount = 0;
+    let truemoneyAmount = 0, truemoneyCount = 0;
+    let otherTypeAmount = 0, otherTypeCount = 0;
+
+    recordsInYear.forEach(r => {
+      const t = (r.type_bill ?? '').toLowerCase();
+      if (t.includes('ทรู') || t.includes('truemoney')) {
+        truemoneyAmount += r.total_amount;
+        truemoneyCount += 1;
+      } else if (t.includes('ธนาคาร') || t.includes('bank')) {
+        bankAmount += r.total_amount;
+        bankCount += 1;
+      } else {
+        otherTypeAmount += r.total_amount;
+        otherTypeCount += 1;
+      }
+    });
+
+    const productMap = new Map<string, { name: string; amount: number; count: number }>();
+    recordsInYear.forEach(r => {
+      if (r.purchase_items && r.purchase_items.length > 0) {
+        r.purchase_items.forEach(pi => {
+          const name = pi.product_display_name || 'สินค้าทั่วไป';
+          const curr = productMap.get(name) || { name, amount: 0, count: 0 };
+          curr.amount += pi.price_paid || 0;
+          curr.count += 1;
+          productMap.set(name, curr);
+        });
+      } else if (r.item) {
+        const name = r.item;
+        const curr = productMap.get(name) || { name, amount: 0, count: 0 };
+        curr.amount += r.total_amount || 0;
+        curr.count += 1;
+        productMap.set(name, curr);
+      }
+    });
+
+    const topProducts = Array.from(productMap.values())
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    const spenderMap = new Map<string, { memberId: string; amount: number; count: number }>();
+    recordsInYear.forEach(r => {
+      const memId = r.member_id;
+      if (!memId) return;
+      const curr = spenderMap.get(memId) || { memberId: memId, amount: 0, count: 0 };
+      curr.amount += r.total_amount;
+      curr.count += 1;
+      spenderMap.set(memId, curr);
+    });
+
+    const topSpenders = Array.from(spenderMap.values())
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    return {
+      monthlyData,
+      yearTotalAmount,
+      yearTotalBills,
+      yearAOV,
+      peakMonthObj,
+      monthlyAvgAmount,
+      recordsInYearCount: recordsInYear.length,
+      paymentBreakdown: {
+        bankAmount, bankCount,
+        truemoneyAmount, truemoneyCount,
+        otherTypeAmount, otherTypeCount,
+      },
+      topProducts,
+      topSpenders,
+    };
+  }, [records, selectedYear]);
+
+  const overallKPIs = useMemo(() => {
+    const totalRevenue = records.reduce((s, r) => s + r.total_amount, 0);
+    const totalBills = records.length;
+    const overallAOV = totalBills > 0 ? totalRevenue / totalBills : 0;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+    const prevYear = prevMonthDate.getFullYear();
+    const prevMonth = prevMonthDate.getMonth();
+
+    let thisMonthRev = 0, thisMonthCount = 0;
+    let lastMonthRev = 0, lastMonthCount = 0;
+
+    records.forEach(r => {
+      const d = parseTransactionDate(r.transaction_date);
+      if (!d) return;
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        thisMonthRev += r.total_amount;
+        thisMonthCount += 1;
+      } else if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) {
+        lastMonthRev += r.total_amount;
+        lastMonthCount += 1;
+      }
+    });
+
+    let momGrowth = 0;
+    if (lastMonthRev > 0) {
+      momGrowth = ((thisMonthRev - lastMonthRev) / lastMonthRev) * 100;
+    } else if (thisMonthRev > 0) {
+      momGrowth = 100;
+    }
+
+    return {
+      totalRevenue,
+      totalBills,
+      overallAOV,
+      thisMonthRev,
+      thisMonthCount,
+      lastMonthRev,
+      lastMonthCount,
+      momGrowth,
+    };
+  }, [records]);
+
+  const exportYearlyCSV = () => {
+    const headers = ['เดือน', 'ยอดขาย (บาท)', 'จำนวนบิล (ใบ)', 'เฉลี่ยต่อบิล (บาท)'];
+    const rows = year12MonthStats.monthlyData.map(m => [
+      m.fullMonthName,
+      m.amount.toFixed(2),
+      m.count.toString(),
+      (m.count > 0 ? (m.amount / m.count).toFixed(2) : '0.00'),
+    ]);
+
+    rows.push([
+      `รวมปี ${selectedYear}`,
+      year12MonthStats.yearTotalAmount.toFixed(2),
+      year12MonthStats.yearTotalBills.toString(),
+      year12MonthStats.yearAOV.toFixed(2),
+    ]);
+
+    const csvContent = '\uFEFF' + [headers, ...rows].map(e => e.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `รายงานยอดขาย_ปี_${selectedYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: `ส่งออกรายงานปี ${selectedYear} สำเร็จ` });
+  };
+
+  const copyYearlySummary = () => {
+    let summaryText = `📊 สรุปยอดขายประจำปี ${selectedYear} (12 เดือน)\n`;
+    summaryText += `-----------------------------------\n`;
+    summaryText += `💰 ยอดขายรวมทั้งปี: ฿${formatCurrency(year12MonthStats.yearTotalAmount)}\n`;
+    summaryText += `🧾 จำนวนบิลทั้งหมด: ${year12MonthStats.yearTotalBills} บิล\n`;
+    summaryText += `🏷️ ยอดขายเฉลี่ย/บิล (AOV): ฿${formatCurrency(year12MonthStats.yearAOV)}\n`;
+    if (year12MonthStats.peakMonthObj) {
+      summaryText += `🔥 เดือนขายดีที่สุด: ${year12MonthStats.peakMonthObj.fullMonthName} (฿${formatCurrency(year12MonthStats.peakMonthObj.amount)})\n`;
+    }
+    summaryText += `-----------------------------------\n`;
+    summaryText += `รายละเอียด 12 เดือน:\n`;
+    year12MonthStats.monthlyData.forEach(m => {
+      summaryText += `• ${m.monthName}: ฿${formatCurrency(m.amount)} (${m.count} บิล)\n`;
+    });
+
+    navigator.clipboard.writeText(summaryText);
+    toast({ title: 'คัดลอกข้อความสรุปสำเร็จ', description: 'พร้อมนำไปส่งใน Discord/Line ได้ทันที' });
+  };
 
   // ── Stats ──
   const periodOptions = useMemo(() => {
@@ -1380,100 +1607,358 @@ export function TradingHistoryManagement() {
         </TabsList>
 
         {/* ── Stats Tab ── */}
-        <TabsContent value="stats" className="space-y-4 mt-0">
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <p className="text-sm font-semibold flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" /> ดูสรุปตามช่วงเวลา</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Tabs value={periodMode} onValueChange={v => { setPeriodMode(v as any); setSelectedPeriod(''); }} className="w-auto">
-                  <TabsList className="h-8">
-                    <TabsTrigger value="day" className="text-xs px-3 h-7">วัน</TabsTrigger>
-                    <TabsTrigger value="month" className="text-xs px-3 h-7">เดือน</TabsTrigger>
-                    <TabsTrigger value="year" className="text-xs px-3 h-7">ปี</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder={`เลือก${periodMode === 'day' ? 'วัน' : periodMode === 'month' ? 'เดือน' : 'ปี'}...`} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">ทั้งหมด</SelectItem>
-                    {currentPeriodOptions.map(opt => <SelectItem key={opt} value={opt} className="text-xs">{formatPeriodLabel(opt)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {selectedPeriod && selectedPeriod !== 'all' && (
-                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedPeriod('')}>ล้าง</Button>
+        <TabsContent value="stats" className="space-y-6 mt-0">
+          {/* Header Controls: Year Selector & Export Buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border/60 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-sm font-bold text-foreground">เลือกปีภาพรวมสถิติ:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 bg-muted/60 p-1 rounded-xl border border-border/40">
+                {availableYears.map(y => (
+                  <Button
+                    key={y}
+                    variant={selectedYear === y ? 'default' : 'ghost'}
+                    size="sm"
+                    className={cn(
+                      'h-8 px-3 text-xs font-bold rounded-lg transition-all',
+                      selectedYear === y ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => setSelectedYear(y)}
+                  >
+                    ปี {y}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-xl border-border/60 hover:bg-muted"
+                onClick={copyYearlySummary}
+              >
+                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                คัดลอกสรุป
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-xl border-border/60 hover:bg-muted"
+                onClick={exportYearlyCSV}
+              >
+                <Download className="h-3.5 w-3.5 text-primary" />
+                ดาวน์โหลด CSV
+              </Button>
+            </div>
+          </div>
+
+          {/* 4 Essential KPI Cards */}
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <Card className="border-border/60 shadow-sm relative overflow-hidden">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-xl bg-primary/10 p-3 shrink-0">
+                  <Receipt className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">ยอดขายรวมทั้งหมด</p>
+                  <p className="text-xl font-black text-foreground truncate">฿{formatCurrency(overallKPIs.totalRevenue)}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{overallKPIs.totalBills} บิลสะสม</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 shadow-sm relative overflow-hidden">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-xl bg-amber-500/10 p-3 shrink-0">
+                  <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">ยอดขายปี {selectedYear}</p>
+                  <p className="text-xl font-black text-foreground truncate">฿{formatCurrency(year12MonthStats.yearTotalAmount)}</p>
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">{year12MonthStats.yearTotalBills} บิลในปีนี้</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 shadow-sm relative overflow-hidden">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-xl bg-emerald-500/10 p-3 shrink-0">
+                  <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">ยอดขายเดือนนี้</p>
+                    {overallKPIs.momGrowth !== 0 && (
+                      <Badge className={cn(
+                        'text-[9px] px-1 py-0 rounded font-bold border-0',
+                        overallKPIs.momGrowth >= 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                      )}>
+                        {overallKPIs.momGrowth >= 0 ? `+${overallKPIs.momGrowth.toFixed(1)}%` : `${overallKPIs.momGrowth.toFixed(1)}%`}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xl font-black text-foreground truncate">฿{formatCurrency(overallKPIs.thisMonthRev)}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{overallKPIs.thisMonthCount} บิลเดือนนี้</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 shadow-sm relative overflow-hidden">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-xl bg-purple-500/10 p-3 shrink-0">
+                  <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">เฉลี่ยต่อบิล (AOV)</p>
+                  <p className="text-xl font-black text-foreground truncate">฿{formatCurrency(year12MonthStats.yearAOV)}</p>
+                  <p className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">คำนวณจากปี {selectedYear}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 12-Month Sales Chart (All 12 months visible at once) */}
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    กราฟแสดงยอดขาย 12 เดือนเต็ม ประจำปี {selectedYear}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">มองเห็นสถิติมกราคม ถึง ธันวาคม ได้พร้อมกันในภาพเดียว</p>
+                </div>
+                {year12MonthStats.peakMonthObj && (
+                  <Badge variant="secondary" className="gap-1.5 text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 px-2.5 py-1">
+                    <Flame className="w-3.5 h-3.5 text-amber-500" />
+                    เดือนขายดีที่สุด: <span className="font-bold">{year12MonthStats.peakMonthObj.fullMonthName}</span> (฿{formatCurrency(year12MonthStats.peakMonthObj.amount)})
+                  </Badge>
                 )}
               </div>
-              {selectedPeriod && selectedPeriod !== 'all' && (
-                <div className="grid gap-3 grid-cols-2 pt-1">
-                  <div className="rounded-lg border bg-primary/5 p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">ยอดรวม</p>
-                    <p className="text-lg font-bold text-primary">฿{formatCurrency(periodSummary.totalAmount)}</p>
-                  </div>
-                  <div className="rounded-lg border bg-chart-2/10 p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">จำนวนบิล</p>
-                    <p className="text-lg font-bold">{periodSummary.totalBills}</p>
-                  </div>
-                </div>
-              )}
+
+              <div className="h-72 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={year12MonthStats.monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" vertical={false} />
+                    <XAxis dataKey="monthName" tick={{ fontSize: 11, fontWeight: 600 }} axisLine={{ stroke: '#E5E7EB' }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `฿${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-xl border bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md space-y-1">
+                            <p className="font-bold text-foreground border-b pb-1 text-sm">{data.fullMonthName} {selectedYear}</p>
+                            <div className="flex items-center justify-between gap-4 pt-0.5">
+                              <span className="text-muted-foreground">ยอดขายรวม:</span>
+                              <span className="font-black text-primary">฿{formatCurrency(data.amount)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">จำนวนบิล:</span>
+                              <span className="font-bold text-foreground">{data.count} บิล</span>
+                            </div>
+                            {data.count > 0 && (
+                              <div className="flex items-center justify-between gap-4 text-[10px] text-muted-foreground pt-1 border-t">
+                                <span>เฉลี่ยต่อบิล:</span>
+                                <span>฿{formatCurrency(data.amount / data.count)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar
+                      dataKey="amount"
+                      fill="hsl(var(--primary))"
+                      radius={[6, 6, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: DollarSign, label: 'ยอดวันนี้', amount: summaryStats.todayStats.amount, count: summaryStats.todayStats.count, color: 'bg-primary/10', iconColor: 'text-primary' },
-              { icon: TrendingUp, label: 'ยอดเดือนนี้', amount: summaryStats.thisMonthStats.amount, count: summaryStats.thisMonthStats.count, color: 'bg-chart-2/20', iconColor: 'text-chart-2' },
-              { icon: Receipt, label: 'ยอดทั้งหมด', amount: summaryStats.totalAmount, count: summaryStats.totalBills, color: 'bg-chart-3/20', iconColor: 'text-chart-3' },
-              { icon: BarChart3, label: 'ทั้งหมด', amount: null, count: records.length, color: 'bg-accent/20', iconColor: 'text-accent-foreground' },
-            ].map(({ icon: Icon, label, amount, count, color, iconColor }) => (
-              <Card key={label}><CardContent className="p-4 flex items-center gap-3">
-                <div className={`rounded-lg ${color} p-2.5`}><Icon className={`h-5 w-5 ${iconColor}`} /></div>
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
-                  {amount != null && <p className="text-lg font-bold truncate">฿{formatCurrency(amount)}</p>}
-                  <p className="text-[10px] text-muted-foreground">{count} {amount != null ? 'บิล' : 'รายการ'}</p>
-                </div>
-              </CardContent></Card>
-            ))}
+
+          {/* 12-Month Detailed Cards Breakdown (Grid 12 Cards) */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              ตารางรายละเอียด 12 เดือน (ปี {selectedYear})
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {year12MonthStats.monthlyData.map(m => {
+                const isPeak = year12MonthStats.peakMonthObj?.monthIndex === m.monthIndex && m.amount > 0;
+                const isAboveAvg = m.amount > year12MonthStats.monthlyAvgAmount && m.amount > 0;
+
+                return (
+                  <div
+                    key={m.monthIndex}
+                    className={cn(
+                      'p-3 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden',
+                      isPeak
+                        ? 'bg-gradient-to-br from-amber-500/10 via-card to-card border-amber-500/40 ring-1 ring-amber-500/30 shadow-sm'
+                        : m.amount > 0
+                          ? 'bg-card border-border/60 hover:border-primary/40'
+                          : 'bg-muted/20 border-border/30 opacity-70'
+                    )}
+                  >
+                    {isPeak && (
+                      <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-bl-lg flex items-center gap-0.5 shadow-sm">
+                        <Flame className="w-2.5 h-2.5" /> PEAK
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-xs font-bold text-muted-foreground uppercase">{m.fullMonthName}</span>
+                      <p className="text-base font-black text-foreground mt-1 truncate">
+                        {m.amount > 0 ? `฿${formatCurrency(m.amount)}` : <span className="text-muted-foreground/50 font-medium text-xs">฿0</span>}
+                      </p>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-border/30 flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">{m.count} บิล</span>
+                      {isAboveAvg && !isPeak && (
+                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">สูงกว่าเฉลี่ย</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          {records.length > 0 && (
-            <Tabs defaultValue="daily" className="w-full">
-              <TabsList className="w-full max-w-xs">
-                <TabsTrigger value="daily" className="flex-1 gap-1.5 text-xs"><BarChart3 className="h-3.5 w-3.5" /> รายวัน</TabsTrigger>
-                <TabsTrigger value="monthly" className="flex-1 gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> รายเดือน</TabsTrigger>
-              </TabsList>
-              <TabsContent value="daily">
-                <Card><CardContent className="p-4">
-                  <p className="text-sm font-medium mb-3">ยอดซื้อขายรายวัน (บาท)</p>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={summaryStats.dailyData.slice(-30)}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                        <Tooltip content={<CustomTooltipContent />} />
-                        <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+
+          {/* 3 Analytics Columns: Payment Breakdown | Top Products | Top Spenders */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-1">
+            {/* Payment Method Breakdown */}
+            <Card className="border-border/60 shadow-sm">
+              <CardContent className="p-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-primary" /> ช่องทางชำระเงิน (ปี {selectedYear})
+                </h4>
+                {year12MonthStats.yearTotalAmount === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6 text-center italic">ไม่มีข้อมูลการชำระเงินในปีนี้</p>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Bank */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> ธนาคารทั่วไป
+                        </span>
+                        <span className="font-bold text-foreground">
+                          ฿{formatCurrency(year12MonthStats.paymentBreakdown.bankAmount)} ({((year12MonthStats.paymentBreakdown.bankAmount / year12MonthStats.yearTotalAmount) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all"
+                          style={{ width: `${(year12MonthStats.paymentBreakdown.bankAmount / year12MonthStats.yearTotalAmount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{year12MonthStats.paymentBreakdown.bankCount} บิล</span>
+                    </div>
+
+                    {/* TrueMoney */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                          <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> ทรูมันนี่
+                        </span>
+                        <span className="font-bold text-foreground">
+                          ฿{formatCurrency(year12MonthStats.paymentBreakdown.truemoneyAmount)} ({((year12MonthStats.paymentBreakdown.truemoneyAmount / year12MonthStats.yearTotalAmount) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-orange-500 rounded-full transition-all"
+                          style={{ width: `${(year12MonthStats.paymentBreakdown.truemoneyAmount / year12MonthStats.yearTotalAmount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{year12MonthStats.paymentBreakdown.truemoneyCount} บิล</span>
+                    </div>
+
+                    {/* Other if any */}
+                    {year12MonthStats.paymentBreakdown.otherTypeAmount > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                            <span className="w-2.5 h-2.5 rounded-full bg-gray-400" /> อื่นๆ
+                          </span>
+                          <span className="font-bold text-foreground">
+                            ฿{formatCurrency(year12MonthStats.paymentBreakdown.otherTypeAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </CardContent></Card>
-              </TabsContent>
-              <TabsContent value="monthly">
-                <Card><CardContent className="p-4">
-                  <p className="text-sm font-medium mb-3">แนวโน้มยอดซื้อขายรายเดือน (บาท)</p>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={summaryStats.monthlyData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                        <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                        <Tooltip content={<CustomTooltipContent />} />
-                        <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--primary))' }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top 5 Products */}
+            <Card className="border-border/60 shadow-sm">
+              <CardContent className="p-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-primary" /> สินค้าขายดี Top 5 (ปี {selectedYear})
+                </h4>
+                {year12MonthStats.topProducts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6 text-center italic">ไม่มีรายการสินค้าในปีนี้</p>
+                ) : (
+                  <div className="space-y-2">
+                    {year12MonthStats.topProducts.map((p, idx) => (
+                      <div key={p.name} className="flex items-center justify-between p-2 rounded-xl bg-muted/30 border border-border/30 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            'w-5 h-5 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0',
+                            idx === 0 ? 'bg-amber-500 text-white' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-muted text-muted-foreground'
+                          )}>
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-foreground truncate">{p.name}</span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-black text-primary">฿{formatCurrency(p.amount)}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.count} ชิ้น</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </CardContent></Card>
-              </TabsContent>
-            </Tabs>
-          )}
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top 5 Spenders */}
+            <Card className="border-border/60 shadow-sm">
+              <CardContent className="p-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-500" /> สมาชิกซื้อสูงสุด Top 5 (ปี {selectedYear})
+                </h4>
+                {year12MonthStats.topSpenders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6 text-center italic">ไม่มีข้อมูลสมาชิกในปีนี้</p>
+                ) : (
+                  <div className="space-y-2">
+                    {year12MonthStats.topSpenders.map((s, idx) => (
+                      <div key={s.memberId} className="flex items-center justify-between p-2 rounded-xl bg-muted/30 border border-border/30 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            'w-5 h-5 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0',
+                            idx === 0 ? 'bg-amber-500 text-white' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-muted text-muted-foreground'
+                          )}>
+                            {idx + 1}
+                          </span>
+                          <UserBadge id={s.memberId} />
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-black text-foreground">฿{formatCurrency(s.amount)}</p>
+                          <p className="text-[10px] text-muted-foreground">{s.count} บิล</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ── Data Tab ── */}
