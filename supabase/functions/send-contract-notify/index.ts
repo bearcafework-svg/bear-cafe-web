@@ -60,7 +60,7 @@ Deno.serve(async (req): Promise<Response> => {
               items: [
                 {
                   media: {
-                    url: "https://cdn.discordapp.com/attachments/1144675871798591569/1517912045306118395/1.png",
+                    url: "https://cdn.discordapp.com/attachments/1524704267015819274/1532076197175890202/NewsBoard_-_bearcafe_18.png?ex=6a6b88a6&is=6a6a3726&hm=ef43133d686f69bf503f1714d46b357579a945a28a9011e6827cc491f9ecf503&",
                   },
                 },
               ],
@@ -78,7 +78,7 @@ Deno.serve(async (req): Promise<Response> => {
                   type: 2,  // Button
                   style: 5, // Link — ห้ามมี custom_id
                   label: "คลิกเพื่อต่อบ้านเช่า",
-                  url: "https://discord.com/channels/1144251788493602848/1202239170219868190",
+                  url: "https://discord.com/channels/1144251788493602848/1524124116053917747",
                 },
               ],
             },
