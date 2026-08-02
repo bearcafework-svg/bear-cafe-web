@@ -40,7 +40,6 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'dm-broadcast', label: 'ส่งข่าวสารบอท DM', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'manage-staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบ', ownerOnly: true },
   { id: 'sticky-messages', label: 'ข้อความติดหนึบ', group: 'content', groupLabel: 'เนื้อหา', ownerOnly: true },
-  { id: 'bees', label: 'ระบบเจ้าผึ้ง', group: 'content', groupLabel: 'เนื้อหา' },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */
