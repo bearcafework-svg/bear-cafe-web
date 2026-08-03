@@ -210,13 +210,17 @@ export function CampaignsManagement() {
 
       if (sRes.data) {
         const row = sRes.data;
+        const totalMins = row.interval_minutes ?? ((row.interval_hours ?? 1) * 60);
+        const hrs = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
+
         setScheduleConfig({
           id: row.id,
           cron_expression: row.cron_expression || '0 * * * *',
-          label: row.label || 'ทุก 1 ชั่วโมง',
+          label: row.label || `ทุก ${hrs > 0 ? `${hrs} ชั่วโมง ` : ''}${mins > 0 ? `${mins} นาที` : ''}`,
           is_enabled: row.is_enabled ?? true,
-          interval_hours: row.interval_hours ?? 1,
-          interval_minutes: row.interval_minutes ?? 0,
+          interval_hours: hrs,
+          interval_minutes: mins,
           updated_at: row.updated_at || '',
         });
       }
@@ -457,13 +461,14 @@ export function CampaignsManagement() {
       const hours = scheduleConfig?.interval_hours ?? 1;
       const minutes = scheduleConfig?.interval_minutes ?? 0;
       const enabled = scheduleConfig?.is_enabled ?? true;
+      const totalMinutes = Math.max(1, hours * 60 + minutes);
 
       const { error } = await (supabase as any)
         .from('campaign_schedule_config')
         .upsert({
           id: '00000000-0000-0000-0000-000000000001',
-          interval_hours: hours,
-          interval_minutes: minutes,
+          interval_hours: Math.floor(totalMinutes / 60),
+          interval_minutes: totalMinutes,
           is_enabled: enabled,
           label: `ทุก ${hours > 0 ? `${hours} ชั่วโมง ` : ''}${minutes > 0 ? `${minutes} นาที` : ''}`,
           updated_at: new Date().toISOString(),
