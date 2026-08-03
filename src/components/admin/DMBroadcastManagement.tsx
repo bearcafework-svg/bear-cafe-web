@@ -512,7 +512,7 @@ export function DMBroadcastManagement() {
         .eq('id', campaignId);
 
       if (error) throw error;
-      toast({ title: 'ยกเลิกแคมเปญแล้วค่ะ' });
+      toast({ title: 'ยกเลิกบรอดแคสต์แล้วค่ะ' });
       fetchDashboardData(true);
     } catch (e) {
       toast({ title: 'ผิดพลาด', description: 'ไม่สามารถยกเลิกได้', variant: 'destructive' });
@@ -521,13 +521,13 @@ export function DMBroadcastManagement() {
 
   // Clean Old Completed Logs (Tool for 88.4K records cleanup)
   const handleCleanOldLogs = async () => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้าง Log แคมเปญเก่าที่ส่งเสร็จสิ้นแล้วเกิน 14 วัน? การดำเนินการนี้จะช่วยคืนพื้นที่ DB')) return;
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้าง Log บรอดแคสต์เก่าที่ส่งเสร็จสิ้นแล้วเกิน 14 วัน? การดำเนินการนี้จะช่วยคืนพื้นที่ DB')) return;
 
     setCleaningLogs(true);
     try {
       const { data, error } = await supabase.rpc('clean_old_dm_broadcast_logs', { days_older: 14 });
       if (error) throw error;
-      toast({ title: 'ล้าง Log เก่าสำเร็จแล้วค่ะ', description: `ทำการลบ Log ซากแคมเปญเก่าเรียบร้อยแล้วจำนวน ${data || 0} รายการ` });
+      toast({ title: 'ล้าง Log เก่าสำเร็จแล้วค่ะ', description: `ทำการลบ Log ซากบรอดแคสต์เก่าเรียบร้อยแล้วจำนวน ${data || 0} รายการ` });
       fetchDashboardData(true);
     } catch (e: any) {
       toast({ title: 'ล้าง Log ไม่สำเร็จ', description: e.message || 'ไม่สามารถเรียกใช้ฟังก์ชั่นล้าง Log ได้', variant: 'destructive' });
@@ -553,7 +553,7 @@ export function DMBroadcastManagement() {
   const handleSubmitCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composerTitle.trim()) {
-      toast({ title: 'กรุณากรอกชื่อแคมเปญ', variant: 'destructive' });
+      toast({ title: 'กรุณากรอกชื่อบรอดแคสต์', variant: 'destructive' });
       return;
     }
 
@@ -609,7 +609,7 @@ export function DMBroadcastManagement() {
         });
 
       if (error) throw error;
-      toast({ title: 'สร้างแคมเปญสำเร็จ', description: 'ระบบนำเข้าคิวเพื่อเตรียมส่งเรียบร้อยแล้วค่ะ' });
+      toast({ title: 'สร้างงานบรอดแคสต์สำเร็จ', description: 'ระบบนำเข้าคิวเพื่อเตรียมส่งเรียบร้อยแล้วค่ะ' });
       setComposerTitle('');
       setTextContent('');
       setActiveTab('campaigns');
@@ -751,7 +751,7 @@ export function DMBroadcastManagement() {
         
         <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-2 md:grid-cols-4 h-auto gap-1">
           <TabsTrigger value="composer" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Send className="w-4 h-4 text-primary" /> 1. สร้างแคมเปญ
+            <Send className="w-4 h-4 text-primary" /> 1. สร้างงานบรอดแคสต์
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
             <Activity className="w-4 h-4 text-indigo-500" /> 2. ประวัติและสถานะคิว ({campaigns.length})
@@ -782,7 +782,7 @@ export function DMBroadcastManagement() {
                     
                     {/* Campaign Title */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="title" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ชื่อแคมเปญ (อ้างอิงภายใน)</Label>
+                      <Label htmlFor="title" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ชื่อรายการบรอดแคสต์ (อ้างอิงภายใน)</Label>
                       <Input 
                         id="title"
                         placeholder="เช่น ประกาศกิจกรรมกิลด์ 15 เม.ย."
@@ -950,12 +950,12 @@ export function DMBroadcastManagement() {
         <TabsContent value="campaigns" className="space-y-6">
           <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
             <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
-              <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการแคมเปญทั้งหมด ({campaigns.length})</CardTitle>
-              <CardDescription className="text-xs">แสดงแคมเปญการส่งบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนแบบแบ่งหน้า</CardDescription>
+              <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการงานบรอดแคสต์ทั้งหมด ({campaigns.length})</CardTitle>
+              <CardDescription className="text-xs">แสดงงานบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนแบบแบ่งหน้า</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               {campaigns.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">ยังไม่มีแคมเปญบรอดแคสต์ใดๆ ถูกสร้างขึ้น</div>
+                <div className="text-center py-12 text-muted-foreground text-sm">ยังไม่มีงานบรอดแคสต์ใดๆ ถูกสร้างขึ้น</div>
               ) : (
                 campaigns.map((c) => {
                   const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
@@ -1196,7 +1196,7 @@ export function DMBroadcastManagement() {
                     <Database className="w-5 h-5 text-amber-500" /> เครื่องมือจัดการพื้นที่ฐานข้อมูล (Database Log Cleaner)
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    ล้างซาก Log แคมเปญเก่าที่ส่งเสร็จสิ้นแล้วเพื่อคืนสปีดและความเบาให้ฐานข้อมูล Supabase
+                    ล้างซาก Log บรอดแคสต์เก่าที่ส่งเสร็จสิ้นแล้วเพื่อคืนสปีดและความเบาให้ฐานข้อมูล Supabase
                   </CardDescription>
                 </div>
                 <Button
@@ -1207,7 +1207,7 @@ export function DMBroadcastManagement() {
                   disabled={cleaningLogs}
                 >
                   {cleaningLogs ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  🗑️ ล้าง Log แคมเปญเก่า (เก่ากว่า 14 วัน)
+                  🗑️ ล้าง Log บรอดแคสต์เก่า (เก่ากว่า 14 วัน)
                 </Button>
               </CardHeader>
             </Card>

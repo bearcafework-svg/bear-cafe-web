@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -38,51 +38,34 @@ import {
   Plus,
   Trash2,
   Edit,
-  Upload,
   RefreshCw,
   Eye,
-  Send,
   Loader2,
-  ExternalLink,
-  AlertCircle,
-  FlaskConical,
   Clock,
   CheckCircle2,
-  XCircle,
   RotateCcw,
   Images,
   Megaphone,
   Search,
-  X,
   Save,
   ArrowUp,
   ArrowDown,
+  Sparkles,
+  Copy,
+  FileCode,
 } from 'lucide-react';
-import { compressImage } from '@/lib/image-compress';
 import { cn } from '@/lib/utils';
 
-// Type for campaign_messages table (will be auto-generated after migration)
-type CampaignMessage = {
+// Type for campaign_messages table (JSON Payload structure)
+type BroadcastAdMessage = {
   id: string;
   internal_name: string;
-  content_text: string;
-  image_url: string | null;
-  image_url_2: string | null;
-  has_button: boolean;
-  button_label: string | null;
-  button_url: string | null;
-  button_emoji_id: string | null;
-  button_emoji_name: string | null;
-  button_2_label: string | null;
-  button_2_url: string | null;
-  button_2_emoji_id: string | null;
-  button_2_emoji_name: string | null;
+  payload: any;
   target_channels: string[];
   sort_order: number;
   is_active: boolean;
   last_sent_at: string | null;
   next_send_at: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -97,7 +80,6 @@ type ScheduleConfig = {
   updated_at: string;
 };
 
-
 interface DiscordChannel {
   id: string;
   name: string;
@@ -109,2380 +91,930 @@ interface DiscordChannel {
 
 interface FormData {
   internal_name: string;
-  content_text: string;
-  image_url: string;
-  image_url_2: string;
-  has_button: boolean;
-  button_label: string;
-  button_url: string;
-  button_emoji_id: string;
-  button_emoji_name: string;
-  button_2_label: string;
-  button_2_url: string;
-  button_2_emoji_id: string;
-  button_2_emoji_name: string;
+  payloadStr: string;
   target_channels: string[];
   is_active: boolean;
 }
 
+const DEFAULT_JSON_EXAMPLE = `{
+  "flags": 32768,
+  "components": [
+    {
+      "type": 17,
+      "components": [
+        {
+          "type": 10,
+          "content": "## 📢 **ประกาศจาก Bear Cafe**\\nต้อนรับสมาชิกใหม่รับสิทธิพิเศษมากมาย! <a:99322sparkles:1372427884479778908>"
+        },
+        {
+          "type": 14,
+          "divider": true,
+          "spacing": 2
+        },
+        {
+          "type": 1,
+          "components": [
+            {
+              "type": 2,
+              "style": 5,
+              "label": "ดูรายละเอียดเพิ่มเติม",
+              "url": "https://bearcafe.app"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}`;
+
 const INITIAL_FORM: FormData = {
   internal_name: '',
-  content_text: '',
-  image_url: '',
-  image_url_2: '',
-  has_button: false,
-  button_label: '',
-  button_url: '',
-  button_emoji_id: '',
-  button_emoji_name: '',
-  button_2_label: '',
-  button_2_url: '',
-  button_2_emoji_id: '',
-  button_2_emoji_name: '',
+  payloadStr: DEFAULT_JSON_EXAMPLE,
   target_channels: [],
   is_active: true,
 };
 
 export function CampaignsManagement() {
-  const [campaigns, setCampaigns] = useState<CampaignMessage[]>([]);
+  const [campaigns, setCampaigns] = useState<BroadcastAdMessage[]>([]);
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
-  const [tick, setTick] = useState(0); // increments every second to drive countdown
+  const [tick, setTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<CampaignMessage | null>(null);
-  const [testSendCampaign, setTestSendCampaign] = useState<CampaignMessage | null>(null);
-  const [testSendChannel, setTestSendChannel] = useState<string>('');
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<BroadcastAdMessage | null>(null);
+  const [previewCampaign, setPreviewCampaign] = useState<BroadcastAdMessage | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [channelSearch, setChannelSearch] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploading2, setUploading2] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSendingTest, setIsSendingTest] = useState(false);
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
   const [isResettingQueue, setIsResettingQueue] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef2 = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
-  // ─── Bucket picker state ──────────────────────────────────────────────────
-  const [bucketPickerOpen, setBucketPickerOpen] = useState(false);
-  const [bucketPickerTarget, setBucketPickerTarget] = useState<'image_url' | 'image_url_2'>('image_url');
-  const [bucketFiles, setBucketFiles] = useState<Array<{ name: string; url: string }>>([]);
-  const [loadingBucket, setLoadingBucket] = useState(false);
-  const [selectedBucketFiles, setSelectedBucketFiles] = useState<string[]>([]);
-  const [deletingBucketFiles, setDeletingBucketFiles] = useState(false);
-  const [bucketDeleteMode, setBucketDeleteMode] = useState(false);
+  // ── Countdown Tick ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const openBucketPicker = async (target: 'image_url' | 'image_url_2') => {
-    setBucketPickerTarget(target);
-    setBucketPickerOpen(true);
-    setBucketDeleteMode(false);
-    setSelectedBucketFiles([]);
-    if (bucketFiles.length > 0) return; // already loaded
-    setLoadingBucket(true);
+  // ── Sync Channels from Discord ──────────────────────────────────────────────
+  const syncChannels = useCallback(async (silent = false) => {
     try {
-      const { data, error } = await supabase.storage.from('campaign-images').list('', {
-        limit: 200,
-        sortBy: { column: 'created_at', order: 'desc' },
-      });
+      if (!silent) setLoadingChannels(true);
+      const { data, error } = await supabase.functions.invoke('sync-discord-channels');
       if (error) throw error;
-      const files = (data || [])
-        .filter((f) => f.name && !f.name.endsWith('/'))
-        .map((f) => ({
-          name: f.name,
-          url: supabase.storage.from('campaign-images').getPublicUrl(f.name).data.publicUrl,
-        }));
-      setBucketFiles(files);
+      if (data?.channels) {
+        setChannels(data.channels);
+        if (!silent) {
+          toast({
+            title: 'ซิงค์สำเร็จ',
+            description: `ดึงข้อมูลช่องแชทจาก Discord จำนวน ${data.channels.length} ช่องแล้ว`,
+          });
+        }
+      }
     } catch (err: any) {
-      toast({ title: 'โหลดรูปไม่สำเร็จ', description: err.message, variant: 'destructive' });
+      console.error('Error syncing channels:', err);
+      if (!silent) {
+        toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
+      }
     } finally {
-      setLoadingBucket(false);
+      if (!silent) setLoadingChannels(false);
     }
-  };
+  }, [toast]);
 
-  const selectBucketImage = (url: string) => {
-    setFormData((p) => ({ ...p, [bucketPickerTarget]: url }));
-    setBucketPickerOpen(false);
-  };
-
-  const toggleSelectBucketFile = (fileName: string) => {
-    setSelectedBucketFiles((prev) =>
-      prev.includes(fileName) ? prev.filter((name) => name !== fileName) : [...prev, fileName]
-    );
-  };
-
-  const selectAllBucketFiles = () => {
-    if (selectedBucketFiles.length === bucketFiles.length) {
-      setSelectedBucketFiles([]);
-    } else {
-      setSelectedBucketFiles(bucketFiles.map((f) => f.name));
-    }
-  };
-
-  const handleBulkDeleteBucketFiles = async () => {
-    if (selectedBucketFiles.length === 0) return;
-    if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพที่เลือกจำนวน ${selectedBucketFiles.length} รายการ?`)) return;
-
-    try {
-      setDeletingBucketFiles(true);
-      const { error } = await supabase.storage.from('campaign-images').remove(selectedBucketFiles);
-      if (error) throw error;
-
-      setBucketFiles((prev) => prev.filter((f) => !selectedBucketFiles.includes(f.name)));
-      toast({
-        title: 'ลบรูปภาพสำเร็จ',
-        description: `ลบรูปภาพจำนวน ${selectedBucketFiles.length} รายการเรียบร้อยแล้ว`,
-      });
-      setSelectedBucketFiles([]);
-    } catch (err: any) {
-      toast({
-        title: 'ลบรูปภาพไม่สำเร็จ',
-        description: err.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setDeletingBucketFiles(false);
-    }
-  };
-
-  const handleDeleteSingleBucketFile = async (fileName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพนี้?')) return;
-
-    try {
-      const { error } = await supabase.storage.from('campaign-images').remove([fileName]);
-      if (error) throw error;
-
-      setBucketFiles((prev) => prev.filter((f) => f.name !== fileName));
-      setSelectedBucketFiles((prev) => prev.filter((name) => name !== fileName));
-      toast({ title: 'ลบรูปภาพสำเร็จ' });
-    } catch (err: any) {
-      toast({ title: 'ลบรูปภาพไม่สำเร็จ', description: err.message, variant: 'destructive' });
-    }
-  };
-
-  // ─── Fetch campaigns ─────────────────────────────────────────────────────
-  const fetchCampaigns = async () => {
+  // ── Fetch Campaigns & Schedule Config ───────────────────────────────────────
+  const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
-      const [campaignsRes, scheduleRes] = await Promise.all([
-        (supabase as any).from('campaign_messages').select('*').order('sort_order', { ascending: true }),
-        (supabase as any).from('campaign_schedule_config').select('*').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle(),
+
+      const [cRes, sRes] = await Promise.all([
+        supabase
+          .from('campaign_messages')
+          .select('*')
+          .order('sort_order', { ascending: true }),
+        (supabase as any)
+          .from('campaign_schedule_config')
+          .select('*')
+          .eq('id', '00000000-0000-0000-0000-000000000001')
+          .maybeSingle(),
       ]);
 
-      if (campaignsRes.error) throw campaignsRes.error;
-      setCampaigns(campaignsRes.data || []);
-      if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
+      if (cRes.error) throw cRes.error;
+      setCampaigns((cRes.data as BroadcastAdMessage[]) || []);
       setHasOrderChanged(false);
-    } catch (error: any) {
-      console.error('Error fetching campaigns:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถโหลดข้อมูลโฆษณาได้',
-        variant: 'destructive',
-      });
+
+      if (sRes.data) {
+        const row = sRes.data;
+        setScheduleConfig({
+          id: row.id,
+          cron_expression: row.cron_expression || '0 * * * *',
+          label: row.label || 'ทุก 1 ชั่วโมง',
+          is_enabled: row.is_enabled ?? true,
+          interval_hours: row.interval_hours ?? 1,
+          interval_minutes: row.interval_minutes ?? 0,
+          updated_at: row.updated_at || '',
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchAllData();
+    syncChannels(true);
+  }, [fetchAllData, syncChannels]);
+
+  // ── Filtered channels for multi-select dropdown ─────────────────────────────
+  const filteredChannels = useMemo(() => {
+    if (!channelSearch.trim()) return channels;
+    return channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()));
+  }, [channels, channelSearch]);
+
+  // ── Open Modals ─────────────────────────────────────────────────────────────
+  const openCreateDialog = () => {
+    setEditingCampaign(null);
+    setFormData(INITIAL_FORM);
+    setDialogOpen(true);
   };
 
-  // ─── Drag-and-drop reorder locally ───────────────────────────────────────
-  const handleDragEnd = useCallback((result: DropResult) => {
-    if (!result.destination || result.destination.index === result.source.index) return;
+  const openEditDialog = (item: BroadcastAdMessage) => {
+    setEditingCampaign(item);
+    setFormData({
+      internal_name: item.internal_name,
+      payloadStr: JSON.stringify(item.payload, null, 2),
+      target_channels: item.target_channels || [],
+      is_active: item.is_active,
+    });
+    setDialogOpen(true);
+  };
 
-    const reordered = Array.from(campaigns);
-    const [moved] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, moved);
+  const openPreviewDialog = (item: BroadcastAdMessage) => {
+    setPreviewCampaign(item);
+    setPreviewDialogOpen(true);
+  };
 
-    const updated = reordered.map((c, i) => ({ ...c, sort_order: i }));
-    setCampaigns(updated);
-    setHasOrderChanged(true);
-  }, [campaigns]);
+  // ── Toggle Active Switch Quick Action ───────────────────────────────────────
+  const handleToggleActive = async (item: BroadcastAdMessage) => {
+    try {
+      const nextState = !item.is_active;
+      const { error } = await supabase
+        .from('campaign_messages')
+        .update({ is_active: nextState })
+        .eq('id', item.id);
 
-  // ─── Move Up / Down locally ─────────────────────────────────────────────
-  const moveCampaign = (campaign: CampaignMessage, dir: 'up' | 'down') => {
-    const idx = campaigns.findIndex((c) => c.id === campaign.id);
-    const newIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= campaigns.length) return;
+      if (error) throw error;
 
-    const updated = Array.from(campaigns);
-    const [moved] = updated.splice(idx, 1);
-    updated.splice(newIdx, 0, moved);
+      setCampaigns((prev) =>
+        prev.map((c) => (c.id === item.id ? { ...c, is_active: nextState } : c))
+      );
 
-    const reordered = updated.map((c, i) => ({ ...c, sort_order: i }));
-    setCampaigns(reordered);
+      toast({
+        title: 'อัปเดตสถานะสำเร็จ',
+        description: `${item.internal_name}: ${nextState ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}`,
+      });
+    } catch (err: any) {
+      toast({ title: 'อัปเดตไม่สำเร็จ', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  // ── Save Order (Drag Drop & Arrows) ─────────────────────────────────────────
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= campaigns.length) return;
+
+    const newItems = Array.from(campaigns);
+    const [moved] = newItems.splice(index, 1);
+    newItems.splice(targetIndex, 0, moved);
+
+    const reindexed = newItems.map((item, idx) => ({
+      ...item,
+      sort_order: idx + 1,
+    }));
+
+    setCampaigns(reindexed);
     setHasOrderChanged(true);
   };
 
-  // ─── Batch save order to DB ──────────────────────────────────────────────
-  const handleSaveOrder = async () => {
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    if (result.destination.index === result.source.index) return;
+
+    const items = Array.from(campaigns);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    const reindexed = items.map((item, idx) => ({
+      ...item,
+      sort_order: idx + 1,
+    }));
+
+    setCampaigns(reindexed);
+    setHasOrderChanged(true);
+  };
+
+  const saveOrderAndResetQueue = async () => {
     try {
       setSavingOrder(true);
-      const updates = campaigns.map((c, i) =>
-        (supabase as any)
+
+      for (let i = 0; i < campaigns.length; i++) {
+        const item = campaigns[i];
+        const { error } = await supabase
           .from('campaign_messages')
-          .update({ sort_order: i })
-          .eq('id', c.id)
-      );
-      await Promise.all(updates);
-      await handleResetQueue(true);
+          .update({ sort_order: i + 1 })
+          .eq('id', item.id);
+        if (error) throw error;
+      }
+
+      // Reset queue schedule
+      const totalInterval = (scheduleConfig?.interval_hours || 1) * 60 + (scheduleConfig?.interval_minutes || 0);
+      const intervalMs = (totalInterval > 0 ? totalInterval : 60) * 60 * 1000;
+      const now = new Date();
+
+      const activeList = campaigns.filter((c) => c.is_active);
+      for (let i = 0; i < activeList.length; i++) {
+        const nextTime = new Date(now.getTime() + (i + 1) * intervalMs);
+        await supabase
+          .from('campaign_messages')
+          .update({ next_send_at: nextTime.toISOString() })
+          .eq('id', activeList[i].id);
+      }
+
+      toast({
+        title: 'บันทึกลำดับเรียบร้อยแล้ว',
+        description: 'จัดลำดับโฆษณาบรอดแคสต์และคิวเวลาใหม่สำเร็จค่ะ',
+      });
       setHasOrderChanged(false);
-      toast({ title: 'สำเร็จ', description: 'บันทึกลำดับโฆษณาเรียบร้อยแล้ว' });
+      fetchAllData();
     } catch (err: any) {
-      console.error('Failed to save order:', err);
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถบันทึกลำดับได้', variant: 'destructive' });
-      fetchCampaigns(); // revert
+      toast({ title: 'เกิดข้อผิดพลาดในการบันทึกลำดับ', description: err?.message, variant: 'destructive' });
     } finally {
       setSavingOrder(false);
     }
   };
 
-  // ─── Sync Discord channels ───────────────────────────────────────────────
-  const syncChannels = async () => {
+  // ── Form Validation & Submission ────────────────────────────────────────────
+  const validateForm = (): { payloadObj: any } | null => {
+    if (!formData.internal_name.trim()) {
+      toast({ title: 'กรุณากรอกชื่อโฆษณา (อ้างอิงภายใน)', variant: 'destructive' });
+      return null;
+    }
+    if (formData.target_channels.length === 0) {
+      toast({ title: 'กรุณาเลือกช่องแชทเป้าหมายอย่างน้อย 1 ช่อง', variant: 'destructive' });
+      return null;
+    }
     try {
-      setLoadingChannels(true);
-      const { data, error } = await supabase.functions.invoke('sync-discord-channels');
-
-      if (error) throw error;
-      if (data?.channels) {
-        setChannels(data.channels);
+      const parsed = JSON.parse(formData.payloadStr);
+      if (!parsed.components || !Array.isArray(parsed.components)) {
         toast({
-          title: 'สำเร็จ',
-          description: `ดึงข้อมูล ${data.channels.length} ช่องแล้ว`,
+          title: 'JSON รูปแบบไม่ถูกต้อง',
+          description: "จำเป็นต้องมีฟิลด์ 'components' ที่ระดับสูงสุดและต้องเป็น Array",
+          variant: 'destructive',
         });
+        return null;
       }
-    } catch (error: any) {
-      console.error('Error syncing channels:', error);
+      return { payloadObj: parsed };
+    } catch (err: any) {
       toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถดึงข้อมูลช่อง Discord ได้',
+        title: 'ไวยากรณ์ JSON ไม่ถูกต้อง',
+        description: `Error: ${err.message}`,
         variant: 'destructive',
       });
-    } finally {
-      setLoadingChannels(false);
+      return null;
     }
   };
 
-  // ─── Image upload (shared logic) ─────────────────────────────────────────
-  const uploadImage = async (
-    file: File,
-    onSuccess: (url: string) => void,
-    setUploadingState: (v: boolean) => void,
-    inputRef: React.RefObject<HTMLInputElement>,
-  ) => {
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'กรุณาเลือกไฟล์รูปภาพเท่านั้น', variant: 'destructive' });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'ไฟล์ใหญ่เกินไป', description: 'ขนาดไฟล์ต้องไม่เกิน 5MB', variant: 'destructive' });
-      return;
-    }
-    try {
-      setUploadingState(true);
-      const isPng = file.type === 'image/png';
-      const compressed = await compressImage(file, {
-        maxWidth: 1920, maxHeight: 1920,
-        maxSizeBytes: 1 * 1024 * 1024,
-        outputType: isPng ? 'image/png' : 'image/jpeg',
-      });
-      const ext = isPng ? 'png' : 'jpg';
-      const fileName = `${Date.now()}-campaign.${ext}`;
-      const { data, error } = await supabase.storage.from('campaign-images').upload(fileName, compressed, { cacheControl: '86400' });
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('campaign-images').getPublicUrl(data.path);
-      onSuccess(publicUrl);
-      toast({ title: 'สำเร็จ', description: 'อัปโหลดรูปภาพเรียบร้อยแล้ว' });
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปโหลดรูปภาพได้', variant: 'destructive' });
-    } finally {
-      setUploadingState(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    uploadImage(file, (url) => setFormData((p) => ({ ...p, image_url: url })), setUploading, fileInputRef);
-  };
-
-  const handleImageUpload2 = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    uploadImage(file, (url) => setFormData((p) => ({ ...p, image_url_2: url })), setUploading2, fileInputRef2);
-  };
-
-  // ─── Form validation ─────────────────────────────────────────────────────
-  const validateForm = (): string | null => {
-    if (!formData.internal_name.trim()) return 'กรุณาระบุชื่อภายใน';
-    if (formData.internal_name.length > 100) return 'ชื่อภายในต้องไม่เกิน 100 ตัวอักษร';
-    if (!formData.content_text.trim()) return 'กรุณาระบุข้อความ';
-    if (formData.content_text.length > 2000) return 'ข้อความต้องไม่เกิน 2000 ตัวอักษร';
-    if (formData.image_url && !formData.image_url.match(/^https?:\/\//)) return 'URL รูปภาพไม่ถูกต้อง';
-    
-    if (formData.has_button) {
-      if (!formData.button_label.trim()) return 'กรุณาระบุข้อความปุ่ม';
-      if (formData.button_label.length > 80) return 'ข้อความปุ่มต้องไม่เกิน 80 ตัวอักษร';
-      if (!formData.button_url.trim()) return 'กรุณาระบุ URL ปุ่ม';
-      if (!formData.button_url.match(/^https?:\/\//)) return 'URL ปุ่มไม่ถูกต้อง';
-    }
-
-    if (formData.target_channels.length === 0) return 'กรุณาเลือกช่องเป้าหมายอย่างน้อย 1 ช่อง';
-
-    return null;
-  };
-
-  // ─── Save campaign ───────────────────────────────────────────────────────
-  const handleSave = async () => {
-    const validationError = validateForm();
-    if (validationError) {
-      toast({
-        title: 'ข้อมูลไม่ครบถ้วน',
-        description: validationError,
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleSaveCampaign = async () => {
+    const valid = validateForm();
+    if (!valid) return;
 
     try {
-      const payload = {
-        ...formData,
-        image_url: formData.image_url || null,
-        image_url_2: formData.image_url_2 || null,
-        button_label: formData.has_button ? formData.button_label : null,
-        button_url: formData.has_button ? formData.button_url : null,
-        button_emoji_id: formData.has_button && formData.button_emoji_id ? formData.button_emoji_id : null,
-        button_emoji_name: formData.has_button && formData.button_emoji_name ? formData.button_emoji_name : null,
-        button_2_label: formData.button_2_label || null,
-        button_2_url: formData.button_2_url || null,
-        button_2_emoji_id: formData.button_2_emoji_id || null,
-        button_2_emoji_name: formData.button_2_emoji_name || null,
-      };
+      const payloadObj = valid.payloadObj;
 
       if (editingCampaign) {
-        const { error } = await (supabase as any)
+        // Edit existing
+        const { error } = await supabase
           .from('campaign_messages')
-          .update(payload)
+          .update({
+            internal_name: formData.internal_name.trim(),
+            payload: payloadObj,
+            target_channels: formData.target_channels,
+            is_active: formData.is_active,
+          })
           .eq('id', editingCampaign.id);
-        if (error) throw error;
-        toast({ title: 'สำเร็จ', description: 'แก้ไขแคมเปญเรียบร้อยแล้ว' });
-      } else {
-        const { error } = await (supabase as any)
-          .from('campaign_messages')
-          .insert([{ ...payload, sort_order: campaigns.length, next_send_at: computeNewNextSendAt() }]);
 
         if (error) throw error;
-        toast({ title: 'สำเร็จ', description: 'สร้างแคมเปญเรียบร้อยแล้ว' });
+        toast({ title: 'สำเร็จ', description: 'แก้ไขโฆษณาบรอดแคสต์เรียบร้อยแล้ว' });
+      } else {
+        // Create new
+        const maxSort = campaigns.reduce((max, c) => Math.max(max, c.sort_order || 0), 0);
+        const { error } = await supabase.from('campaign_messages').insert({
+          internal_name: formData.internal_name.trim(),
+          payload: payloadObj,
+          target_channels: formData.target_channels,
+          sort_order: maxSort + 1,
+          is_active: formData.is_active,
+        });
+
+        if (error) throw error;
+        toast({ title: 'สำเร็จ', description: 'สร้างโฆษณาบรอดแคสต์เรียบร้อยแล้ว' });
       }
 
       setDialogOpen(false);
-      setEditingCampaign(null);
-      setFormData(INITIAL_FORM);
-      fetchCampaigns();
-    } catch (error: any) {
-      console.error('Error saving campaign:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถบันทึกแคมเปญได้',
-        variant: 'destructive',
-      });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
     }
   };
 
-  // ─── Delete campaign ─────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบแคมเปญนี้?')) return;
-
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบโฆษณาบรอดแคสต์นี้?')) return;
     try {
       setIsDeleting(true);
-      const { error } = await (supabase as any)
-        .from('campaign_messages')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('campaign_messages').delete().eq('id', id);
       if (error) throw error;
-      toast({ title: 'สำเร็จ', description: 'ลบแคมเปญเรียบร้อยแล้ว' });
-      fetchCampaigns();
-    } catch (error: any) {
-      console.error('Error deleting campaign:', error);
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถลบแคมเปญได้',
-        variant: 'destructive',
-      });
+      toast({ title: 'ลบสำเร็จ', description: 'ลบโฆษณาบรอดแคสต์เรียบร้อยแล้ว' });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // ─── Open edit dialog ────────────────────────────────────────────────────
-  const handleEdit = (campaign: CampaignMessage) => {
-    setEditingCampaign(campaign);
-    setChannelSearch('');
-    setFormData({
-      internal_name: campaign.internal_name,
-      content_text: campaign.content_text,
-      image_url: campaign.image_url || '',
-      image_url_2: campaign.image_url_2 || '',
-      has_button: campaign.has_button,
-      button_label: campaign.button_label || '',
-      button_url: campaign.button_url || '',
-      button_emoji_id: campaign.button_emoji_id || '',
-      button_emoji_name: campaign.button_emoji_name || '',
-      button_2_label: campaign.button_2_label || '',
-      button_2_url: campaign.button_2_url || '',
-      button_2_emoji_id: campaign.button_2_emoji_id || '',
-      button_2_emoji_name: campaign.button_2_emoji_name || '',
-      target_channels: campaign.target_channels || [],
-      is_active: campaign.is_active,
-    });
-    setDialogOpen(true);
-  };
-
-  // ─── Open create dialog ──────────────────────────────────────────────────
-  const handleCreate = () => {
-    setEditingCampaign(null);
-    setChannelSearch('');
-    setFormData(INITIAL_FORM);
-    setDialogOpen(true);
-  };
-
-  // ─── Toggle channel selection ────────────────────────────────────────────
-  const toggleChannel = (channelId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      target_channels: prev.target_channels.includes(channelId)
-        ? prev.target_channels.filter((id) => id !== channelId)
-        : [...prev.target_channels, channelId],
-    }));
-  };
-
-  const filteredChannels = useMemo(() => {
-    const q = channelSearch.toLowerCase().trim();
-    if (!q) return channels;
-    return channels.filter((ch) => ch.name.toLowerCase().includes(q));
-  }, [channels, channelSearch]);
-
-  // ─── Test send ───────────────────────────────────────────────────────────
-  const handleOpenTestSend = (campaign: CampaignMessage) => {
-    setTestSendCampaign(campaign);
-    setTestSendChannel('');
-    setTestSendDialogOpen(true);
-  };
-
-  const handleTestSend = async () => {
-    if (!testSendCampaign || !testSendChannel) {
-      toast({ title: 'กรุณาเลือกช่อง', variant: 'destructive' });
-      return;
-    }
-    try {
-      setIsSendingTest(true);
-      const { data, error } = await supabase.functions.invoke('test-send-campaign', {
-        body: { campaign_id: testSendCampaign.id, channel_id: testSendChannel },
-      });
-      if (error) throw error;
-      if (data?.success) {
-        toast({
-          title: 'ส่งสำเร็จ',
-          description: `ส่งไปยังช่องเรียบร้อยแล้ว (ID: ${data.message_id})`,
-        });
-        setTestSendDialogOpen(false);
-      } else {
-        throw new Error(data?.error || 'Unknown error');
-      }
-    } catch (error: any) {
-      console.error('Test send error:', error);
-      toast({
-        title: 'ส่งไม่สำเร็จ',
-        description: error.message || 'ไม่สามารถส่งข้อความได้',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
-
-  // ─── Reset queue ─────────────────────────────────────────────────────────
-  const handleResetQueue = async (silent = false) => {
-    try {
-      setIsResettingQueue(true);
-      const { data, error } = await supabase.functions.invoke('reset-campaign-queue');
-      if (error) throw error;
-      if (!silent) {
-        toast({
-          title: 'รีเซ็ตคิวสำเร็จ',
-          description: `จัดคิว ${data?.updated ?? 0} แคมเปญใหม่ (interval ${data?.interval_minutes} นาที)`,
-        });
-      }
-      fetchCampaigns();
-    } catch (error: any) {
-      console.error('Reset queue error:', error);
-      if (!silent) {
-        toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถรีเซ็ตคิวได้', variant: 'destructive' });
-      }
-    } finally {
-      setIsResettingQueue(false);
-    }
-  };
-
-  // ─── Update schedule ─────────────────────────────────────────────────────
-  const handleUpdateSchedule = async (newConfig: Partial<ScheduleConfig>) => {
+  // ── Save Schedule Config ────────────────────────────────────────────────────
+  const handleSaveScheduleConfig = async () => {
     try {
       setIsUpdatingSchedule(true);
-      const { data, error } = await supabase.functions.invoke('update-cron-schedule', {
-        body: {
-          interval_minutes: newConfig.interval_minutes ?? scheduleConfig?.interval_minutes ?? 1440,
-          is_enabled: newConfig.is_enabled ?? scheduleConfig?.is_enabled,
-        },
-      });
+      const hours = scheduleConfig?.interval_hours ?? 1;
+      const minutes = scheduleConfig?.interval_minutes ?? 0;
+      const enabled = scheduleConfig?.is_enabled ?? true;
+
+      const { error } = await (supabase as any)
+        .from('campaign_schedule_config')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000001',
+          interval_hours: hours,
+          interval_minutes: minutes,
+          is_enabled: enabled,
+          label: `ทุก ${hours > 0 ? `${hours} ชั่วโมง ` : ''}${minutes > 0 ? `${minutes} นาที` : ''}`,
+          updated_at: new Date().toISOString(),
+        });
+
       if (error) throw error;
-      toast({ title: 'บันทึกตารางเวลาแล้ว', description: data?.label || 'อัปเดตเรียบร้อย' });
+
+      toast({ title: 'สำเร็จ', description: 'บันทึกการตั้งค่าเวลาบรอดแคสต์เรียบร้อยแล้ว' });
       setScheduleDialogOpen(false);
-      // Auto-reset queue so all next_send_at values reflect the new interval
-      await handleResetQueue(true);
-    } catch (error: any) {
-      console.error('Schedule update error:', error);
-      toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปเดตตารางเวลาได้', variant: 'destructive' });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
     } finally {
       setIsUpdatingSchedule(false);
     }
   };
 
-  // ─── Format countdown from a future ISO timestamp ───────────────────────
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const formatCountdown = (nextSendAt: string | null): React.ReactNode => {
-    void tick; // depend on tick so this re-evaluates every second
-    if (!nextSendAt) return <Badge variant="outline" className="text-matcha border-matcha/40 bg-matcha/10 dark:bg-matcha/20 text-xs">พร้อมส่ง</Badge>;
-    const ms = new Date(nextSendAt).getTime() - Date.now();
-    if (ms <= 0) return <Badge variant="outline" className="text-matcha border-matcha/40 bg-matcha/10 dark:bg-matcha/20 text-xs">พร้อมส่ง</Badge>;
-    const h = Math.floor(ms / 3_600_000);
-    const m = Math.floor((ms % 3_600_000) / 60_000);
-    const s = Math.floor((ms % 60_000) / 1_000);
-    const label = h > 0 ? `${h}ชม. ${m}น. ${s}ว.` : m > 0 ? `${m}น. ${s}ว.` : `${s}ว.`;
-    return <span className="text-xs tabular-nums text-muted-foreground">อีก {label}</span>;
+  // ── Manual Queue Reset ─────────────────────────────────────────────────────
+  const handleResetQueueSchedule = async () => {
+    try {
+      setIsResettingQueue(true);
+      await saveOrderAndResetQueue();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: err?.message, variant: 'destructive' });
+    } finally {
+      setIsResettingQueue(false);
+    }
   };
 
-  // ─── Compute next_send_at for a new campaign (appended to queue end) ─────
-  const computeNewNextSendAt = (): string | null => {
-    const intervalMs = (scheduleConfig?.interval_minutes ?? 1440) * 60 * 1000;
-    // Find the latest next_send_at among active campaigns
-    const latestMs = campaigns
-      .filter((c) => c.is_active && c.next_send_at)
-      .reduce((max, c) => Math.max(max, new Date(c.next_send_at!).getTime()), 0);
-    if (latestMs === 0) return null; // no campaigns in queue yet → send immediately
-    return new Date(latestMs + intervalMs).toISOString();
+  // ── Helper: Format Time Left ────────────────────────────────────────────────
+  const formatTimeLeft = (nextSendAtStr: string | null) => {
+    if (!nextSendAtStr) return 'ไม่อยู่ในคิว';
+    const target = new Date(nextSendAtStr).getTime();
+    const now = Date.now();
+    const diff = target - now;
+    if (diff <= 0) return 'กำลังเตรียมส่ง...';
+
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    if (mins >= 60) {
+      const hrs = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      return `อีก ${hrs} ชม. ${remMins} นาที`;
+    }
+    return `อีก ${mins} นาที ${secs} วินาที`;
   };
-  useEffect(() => {
-    fetchCampaigns();
-
-    // Tick every second to drive countdown display without page refresh
-    const ticker = setInterval(() => setTick((t) => t + 1), 1000);
-
-    return () => {
-      clearInterval(ticker);
-    };
-  }, []);
 
   return (
-    <Tabs defaultValue="campaigns" className="space-y-6">
-      <TabsList className="w-fit p-1 bg-muted/60 border border-border/40 rounded-2xl shadow-sm">
-        <TabsTrigger
-          value="campaigns"
-          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
-        >
-          <Send className="w-4 h-4" />โฆษณาแคมเปญ
-        </TabsTrigger>
-        <TabsTrigger
-          value="session-ads"
-          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
-        >
-          <Megaphone className="w-4 h-4" />โฆษณาผ่านระบบ
-        </TabsTrigger>
-      </TabsList>
-
-      {/* ── Tab: โฆษณาแคมเปญ ── */}
-      <TabsContent value="campaigns" className="mt-0">
     <div className="space-y-6">
-      {/* ─── Header ─── */}
-      <Card className="rounded-2xl border-border/40 bg-card">
-        <CardHeader className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
-              <Send className="w-5 h-5 text-primary" />
-              จัดการโฆษณาแคมเปญ
-            </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              {hasOrderChanged && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={handleSaveOrder}
-                  disabled={savingOrder}
-                  className="gap-2 rounded-xl text-xs h-9 bg-success hover:bg-success/90 text-white animate-pulse"
-                >
-                  {savingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  บันทึกลำดับ
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleResetQueue()}
-                disabled={isResettingQueue || campaigns.length === 0}
-                className="gap-2 rounded-xl text-xs h-9 border-border/40"
-                title="รีเซ็ตคิวใหม่ตามลำดับโฆษณาและรอบเวลาปัจจุบัน"
-              >
-                {isResettingQueue ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-4 h-4 text-primary" />
-                )}
-                รีเซ็ตคิว
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setScheduleDialogOpen(true)}
-                className="gap-2 rounded-xl text-xs h-9 border-border/40"
-              >
-                <Clock className="w-4 h-4 text-accent" />
-                ตั้งเวลาส่ง
-                {scheduleConfig && (
-                  <Badge
-                    variant={scheduleConfig.is_enabled ? 'default' : 'secondary'}
-                    className={cn(
-                      "ml-1 text-[10px] px-1.5 py-0 h-4 rounded-full font-medium",
-                      scheduleConfig.is_enabled
-                        ? "bg-success/15 border-success/35 text-success hover:bg-success/20 border"
-                        : "bg-muted-foreground/15 border-muted-foreground/35 text-muted-foreground border"
-                    )}
-                  >
-                    {scheduleConfig.is_enabled
-                      ? (() => {
-                          const m = scheduleConfig.interval_minutes ?? scheduleConfig.interval_hours * 60;
-                          return m < 60 ? `ทุก ${m} นาที` : `ทุก ${Math.round(m / 60)} ชม.`;
-                        })()
-                      : 'ปิดอยู่'}
-                  </Badge>
-                )}
-              </Button>
-              <Button onClick={handleCreate} size="sm" className="gap-2 rounded-xl text-xs h-9 bg-primary hover:bg-primary/90 text-white">
-                <Plus className="w-4 h-4 text-white" />
-                สร้างโฆษณา
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* ─── Campaigns table ─── */}
-      <Card className="rounded-2xl border-border/40 bg-card">
-        <CardContent className="p-4 sm:p-6">
-          {campaigns.length > 1 && !loading && (
-            <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
-              <GripVertical className="w-3.5 h-3.5" />
-              ลากแถวเพื่อเรียงลำดับ แล้วกด "บันทึกลำดับ"
+      <Tabs defaultValue="campaigns" className="w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Megaphone className="w-6 h-6 text-primary" />
+              จัดการโฆษณา
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              บริหารจัดการโฆษณาบรอดแคสต์ตามช่วงเวลา และโฆษณาในห้องสนทนาผ่านบอท
             </p>
-          )}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : campaigns.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Send className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>ยังไม่มีโฆษณา</p>
-            </div>
-          ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="campaigns">
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="space-y-3"
-                  >
-                    {campaigns.map((campaign, index) => (
-                      <Draggable key={campaign.id} draggableId={campaign.id} index={index}>
-                        {(drag, snapshot) => (
-                          <div
-                            ref={drag.innerRef}
-                            {...drag.draggableProps}
-                            className={cn(
-                              "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border bg-card transition-all hover:shadow-sm",
-                              snapshot.isDragging
-                                ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-md scale-[1.01]"
-                                : "border-border/40 hover:bg-muted/30"
-                            )}
-                          >
-                            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                              {/* Drag handle & Up/Down buttons */}
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  type="button"
-                                  {...drag.dragHandleProps}
-                                  className="flex items-center justify-center p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing shrink-0 animate-none"
-                                  title="ลากเพื่อเรียงลำดับ"
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </button>
-                                <div className="flex flex-col gap-0.5">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
-                                    onClick={() => moveCampaign(campaign, 'up')}
-                                    disabled={index === 0}
-                                    title="เลื่อนขึ้น"
-                                  >
-                                    <ArrowUp className="w-3 h-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
-                                    onClick={() => moveCampaign(campaign, 'down')}
-                                    disabled={index === campaigns.length - 1}
-                                    title="เลื่อนลง"
-                                  >
-                                    <ArrowDown className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
+          </div>
+          <TabsList className="bg-muted p-1 rounded-2xl">
+            <TabsTrigger value="campaigns" className="rounded-xl text-xs font-bold gap-1.5 px-3 py-1.5">
+              <Megaphone className="w-4 h-4 text-primary" />
+              โฆษณาบรอดแคสต์
+            </TabsTrigger>
+            <TabsTrigger value="session-ads" className="rounded-xl text-xs font-bold gap-1.5 px-3 py-1.5">
+              <Images className="w-4 h-4 text-emerald-500" />
+              โฆษณาผ่านระบบ
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-                              {/* Image thumbnail if exists */}
-                              {campaign.image_url && (
-                                <div className="w-14 h-14 rounded-xl overflow-hidden border border-border/40 shrink-0 bg-muted hidden xs:block">
-                                  <img src={campaign.image_url} alt="" className="w-full h-full object-cover" />
-                                </div>
-                              )}
+        {/* ─── TAB 1: โฆษณาบรอดแคสต์ ─── */}
+        <TabsContent value="campaigns" className="space-y-6 mt-4">
+          <Card className="rounded-2xl shadow-sm border border-border/60">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base font-bold flex items-center gap-2">
+                    <FileCode className="w-5 h-5 text-primary" />
+                    รายการโฆษณาบรอดแคสต์
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    กำหนดข้อความรูปแบบ JSON Component v2 และจัดลำดับคิวส่งข้อความไปยังช่อง Discord
+                  </p>
+                </div>
 
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded font-mono border-border/40 font-bold text-foreground">
-                                    ลำดับที่ {index + 1}
-                                  </Badge>
-                                  <h4 className="font-semibold text-sm truncate text-foreground">{campaign.internal_name}</h4>
-                                  {campaign.is_active ? (
-                                    <Badge className="bg-success/15 border-success/35 text-success hover:bg-success/20 text-[10px] px-1.5 py-0 h-4 rounded-full font-medium">เปิดใช้งาน</Badge>
-                                  ) : (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 rounded-full font-medium">ปิดใช้งาน</Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground line-clamp-1 max-w-xl">
-                                  {campaign.content_text}
-                                </p>
-                                <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap pt-0.5">
-                                  <span className="flex items-center gap-1">
-                                    <Send className="w-3 h-3 text-primary/70" />
-                                    ช่องเป้าหมาย: <span className="font-semibold text-foreground">{campaign.target_channels?.length || 0} ช่อง</span>
-                                  </span>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-accent/70" />
-                                    คิวถัดไป: {formatCountdown(campaign.next_send_at)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-1 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border/40">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenTestSend(campaign)}
-                                title="ทดลองส่ง"
-                                className="h-8 w-8 p-0 text-accent hover:text-accent/80 hover:bg-accent/10 rounded-xl"
-                              >
-                                <FlaskConical className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(campaign)}
-                                title="แก้ไข"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(campaign.id)}
-                                disabled={isDeleting}
-                                title="ลบ"
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ─── Bucket Picker Dialog ─── */}
-      <Dialog open={bucketPickerOpen} onOpenChange={setBucketPickerOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col rounded-2xl">
-          <DialogHeader className="pb-2 border-b">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                <Images className="w-5 h-5 text-primary" />
-                เลือกรูปจาก Bucket — {bucketPickerTarget === 'image_url' ? 'รูปภาพที่ 1' : 'รูปภาพที่ 2'}
-              </DialogTitle>
-              {bucketFiles.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     type="button"
-                    variant={bucketDeleteMode ? "secondary" : "outline"}
+                    variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const next = !bucketDeleteMode;
-                      setBucketDeleteMode(next);
-                      if (!next) setSelectedBucketFiles([]);
-                    }}
-                    className={`h-8 text-xs rounded-xl gap-1.5 font-medium ${
-                      bucketDeleteMode ? "bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/25" : ""
-                    }`}
+                    onClick={() => setScheduleDialogOpen(true)}
+                    className="h-9 text-xs rounded-xl gap-1.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    {bucketDeleteMode ? 'ออกจากโหมดลบรูป' : 'โหมดลบหลายรูป'}
+                    <Clock className="w-4 h-4 text-indigo-500" />
+                    ตั้งเวลา ({scheduleConfig?.interval_hours || 1} ชม. {scheduleConfig?.interval_minutes || 0} นาที)
                   </Button>
 
-                  {(bucketDeleteMode || selectedBucketFiles.length > 0) && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={selectAllBucketFiles}
-                        className="h-8 text-xs rounded-xl gap-1.5"
-                      >
-                        <Checkbox
-                          checked={selectedBucketFiles.length === bucketFiles.length && bucketFiles.length > 0}
-                          className="w-3.5 h-3.5"
-                        />
-                        {selectedBucketFiles.length === bucketFiles.length ? 'ยกเลิกการเลือก' : 'เลือกทั้งหมด'}
-                      </Button>
-                      {selectedBucketFiles.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={handleBulkDeleteBucketFiles}
-                          disabled={deletingBucketFiles}
-                          className="h-8 text-xs rounded-xl gap-1.5 animate-pulse shadow-md"
-                        >
-                          {deletingBucketFiles ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                          ลบที่เลือก ({selectedBucketFiles.length})
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <DialogDescription className="text-xs font-medium text-muted-foreground mt-1">
-              {bucketDeleteMode ? (
-                <span className="text-destructive font-semibold">
-                  ⚠️ อยู่ในโหมดลบภาพ: คลิกที่การ์ดรูปใดก็ได้เพื่อเลือก/ยกเลิกรูปที่ต้องการลบ แล้วกด "ลบที่เลือก"
-                </span>
-              ) : (
-                <span>
-                  คลิกที่รูปเพื่อเลือกใช้งานใส่โฆษณา หรือกดปุ่ม "โหมดลบหลายรูป" เพื่อจัดการลบภาพ
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto min-h-0 py-3">
-            {loadingBucket ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : bucketFiles.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground text-sm">
-                ยังไม่มีรูปภาพใน Bucket — อัปโหลดรูปใหม่ก่อน
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {bucketFiles.map((f) => {
-                  const isCheckedForDelete = selectedBucketFiles.includes(f.name);
-                  const isChosenForForm = formData[bucketPickerTarget] === f.url;
-
-                  return (
-                    <div
-                      key={f.name}
-                      onClick={() => {
-                        if (bucketDeleteMode || selectedBucketFiles.length > 0) {
-                          toggleSelectBucketFile(f.name);
-                        } else {
-                          selectBucketImage(f.url);
-                        }
-                      }}
-                      className={`relative group rounded-2xl overflow-hidden border-2 transition-all aspect-video bg-muted cursor-pointer select-none ${
-                        isCheckedForDelete
-                          ? 'border-destructive ring-4 ring-destructive/20 bg-destructive/10 scale-[0.98]'
-                          : isChosenForForm
-                          ? 'border-primary ring-4 ring-primary/20'
-                          : 'border-border/40 hover:border-primary/50 hover:shadow-md'
-                      }`}
+                  {hasOrderChanged ? (
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={saveOrderAndResetQueue}
+                      disabled={savingOrder}
+                      className="h-9 text-xs rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold animate-pulse shadow-md"
                     >
-                      <img
-                        src={f.url}
-                        alt={f.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-
-                      {/* Large Checkbox Overlay top-left */}
-                      <div
-                        className="absolute top-2 left-2 z-10 p-2 rounded-xl bg-black/70 backdrop-blur-sm hover:bg-black/90 transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectBucketFile(f.name);
-                        }}
-                        title="ติ๊กเพื่อเลือก/ยกเลิกรูปนี้"
-                      >
-                        <Checkbox
-                          checked={isCheckedForDelete}
-                          onCheckedChange={() => toggleSelectBucketFile(f.name)}
-                          className="w-4 h-4 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
-                        />
-                      </div>
-
-                      {/* Delete Icon top-right */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteSingleBucketFile(f.name, e)}
-                        className="absolute top-2 right-2 z-10 p-2 rounded-xl bg-black/70 text-white hover:bg-destructive transition-colors opacity-80 hover:opacity-100"
-                        title="ลบรูปภาพนี้"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Delete mode checked badge overlay */}
-                      {isCheckedForDelete && (
-                        <div className="absolute inset-0 bg-destructive/20 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-                          <Badge variant="destructive" className="text-xs px-2.5 py-1 rounded-xl shadow-lg gap-1.5 font-bold animate-in zoom-in-95">
-                            <Trash2 className="w-3.5 h-3.5" />
-                            เลือกเพื่อลบ
-                          </Badge>
-                        </div>
+                      {savingOrder ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
                       )}
-
-                      {/* Selection badge for active form choice */}
-                      {isChosenForForm && !isCheckedForDelete && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
-                          <Badge className="bg-primary text-primary-foreground text-xs px-2.5 py-1 rounded-xl shadow-lg gap-1.5 font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            เลือกใช้อยู่
-                          </Badge>
-                        </div>
+                      บันทึกลำดับและรีเซ็ตคิว
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetQueueSchedule}
+                      disabled={isResettingQueue}
+                      className="h-9 text-xs rounded-xl gap-1.5"
+                    >
+                      {isResettingQueue ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4" />
                       )}
+                      รีเซ็ตคิวส่ง
+                    </Button>
+                  )}
 
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white text-[10px] px-2 py-1 truncate opacity-90">
-                        {f.name}
-                      </div>
-                    </div>
-                  );
-                })}
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={openCreateDialog}
+                    className="h-9 text-xs rounded-xl gap-1.5 font-bold shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    สร้างโฆษณาบรอดแคสต์ใหม่
+                  </Button>
+                </div>
               </div>
-            )}
-          </div>
+            </CardHeader>
 
-          <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t">
-            <div className="text-xs text-muted-foreground">
-              ทั้งหมด <span className="font-bold text-foreground">{bucketFiles.length}</span> รูป
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={async () => {
-                  setBucketFiles([]);
-                  setSelectedBucketFiles([]);
-                  await openBucketPicker(bucketPickerTarget);
-                }}
-              >
-                <RefreshCw className="w-4 h-4" />
-                รีเฟรช
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setBucketPickerOpen(false)}>
-                ปิด
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <CardContent className="pt-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : campaigns.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground text-sm space-y-2">
+                  <Megaphone className="w-10 h-10 mx-auto text-muted-foreground/40 stroke-1" />
+                  <p className="font-semibold">ยังไม่มีโฆษณาบรอดแคสต์ในระบบ</p>
+                  <p className="text-xs">กดปุ่ม "สร้างโฆษณาบรอดแคสต์ใหม่" เพื่อเริ่มสร้างข้อความโฆษณา</p>
+                </div>
+              ) : (
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="broadcast-ads-list">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="space-y-3"
+                      >
+                        {campaigns.map((item, index) => {
+                          const channelCount = item.target_channels?.length || 0;
+                          const channelNames = (item.target_channels || [])
+                            .map((cid) => channels.find((c) => c.id === cid)?.name || cid)
+                            .slice(0, 3);
 
-      {/* ─── Test Send Dialog ─── */}
-      <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FlaskConical className="w-5 h-5 text-honey" />
-              ทดลองส่ง
+                          return (
+                            <Draggable key={item.id} draggableId={item.id} index={index}>
+                              {(providedItem, snapshot) => (
+                                <div
+                                  ref={providedItem.innerRef}
+                                  {...providedItem.draggableProps}
+                                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl border transition-all gap-3 bg-card ${
+                                    snapshot.isDragging
+                                      ? 'shadow-xl ring-2 ring-primary/40 border-primary bg-primary/5'
+                                      : 'border-border/60 hover:border-primary/40 hover:shadow-xs'
+                                  }`}
+                                >
+                                  {/* Left: Drag Handle, Arrow Buttons, Badge & Details */}
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div
+                                      {...providedItem.dragHandleProps}
+                                      className="cursor-grab active:cursor-grabbing p-1 rounded-xl hover:bg-muted text-muted-foreground transition-colors"
+                                      title="ลากเพื่อเปลี่ยนลำดับ"
+                                    >
+                                      <GripVertical className="w-5 h-5" />
+                                    </div>
+
+                                    {/* Arrow Buttons */}
+                                    <div className="flex flex-col gap-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => moveItem(index, 'up')}
+                                        disabled={index === 0}
+                                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                        title="เลื่อนขึ้น"
+                                      >
+                                        <ArrowUp className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => moveItem(index, 'down')}
+                                        disabled={index === campaigns.length - 1}
+                                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                        title="เลื่อนลง"
+                                      >
+                                        <ArrowDown className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs font-mono font-bold px-2 py-0.5 rounded-xl shrink-0 bg-muted/60"
+                                    >
+                                      ลำดับที่ {index + 1}
+                                    </Badge>
+
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-sm font-bold truncate">
+                                          {item.internal_name}
+                                        </h3>
+                                        <Switch
+                                          checked={item.is_active}
+                                          onCheckedChange={() => handleToggleActive(item)}
+                                          className="scale-90"
+                                        />
+                                        <Badge
+                                          variant={item.is_active ? 'default' : 'secondary'}
+                                          className={`text-[10px] px-2 py-0.5 rounded-xl font-bold ${
+                                            item.is_active
+                                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                                              : 'bg-muted text-muted-foreground'
+                                          }`}
+                                        >
+                                          {item.is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                                        </Badge>
+                                      </div>
+
+                                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                        <span className="flex items-center gap-1">
+                                          📍 {channelCount} ช่องทาง ({channelNames.join(', ')}
+                                          {channelCount > 3 ? '...' : ''})
+                                        </span>
+                                        {item.is_active && (
+                                          <span className="flex items-center gap-1 text-primary font-medium">
+                                            <Clock className="w-3.5 h-3.5" />
+                                            {formatTimeLeft(item.next_send_at)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right Actions */}
+                                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openPreviewDialog(item)}
+                                      className="h-8 text-xs rounded-xl gap-1"
+                                      title="ดูโค้ด JSON"
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-primary" />
+                                      ดู JSON
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditDialog(item)}
+                                      className="h-8 text-xs rounded-xl gap-1"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                      แก้ไข
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleDeleteCampaign(item.id)}
+                                      disabled={isDeleting}
+                                      className="h-8 text-xs rounded-xl gap-1"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── TAB 2: โฆษณาผ่านระบบ ─── */}
+        <TabsContent value="session-ads" className="mt-4">
+          <SessionAdsManagement />
+        </TabsContent>
+      </Tabs>
+
+      {/* ─── Dialog: Create / Edit Broadcast Ad ─── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col rounded-2xl">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Megaphone className="w-5 h-5 text-primary" />
+              {editingCampaign ? 'แก้ไขโฆษณาบรอดแคสต์' : 'สร้างโฆษณาบรอดแคสต์ใหม่'}
             </DialogTitle>
-            <DialogDescription>
-              ส่งแคมเปญ{' '}
-              <span className="font-medium text-foreground">
-                "{testSendCampaign?.internal_name}"
-              </span>{' '}
-              ไปยังช่องที่เลือกทันที (ไม่เช็คกิจกรรมล่าสุด)
+            <DialogDescription className="text-xs">
+              กรอกชื่ออ้างอิง เลือกช่อง Discord และระบุโครงสร้าง JSON Component v2 สำหรับบรอดแคสต์
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>เลือกช่องที่จะส่ง *</Label>
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 py-3 pr-1">
+            {/* 1. Internal Name */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">ชื่อโฆษณาบรอดแคสต์ (อ้างอิงภายใน)</Label>
+              <Input
+                placeholder="เช่น โปรโมชั่นต้อนรับหน้าร้อน"
+                value={formData.internal_name}
+                onChange={(e) => setFormData({ ...formData, internal_name: e.target.value })}
+                className="rounded-xl h-9 text-xs"
+              />
+            </div>
+
+            {/* 2. Target Channels */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold">เลือกช่องแชทเป้าหมาย (Discord Channels)</Label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={syncChannels}
+                  onClick={() => syncChannels(false)}
                   disabled={loadingChannels}
-                  className="gap-1 text-xs h-7"
+                  className="h-7 text-[11px] rounded-lg gap-1 text-primary"
                 >
-                  {loadingChannels ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                  ซิงค์ช่อง
+                  {loadingChannels ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  ซิงค์ช่องจาก Discord
                 </Button>
               </div>
 
-              {channels.length === 0 ? (
-                <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
-                  คลิก "ซิงค์ช่อง" เพื่อดึงรายการช่อง Discord
+              <div className="border rounded-2xl p-3 space-y-2.5 bg-muted/30">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
+                  <Input
+                    placeholder="ค้นหาชื่อช่อง..."
+                    value={channelSearch}
+                    onChange={(e) => setChannelSearch(e.target.value)}
+                    className="pl-8 h-8 text-xs rounded-xl bg-background"
+                  />
                 </div>
-              ) : (
-                <div className="border rounded-lg max-h-52 overflow-y-auto">
-                  {channels.map((ch) => (
-                    <button
-                      key={ch.id}
-                      type="button"
-                      onClick={() => setTestSendChannel(ch.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-muted/50 ${
-                        testSendChannel === ch.id
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : ''
-                      }`}
-                    >
-                      {testSendChannel === ch.id ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      ) : (
-                        <span className="w-3.5 h-3.5 shrink-0 text-muted-foreground text-center">#</span>
-                      )}
-                      {ch.name}
-                    </button>
-                  ))}
+
+                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                  {filteredChannels.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">ไม่พบช่องแชท</p>
+                  ) : (
+                    filteredChannels.map((ch) => {
+                      const isChecked = formData.target_channels.includes(ch.id);
+                      return (
+                        <label
+                          key={ch.id}
+                          className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-background cursor-pointer text-xs transition-colors"
+                        >
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData({
+                                  ...formData,
+                                  target_channels: [...formData.target_channels, ch.id],
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  target_channels: formData.target_channels.filter((id) => id !== ch.id),
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 rounded-md"
+                          />
+                          <span className="font-mono text-muted-foreground">#</span>
+                          <span className="font-medium">{ch.name}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono ml-auto">
+                            {ch.id}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            {testSendChannel && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-                <span>
-                  จะส่งไปยัง{' '}
-                  <span className="font-medium text-foreground">
-                    #{channels.find((c) => c.id === testSendChannel)?.name ?? testSendChannel}
-                  </span>
-                </span>
+            {/* 3. JSON Payload */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold flex items-center gap-1.5">
+                <FileCode className="w-4 h-4 text-primary" />
+                JSON Payload (Discord Components v2)
+              </Label>
+
+              <Textarea
+                rows={10}
+                value={formData.payloadStr}
+                onChange={(e) => setFormData({ ...formData, payloadStr: e.target.value })}
+                className="font-mono text-xs rounded-xl leading-relaxed"
+                placeholder={DEFAULT_JSON_EXAMPLE}
+              />
+            </div>
+
+            {/* 4. Active Status Switch */}
+            <div className="flex items-center justify-between p-3 rounded-2xl border bg-muted/20">
+              <div>
+                <Label className="text-xs font-bold">เปิดใช้งานข้อความบรอดแคสต์นี้</Label>
+                <p className="text-[11px] text-muted-foreground">หากปิดอยู่ ระบบจะข้ามข้อความนี้เมื่อถึงคิวส่ง</p>
               </div>
-            )}
+              <Switch
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTestSendDialogOpen(false)}>
+          <DialogFooter className="pt-2 border-t flex items-center justify-between gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} className="rounded-xl">
               ยกเลิก
             </Button>
-            <Button
-              onClick={handleTestSend}
-              disabled={!testSendChannel || isSendingTest}
-              className="gap-2"
-            >
-              {isSendingTest ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FlaskConical className="w-4 h-4" />
-              )}
-              ส่งทดลอง
+            <Button size="sm" onClick={handleSaveCampaign} className="rounded-xl font-bold gap-1.5">
+              <Save className="w-4 h-4" />
+              บันทึกข้อความ
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Schedule Config Dialog ─── */}
-      <ScheduleDialog
-        open={scheduleDialogOpen}
-        onOpenChange={setScheduleDialogOpen}
-        config={scheduleConfig}
-        isSaving={isUpdatingSchedule}
-        onSave={handleUpdateSchedule}
-      />
-
-      {/* ─── Create/Edit Dialog ─── */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingCampaign ? 'แก้ไขโฆษณา' : 'สร้างโฆษณาใหม่'}
+      {/* ─── Dialog: Preview JSON Code ─── */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col rounded-2xl">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Eye className="w-5 h-5 text-primary" />
+              ตัวอย่าง JSON — {previewCampaign?.internal_name}
             </DialogTitle>
-            <DialogDescription>
-              กรอกข้อมูลโฆษณาและดูตัวอย่างแบบเรียลไทม์
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-3">
+            <pre className="bg-slate-950 text-slate-100 p-4 rounded-2xl font-mono text-xs overflow-x-auto leading-relaxed">
+              {previewCampaign ? JSON.stringify(previewCampaign.payload, null, 2) : ''}
+            </pre>
+          </div>
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => setPreviewDialogOpen(false)} className="rounded-xl">
+              ปิดหน้าต่าง
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Schedule Config ─── */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Clock className="w-5 h-5 text-indigo-500" />
+              ตั้งค่าระยะเวลาการส่งบรอดแคสต์
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              กำหนดว่าระบบจะส่งข้อความโฆษณาบรอดแคสต์ถัดไปวนลูปทุกๆ กี่ชั่วโมง/กี่นาที
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ─── Left Column: Form ─── */}
-            <div className="space-y-4">
-              {/* Internal name */}
-              <div>
-                <Label htmlFor="internal_name">ชื่อภายใน *</Label>
+          <div className="space-y-4 py-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">ชั่วโมง</Label>
                 <Input
-                  id="internal_name"
-                  value={formData.internal_name}
-                  onChange={(e) => setFormData({ ...formData, internal_name: e.target.value })}
-                  placeholder="เช่น: Summer Sale 2024"
-                  maxLength={100}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.internal_name.length}/100
-                </p>
-              </div>
-
-              {/* Content text */}
-              <div>
-                <Label htmlFor="content_text">ข้อความ *</Label>
-                <Textarea
-                  id="content_text"
-                  value={formData.content_text}
-                  onChange={(e) => setFormData({ ...formData, content_text: e.target.value })}
-                  placeholder="ข้อความที่จะแสดงในโฆษณา"
-                  rows={4}
-                  maxLength={2000}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.content_text.length}/2000
-                </p>
-              </div>
-
-              {/* Image 1 */}
-              <div>
-                <Label>รูปภาพที่ 1</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="gap-2">
-                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    อัปโหลด
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => openBucketPicker('image_url')} className="gap-2">
-                    <Images className="w-4 h-4" />
-                    เลือกจาก Bucket
-                  </Button>
-                  {formData.image_url && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url: '' })}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                {formData.image_url && (
-                  <img src={formData.image_url} alt="Preview 1" className="mt-2 w-full h-28 object-cover rounded-lg" />
-                )}
-              </div>
-
-              {/* Image 2 */}
-              <div>
-                <Label>รูปภาพที่ 2 (ไม่บังคับ)</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Input type="file" ref={fileInputRef2} onChange={handleImageUpload2} accept="image/*" className="hidden" />
-                  <Button type="button" variant="outline" onClick={() => fileInputRef2.current?.click()} disabled={uploading2} className="gap-2">
-                    {uploading2 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    อัปโหลด
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => openBucketPicker('image_url_2')} className="gap-2">
-                    <Images className="w-4 h-4" />
-                    เลือกจาก Bucket
-                  </Button>
-                  {formData.image_url_2 && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFormData({ ...formData, image_url_2: '' })}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                {formData.image_url_2 && (
-                  <img src={formData.image_url_2} alt="Preview 2" className="mt-2 w-full h-28 object-cover rounded-lg" />
-                )}
-              </div>
-
-              {/* Button 1 toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="has_button">เพิ่มปุ่มที่ 1</Label>
-                <Switch
-                  id="has_button"
-                  checked={formData.has_button}
-                  onCheckedChange={(checked) => setFormData({ ...formData, has_button: checked })}
+                  type="number"
+                  min={0}
+                  max={168}
+                  value={scheduleConfig?.interval_hours ?? 1}
+                  onChange={(e) =>
+                    setScheduleConfig({
+                      ...scheduleConfig!,
+                      interval_hours: Math.max(0, parseInt(e.target.value) || 0),
+                    })
+                  }
+                  className="rounded-xl h-9 text-xs"
                 />
               </div>
-
-              {/* Button 1 fields */}
-              {formData.has_button && (
-                <div className="space-y-3 pl-4 border-l-2 border-primary/20">
-                  <div>
-                    <Label htmlFor="button_label">ข้อความปุ่ม *</Label>
-                    <Input
-                      id="button_label"
-                      value={formData.button_label}
-                      onChange={(e) => setFormData({ ...formData, button_label: e.target.value })}
-                      placeholder="เช่น: ดูรายละเอียด"
-                      maxLength={80}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="button_url">URL ปุ่ม *</Label>
-                    <Input
-                      id="button_url"
-                      value={formData.button_url}
-                      onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="button_emoji_id">Emoji ID</Label>
-                      <Input
-                        id="button_emoji_id"
-                        value={formData.button_emoji_id}
-                        onChange={(e) => setFormData({ ...formData, button_emoji_id: e.target.value })}
-                        placeholder="1234567890"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="button_emoji_name">Emoji Name</Label>
-                      <Input
-                        id="button_emoji_name"
-                        value={formData.button_emoji_name}
-                        onChange={(e) => setFormData({ ...formData, button_emoji_name: e.target.value })}
-                        placeholder="emoji_name"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Button 2 */}
-              <div>
-                <Label className="mb-2 block">ปุ่มที่ 2 (ไม่บังคับ)</Label>
-                <div className="space-y-3 pl-4 border-l-2 border-muted">
-                  <div>
-                    <Label htmlFor="button_2_label">ข้อความปุ่ม</Label>
-                    <Input
-                      id="button_2_label"
-                      value={formData.button_2_label}
-                      onChange={(e) => setFormData({ ...formData, button_2_label: e.target.value })}
-                      placeholder="เช่น: สมัครสมาชิก"
-                      maxLength={80}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="button_2_url">URL ปุ่ม</Label>
-                    <Input
-                      id="button_2_url"
-                      value={formData.button_2_url}
-                      onChange={(e) => setFormData({ ...formData, button_2_url: e.target.value })}
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="button_2_emoji_id">Emoji ID</Label>
-                      <Input
-                        id="button_2_emoji_id"
-                        value={formData.button_2_emoji_id}
-                        onChange={(e) => setFormData({ ...formData, button_2_emoji_id: e.target.value })}
-                        placeholder="1234567890"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="button_2_emoji_name">Emoji Name</Label>
-                      <Input
-                        id="button_2_emoji_name"
-                        value={formData.button_2_emoji_name}
-                        onChange={(e) => setFormData({ ...formData, button_2_emoji_name: e.target.value })}
-                        placeholder="emoji_name"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Target channels */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>ช่องเป้าหมาย *</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={syncChannels}
-                    disabled={loadingChannels}
-                    className="gap-1.5 text-xs h-7 hover:bg-muted/85 rounded-lg"
-                  >
-                    {loadingChannels ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    )}
-                    ซิงค์ช่อง
-                  </Button>
-                </div>
-                
-                {/* Channel Search Input */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    value={channelSearch}
-                    onChange={(e) => setChannelSearch(e.target.value)}
-                    placeholder="ค้นหาชื่อช่อง..."
-                    className="pl-8 h-8 text-xs rounded-xl bg-card border-border/40 focus:ring-primary/20"
-                  />
-                  {channelSearch && (
-                    <button
-                      onClick={() => setChannelSearch('')}
-                      className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="border rounded-2xl p-3 max-h-48 overflow-y-auto space-y-1.5 bg-muted/10 border-border/40">
-                  {filteredChannels.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4 italic">
-                      {channels.length === 0 ? 'คลิก "ซิงค์ช่อง" เพื่อดึงข้อมูลช่อง Discord' : 'ไม่พบช่องที่ตรงกับคำค้นหา'}
-                    </p>
-                  ) : (
-                    filteredChannels.map((channel) => (
-                      <div key={channel.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
-                        <Checkbox
-                          id={`channel-${channel.id}`}
-                          checked={formData.target_channels.includes(channel.id)}
-                          onCheckedChange={() => toggleChannel(channel.id)}
-                        />
-                        <Label
-                          htmlFor={`channel-${channel.id}`}
-                          className="text-xs cursor-pointer flex-1 select-none font-medium text-foreground/80 hover:text-foreground"
-                        >
-                          # {channel.name}
-                        </Label>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground pl-1">
-                  เลือกแล้ว <span className="font-bold text-foreground">{formData.target_channels.length}</span> ช่อง
-                </p>
-              </div>
-
-              {/* Active toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="is_active">เปิดใช้งาน</Label>
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">นาที</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={scheduleConfig?.interval_minutes ?? 0}
+                  onChange={(e) =>
+                    setScheduleConfig({
+                      ...scheduleConfig!,
+                      interval_minutes: Math.max(0, parseInt(e.target.value) || 0),
+                    })
+                  }
+                  className="rounded-xl h-9 text-xs"
                 />
               </div>
             </div>
 
-            {/* ─── Right Column: Live Preview ─── */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ตัวอย่างแบบเรียลไทม์ (จำลองหน้าจอ Discord)</Label>
-              <DiscordLiveMockup formData={formData} />
+            <div className="flex items-center justify-between p-3 rounded-2xl border bg-muted/20">
+              <div>
+                <Label className="text-xs font-bold">เปิดใช้งานระบบวนลูปส่งอัตโนมัติ</Label>
+              </div>
+              <Switch
+                checked={scheduleConfig?.is_enabled ?? true}
+                onCheckedChange={(checked) =>
+                  setScheduleConfig({ ...scheduleConfig!, is_enabled: checked })
+                }
+              />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="pt-2 border-t flex items-center justify-between gap-2">
+            <Button variant="outline" size="sm" onClick={() => setScheduleDialogOpen(false)} className="rounded-xl">
               ยกเลิก
             </Button>
-            <Button onClick={handleSave}>
-              {editingCampaign ? 'บันทึกการแก้ไข' : 'สร้างโฆษณา'}
+            <Button
+              size="sm"
+              onClick={handleSaveScheduleConfig}
+              disabled={isUpdatingSchedule}
+              className="rounded-xl font-bold gap-1.5"
+            >
+              {isUpdatingSchedule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              บันทึกการตั้งค่า
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-      </TabsContent>
-
-      {/* ── Tab: โฆษณาผ่านระบบ ── */}
-      <TabsContent value="session-ads" className="mt-0">
-        <SessionAdsManagement />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-// ─── Schedule Dialog (sub-component) ─────────────────────────────────────────
-
-// Presets in minutes
-const MINUTE_PRESETS = [
-  { label: '5 นาที',   minutes: 5 },
-  { label: '10 นาที',  minutes: 10 },
-  { label: '15 นาที',  minutes: 15 },
-  { label: '30 นาที',  minutes: 30 },
-  { label: '45 นาที',  minutes: 45 },
-];
-
-const HOUR_PRESETS = [
-  { label: '1 ชั่วโมง',              minutes: 60 },
-  { label: '2 ชั่วโมง',              minutes: 120 },
-  { label: '4 ชั่วโมง',              minutes: 240 },
-  { label: '6 ชั่วโมง',              minutes: 360 },
-  { label: '8 ชั่วโมง',              minutes: 480 },
-  { label: '12 ชั่วโมง',             minutes: 720 },
-  { label: '24 ชั่วโมง (1 วัน)',     minutes: 1440 },
-  { label: '48 ชั่วโมง (2 วัน)',     minutes: 2880 },
-  { label: '72 ชั่วโมง (3 วัน)',     minutes: 4320 },
-  { label: '168 ชั่วโมง (1 สัปดาห์)', minutes: 10080 },
-];
-
-interface ScheduleDialogProps {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  config: ScheduleConfig | null;
-  isSaving: boolean;
-  onSave: (config: Partial<ScheduleConfig>) => void;
-}
-
-function ScheduleDialog({ open, onOpenChange, config, isSaving, onSave }: ScheduleDialogProps) {
-  const [tab, setTab] = useState<'minute' | 'hour'>('hour');
-  const [selectedMinutes, setSelectedMinutes] = useState<number>(1440);
-  const [customValue, setCustomValue] = useState('');
-  const [useCustom, setUseCustom] = useState(false);
-  const [isEnabled, setIsEnabled] = useState(false);
-
-  // Sync from config when dialog opens
-  useEffect(() => {
-    if (!open || !config) return;
-    setIsEnabled(config.is_enabled);
-    const m = config.interval_minutes ?? (config.interval_hours ?? 24) * 60;
-    const allPresets = [...MINUTE_PRESETS, ...HOUR_PRESETS];
-    const match = allPresets.find((p) => p.minutes === m);
-    if (match) {
-      setSelectedMinutes(m);
-      setUseCustom(false);
-      setCustomValue('');
-      setTab(m < 60 ? 'minute' : 'hour');
-    } else {
-      setUseCustom(true);
-      setCustomValue(String(m));
-      setSelectedMinutes(m);
-      setTab(m < 60 ? 'minute' : 'hour');
-    }
-  }, [open, config]);
-
-  const effectiveMinutes = useCustom ? (parseInt(customValue) || 0) : selectedMinutes;
-  const isValid = effectiveMinutes >= 5 && effectiveMinutes <= 10080;
-
-  const handlePresetClick = (minutes: number) => {
-    setSelectedMinutes(minutes);
-    setUseCustom(false);
-    setCustomValue('');
-  };
-
-  const describeInterval = (m: number): string => {
-    if (m < 60) return `ส่งซ้ำได้ทุก ${m} นาที`;
-    const h = Math.floor(m / 60);
-    const rem = m % 60;
-    if (rem === 0) {
-      if (h === 1) return 'ส่งซ้ำได้ทุก 1 ชั่วโมง';
-      if (h === 24) return 'ส่งซ้ำได้วันละ 1 ครั้ง';
-      if (h === 168) return 'ส่งซ้ำได้สัปดาห์ละ 1 ครั้ง';
-      return `ส่งซ้ำได้ทุก ${h} ชั่วโมง`;
-    }
-    return `ส่งซ้ำได้ทุก ${h} ชั่วโมง ${rem} นาที`;
-  };
-
-  const handleSave = () => {
-    if (!isValid) return;
-    onSave({ interval_minutes: effectiveMinutes, is_enabled: isEnabled });
-  };
-
-  const currentPresets = tab === 'minute' ? MINUTE_PRESETS : HOUR_PRESETS;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            ตั้งความถี่การส่ง
-          </DialogTitle>
-          <DialogDescription>
-            กำหนดว่าระบบจะส่งแคมเปญซ้ำได้บ่อยแค่ไหน
-            เพื่อป้องกันข้อความสแปมในช่อง Discord
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-
-          {/* ── Enable toggle ── */}
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <p className="text-sm font-medium">เปิดใช้งานการส่งอัตโนมัติ</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                ปิดเพื่อหยุดชั่วคราวโดยไม่ต้องลบการตั้งค่า
-              </p>
-            </div>
-            <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
-          </div>
-
-          {/* ── Unit tab ── */}
-          <div className="flex rounded-lg border overflow-hidden text-sm">
-            <button
-              type="button"
-              onClick={() => { setTab('minute'); setUseCustom(false); }}
-              className={`flex-1 py-2 font-medium transition-colors ${
-                tab === 'minute'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-muted/50'
-              }`}
-            >
-              นาที
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTab('hour'); setUseCustom(false); }}
-              className={`flex-1 py-2 font-medium transition-colors ${
-                tab === 'hour'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-muted/50'
-              }`}
-            >
-              ชั่วโมง / วัน
-            </button>
-          </div>
-
-          {/* ── Presets ── */}
-          <div className="grid grid-cols-2 gap-1.5">
-            {currentPresets.map((preset) => (
-              <button
-                key={preset.minutes}
-                type="button"
-                onClick={() => handlePresetClick(preset.minutes)}
-                className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors ${
-                  !useCustom && selectedMinutes === preset.minutes
-                    ? 'border-primary bg-primary/5 text-primary font-medium'
-                    : 'border-border hover:bg-muted/50'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setUseCustom(true)}
-              className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors col-span-2 ${
-                useCustom
-                  ? 'border-primary bg-primary/5 text-primary font-medium'
-                  : 'border-border hover:bg-muted/50'
-              }`}
-            >
-              กำหนดเอง...
-            </button>
-          </div>
-
-          {/* ── Custom input ── */}
-          {useCustom && (
-            <div className="pl-3 border-l-2 border-primary/20 space-y-1">
-              <Label htmlFor="custom_minutes">
-                จำนวน{tab === 'minute' ? 'นาที' : 'ชั่วโมง'} (
-                {tab === 'minute' ? '5–59' : '1–168'})
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="custom_minutes"
-                  type="number"
-                  min={tab === 'minute' ? 5 : 1}
-                  max={tab === 'minute' ? 59 : 168}
-                  value={customValue}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setCustomValue(v);
-                    // auto-convert hours → minutes
-                    if (tab === 'hour') {
-                      const h = parseInt(v);
-                      if (!isNaN(h)) setSelectedMinutes(h * 60);
-                    } else {
-                      const m = parseInt(v);
-                      if (!isNaN(m)) setSelectedMinutes(m);
-                    }
-                  }}
-                  placeholder={tab === 'minute' ? 'เช่น 20' : 'เช่น 3'}
-                  className="w-28"
-                />
-                <span className="text-sm text-muted-foreground">
-                  {tab === 'minute' ? 'นาที' : 'ชั่วโมง'}
-                </span>
-              </div>
-              {customValue && !isValid && (
-                <p className="text-xs text-destructive">
-                  ต้องอยู่ระหว่าง 5 นาที – 168 ชั่วโมง
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* ── Summary ── */}
-          {isValid && (
-            <div className="rounded-lg bg-muted/40 px-4 py-3 space-y-1.5 text-sm">
-              <div className="flex items-center gap-2 font-medium">
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                สรุปการตั้งค่า
-              </div>
-              <p className="text-muted-foreground">{describeInterval(effectiveMinutes)}</p>
-              <p className="text-muted-foreground">
-                ระบบตรวจสอบทุกนาที แต่ส่งจริงเมื่อผ่านครบ{' '}
-                <span className="font-medium text-foreground">
-                  {effectiveMinutes < 60
-                    ? `${effectiveMinutes} นาที`
-                    : `${Math.floor(effectiveMinutes / 60)} ชั่วโมง${effectiveMinutes % 60 > 0 ? ` ${effectiveMinutes % 60} นาที` : ''}`}
-                </span>{' '}
-                นับจากครั้งล่าสุด
-              </p>
-              <p className="text-muted-foreground">
-                ช่องที่ไม่มีกิจกรรมใน 7 วัน จะถูกข้ามโดยอัตโนมัติ
-              </p>
-              <p>
-                สถานะ:{' '}
-                <span className={isEnabled ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
-                  {isEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
-                </span>
-              </p>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={isSaving || !isValid} className="gap-2">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            บันทึก
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DiscordSpoiler({ children }: { children: React.ReactNode }) {
-  const [revealed, setRevealed] = useState(false);
-  return (
-    <span
-      onClick={(e) => {
-        e.stopPropagation();
-        setRevealed(true);
-      }}
-      className={cn(
-        "cursor-pointer rounded px-1 transition-all text-xs font-sans select-none",
-        revealed
-          ? "bg-white/10 text-inherit cursor-default select-text"
-          : "bg-[#1e1f22] hover:bg-[#232428] text-transparent select-none"
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function renderDiscordMarkdown(text: string): React.ReactNode {
-  if (!text) return null;
-
-  // 1. Extract triple-backtick code blocks first to prevent parsing inside them
-  const codeBlocks: string[] = [];
-  let txt = text.replace(/```([a-zA-Z0-9+.-]+)?\n([\s\S]*?)\n```/g, (_, lang, content) => {
-    const id = codeBlocks.length;
-    codeBlocks.push(content);
-    return `\n__TRIPLE_CODE_${id}__\n`;
-  });
-
-  // 2. Extract inline code (single-backtick)
-  const inlineCodes: string[] = [];
-  txt = txt.replace(/`([^`\n]+)`/g, (_, content) => {
-    const id = inlineCodes.length;
-    inlineCodes.push(content);
-    return `__INLINE_CODE_${id}__`;
-  });
-
-  // 3. Extract links [label](url)
-  const mdLinks: { label: string; url: string }[] = [];
-  txt = txt.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-    const id = mdLinks.length;
-    mdLinks.push({ label, url });
-    return `__MD_LINK_${id}__`;
-  });
-
-  // Split into lines to parse line-by-line blocks (headings, quotes, lists)
-  const lines = txt.split('\n');
-  const elements: React.ReactNode[] = [];
-  
-  let inMultiLineQuote = false;
-  let multiLineQuoteLines: string[] = [];
-  
-  // Helper to parse inline styles (bold, italic, strikethrough, underline, spoilers, emojis, mentions)
-  const parseInline = (lineText: string): React.ReactNode => {
-    if (!lineText) return <br />;
-    
-    // We will do a token replacement for bold, italic, etc.
-    let tokens: Array<string | React.ReactNode> = [lineText];
-    
-    // 1. Restore Md Links
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(__MD_LINK_\d+__)/);
-      return parts.map(part => {
-        const match = part.match(/__MD_LINK_(\d+)__/);
-        if (match) {
-          const link = mdLinks[parseInt(match[1])];
-          return (
-            <a key={part} href={link.url} target="_blank" rel="noopener noreferrer" className="text-[#00a8fc] hover:underline cursor-pointer font-medium">
-              {link.label}
-            </a>
-          );
-        }
-        return part;
-      });
-    });
-
-    // 2. Restore Inline Codes
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(__INLINE_CODE_\d+__)/);
-      return parts.map(part => {
-        const match = part.match(/__INLINE_CODE_(\d+)__/);
-        if (match) {
-          return (
-            <code key={part} className="bg-[#1e1f22] text-[#e3e5e8] font-mono px-1 py-0.5 rounded text-[12px] border border-black/10">
-              {inlineCodes[parseInt(match[1])]}
-            </code>
-          );
-        }
-        return part;
-      });
-    });
-
-    // 3. Spoilers ||text||
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(\|\|.*?\|\|)/);
-      return parts.map(part => {
-        if (part.startsWith('||') && part.endsWith('||')) {
-          const inner = part.slice(2, -2);
-          return <DiscordSpoiler key={part}>{parseInline(inner)}</DiscordSpoiler>;
-        }
-        return part;
-      });
-    });
-
-    // 4. Bold-Italic ***text*** or **_text_** etc.
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(\*\*.*?\*\*)/);
-      return parts.map(part => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          const inner = part.slice(2, -2);
-          return <strong key={part} className="font-bold text-white">{parseInline(inner)}</strong>;
-        }
-        return part;
-      });
-    });
-
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(__.*?__)/);
-      return parts.map(part => {
-        if (part.startsWith('__') && part.endsWith('__')) {
-          const inner = part.slice(2, -2);
-          return <span key={part} className="underline">{parseInline(inner)}</span>;
-        }
-        return part;
-      });
-    });
-
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(\*.*?\*)/);
-      return parts.map(part => {
-        if (part.startsWith('*') && part.endsWith('*')) {
-          const inner = part.slice(1, -1);
-          return <em key={part} className="italic">{parseInline(inner)}</em>;
-        }
-        return part;
-      });
-    });
-
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(~~.*?~~)/);
-      return parts.map(part => {
-        if (part.startsWith('~~') && part.endsWith('~~')) {
-          const inner = part.slice(2, -2);
-          return <span key={part} className="line-through opacity-60">{parseInline(inner)}</span>;
-        }
-        return part;
-      });
-    });
-
-    // 5. Custom Emojis <:name:id> or <a:name:id>
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(<a?:[a-zA-Z0-9_~\s-]+:\d+>)/);
-      return parts.map(part => {
-        const emojiMatch = part.match(/<(a)?:([a-zA-Z0-9_~\s-]+):(\d+)>/);
-        if (emojiMatch) {
-          const isAnimated = !!emojiMatch[1];
-          const name = emojiMatch[2];
-          const id = emojiMatch[3];
-          const ext = isAnimated ? 'gif' : 'webp';
-          const src = `https://cdn.discordapp.com/emojis/${id}.${ext}?size=48&quality=lossless`;
-          return (
-            <img
-              key={part}
-              src={src}
-              alt={`:${name}:`}
-              title={`:${name}:`}
-              className="inline-block w-5.5 h-5.5 vertical-text-bottom mx-0.5 object-contain"
-            />
-          );
-        }
-        return part;
-      });
-    });
-
-    // 6. Mentions <@id>, <@&id>, <#id>
-    tokens = tokens.flatMap(t => {
-      if (typeof t !== 'string') return [t];
-      const parts = t.split(/(<@[!&]?\d+>|<#\d+>)/);
-      return parts.map(part => {
-        if (part.startsWith('<@&')) {
-          const id = part.slice(3, -1);
-          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">@role-{id}</span>;
-        } else if (part.startsWith('<@')) {
-          const id = part.slice(part.startsWith('<@!') ? 3 : 2, -1);
-          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">@user-{id}</span>;
-        } else if (part.startsWith('<#')) {
-          const id = part.slice(2, -1);
-          return <span key={part} className="bg-[#5865f2]/15 text-[#c9cdfb] hover:bg-[#5865f2]/30 hover:text-white transition-colors px-1 rounded font-medium cursor-pointer">#channel-{id}</span>;
-        }
-        return part;
-      });
-    });
-
-    return (
-      <span className="break-words">
-        {tokens.map((tok, idx) => (typeof tok === 'string' ? tok : <React.Fragment key={idx}>{tok}</React.Fragment>))}
-      </span>
-    );
-  };
-
-  // Process line by line
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Handle multiline quote state
-    if (inMultiLineQuote) {
-      multiLineQuoteLines.push(line);
-      if (i === lines.length - 1) {
-        elements.push(
-          <div key={`multi-quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
-            {multiLineQuoteLines.map((l, li) => (
-              <div key={li}>{parseInline(l)}</div>
-            ))}
-          </div>
-        );
-      }
-      continue;
-    }
-
-    // 1. Triple-backtick Code Blocks placeholder restore
-    const tripleCodeMatch = line.match(/^__TRIPLE_CODE_(\d+)__$/);
-    if (tripleCodeMatch) {
-      const codeId = parseInt(tripleCodeMatch[1]);
-      elements.push(
-        <pre key={`code-${i}`} className="bg-[#1e1f22] text-[#e3e5e8] font-mono p-3 rounded-xl text-xs whitespace-pre-wrap block w-full border border-[#232428] my-1.5 select-text overflow-x-auto">
-          {codeBlocks[codeId]}
-        </pre>
-      );
-      continue;
-    }
-
-    // 2. Multiline Quote start
-    if (line.startsWith('>>>')) {
-      inMultiLineQuote = true;
-      const rest = line.slice(3).trim();
-      multiLineQuoteLines = rest ? [rest] : [];
-      if (i === lines.length - 1) {
-        elements.push(
-          <div key={`multi-quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
-            {multiLineQuoteLines.map((l, li) => (
-              <div key={li}>{parseInline(l)}</div>
-            ))}
-          </div>
-        );
-      }
-      continue;
-    }
-
-    // 3. Singleline Quote start
-    if (line.startsWith('>')) {
-      const content = line.slice(1).trim();
-      elements.push(
-        <div key={`quote-${i}`} className="border-l-[4px] border-[#4e5058] pl-3 py-0.5 text-[#dbdee1] my-1 bg-[#2b2d31]/20 rounded-r-md">
-          {parseInline(content)}
-        </div>
-      );
-      continue;
-    }
-
-    // 4. Headings
-    if (line.startsWith('# ')) {
-      elements.push(
-        <h1 key={`h1-${i}`} className="text-xl font-bold text-white border-b border-white/5 pb-1 mt-3 mb-1 select-text">
-          {parseInline(line.slice(2))}
-        </h1>
-      );
-      continue;
-    }
-    if (line.startsWith('## ')) {
-      elements.push(
-        <h2 key={`h2-${i}`} className="text-lg font-bold text-white border-b border-white/5 pb-1 mt-2.5 mb-1 select-text">
-          {parseInline(line.slice(3))}
-        </h2>
-      );
-      continue;
-    }
-    if (line.startsWith('### ')) {
-      elements.push(
-        <h3 key={`h3-${i}`} className="text-base font-bold text-white mt-2 mb-1 select-text">
-          {parseInline(line.slice(4))}
-        </h3>
-      );
-      continue;
-    }
-
-    // 5. Unordered List Items
-    const ulMatch = line.match(/^([*-])\s+(.*)$/);
-    if (ulMatch) {
-      elements.push(
-        <div key={`ul-${i}`} className="flex items-start gap-2 pl-4 py-0.5">
-          <span className="text-muted-foreground select-none shrink-0">•</span>
-          <span className="flex-1">{parseInline(ulMatch[2])}</span>
-        </div>
-      );
-      continue;
-    }
-
-    // 6. Ordered List Items
-    const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
-    if (olMatch) {
-      elements.push(
-        <div key={`ol-${i}`} className="flex items-start gap-2 pl-4 py-0.5">
-          <span className="text-muted-foreground select-none shrink-0 font-medium font-mono text-xs mt-0.5">{olMatch[1]}.</span>
-          <span className="flex-1">{parseInline(olMatch[2])}</span>
-        </div>
-      );
-      continue;
-    }
-
-    // 7. Regular line
-    elements.push(
-      <div key={`line-${i}`} className="min-h-[1rem]">
-        {parseInline(line)}
-      </div>
-    );
-  }
-
-  return <div className="space-y-0.5 select-text">{elements}</div>;
-}
-
-function DiscordEmbedRenderer({ embed }: { embed: any }) {
-  if (!embed || typeof embed !== 'object') return null;
-
-  // Convert decimal color to CSS hex color
-  let hexColor = "";
-  if (embed.color !== undefined) {
-    hexColor = embed.color.toString(16).padStart(6, '0');
-  }
-
-  return (
-    <div
-      style={hexColor ? { borderLeftColor: `#${hexColor}` } : {}}
-      className={cn(
-        "bg-[#2b2d31] rounded-r-lg p-4 border-l-[4px] border-[#1e1f22] text-[#dbdee1] flex gap-3 justify-between my-2 select-text shadow-sm",
-        hexColor ? "" : "border-[#1e1f22]"
-      )}
-    >
-      <div className="flex-1 min-w-0 space-y-2">
-        {/* Author */}
-        {embed.author && (
-          <div className="flex items-center gap-2">
-            {embed.author.icon_url && (
-              <img src={embed.author.icon_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-            )}
-            {embed.author.url ? (
-              <a href={embed.author.url} target="_blank" rel="noopener noreferrer" className="text-white font-semibold text-sm hover:underline">
-                {embed.author.name}
-              </a>
-            ) : (
-              <span className="text-white font-semibold text-sm">{embed.author.name}</span>
-            )}
-          </div>
-        )}
-
-        {/* Title */}
-        {embed.title && (
-          <div>
-            {embed.url ? (
-              <a href={embed.url} target="_blank" rel="noopener noreferrer" className="text-white font-bold text-base hover:underline">
-                {embed.title}
-              </a>
-            ) : (
-              <span className="text-white font-bold text-base">{embed.title}</span>
-            )}
-          </div>
-        )}
-
-        {/* Description */}
-        {embed.description && (
-          <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal whitespace-pre-wrap">
-            {renderDiscordMarkdown(embed.description)}
-          </div>
-        )}
-
-        {/* Fields */}
-        {embed.fields && embed.fields.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 pt-1">
-            {embed.fields.map((f: any, idx: number) => (
-              <div key={idx} className={cn("space-y-0.5", f.inline ? "col-span-1" : "col-span-full")}>
-                <div className="text-xs font-semibold text-[#949ba4]">{f.name}</div>
-                <div className="text-sm text-[#dbdee1] whitespace-pre-wrap">{renderDiscordMarkdown(f.value)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Image */}
-        {embed.image?.url && (
-          <div className="rounded-lg overflow-hidden border border-[#1e1f22] bg-[#232428] mt-2 max-w-[500px]">
-            <img src={embed.image.url} alt="" className="max-h-[300px] object-cover w-full" />
-          </div>
-        )}
-
-        {/* Footer */}
-        {embed.footer && (
-          <div className="flex items-center gap-1.5 text-xs text-[#949ba4] font-medium pt-1">
-            {embed.footer.icon_url && (
-              <img src={embed.footer.icon_url} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
-            )}
-            <span>{embed.footer.text}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Thumbnail */}
-      {embed.thumbnail?.url && (
-        <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-[#232428] border border-[#1e1f22]">
-          <img src={embed.thumbnail.url} alt="" className="w-full h-full object-cover" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DiscordComponentRenderer({ comp }: { comp: any }) {
-  if (!comp || typeof comp !== 'object') return null;
-
-  switch (comp.type) {
-    case 1: // Action Row
-      return (
-        <div className="flex gap-2 flex-wrap pt-1.5 pb-1">
-          {comp.components?.map((child: any, idx: number) => (
-            <DiscordComponentRenderer key={idx} comp={child} />
-          ))}
-        </div>
-      );
-
-    case 2: // Button
-      {
-        const style = comp.style ?? 2;
-        let btnClass = "";
-        if (style === 1) btnClass = "bg-[#5865F2] hover:bg-[#4752C4] text-white";
-        else if (style === 3) btnClass = "bg-[#248046] hover:bg-[#1a6535] text-white";
-        else if (style === 4) btnClass = "bg-[#da373c] hover:bg-[#a92b2f] text-white";
-        else btnClass = "bg-[#4e5058] hover:bg-[#6d6f78] text-white"; // style 2 and 5
-
-        return (
-          <button
-            type="button"
-            disabled
-            className={cn(
-              "px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0 shadow-sm",
-              btnClass
-            )}
-          >
-            {comp.emoji && (
-              <span className="text-sm shrink-0">
-                {comp.emoji.id ? (
-                  <img
-                    src={`https://cdn.discordapp.com/emojis/${comp.emoji.id}.webp?size=32`}
-                    alt={comp.emoji.name}
-                    className="w-4 h-4 object-contain"
-                  />
-                ) : (
-                  comp.emoji.name
-                )}
-              </span>
-            )}
-            <span>{comp.label}</span>
-            {style === 5 && <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />}
-          </button>
-        );
-      }
-
-    case 17: // V2 Container (card box)
-      return (
-        <div className="border border-[#232428] bg-[#2b2d31] rounded-2xl p-4 my-2 shadow-sm space-y-3">
-          {comp.components?.map((child: any, idx: number) => (
-            <DiscordComponentRenderer key={idx} comp={child} />
-          ))}
-        </div>
-      );
-
-    case 14: // V2 Separator
-      {
-        const spacing = comp.spacing ?? 1;
-        const divider = comp.divider ?? true;
-        let spacingClass = "my-2";
-        if (spacing === 1) spacingClass = "my-1";
-        else if (spacing === 3) spacingClass = "my-4";
-        
-        return (
-          <div className={cn("w-full", spacingClass)}>
-            {divider && <div className="border-t border-[#3f4147]" />}
-          </div>
-        );
-      }
-
-    case 9: // V2 Section
-      return (
-        <div className="flex gap-4 items-start justify-between my-1">
-          <div className="flex-1 min-w-0 space-y-2">
-            {comp.components?.map((child: any, idx: number) => (
-              <DiscordComponentRenderer key={idx} comp={child} />
-            ))}
-          </div>
-          {comp.accessory && (
-            <div className="shrink-0 max-w-[100px] sm:max-w-[150px]">
-              <DiscordComponentRenderer comp={comp.accessory} />
-            </div>
-          )}
-        </div>
-      );
-
-    case 10: // V2 Text Display
-      return (
-        <div className="text-[14px] leading-[1.375rem] text-[#dbdee1]">
-          {renderDiscordMarkdown(comp.content)}
-        </div>
-      );
-
-    case 11: // V2 Media
-      return (
-        <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31] mt-1 max-w-[280px]">
-          <img
-            src={comp.media?.url}
-            alt=""
-            className="max-h-[180px] object-cover w-full"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        </div>
-      );
-
-    case 12: // V2 Media Gallery
-      return (
-        <div className="grid grid-cols-2 gap-2 my-2">
-          {comp.items?.map((item: any, idx: number) => (
-            <div key={idx} className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
-              <img
-                src={item.media?.url}
-                alt=""
-                className="max-h-[220px] object-cover w-full"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-            </div>
-          ))}
-        </div>
-      );
-
-    default:
-      return null;
-  }
-}
-
-interface DiscordLiveMockupProps {
-  formData: FormData;
-}
-
-export function DiscordLiveMockup({ formData }: DiscordLiveMockupProps) {
-  const timeString = "วันนี้ เวลา 12:00 น.";
-  
-  // Try parsing the text as JSON
-  let parsedPayload: any = null;
-  let isJsonPayload = false;
-  
-  const trimmedText = (formData.content_text ?? "").trim();
-  if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
-    try {
-      parsedPayload = JSON.parse(trimmedText);
-      isJsonPayload = true;
-    } catch {
-      // Not a valid JSON payload
-    }
-  }
-
-  return (
-    <div className="bg-[#313338] text-[#dbdee1] p-4 rounded-2xl font-sans text-sm select-none border border-[#1e1f22] shadow-lg max-h-[600px] overflow-y-auto">
-      <div className="flex gap-3 items-start">
-        {/* Mock Discord Bot Avatar */}
-        <div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center shrink-0 text-white font-bold select-none text-xs">
-          BC
-        </div>
-        
-        {/* Discord Message Content */}
-        <div className="space-y-2 min-w-0 flex-1">
-          {/* Header info */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-white hover:underline cursor-pointer text-[15px]">Bear Cafe Bot</span>
-            <span className="bg-[#5865F2] text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0 uppercase">BOT</span>
-            <span className="text-[11px] text-[#949ba4] font-medium">{timeString}</span>
-          </div>
-          
-          {isJsonPayload && parsedPayload ? (
-            // Render JSON Discohook Payload
-            <div className="space-y-3">
-              {/* 1. Main content */}
-              {parsedPayload.content && (
-                <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal whitespace-pre-wrap">
-                  {renderDiscordMarkdown(parsedPayload.content)}
-                </div>
-              )}
-              
-              {/* 2. Rich Embeds */}
-              {parsedPayload.embeds && Array.isArray(parsedPayload.embeds) && (
-                <div className="space-y-2">
-                  {parsedPayload.embeds.map((emb: any, idx: number) => (
-                    <DiscordEmbedRenderer key={idx} embed={emb} />
-                  ))}
-                </div>
-              )}
-              
-              {/* 3. Rich Components */}
-              {parsedPayload.components && Array.isArray(parsedPayload.components) && (
-                <div className="space-y-1">
-                  {parsedPayload.components.map((comp: any, idx: number) => (
-                    <DiscordComponentRenderer key={idx} comp={comp} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            // Render Standard Campaign Message (Form-based)
-            <div className="space-y-2">
-              {/* Text Content */}
-              {formData.content_text ? (
-                <div className="text-[14px] leading-[1.375rem] text-[#dbdee1] font-normal">
-                  {renderDiscordMarkdown(formData.content_text)}
-                </div>
-              ) : (
-                <div className="text-[14px] text-muted-foreground/40 italic">
-                  พิมพ์ข้อความเพื่อแสดงตัวอย่างแคมเปญ
-                </div>
-              )}
-              
-              {/* Embed images */}
-              {(formData.image_url || formData.image_url_2) && (
-                <div className="flex flex-col gap-2 mt-2 max-w-[520px]">
-                  {formData.image_url && (
-                    <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
-                      <img src={formData.image_url} alt="" className="max-h-[280px] object-cover w-full" />
-                    </div>
-                  )}
-                  {formData.image_url_2 && (
-                    <div className="rounded-lg overflow-hidden border border-[#232428] bg-[#2b2d31]">
-                      <img src={formData.image_url_2} alt="" className="max-h-[280px] object-cover w-full" />
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Form Buttons */}
-              {((formData.has_button && formData.button_label) || formData.button_2_label) && (
-                <div className="flex gap-2 flex-wrap pt-2">
-                  {formData.has_button && formData.button_label && (
-                    <button
-                      type="button"
-                      disabled
-                      className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
-                    >
-                      {formData.button_emoji_name && <span className="text-sm">{formData.button_emoji_name}</span>}
-                      <span>{formData.button_label}</span>
-                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
-                    </button>
-                  )}
-                  {formData.button_2_label && formData.button_2_url && (
-                    <button
-                      type="button"
-                      disabled
-                      className="bg-[#4e5058] hover:bg-[#6d6f78] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-not-allowed select-none border-0"
-                    >
-                      {formData.button_2_emoji_name && <span className="text-sm">{formData.button_2_emoji_name}</span>}
-                      <span>{formData.button_2_label}</span>
-                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
