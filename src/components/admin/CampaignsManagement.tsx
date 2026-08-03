@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SessionAdsManagement } from '@/components/admin/SessionAdsManagement';
-import { AdPlacementsManagement } from '@/components/admin/AdPlacementsManagement';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -55,6 +54,9 @@ import {
   Megaphone,
   Search,
   X,
+  Save,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 import { cn } from '@/lib/utils';
@@ -148,6 +150,8 @@ export function CampaignsManagement() {
   const [tick, setTick] = useState(0); // increments every second to drive countdown
   const [loading, setLoading] = useState(true);
   const [loadingChannels, setLoadingChannels] = useState(false);
+  const [hasOrderChanged, setHasOrderChanged] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
@@ -171,15 +175,20 @@ export function CampaignsManagement() {
   const [bucketPickerTarget, setBucketPickerTarget] = useState<'image_url' | 'image_url_2'>('image_url');
   const [bucketFiles, setBucketFiles] = useState<Array<{ name: string; url: string }>>([]);
   const [loadingBucket, setLoadingBucket] = useState(false);
+  const [selectedBucketFiles, setSelectedBucketFiles] = useState<string[]>([]);
+  const [deletingBucketFiles, setDeletingBucketFiles] = useState(false);
+  const [bucketDeleteMode, setBucketDeleteMode] = useState(false);
 
   const openBucketPicker = async (target: 'image_url' | 'image_url_2') => {
     setBucketPickerTarget(target);
     setBucketPickerOpen(true);
+    setBucketDeleteMode(false);
+    setSelectedBucketFiles([]);
     if (bucketFiles.length > 0) return; // already loaded
     setLoadingBucket(true);
     try {
       const { data, error } = await supabase.storage.from('campaign-images').list('', {
-        limit: 100,
+        limit: 200,
         sortBy: { column: 'created_at', order: 'desc' },
       });
       if (error) throw error;
@@ -202,6 +211,62 @@ export function CampaignsManagement() {
     setBucketPickerOpen(false);
   };
 
+  const toggleSelectBucketFile = (fileName: string) => {
+    setSelectedBucketFiles((prev) =>
+      prev.includes(fileName) ? prev.filter((name) => name !== fileName) : [...prev, fileName]
+    );
+  };
+
+  const selectAllBucketFiles = () => {
+    if (selectedBucketFiles.length === bucketFiles.length) {
+      setSelectedBucketFiles([]);
+    } else {
+      setSelectedBucketFiles(bucketFiles.map((f) => f.name));
+    }
+  };
+
+  const handleBulkDeleteBucketFiles = async () => {
+    if (selectedBucketFiles.length === 0) return;
+    if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพที่เลือกจำนวน ${selectedBucketFiles.length} รายการ?`)) return;
+
+    try {
+      setDeletingBucketFiles(true);
+      const { error } = await supabase.storage.from('campaign-images').remove(selectedBucketFiles);
+      if (error) throw error;
+
+      setBucketFiles((prev) => prev.filter((f) => !selectedBucketFiles.includes(f.name)));
+      toast({
+        title: 'ลบรูปภาพสำเร็จ',
+        description: `ลบรูปภาพจำนวน ${selectedBucketFiles.length} รายการเรียบร้อยแล้ว`,
+      });
+      setSelectedBucketFiles([]);
+    } catch (err: any) {
+      toast({
+        title: 'ลบรูปภาพไม่สำเร็จ',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingBucketFiles(false);
+    }
+  };
+
+  const handleDeleteSingleBucketFile = async (fileName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพนี้?')) return;
+
+    try {
+      const { error } = await supabase.storage.from('campaign-images').remove([fileName]);
+      if (error) throw error;
+
+      setBucketFiles((prev) => prev.filter((f) => f.name !== fileName));
+      setSelectedBucketFiles((prev) => prev.filter((name) => name !== fileName));
+      toast({ title: 'ลบรูปภาพสำเร็จ' });
+    } catch (err: any) {
+      toast({ title: 'ลบรูปภาพไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    }
+  };
+
   // ─── Fetch campaigns ─────────────────────────────────────────────────────
   const fetchCampaigns = async () => {
     try {
@@ -214,11 +279,12 @@ export function CampaignsManagement() {
       if (campaignsRes.error) throw campaignsRes.error;
       setCampaigns(campaignsRes.data || []);
       if (scheduleRes.data) setScheduleConfig(scheduleRes.data as ScheduleConfig);
+      setHasOrderChanged(false);
     } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
         title: 'เกิดข้อผิดพลาด',
-        description: 'ไม่สามารถโหลดข้อมูลแคมเปญได้',
+        description: 'ไม่สามารถโหลดข้อมูลโฆษณาได้',
         variant: 'destructive',
       });
     } finally {
@@ -226,36 +292,56 @@ export function CampaignsManagement() {
     }
   };
 
-  // ─── Drag-and-drop reorder ───────────────────────────────────────────────
-  const handleDragEnd = useCallback(async (result: DropResult) => {
+  // ─── Drag-and-drop reorder locally ───────────────────────────────────────
+  const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination || result.destination.index === result.source.index) return;
 
-    // Reorder local state immediately for snappy UI
     const reordered = Array.from(campaigns);
     const [moved] = reordered.splice(result.source.index, 1);
     reordered.splice(result.destination.index, 0, moved);
 
-    // Assign new sort_order values (0, 1, 2, …)
     const updated = reordered.map((c, i) => ({ ...c, sort_order: i }));
     setCampaigns(updated);
+    setHasOrderChanged(true);
+  }, [campaigns]);
 
-    // Persist to DB — batch update
+  // ─── Move Up / Down locally ─────────────────────────────────────────────
+  const moveCampaign = (campaign: CampaignMessage, dir: 'up' | 'down') => {
+    const idx = campaigns.findIndex((c) => c.id === campaign.id);
+    const newIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= campaigns.length) return;
+
+    const updated = Array.from(campaigns);
+    const [moved] = updated.splice(idx, 1);
+    updated.splice(newIdx, 0, moved);
+
+    const reordered = updated.map((c, i) => ({ ...c, sort_order: i }));
+    setCampaigns(reordered);
+    setHasOrderChanged(true);
+  };
+
+  // ─── Batch save order to DB ──────────────────────────────────────────────
+  const handleSaveOrder = async () => {
     try {
-      const updates = updated.map((c) =>
+      setSavingOrder(true);
+      const updates = campaigns.map((c, i) =>
         (supabase as any)
           .from('campaign_messages')
-          .update({ sort_order: c.sort_order })
+          .update({ sort_order: i })
           .eq('id', c.id)
       );
       await Promise.all(updates);
-      // Recalculate queue after reorder
       await handleResetQueue(true);
-    } catch (err) {
+      setHasOrderChanged(false);
+      toast({ title: 'สำเร็จ', description: 'บันทึกลำดับโฆษณาเรียบร้อยแล้ว' });
+    } catch (err: any) {
       console.error('Failed to save order:', err);
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถบันทึกลำดับได้', variant: 'destructive' });
       fetchCampaigns(); // revert
+    } finally {
+      setSavingOrder(false);
     }
-  }, [campaigns]);
+  };
 
   // ─── Sync Discord channels ───────────────────────────────────────────────
   const syncChannels = async () => {
@@ -612,7 +698,7 @@ export function CampaignsManagement() {
           value="campaigns"
           className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
         >
-          <Send className="w-4 h-4" />แคมเปญโฆษณา
+          <Send className="w-4 h-4" />โฆษณาแคมเปญ
         </TabsTrigger>
         <TabsTrigger
           value="session-ads"
@@ -620,15 +706,9 @@ export function CampaignsManagement() {
         >
           <Megaphone className="w-4 h-4" />โฆษณาผ่านระบบ
         </TabsTrigger>
-        <TabsTrigger
-          value="placements"
-          className="gap-2 rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-200"
-        >
-          <Images className="w-4 h-4" />Ad Placements
-        </TabsTrigger>
       </TabsList>
 
-      {/* ── Tab: แคมเปญโฆษณา ── */}
+      {/* ── Tab: โฆษณาแคมเปญ ── */}
       <TabsContent value="campaigns" className="mt-0">
     <div className="space-y-6">
       {/* ─── Header ─── */}
@@ -637,16 +717,28 @@ export function CampaignsManagement() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
               <Send className="w-5 h-5 text-primary" />
-              จัดการแคมเปญโฆษณา
+              จัดการโฆษณาแคมเปญ
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              {hasOrderChanged && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={handleSaveOrder}
+                  disabled={savingOrder}
+                  className="gap-2 rounded-xl text-xs h-9 bg-success hover:bg-success/90 text-white animate-pulse"
+                >
+                  {savingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  บันทึกลำดับ
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleResetQueue()}
                 disabled={isResettingQueue || campaigns.length === 0}
                 className="gap-2 rounded-xl text-xs h-9 border-border/40"
-                title="รีเซ็ตคิวใหม่ตามลำดับแคมเปญและรอบเวลาปัจจุบัน"
+                title="รีเซ็ตคิวใหม่ตามลำดับโฆษณาและรอบเวลาปัจจุบัน"
               >
                 {isResettingQueue ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -684,7 +776,7 @@ export function CampaignsManagement() {
               </Button>
               <Button onClick={handleCreate} size="sm" className="gap-2 rounded-xl text-xs h-9 bg-primary hover:bg-primary/90 text-white">
                 <Plus className="w-4 h-4 text-white" />
-                สร้างแคมเปญ
+                สร้างโฆษณา
               </Button>
             </div>
           </div>
@@ -697,7 +789,7 @@ export function CampaignsManagement() {
           {campaigns.length > 1 && !loading && (
             <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
               <GripVertical className="w-3.5 h-3.5" />
-              ลากแถวเพื่อเรียงลำดับการส่ง
+              ลากแถวเพื่อเรียงลำดับ แล้วกด "บันทึกลำดับ"
             </p>
           )}
           {loading ? (
@@ -707,7 +799,7 @@ export function CampaignsManagement() {
           ) : campaigns.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Send className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>ยังไม่มีแคมเปญ</p>
+              <p>ยังไม่มีโฆษณา</p>
             </div>
           ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
@@ -732,14 +824,39 @@ export function CampaignsManagement() {
                             )}
                           >
                             <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                              {/* Drag handle */}
-                              <button
-                                type="button"
-                                {...drag.dragHandleProps}
-                                className="flex items-center justify-center p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing shrink-0 animate-none"
-                              >
-                                <GripVertical className="w-4 h-4" />
-                              </button>
+                              {/* Drag handle & Up/Down buttons */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  {...drag.dragHandleProps}
+                                  className="flex items-center justify-center p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing shrink-0 animate-none"
+                                  title="ลากเพื่อเรียงลำดับ"
+                                >
+                                  <GripVertical className="w-4 h-4" />
+                                </button>
+                                <div className="flex flex-col gap-0.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    onClick={() => moveCampaign(campaign, 'up')}
+                                    disabled={index === 0}
+                                    title="เลื่อนขึ้น"
+                                  >
+                                    <ArrowUp className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    onClick={() => moveCampaign(campaign, 'down')}
+                                    disabled={index === campaigns.length - 1}
+                                    title="เลื่อนลง"
+                                  >
+                                    <ArrowDown className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
 
                               {/* Image thumbnail if exists */}
                               {campaign.image_url && (
@@ -750,6 +867,9 @@ export function CampaignsManagement() {
 
                               <div className="min-w-0 flex-1 space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded font-mono border-border/40 font-bold text-foreground">
+                                    ลำดับที่ {index + 1}
+                                  </Badge>
                                   <h4 className="font-semibold text-sm truncate text-foreground">{campaign.internal_name}</h4>
                                   {campaign.is_active ? (
                                     <Badge className="bg-success/15 border-success/35 text-success hover:bg-success/20 text-[10px] px-1.5 py-0 h-4 rounded-full font-medium">เปิดใช้งาน</Badge>
@@ -819,18 +939,83 @@ export function CampaignsManagement() {
 
       {/* ─── Bucket Picker Dialog ─── */}
       <Dialog open={bucketPickerOpen} onOpenChange={setBucketPickerOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Images className="w-5 h-5" />
-              เลือกรูปจาก Bucket — {bucketPickerTarget === 'image_url' ? 'รูปภาพที่ 1' : 'รูปภาพที่ 2'}
-            </DialogTitle>
-            <DialogDescription>
-              คลิกรูปเพื่อเลือก หรืออัปโหลดใหม่จากปุ่มอัปโหลดด้านล่าง
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col rounded-2xl">
+          <DialogHeader className="pb-2 border-b">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <Images className="w-5 h-5 text-primary" />
+                เลือกรูปจาก Bucket — {bucketPickerTarget === 'image_url' ? 'รูปภาพที่ 1' : 'รูปภาพที่ 2'}
+              </DialogTitle>
+              {bucketFiles.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant={bucketDeleteMode ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const next = !bucketDeleteMode;
+                      setBucketDeleteMode(next);
+                      if (!next) setSelectedBucketFiles([]);
+                    }}
+                    className={`h-8 text-xs rounded-xl gap-1.5 font-medium ${
+                      bucketDeleteMode ? "bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/25" : ""
+                    }`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    {bucketDeleteMode ? 'ออกจากโหมดลบรูป' : 'โหมดลบหลายรูป'}
+                  </Button>
+
+                  {(bucketDeleteMode || selectedBucketFiles.length > 0) && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllBucketFiles}
+                        className="h-8 text-xs rounded-xl gap-1.5"
+                      >
+                        <Checkbox
+                          checked={selectedBucketFiles.length === bucketFiles.length && bucketFiles.length > 0}
+                          className="w-3.5 h-3.5"
+                        />
+                        {selectedBucketFiles.length === bucketFiles.length ? 'ยกเลิกการเลือก' : 'เลือกทั้งหมด'}
+                      </Button>
+                      {selectedBucketFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleBulkDeleteBucketFiles}
+                          disabled={deletingBucketFiles}
+                          className="h-8 text-xs rounded-xl gap-1.5 animate-pulse shadow-md"
+                        >
+                          {deletingBucketFiles ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          ลบที่เลือก ({selectedBucketFiles.length})
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogDescription className="text-xs font-medium text-muted-foreground mt-1">
+              {bucketDeleteMode ? (
+                <span className="text-destructive font-semibold">
+                  ⚠️ อยู่ในโหมดลบภาพ: คลิกที่การ์ดรูปใดก็ได้เพื่อเลือก/ยกเลิกรูปที่ต้องการลบ แล้วกด "ลบที่เลือก"
+                </span>
+              ) : (
+                <span>
+                  คลิกที่รูปเพื่อเลือกใช้งานใส่โฆษณา หรือกดปุ่ม "โหมดลบหลายรูป" เพื่อจัดการลบภาพ
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto min-h-0 py-2">
+          <div className="flex-1 overflow-y-auto min-h-0 py-3">
             {loadingBucket ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -840,19 +1025,27 @@ export function CampaignsManagement() {
                 ยังไม่มีรูปภาพใน Bucket — อัปโหลดรูปใหม่ก่อน
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {bucketFiles.map((f) => {
-                  const isSelected =
-                    formData[bucketPickerTarget] === f.url;
+                  const isCheckedForDelete = selectedBucketFiles.includes(f.name);
+                  const isChosenForForm = formData[bucketPickerTarget] === f.url;
+
                   return (
-                    <button
+                    <div
                       key={f.name}
-                      type="button"
-                      onClick={() => selectBucketImage(f.url)}
-                      className={`relative group rounded-xl overflow-hidden border-2 transition-all aspect-video bg-muted ${
-                        isSelected
-                          ? 'border-primary ring-2 ring-primary/30'
-                          : 'border-transparent hover:border-primary/50'
+                      onClick={() => {
+                        if (bucketDeleteMode || selectedBucketFiles.length > 0) {
+                          toggleSelectBucketFile(f.name);
+                        } else {
+                          selectBucketImage(f.url);
+                        }
+                      }}
+                      className={`relative group rounded-2xl overflow-hidden border-2 transition-all aspect-video bg-muted cursor-pointer select-none ${
+                        isCheckedForDelete
+                          ? 'border-destructive ring-4 ring-destructive/20 bg-destructive/10 scale-[0.98]'
+                          : isChosenForForm
+                          ? 'border-primary ring-4 ring-primary/20'
+                          : 'border-border/40 hover:border-primary/50 hover:shadow-md'
                       }`}
                     >
                       <img
@@ -861,15 +1054,57 @@ export function CampaignsManagement() {
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                          <CheckCircle2 className="w-6 h-6 text-primary drop-shadow" />
+
+                      {/* Large Checkbox Overlay top-left */}
+                      <div
+                        className="absolute top-2 left-2 z-10 p-2 rounded-xl bg-black/70 backdrop-blur-sm hover:bg-black/90 transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectBucketFile(f.name);
+                        }}
+                        title="ติ๊กเพื่อเลือก/ยกเลิกรูปนี้"
+                      >
+                        <Checkbox
+                          checked={isCheckedForDelete}
+                          onCheckedChange={() => toggleSelectBucketFile(f.name)}
+                          className="w-4 h-4 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
+                        />
+                      </div>
+
+                      {/* Delete Icon top-right */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSingleBucketFile(f.name, e)}
+                        className="absolute top-2 right-2 z-10 p-2 rounded-xl bg-black/70 text-white hover:bg-destructive transition-colors opacity-80 hover:opacity-100"
+                        title="ลบรูปภาพนี้"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Delete mode checked badge overlay */}
+                      {isCheckedForDelete && (
+                        <div className="absolute inset-0 bg-destructive/20 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                          <Badge variant="destructive" className="text-xs px-2.5 py-1 rounded-xl shadow-lg gap-1.5 font-bold animate-in zoom-in-95">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            เลือกเพื่อลบ
+                          </Badge>
                         </div>
                       )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+
+                      {/* Selection badge for active form choice */}
+                      {isChosenForForm && !isCheckedForDelete && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
+                          <Badge className="bg-primary text-primary-foreground text-xs px-2.5 py-1 rounded-xl shadow-lg gap-1.5 font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            เลือกใช้อยู่
+                          </Badge>
+                        </div>
+                      )}
+
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white text-[10px] px-2 py-1 truncate opacity-90">
                         {f.name}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -877,22 +1112,28 @@ export function CampaignsManagement() {
           </div>
 
           <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={async () => {
-                setBucketFiles([]);
-                await openBucketPicker(bucketPickerTarget);
-              }}
-            >
-              <RefreshCw className="w-4 h-4" />
-              รีเฟรช
-            </Button>
-            <Button variant="outline" onClick={() => setBucketPickerOpen(false)}>
-              ปิด
-            </Button>
+            <div className="text-xs text-muted-foreground">
+              ทั้งหมด <span className="font-bold text-foreground">{bucketFiles.length}</span> รูป
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={async () => {
+                  setBucketFiles([]);
+                  setSelectedBucketFiles([]);
+                  await openBucketPicker(bucketPickerTarget);
+                }}
+              >
+                <RefreshCw className="w-4 h-4" />
+                รีเฟรช
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setBucketPickerOpen(false)}>
+                ปิด
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1011,10 +1252,10 @@ export function CampaignsManagement() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingCampaign ? 'แก้ไขแคมเปญ' : 'สร้างแคมเปญใหม่'}
+              {editingCampaign ? 'แก้ไขโฆษณา' : 'สร้างโฆษณาใหม่'}
             </DialogTitle>
             <DialogDescription>
-              กรอกข้อมูลแคมเปญและดูตัวอย่างแบบเรียลไทม์
+              กรอกข้อมูลโฆษณาและดูตัวอย่างแบบเรียลไทม์
             </DialogDescription>
           </DialogHeader>
 
@@ -1043,7 +1284,7 @@ export function CampaignsManagement() {
                   id="content_text"
                   value={formData.content_text}
                   onChange={(e) => setFormData({ ...formData, content_text: e.target.value })}
-                  placeholder="ข้อความที่จะแสดงในแคมเปญ"
+                  placeholder="ข้อความที่จะแสดงในโฆษณา"
                   rows={4}
                   maxLength={2000}
                 />
@@ -1292,7 +1533,7 @@ export function CampaignsManagement() {
               ยกเลิก
             </Button>
             <Button onClick={handleSave}>
-              {editingCampaign ? 'บันทึกการแก้ไข' : 'สร้างแคมเปญ'}
+              {editingCampaign ? 'บันทึกการแก้ไข' : 'สร้างโฆษณา'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1303,11 +1544,6 @@ export function CampaignsManagement() {
       {/* ── Tab: โฆษณาผ่านระบบ ── */}
       <TabsContent value="session-ads" className="mt-0">
         <SessionAdsManagement />
-      </TabsContent>
-
-      {/* ── Tab: Ad Placements ── */}
-      <TabsContent value="placements" className="mt-0">
-        <AdPlacementsManagement />
       </TabsContent>
     </Tabs>
   );
