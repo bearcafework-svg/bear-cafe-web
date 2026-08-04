@@ -497,9 +497,10 @@ export function SessionAdsManagement() {
         if (error) throw error;
         toast({ title: 'แก้ไขสำเร็จ' });
       } else {
+        const maxSort = ads.length === 0 ? -1 : Math.max(...ads.map(a => Number(a.sort_order) || 0));
         const { error } = await (supabase as any)
           .from('session_ads')
-          .insert({ ...payload, sort_order: ads.length });
+          .insert({ ...payload, sort_order: maxSort + 1 });
         if (error) throw error;
         toast({ title: 'เพิ่มโฆษณาสำเร็จ' });
       }
@@ -518,6 +519,16 @@ export function SessionAdsManagement() {
     try {
       const { error } = await (supabase as any).from('session_ads').delete().eq('id', ad.id);
       if (error) throw error;
+
+      // Re-index remaining items cleanly
+      const remaining = ads.filter(a => a.id !== ad.id);
+      if (remaining.length > 0) {
+        const reindexPromises = remaining.map((item, idx) =>
+          (supabase as any).from('session_ads').update({ sort_order: idx }).eq('id', item.id)
+        );
+        await Promise.all(reindexPromises);
+      }
+
       toast({ title: 'ลบสำเร็จ' });
       fetchAds();
     } catch (err: any) {

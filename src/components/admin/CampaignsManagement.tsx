@@ -419,7 +419,7 @@ export function CampaignsManagement() {
         toast({ title: 'สำเร็จ', description: 'แก้ไขโฆษณาบรอดแคสต์เรียบร้อยแล้ว' });
       } else {
         // Create new
-        const maxSort = campaigns.reduce((max, c) => Math.max(max, c.sort_order || 0), 0);
+        const maxSort = campaigns.length === 0 ? -1 : Math.max(...campaigns.map(c => Number(c.sort_order) || 0));
         const { error } = await supabase.from('campaign_messages').insert({
           internal_name: formData.internal_name.trim(),
           payload: payloadObj,
@@ -445,6 +445,16 @@ export function CampaignsManagement() {
       setIsDeleting(true);
       const { error } = await supabase.from('campaign_messages').delete().eq('id', id);
       if (error) throw error;
+
+      // Re-index remaining campaigns
+      const remaining = campaigns.filter(c => c.id !== id);
+      if (remaining.length > 0) {
+        const reindexPromises = remaining.map((item, idx) =>
+          supabase.from('campaign_messages').update({ sort_order: idx }).eq('id', item.id)
+        );
+        await Promise.all(reindexPromises);
+      }
+
       toast({ title: 'ลบสำเร็จ', description: 'ลบโฆษณาบรอดแคสต์เรียบร้อยแล้ว' });
       fetchAllData();
     } catch (err: any) {
