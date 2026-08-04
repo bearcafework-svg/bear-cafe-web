@@ -381,18 +381,23 @@ export function DMBroadcastManagement() {
         setSubStats({ totalSubs: uniqueUsers.size, options: counts });
       }
 
-      // 2. Fetch Reachability Stats
-      const { data: rawStatuses } = await supabase
-        .from('member_dm_status' as any)
-        .select('dm_status');
+      // 2. Fetch Reachability Stats (Use count: 'exact' to bypass Supabase 1000 row REST payload limit)
+      const [openRes, closedRes] = await Promise.all([
+        supabase
+          .from('member_dm_status' as any)
+          .select('*', { count: 'exact', head: true })
+          .eq('dm_status', 'open'),
+        supabase
+          .from('member_dm_status' as any)
+          .select('*', { count: 'exact', head: true })
+          .eq('dm_status', 'closed'),
+      ]);
 
-      if (rawStatuses) {
-        const counts = { open: 0, closed: 0, unknown: 0 };
-        rawStatuses.forEach((item: any) => {
-          if (item.dm_status in counts) counts[item.dm_status as keyof typeof counts]++;
-        });
-        setDmStatusStats(counts);
-      }
+      setDmStatusStats({
+        open: openRes.count || 0,
+        closed: closedRes.count || 0,
+        unknown: 0,
+      });
 
       // 3. Fetch Campaigns Queue
       const { data: rawQueues } = await supabase
