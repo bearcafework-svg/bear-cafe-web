@@ -339,7 +339,7 @@ export function CampaignsManagement() {
       }
 
       // Reset queue schedule
-      const totalInterval = (scheduleConfig?.interval_hours || 1) * 60 + (scheduleConfig?.interval_minutes || 0);
+      const totalInterval = (scheduleConfig?.interval_hours ?? 0) * 60 + (scheduleConfig?.interval_minutes ?? 0);
       const intervalMs = (totalInterval > 0 ? totalInterval : 60) * 60 * 1000;
       const now = new Date();
 
@@ -468,7 +468,7 @@ export function CampaignsManagement() {
   const handleSaveScheduleConfig = async () => {
     try {
       setIsUpdatingSchedule(true);
-      const hours = scheduleConfig?.interval_hours ?? 1;
+      const hours = scheduleConfig?.interval_hours ?? 0;
       const minutes = scheduleConfig?.interval_minutes ?? 0;
       const enabled = scheduleConfig?.is_enabled ?? true;
       const totalMinutes = Math.max(1, hours * 60 + minutes);
@@ -575,7 +575,7 @@ export function CampaignsManagement() {
                     className="h-9 text-xs rounded-xl gap-1.5"
                   >
                     <Clock className="w-4 h-4 text-indigo-500" />
-                    ตั้งเวลา ({scheduleConfig?.interval_hours || 1} ชม. {scheduleConfig?.interval_minutes || 0} นาที)
+                    ตั้งเวลา ({scheduleConfig?.interval_hours ?? 0} ชม. {scheduleConfig?.interval_minutes ?? 0} นาที)
                   </Button>
 
                   {hasOrderChanged ? (
@@ -973,7 +973,7 @@ export function CampaignsManagement() {
                   type="number"
                   min={0}
                   max={168}
-                  value={scheduleConfig?.interval_hours ?? 1}
+                  value={scheduleConfig?.interval_hours ?? 0}
                   onChange={(e) =>
                     setScheduleConfig({
                       ...scheduleConfig!,
