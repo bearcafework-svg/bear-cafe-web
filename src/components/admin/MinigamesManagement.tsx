@@ -29,6 +29,7 @@ interface Question {
   hints: string[];
   options: string[];
   difficulty: 'easy' | 'medium' | 'hard' | null;
+  category?: string | null;
   is_active: boolean;
 }
 
@@ -53,16 +54,21 @@ export function MinigamesManagement() {
   const [formGameId, setFormGameId] = useState<string>('9');
   const [formQuestion, setFormQuestion] = useState<string>('');
   const [formAnswer, setFormAnswer] = useState<string>('');
+  const [formCategory, setFormCategory] = useState<string>('คำทั่วไป');
   const [formDifficulty, setFormDifficulty] = useState<string>('medium');
   const [formHint1, setFormHint1] = useState<string>('');
   const [formHint2, setFormHint2] = useState<string>('');
   const [formHint3, setFormHint3] = useState<string>('');
+
+  // Category filter state
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   // Edit Modal state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<string>('');
   const [editAnswer, setEditAnswer] = useState<string>('');
+  const [editCategory, setEditCategory] = useState<string>('คำทั่วไป');
   const [editDifficulty, setEditDifficulty] = useState<string>('medium');
   const [editHint1, setEditHint1] = useState<string>('');
   const [editHint2, setEditHint2] = useState<string>('');
@@ -219,6 +225,7 @@ export function MinigamesManagement() {
           game_id: gId,
           word_or_question: formQuestion.trim(),
           answer: formAnswer.trim(),
+          category: formCategory.trim() || 'คำทั่วไป',
           hints: hintsArray,
           options: [],
           difficulty: finalDiff,
@@ -240,6 +247,7 @@ export function MinigamesManagement() {
     setEditingQuestion(q);
     setEditQuestion(q.word_or_question || '');
     setEditAnswer(q.answer || '');
+    setEditCategory(q.category || 'คำทั่วไป');
     setEditDifficulty(q.difficulty || 'medium');
     setEditHint1(q.hints?.[0] || '');
     setEditHint2(q.hints?.[1] || '');
@@ -269,6 +277,7 @@ export function MinigamesManagement() {
         .update({
           word_or_question: editQuestion.trim(),
           answer: editAnswer.trim(),
+          category: editCategory.trim() || 'คำทั่วไป',
           hints: hintsArray,
           options: [],
           difficulty: finalDiff,
@@ -297,16 +306,24 @@ export function MinigamesManagement() {
     }
   };
 
-  // Filter questions by search keyword
+  // Filter questions by search keyword and category
   const filteredQuestions = questions.filter(q => {
+    if (selectedCategoryFilter !== 'all' && (q.category || 'คำทั่วไป') !== selectedCategoryFilter) {
+      return false;
+    }
     if (!searchKeyword.trim()) return true;
     const kw = searchKeyword.toLowerCase().trim();
     return (
       q.word_or_question.toLowerCase().includes(kw) ||
       q.answer.toLowerCase().includes(kw) ||
+      (q.category && q.category.toLowerCase().includes(kw)) ||
       String(q.id).includes(kw)
     );
   });
+
+  const categoriesList = Array.from(
+    new Set(questions.map((q) => q.category || 'คำทั่วไป').filter(Boolean))
+  );
 
   const selectedGId = Number(formGameId);
   const top1 = leaderboard[0] || null;
@@ -421,7 +438,7 @@ export function MinigamesManagement() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground mb-1 block">
                           {selectedGId === 9 || selectedGId === 10 ? 'คำศัพท์ภาษาอังกฤษ (English Word)' : 'โจทย์ / คำศัพท์'}
@@ -443,6 +460,18 @@ export function MinigamesManagement() {
                           placeholder={selectedGId === 9 || selectedGId === 10 ? 'เช่น แอปเปิ้ล หรือ กล้วย' : 'เฉลยที่ต้องพิมพ์ตอบ'}
                           value={formAnswer}
                           onChange={(e) => setFormAnswer(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                          หมวดหมู่ (Category)
+                        </label>
+                        <Input
+                          className="h-10 text-sm font-semibold text-purple-600 dark:text-purple-400"
+                          placeholder="เช่น ผลไม้, สัตว์, คำทั่วไป"
+                          value={formCategory}
+                          onChange={(e) => setFormCategory(e.target.value)}
                         />
                       </div>
                     </div>
@@ -494,9 +523,20 @@ export function MinigamesManagement() {
                     />
                   </div>
 
-                  {/* Filter by Game */}
+                  <Select value={selectedCategoryFilter} onValueChange={(val) => setSelectedCategoryFilter(val)}>
+                    <SelectTrigger className="w-full sm:w-44 h-9 text-xs font-semibold">
+                      <SelectValue placeholder="หมวดหมู่ทั้งหมด" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">หมวดหมู่ทั้งหมด</SelectItem>
+                      {categoriesList.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Select value={selectedGameFilter} onValueChange={(val) => setSelectedGameFilter(val)}>
-                    <SelectTrigger className="w-44 h-9 text-xs">
+                    <SelectTrigger className="w-full sm:w-56 h-9 text-xs font-semibold">
                       <SelectValue placeholder="เลือกมินิเกม" />
                     </SelectTrigger>
                     <SelectContent>
@@ -524,8 +564,9 @@ export function MinigamesManagement() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="w-16 text-xs">ID</TableHead>
-                      <TableHead className="w-28 text-xs">เกม/คลัง</TableHead>
+                      <TableHead className="w-14 text-xs">ID</TableHead>
+                      <TableHead className="w-24 text-xs">เกม/คลัง</TableHead>
+                      <TableHead className="w-28 text-xs">หมวดหมู่</TableHead>
                       <TableHead className="text-xs">คำศัพท์ / โจทย์</TableHead>
                       <TableHead className="text-xs">คำตอบ / คำแปล</TableHead>
                       <TableHead className="text-xs">รายละเอียด</TableHead>
@@ -547,6 +588,11 @@ export function MinigamesManagement() {
                           <TableCell>
                             <Badge variant="outline" className="text-[10px] font-semibold">
                               เกม {q.game_id}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/20 font-medium">
+                              {q.category || 'คำทั่วไป'}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-sm">{q.word_or_question}</TableCell>
@@ -850,6 +896,11 @@ export function MinigamesManagement() {
                   {editingQuestion.game_id === 9 || editingQuestion.game_id === 10 ? 'คำแปลภาษาไทย (Thai Translation)' : 'คำตอบที่ถูกต้อง (เฉลย)'}
                 </label>
                 <Input value={editAnswer} onChange={(e) => setEditAnswer(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">หมวดหมู่ (Category)</label>
+                <Input value={editCategory} onChange={(e) => setEditCategory(e.target.value)} placeholder="เช่น ผลไม้, สัตว์, คำทั่วไป" />
               </div>
 
               {/* Difficulty ONLY for Game 4 */}

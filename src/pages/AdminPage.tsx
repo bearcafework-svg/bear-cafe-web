@@ -42,6 +42,8 @@ import { HealingMessagesManagement } from '@/components/admin/HealingMessagesMan
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
 import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
+import { BannerManagement } from '@/components/admin/BannerManagement';
+
 
 
 import { RoleTransferManagement } from '@/components/admin/RoleTransferManagement';
