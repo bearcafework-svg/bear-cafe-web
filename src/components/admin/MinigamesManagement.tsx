@@ -50,7 +50,7 @@ export function MinigamesManagement() {
   const [searchKeyword, setSearchKeyword] = useState<string>('');
 
   // Form Add Question state
-  const [formGameId, setFormGameId] = useState<string>('1');
+  const [formGameId, setFormGameId] = useState<string>('9');
   const [formQuestion, setFormQuestion] = useState<string>('');
   const [formAnswer, setFormAnswer] = useState<string>('');
   const [formDifficulty, setFormDifficulty] = useState<string>('medium');
@@ -357,24 +357,19 @@ export function MinigamesManagement() {
             <CardContent>
               <form onSubmit={handleAddQuestion} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Select Game */}
+                  {/* Select Category */}
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">เลือกประเภทเกม / คลังคำศัพท์</label>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">เลือกประเภทคลังคำศัพท์ที่ต้องการเพิ่ม</label>
                     <Select value={formGameId} onValueChange={(val) => setFormGameId(val)}>
-                      <SelectTrigger className="h-10 text-sm">
+                      <SelectTrigger className="h-10 text-sm font-semibold">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1. เติมคำศัพท์ไทย (แชร์คำไทยในคลัง)</SelectItem>
-                        <SelectItem value="2">2. เติมคำศัพท์อังกฤษ (แชร์คำอังกฤษในคลัง)</SelectItem>
-                        <SelectItem value="3">3. สุ่มโจทย์คณิตฯ (สร้างไดนามิกในโค้ด)</SelectItem>
-                        <SelectItem value="4">4. ทายคำจากคำใบ้ (มีระดับความยาก & คำใบ้)</SelectItem>
-                        <SelectItem value="5">5. เรียงคำศัพท์ไทย (แชร์คำไทยในคลัง)</SelectItem>
-                        <SelectItem value="6">6. เรียงคำศัพท์อังกฤษ (แชร์คำอังกฤษในคลัง)</SelectItem>
-                        <SelectItem value="7">7. พิมพ์คำต่อไปนี้ - ไทย</SelectItem>
-                        <SelectItem value="8">8. พิมพ์คำต่อไปนี้ - อังกฤษ</SelectItem>
-                        <SelectItem value="9">9. ทายคำแปลอังกฤษ (แชร์คู่คำแปล อังกฤษ-ไทย)</SelectItem>
-                        <SelectItem value="10">10. ทายคำแปลไทย (แชร์คู่คำแปล ไทย-อังกฤษ)</SelectItem>
+                        <SelectItem value="9">🌐 คลังคู่คำแปลภาษา (อังกฤษ ↔ ไทย) — ⚡ เล่นได้พร้อมกัน 4 เกม!</SelectItem>
+                        <SelectItem value="1">🇹🇭 คลังคำศัพท์ภาษาไทยเดี่ยว — ⚡ เล่นได้พร้อมกัน 2 เกม!</SelectItem>
+                        <SelectItem value="4">💡 คลังคำศัพท์ทายคำจากคำใบ้ (เกมที่ 4)</SelectItem>
+                        <SelectItem value="7">📝 คลังประโยคฝึกพิมพ์ (เกมที่ 7 & 8)</SelectItem>
+                        <SelectItem value="3">ℹ️ เกมสุ่มโจทย์คณิตศาสตร์ (เกมที่ 3 - สร้างจากโค้ด)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -384,7 +379,7 @@ export function MinigamesManagement() {
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-1 block">ระดับความยาก (เฉพาะเกมที่ 4)</label>
                       <Select value={formDifficulty} onValueChange={(val) => setFormDifficulty(val)}>
-                        <SelectTrigger className="h-10 text-sm">
+                        <SelectTrigger className="h-10 text-sm font-semibold">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -396,6 +391,24 @@ export function MinigamesManagement() {
                     </div>
                   )}
                 </div>
+
+                {/* SHARED POOL EXPLANATION HELPER BANNER */}
+                {selectedGId === 9 ? (
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span><strong>ประโยชน์:</strong> คำศัพท์คู่นี้จะถูกนำไปใช้อัตโนมัติใน <strong>เกม 2 (เติมคำ EN)</strong>, <strong>เกม 6 (เรียงคำ EN)</strong>, <strong>เกม 9 (ทายคำแปล EN)</strong> และ <strong>เกม 10 (ทายคำแปล TH)</strong> โดยไม่ต้องเพิ่มซ้ำอีก!</span>
+                  </div>
+                ) : selectedGId === 1 ? (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span><strong>ประโยชน์:</strong> คำศัพท์ไทยนี้จะถูกนำไปใช้อัตโนมัติใน <strong>เกม 1 (เติมคำ TH)</strong> และ <strong>เกม 5 (เรียงคำ TH)</strong> ทันที!</span>
+                  </div>
+                ) : selectedGId === 7 ? (
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center gap-2 text-purple-600 dark:text-purple-400 text-xs">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span><strong>ประโยชน์:</strong> ประโยคฝึกพิมพ์จะถูกนำไปใช้ใน <strong>เกม 7 (พิมพ์คำ TH)</strong> และ <strong>เกม 8 (พิมพ์คำ EN)</strong></span>
+                  </div>
+                ) : null}
 
                 {/* GAME 3 SPECIAL INFO NOTICE */}
                 {selectedGId === 3 ? (
