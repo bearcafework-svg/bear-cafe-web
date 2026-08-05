@@ -6,12 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Gamepad2, Plus, Trash2, Save, RefreshCw, Trophy, Sparkles, Medal, Award, Crown, Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, HelpCircle, ListFilter } from 'lucide-react';
+import { Gamepad2, Plus, Trash2, Save, RefreshCw, Trophy, Sparkles, Medal, Award, Crown, Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, ListFilter } from 'lucide-react';
 
 interface MinigameSetting {
   game_id: number;
@@ -40,19 +39,6 @@ interface LeaderboardItem {
   last_win: string;
 }
 
-const GAME_NAMES: Record<number, string> = {
-  1: '1. เติมคำศัพท์ไทย (สุ่ม 3-6 แต้ม)',
-  2: '2. เติมคำศัพท์ภาษาอังกฤษ (สุ่ม 3-6 แต้ม)',
-  3: '3. สุ่มโจทย์คณิตฯ (สร้างไดนามิกในโค้ด)',
-  4: '4. ทายคำจากคำใบ้ (มีระดับความยาก & คำใบ้)',
-  5: '5. เรียงคำศัพท์ไทย (สุ่ม 3-6 แต้ม)',
-  6: '6. เรียงคำศัพท์อังกฤษ (สุ่ม 3-6 แต้ม)',
-  7: '7. พิมพ์คำต่อไปนี้ - ไทย (สุ่ม 3-6 แต้ม)',
-  8: '8. พิมพ์คำต่อไปนี้ - อังกฤษ (สุ่ม 3-6 แต้ม)',
-  9: '9. ทายคำแปลภาษาอังกฤษ (มีตัวเลือก 3 ปุ่ม)',
-  10: '10. ทายคำแปลภาษาไทย (มีตัวเลือก 3 ปุ่ม)',
-};
-
 export function MinigamesManagement() {
   const { toast } = useToast();
 
@@ -71,9 +57,6 @@ export function MinigamesManagement() {
   const [formHint1, setFormHint1] = useState<string>('');
   const [formHint2, setFormHint2] = useState<string>('');
   const [formHint3, setFormHint3] = useState<string>('');
-  const [formOption1, setFormOption1] = useState<string>('');
-  const [formOption2, setFormOption2] = useState<string>('');
-  const [formOption3, setFormOption3] = useState<string>('');
 
   // Edit Modal state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -84,9 +67,6 @@ export function MinigamesManagement() {
   const [editHint1, setEditHint1] = useState<string>('');
   const [editHint2, setEditHint2] = useState<string>('');
   const [editHint3, setEditHint3] = useState<string>('');
-  const [editOption1, setEditOption1] = useState<string>('');
-  const [editOption2, setEditOption2] = useState<string>('');
-  const [editOption3, setEditOption3] = useState<string>('');
 
   // Leaderboard state
   const [lbTimeFilter, setLbTimeFilter] = useState<'30d' | 'all'>('30d');
@@ -232,11 +212,6 @@ export function MinigamesManagement() {
       hintsArray = [formHint1.trim(), formHint2.trim(), formHint3.trim()].filter(Boolean);
     }
 
-    let optionsArray: string[] = [];
-    if (gId === 9 || gId === 10) {
-      optionsArray = [formOption1.trim(), formOption2.trim(), formOption3.trim()].filter(Boolean);
-    }
-
     try {
       const { error } = await (supabase as any)
         .from('minigame_questions')
@@ -245,17 +220,16 @@ export function MinigamesManagement() {
           word_or_question: formQuestion.trim(),
           answer: formAnswer.trim(),
           hints: hintsArray,
-          options: optionsArray,
+          options: [],
           difficulty: finalDiff,
           is_active: true
         });
 
       if (error) throw error;
-      toast({ title: 'สำเร็จ', description: 'เพิ่มโจทย์ใหม่เข้าคลังเรียบร้อยแล้ว' });
+      toast({ title: 'สำเร็จ', description: 'เพิ่มคำศัพท์/โจทย์ใหม่เข้าคลังเรียบร้อยแล้ว' });
       setFormQuestion('');
       setFormAnswer('');
       setFormHint1(''); setFormHint2(''); setFormHint3('');
-      setFormOption1(''); setFormOption2(''); setFormOption3('');
       fetchQuestions();
     } catch (err: any) {
       toast({ title: 'เกิดข้อผิดพลาดในการบันทึกโจทย์', description: err.message, variant: 'destructive' });
@@ -270,9 +244,6 @@ export function MinigamesManagement() {
     setEditHint1(q.hints?.[0] || '');
     setEditHint2(q.hints?.[1] || '');
     setEditHint3(q.hints?.[2] || '');
-    setEditOption1(q.options?.[0] || '');
-    setEditOption2(q.options?.[1] || '');
-    setEditOption3(q.options?.[2] || '');
     setEditDialogOpen(true);
   };
 
@@ -290,11 +261,6 @@ export function MinigamesManagement() {
       hintsArray = [editHint1.trim(), editHint2.trim(), editHint3.trim()].filter(Boolean);
     }
 
-    let optionsArray: string[] = [];
-    if (gId === 9 || gId === 10) {
-      optionsArray = [editOption1.trim(), editOption2.trim(), editOption3.trim()].filter(Boolean);
-    }
-
     const finalDiff = (gId === 4) ? editDifficulty : null;
 
     try {
@@ -304,14 +270,14 @@ export function MinigamesManagement() {
           word_or_question: editQuestion.trim(),
           answer: editAnswer.trim(),
           hints: hintsArray,
-          options: optionsArray,
+          options: [],
           difficulty: finalDiff,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingQuestion.id);
 
       if (error) throw error;
-      toast({ title: 'สำเร็จ', description: `แก้ไขโจทย์ #${editingQuestion.id} เรียบร้อยแล้ว` });
+      toast({ title: 'สำเร็จ', description: `แก้ไขคำศัพท์/โจทย์ #${editingQuestion.id} เรียบร้อยแล้ว` });
       setEditDialogOpen(false);
       fetchQuestions();
     } catch (err: any) {
@@ -320,11 +286,11 @@ export function MinigamesManagement() {
   };
 
   const handleDeleteQuestion = async (id: number) => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบโจทย์ข้อนี้ออกจากคลัง?')) return;
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบคำศัพท์ข้อนี้ออกจากคลัง?')) return;
     try {
       const { error } = await (supabase as any).from('minigame_questions').delete().eq('id', id);
       if (error) throw error;
-      toast({ title: 'ลบโจทย์เรียบร้อยแล้ว' });
+      toast({ title: 'ลบคำศัพท์เรียบร้อยแล้ว' });
       fetchQuestions();
     } catch (err: any) {
       toast({ title: 'เกิดข้อผิดพลาดในการลบ', description: err.message, variant: 'destructive' });
@@ -356,7 +322,7 @@ export function MinigamesManagement() {
           ระบบจัดการมินิเกมและตารางจัดอันดับ (Mini-Games Hub)
         </h2>
         <p className="text-sm text-muted-foreground">
-          ปรับแต่งการตั้งค่า Channel ID, บริหารคลังโจทย์ (CRUD), และตรวจสอบตารางจัดอันดับผู้ชนะ
+          เพิ่มคลังคำศัพท์แชร์ร่วมกัน (Shared Vocabulary), กำหนด Channel ID และตรวจสอบตารางจัดอันดับผู้ชนะ
         </p>
       </div>
 
@@ -364,7 +330,7 @@ export function MinigamesManagement() {
       <Tabs defaultValue="questions" className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-xl mb-6">
           <TabsTrigger value="questions" className="flex items-center gap-2 text-xs font-semibold">
-            <Edit3 className="w-4 h-4 text-blue-500" /> คลังโจทย์มินิเกม
+            <Edit3 className="w-4 h-4 text-blue-500" /> คลังคำศัพท์/โจทย์
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2 text-xs font-semibold">
             <Settings2 className="w-4 h-4 text-purple-500" /> ตั้งค่า Channel ID
@@ -382,10 +348,10 @@ export function MinigamesManagement() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <Plus className="w-5 h-5 text-blue-500" />
-                เพิ่มโจทย์ใหม่เข้าคลัง
+                เพิ่มคำศัพท์ / โจทย์ใหม่เข้าคลังแชร์ร่วมกัน
               </CardTitle>
               <CardDescription className="text-xs">
-                เลือกมินิเกมที่ต้องการ และกรอกข้อมูลโจทย์ให้ตรงตามเงื่อนไขของแต่ละเกม
+                คำศัพท์เพียง 1 รายการ จะถูกนำไปใช้ร่วมกันโดยอัตโนมัติทั้งเกมเติมคำ เรียงคำ และเกมทายคำแปล (ไม่ต้องนั่งพิมพ์ช้อยส์หลอก)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -393,22 +359,22 @@ export function MinigamesManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Select Game */}
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">เลือกมินิเกม</label>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">เลือกประเภทเกม / คลังคำศัพท์</label>
                     <Select value={formGameId} onValueChange={(val) => setFormGameId(val)}>
                       <SelectTrigger className="h-10 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">1. เติมคำศัพท์ไทย (สุ่ม 3-6 แต้ม)</SelectItem>
-                        <SelectItem value="2">2. เติมคำศัพท์ภาษาอังกฤษ (สุ่ม 3-6 แต้ม)</SelectItem>
+                        <SelectItem value="1">1. เติมคำศัพท์ไทย (แชร์คำไทยในคลัง)</SelectItem>
+                        <SelectItem value="2">2. เติมคำศัพท์อังกฤษ (แชร์คำอังกฤษในคลัง)</SelectItem>
                         <SelectItem value="3">3. สุ่มโจทย์คณิตฯ (สร้างไดนามิกในโค้ด)</SelectItem>
                         <SelectItem value="4">4. ทายคำจากคำใบ้ (มีระดับความยาก & คำใบ้)</SelectItem>
-                        <SelectItem value="5">5. เรียงคำศัพท์ไทย (สุ่ม 3-6 แต้ม)</SelectItem>
-                        <SelectItem value="6">6. เรียงคำศัพท์อังกฤษ (สุ่ม 3-6 แต้ม)</SelectItem>
-                        <SelectItem value="7">7. พิมพ์คำต่อไปนี้ - ไทย (สุ่ม 3-6 แต้ม)</SelectItem>
-                        <SelectItem value="8">8. พิมพ์คำต่อไปนี้ - อังกฤษ (สุ่ม 3-6 แต้ม)</SelectItem>
-                        <SelectItem value="9">9. ทายคำแปลภาษาอังกฤษ (มีตัวเลือก 3 ปุ่ม)</SelectItem>
-                        <SelectItem value="10">10. ทายคำแปลภาษาไทย (มีตัวเลือก 3 ปุ่ม)</SelectItem>
+                        <SelectItem value="5">5. เรียงคำศัพท์ไทย (แชร์คำไทยในคลัง)</SelectItem>
+                        <SelectItem value="6">6. เรียงคำศัพท์อังกฤษ (แชร์คำอังกฤษในคลัง)</SelectItem>
+                        <SelectItem value="7">7. พิมพ์คำต่อไปนี้ - ไทย</SelectItem>
+                        <SelectItem value="8">8. พิมพ์คำต่อไปนี้ - อังกฤษ</SelectItem>
+                        <SelectItem value="9">9. ทายคำแปลอังกฤษ (แชร์คู่คำแปล อังกฤษ-ไทย)</SelectItem>
+                        <SelectItem value="10">10. ทายคำแปลไทย (แชร์คู่คำแปล ไทย-อังกฤษ)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -445,11 +411,11 @@ export function MinigamesManagement() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                          {selectedGId === 9 || selectedGId === 10 ? 'คำศัพท์หลัก (ภาษาเดิม)' : 'โจทย์ / คำศัพท์'}
+                          {selectedGId === 9 || selectedGId === 10 ? 'คำศัพท์ภาษาอังกฤษ (English Word)' : 'โจทย์ / คำศัพท์'}
                         </label>
                         <Input
-                          className="h-10 text-sm"
-                          placeholder={selectedGId === 9 ? 'เช่น Banana' : selectedGId === 10 ? 'เช่น กล้วย' : 'เช่น สวัสดี หรือ Apple'}
+                          className="h-10 text-sm font-semibold"
+                          placeholder={selectedGId === 9 || selectedGId === 10 ? 'เช่น Apple หรือ Banana' : 'เช่น สวัสดี หรือ Apple'}
                           value={formQuestion}
                           onChange={(e) => setFormQuestion(e.target.value)}
                         />
@@ -457,11 +423,11 @@ export function MinigamesManagement() {
 
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                          คำตอบที่ถูกต้อง (เฉลย)
+                          {selectedGId === 9 || selectedGId === 10 ? 'คำแปลภาษาไทย (Thai Translation)' : 'คำตอบที่ถูกต้อง (เฉลย)'}
                         </label>
                         <Input
                           className="h-10 text-sm font-semibold text-emerald-600 dark:text-emerald-400"
-                          placeholder={selectedGId === 9 ? 'เช่น กล้วย' : selectedGId === 10 ? 'เช่น Banana' : 'เฉลยที่ต้องพิมพ์ตรงเป๊ะ'}
+                          placeholder={selectedGId === 9 || selectedGId === 10 ? 'เช่น แอปเปิ้ล หรือ กล้วย' : 'เฉลยที่ต้องพิมพ์ตอบ'}
                           value={formAnswer}
                           onChange={(e) => setFormAnswer(e.target.value)}
                         />
@@ -480,20 +446,8 @@ export function MinigamesManagement() {
                       </div>
                     )}
 
-                    {/* Options inputs ONLY for Games 9 and 10 */}
-                    {(selectedGId === 9 || selectedGId === 10) && (
-                      <div className="space-y-2 pt-2 border-t border-dashed border-border">
-                        <label className="text-xs font-semibold text-cyan-500 block">ตัวเลือก 3 ช้อยส์บนปุ่ม (รวมคำตอบที่ถูกต้องด้วย)</label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 1 (เช่น กล้วย)" value={formOption1} onChange={(e) => setFormOption1(e.target.value)} />
-                          <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 2 (เช่น แอปเปิ้ล)" value={formOption2} onChange={(e) => setFormOption2(e.target.value)} />
-                          <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 3 (เช่น องุ่น)" value={formOption3} onChange={(e) => setFormOption3(e.target.value)} />
-                        </div>
-                      </div>
-                    )}
-
                     <Button type="submit" className="w-full h-10 font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                      <Plus className="w-4 h-4 mr-2" /> บันทึกโจทย์ใหม่เข้าคลัง
+                      <Plus className="w-4 h-4 mr-2" /> บันทึกเข้าคลังคำศัพท์
                     </Button>
                   </>
                 )}
@@ -508,10 +462,10 @@ export function MinigamesManagement() {
                 <div>
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <ListFilter className="w-5 h-5 text-indigo-500" />
-                    คลังโจทย์ทั้งหมด ({filteredQuestions.length} รายการ)
+                    คลังคำศัพท์ทั้งหมด ({filteredQuestions.length} รายการ)
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    รายการโจทย์ในระบบ สามารถค้นหา แก้ไข (✏️) หรือลบ (🗑️) ได้อย่างสะดวก
+                    รายการคำศัพท์ในระบบ สามารถค้นหา แก้ไข (✏️) หรือลบ (🗑️) ได้อย่างสะดวก
                   </CardDescription>
                 </div>
 
@@ -520,7 +474,7 @@ export function MinigamesManagement() {
                   <div className="relative w-full sm:w-56">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-muted-foreground" />
                     <Input
-                      placeholder="ค้นหาโจทย์ หรือเฉลย..."
+                      placeholder="ค้นหาคำศัพท์ หรือคำแปล..."
                       className="pl-9 h-9 text-xs"
                       value={searchKeyword}
                       onChange={(e) => setSearchKeyword(e.target.value)}
@@ -558,10 +512,10 @@ export function MinigamesManagement() {
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead className="w-16 text-xs">ID</TableHead>
-                      <TableHead className="w-28 text-xs">เกม</TableHead>
-                      <TableHead className="text-xs">โจทย์ / คำศัพท์</TableHead>
-                      <TableHead className="text-xs">คำตอบ (เฉลย)</TableHead>
-                      <TableHead className="text-xs">รายละเอียด / ช้อยส์</TableHead>
+                      <TableHead className="w-28 text-xs">เกม/คลัง</TableHead>
+                      <TableHead className="text-xs">คำศัพท์ / โจทย์</TableHead>
+                      <TableHead className="text-xs">คำตอบ / คำแปล</TableHead>
+                      <TableHead className="text-xs">รายละเอียด</TableHead>
                       <TableHead className="w-24 text-xs">ระดับความยาก</TableHead>
                       <TableHead className="text-right w-24 text-xs">การจัดการ</TableHead>
                     </TableRow>
@@ -570,7 +524,7 @@ export function MinigamesManagement() {
                     {filteredQuestions.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-10 text-xs">
-                          {searchKeyword ? 'ไม่พบโจทย์ที่ตรงกับคำค้นหา' : 'ไม่พบรายการโจทย์ในคลัง'}
+                          {searchKeyword ? 'ไม่พบคำศัพท์ที่ตรงกับคำค้นหา' : 'ไม่พบรายการคำศัพท์ในคลัง'}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -589,8 +543,8 @@ export function MinigamesManagement() {
                           <TableCell className="text-xs text-muted-foreground">
                             {q.game_id === 4 && q.hints?.length ? (
                               <span className="text-purple-500 font-medium">💡 คำใบ้ {q.hints.length} ข้อ</span>
-                            ) : (q.game_id === 9 || q.game_id === 10) && q.options?.length ? (
-                              <span className="text-cyan-500 font-medium">🔘 ช้อยส์: {q.options.join(', ')}</span>
+                            ) : (q.game_id === 9 || q.game_id === 10) ? (
+                              <span className="text-cyan-500 font-medium">⚡ สุ่มช้อยส์ให้อัตโนมัติ</span>
                             ) : (
                               '-'
                             )}
@@ -619,7 +573,7 @@ export function MinigamesManagement() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                                title="แก้ไขโจทย์"
+                                title="แก้ไขคำศัพท์"
                                 onClick={() => openEditModal(q)}
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -628,7 +582,7 @@ export function MinigamesManagement() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-                                title="ลบโจทย์"
+                                title="ลบคำศัพท์"
                                 onClick={() => handleDeleteQuestion(q.id)}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -862,22 +816,26 @@ export function MinigamesManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit3 className="w-5 h-5 text-blue-500" />
-              แก้ไขโจทย์ #{editingQuestion?.id} (เกมที่ {editingQuestion?.game_id})
+              แก้ไขคำศัพท์ #{editingQuestion?.id} (เกมที่ {editingQuestion?.game_id})
             </DialogTitle>
             <DialogDescription className="text-xs">
-              แก้ไขโจทย์ คำตอบ คำใบ้ หรือช้อยส์ปุ่มของข้อนี้
+              แก้ไขคำศัพท์ หรือคำแปลของข้อนี้
             </DialogDescription>
           </DialogHeader>
 
           {editingQuestion && (
             <div className="space-y-4 py-2">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">โจทย์ / คำศัพท์</label>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  {editingQuestion.game_id === 9 || editingQuestion.game_id === 10 ? 'คำศัพท์ภาษาอังกฤษ (English Word)' : 'โจทย์ / คำศัพท์'}
+                </label>
                 <Input value={editQuestion} onChange={(e) => setEditQuestion(e.target.value)} />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">คำตอบที่ถูกต้อง (เฉลย)</label>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  {editingQuestion.game_id === 9 || editingQuestion.game_id === 10 ? 'คำแปลภาษาไทย (Thai Translation)' : 'คำตอบที่ถูกต้อง (เฉลย)'}
+                </label>
                 <Input value={editAnswer} onChange={(e) => setEditAnswer(e.target.value)} />
               </div>
 
@@ -905,16 +863,6 @@ export function MinigamesManagement() {
                   <Input className="h-9 text-xs" placeholder="คำใบ้ที่ 1" value={editHint1} onChange={(e) => setEditHint1(e.target.value)} />
                   <Input className="h-9 text-xs" placeholder="คำใบ้ที่ 2" value={editHint2} onChange={(e) => setEditHint2(e.target.value)} />
                   <Input className="h-9 text-xs" placeholder="คำใบ้ที่ 3" value={editHint3} onChange={(e) => setEditHint3(e.target.value)} />
-                </div>
-              )}
-
-              {/* Options ONLY for Games 9 and 10 */}
-              {(editingQuestion.game_id === 9 || editingQuestion.game_id === 10) && (
-                <div className="space-y-2 pt-2 border-t">
-                  <label className="text-xs font-semibold text-cyan-500 block">ตัวเลือกช้อยส์ 3 ปุ่ม</label>
-                  <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 1" value={editOption1} onChange={(e) => setEditOption1(e.target.value)} />
-                  <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 2" value={editOption2} onChange={(e) => setEditOption2(e.target.value)} />
-                  <Input className="h-9 text-xs" placeholder="ตัวเลือกปุ่มที่ 3" value={editOption3} onChange={(e) => setEditOption3(e.target.value)} />
                 </div>
               )}
             </div>
