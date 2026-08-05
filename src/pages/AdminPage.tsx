@@ -55,9 +55,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
 import type { Tables } from '@/integrations/supabase/types';
-import { BannerManagement } from '@/components/admin/BannerManagement';
-import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
-import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
+import { Gamepad2 } from 'lucide-react';
+import { MinigamesManagement } from '@/components/admin/MinigamesManagement';
 import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
 
 type Profile = Tables<'profiles'>;
@@ -114,6 +113,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'dm-broadcast': Send,
   'manage-staff': Users,
   'sticky-messages': Pin,
+  'minigames': Gamepad2,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -376,6 +376,7 @@ export default function AdminPage() {
         case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
         case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
+        case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;
 
         default: return null;
       }

@@ -26,6 +26,7 @@ import SpinPrizePage from "./pages/SpinPrizePage";
 import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 import InventoryPage from "./pages/InventoryPage";
 import GachaPage from "./pages/GachaPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 
 const queryClient = new QueryClient();
 
@@ -150,6 +151,7 @@ export function AppRoutes() {
       <Route path="/discord-servers" element={<DiscordServersPage />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
+      <Route path="/leaderboard" element={<LeaderboardPage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/overview" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
 
