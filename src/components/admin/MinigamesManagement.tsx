@@ -79,6 +79,15 @@ export function MinigamesManagement() {
   const [lbGameFilter, setLbGameFilter] = useState<string>('all');
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [loadingLb, setLoadingLb] = useState(false);
+  const [userProfilesMap, setUserProfilesMap] = useState<Record<string, { username: string; discord_username: string | null; avatar_url: string | null }>>({});
+
+  // Question Pagination state
+  const [qPage, setQPage] = useState(1);
+  const [qItemsPerPage, setQItemsPerPage] = useState(15);
+
+  useEffect(() => {
+    setQPage(1);
+  }, [searchKeyword, selectedCategoryFilter, selectedGameFilter]);
 
   // Fetch Settings
   const fetchSettings = async () => {
@@ -162,6 +171,31 @@ export function MinigamesManagement() {
       });
 
       setLeaderboard(sorted);
+
+      // Fetch profiles for leaderboard discord_ids
+      const discordIds = sorted.map((item) => item.discord_id).filter(Boolean);
+      if (discordIds.length > 0) {
+        const uniqueIds = Array.from(new Set(discordIds));
+        const profilesMap: Record<string, { username: string; discord_username: string | null; avatar_url: string | null }> = {};
+        const chunkSize = 100;
+        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+          const chunk = uniqueIds.slice(i, i + chunkSize);
+          const { data: pData } = await (supabase as any)
+            .from('profiles')
+            .select('discord_id, username, discord_username, avatar_url')
+            .in('discord_id', chunk);
+          if (pData) {
+            for (const p of pData) {
+              profilesMap[p.discord_id] = {
+                username: p.username,
+                discord_username: p.discord_username ?? null,
+                avatar_url: p.avatar_url ?? null,
+              };
+            }
+          }
+        }
+        setUserProfilesMap(profilesMap);
+      }
     } catch (err: any) {
       toast({ title: 'เกิดข้อผิดพลาดในการดึงข้อมูลจัดอันดับ', description: err.message, variant: 'destructive' });
     } finally {
@@ -560,9 +594,9 @@ export function MinigamesManagement() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-xl border border-border overflow-hidden max-h-[580px] overflow-y-auto">
                 <Table>
-                  <TableHeader className="bg-muted/50">
+                  <TableHeader className="bg-muted/90 backdrop-blur sticky top-0 z-10">
                     <TableRow>
                       <TableHead className="w-14 text-xs">ID</TableHead>
                       <TableHead className="w-24 text-xs">เกม/คลัง</TableHead>
@@ -577,12 +611,12 @@ export function MinigamesManagement() {
                   <TableBody>
                     {filteredQuestions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-10 text-xs">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-10 text-xs">
                           {searchKeyword ? 'ไม่พบคำศัพท์ที่ตรงกับคำค้นหา' : 'ไม่พบรายการคำศัพท์ในคลัง'}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredQuestions.map((q) => (
+                      filteredQuestions.slice((qPage - 1) * qItemsPerPage, qPage * qItemsPerPage).map((q) => (
                         <TableRow key={q.id} className="hover:bg-muted/40 transition-colors">
                           <TableCell className="font-mono text-xs font-bold text-muted-foreground">#{q.id}</TableCell>
                           <TableCell>
@@ -654,6 +688,42 @@ export function MinigamesManagement() {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Question Pagination Controls */}
+              {filteredQuestions.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 text-xs">
+                  <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
+                    <span>
+                      แสดง <strong className="text-foreground">{((qPage - 1) * qItemsPerPage) + 1}</strong> - <strong className="text-foreground">{Math.min(qPage * qItemsPerPage, filteredQuestions.length)}</strong> จาก <strong className="text-foreground">{filteredQuestions.length}</strong> รายการ
+                    </span>
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <span className="text-[11px]">ต่อหน้า:</span>
+                      <Select value={String(qItemsPerPage)} onValueChange={(val) => { setQItemsPerPage(Number(val)); setQPage(1); }}>
+                        <SelectTrigger className="h-7 text-xs w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="15">15</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {Math.ceil(filteredQuestions.length / qItemsPerPage) > 1 && (
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" onClick={() => setQPage(1)} disabled={qPage <= 1} className="h-8 px-2 text-xs rounded-lg">«</Button>
+                      <Button variant="outline" size="sm" onClick={() => setQPage(p => Math.max(1, p - 1))} disabled={qPage <= 1} className="h-8 px-2.5 text-xs rounded-lg">ก่อนหน้า</Button>
+                      <span className="px-2 text-xs font-semibold">หน้า {qPage} / {Math.ceil(filteredQuestions.length / qItemsPerPage)}</span>
+                      <Button variant="outline" size="sm" onClick={() => setQPage(p => Math.min(Math.ceil(filteredQuestions.length / qItemsPerPage), p + 1))} disabled={qPage >= Math.ceil(filteredQuestions.length / qItemsPerPage)} className="h-8 px-2.5 text-xs rounded-lg">ถัดไป</Button>
+                      <Button variant="outline" size="sm" onClick={() => setQPage(Math.ceil(filteredQuestions.length / qItemsPerPage))} disabled={qPage >= Math.ceil(filteredQuestions.length / qItemsPerPage)} className="h-8 px-2 text-xs rounded-lg">»</Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -783,7 +853,28 @@ export function MinigamesManagement() {
                 <Badge variant="outline" className="w-fit mx-auto border-slate-400 text-slate-500 font-bold">
                   อันดับ 2 (Silver)
                 </Badge>
-                <CardTitle className="text-base font-bold font-mono mt-2">{top2 ? top2.discord_id : '-'}</CardTitle>
+                {top2 ? (
+                  userProfilesMap[top2.discord_id] ? (
+                    <div className="flex flex-col items-center gap-1.5 mt-2">
+                      {userProfilesMap[top2.discord_id].avatar_url ? (
+                        <img src={userProfilesMap[top2.discord_id].avatar_url!} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-slate-400 shadow-sm" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-slate-300 dark:bg-slate-700 text-foreground flex items-center justify-center font-bold text-base">
+                          {userProfilesMap[top2.discord_id].username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="text-center min-w-0 max-w-full">
+                        <p className="font-bold text-sm text-foreground truncate px-1">{userProfilesMap[top2.discord_id].username}</p>
+                        {userProfilesMap[top2.discord_id].discord_username && <p className="text-xs text-muted-foreground truncate">@{userProfilesMap[top2.discord_id].discord_username}</p>}
+                        <p className="font-mono text-[10px] text-muted-foreground mt-0.5">ID: {top2.discord_id}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <CardTitle className="text-base font-bold font-mono mt-2">{top2.discord_id}</CardTitle>
+                  )
+                ) : (
+                  <CardTitle className="text-base font-bold font-mono mt-2">-</CardTitle>
+                )}
               </CardHeader>
               <CardContent className="text-center text-sm font-semibold text-muted-foreground">
                 {top2 ? `ชนะ ${top2.total_wins} ครั้ง (${top2.total_points} แต้ม)` : 'ไม่มีข้อมูล'}
@@ -798,7 +889,28 @@ export function MinigamesManagement() {
                 <Badge className="w-fit mx-auto bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-extrabold px-3 py-1">
                   🏆 อันดับ 1 (Gold Champion)
                 </Badge>
-                <CardTitle className="text-lg font-extrabold font-mono mt-2 text-amber-500">{top1 ? top1.discord_id : '-'}</CardTitle>
+                {top1 ? (
+                  userProfilesMap[top1.discord_id] ? (
+                    <div className="flex flex-col items-center gap-1.5 mt-2">
+                      {userProfilesMap[top1.discord_id].avatar_url ? (
+                        <img src={userProfilesMap[top1.discord_id].avatar_url!} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow-md" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-amber-400/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-lg border border-amber-400">
+                          {userProfilesMap[top1.discord_id].username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="text-center min-w-0 max-w-full">
+                        <p className="font-extrabold text-base text-amber-600 dark:text-amber-400 truncate px-1">{userProfilesMap[top1.discord_id].username}</p>
+                        {userProfilesMap[top1.discord_id].discord_username && <p className="text-xs text-muted-foreground truncate">@{userProfilesMap[top1.discord_id].discord_username}</p>}
+                        <p className="font-mono text-[10px] text-muted-foreground mt-0.5">ID: {top1.discord_id}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <CardTitle className="text-lg font-extrabold font-mono mt-2 text-amber-500">{top1.discord_id}</CardTitle>
+                  )
+                ) : (
+                  <CardTitle className="text-lg font-extrabold font-mono mt-2 text-amber-500">-</CardTitle>
+                )}
               </CardHeader>
               <CardContent className="text-center text-base font-bold text-amber-600 dark:text-amber-400">
                 {top1 ? `ชนะ ${top1.total_wins} ครั้ง (${top1.total_points} แต้ม)` : 'ไม่มีข้อมูล'}
@@ -813,7 +925,28 @@ export function MinigamesManagement() {
                 <Badge variant="outline" className="w-fit mx-auto border-amber-700 text-amber-700 font-bold">
                   อันดับ 3 (Bronze)
                 </Badge>
-                <CardTitle className="text-base font-bold font-mono mt-2">{top3 ? top3.discord_id : '-'}</CardTitle>
+                {top3 ? (
+                  userProfilesMap[top3.discord_id] ? (
+                    <div className="flex flex-col items-center gap-1.5 mt-2">
+                      {userProfilesMap[top3.discord_id].avatar_url ? (
+                        <img src={userProfilesMap[top3.discord_id].avatar_url!} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-amber-700 shadow-sm" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-amber-900/20 text-amber-700 flex items-center justify-center font-bold text-base">
+                          {userProfilesMap[top3.discord_id].username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="text-center min-w-0 max-w-full">
+                        <p className="font-bold text-sm text-foreground truncate px-1">{userProfilesMap[top3.discord_id].username}</p>
+                        {userProfilesMap[top3.discord_id].discord_username && <p className="text-xs text-muted-foreground truncate">@{userProfilesMap[top3.discord_id].discord_username}</p>}
+                        <p className="font-mono text-[10px] text-muted-foreground mt-0.5">ID: {top3.discord_id}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <CardTitle className="text-base font-bold font-mono mt-2">{top3.discord_id}</CardTitle>
+                  )
+                ) : (
+                  <CardTitle className="text-base font-bold font-mono mt-2">-</CardTitle>
+                )}
               </CardHeader>
               <CardContent className="text-center text-sm font-semibold text-muted-foreground">
                 {top3 ? `ชนะ ${top3.total_wins} ครั้ง (${top3.total_points} แต้ม)` : 'ไม่มีข้อมูล'}
@@ -834,7 +967,7 @@ export function MinigamesManagement() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">อันดับ</TableHead>
-                    <TableHead>User Discord ID</TableHead>
+                    <TableHead>สมาชิก / Discord Profile</TableHead>
                     <TableHead>จำนวนครั้งที่ชนะ</TableHead>
                     <TableHead>แต้มสะสมรวม</TableHead>
                     <TableHead className="text-right">ชนะล่าสุด</TableHead>
@@ -848,19 +981,43 @@ export function MinigamesManagement() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    leaderboard.map((item, index) => (
-                      <TableRow key={item.discord_id}>
-                        <TableCell className="font-extrabold text-sm">
-                          {index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs font-semibold">{item.discord_id}</TableCell>
-                        <TableCell className="font-bold text-sky-500">{item.total_wins} ครั้ง</TableCell>
-                        <TableCell className="font-bold text-amber-500">{item.total_points} แต้ม</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {new Date(item.last_win).toLocaleString('th-TH')}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    leaderboard.map((item, index) => {
+                      const userProf = userProfilesMap[item.discord_id];
+                      return (
+                        <TableRow key={item.discord_id}>
+                          <TableCell className="font-extrabold text-sm">
+                            {index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`}
+                          </TableCell>
+                          <TableCell>
+                            {userProf ? (
+                              <div className="flex items-center gap-3">
+                                {userProf.avatar_url ? (
+                                  <img src={userProf.avatar_url} alt={userProf.username} className="w-8 h-8 rounded-full object-cover shrink-0 border border-border shadow-sm" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center font-bold text-xs shrink-0 text-muted-foreground border border-border">
+                                    {userProf.username.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-bold text-xs text-foreground truncate">{userProf.username}</span>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                    {userProf.discord_username && <span>@{userProf.discord_username}</span>}
+                                    <span className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.2 rounded text-muted-foreground font-semibold">ID: {item.discord_id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-xs font-semibold">{item.discord_id}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-bold text-sky-500">{item.total_wins} ครั้ง</TableCell>
+                          <TableCell className="font-bold text-amber-500">{item.total_points} แต้ม</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">
+                            {new Date(item.last_win).toLocaleString('th-TH')}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

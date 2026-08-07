@@ -24,7 +24,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { 
   Users, UserPlus, Shield, Settings, Activity, Clock, Trash2, Edit2, 
   ArrowUpDown, Plus, Calendar, Save, History, Search, CheckCircle, Loader2, GripVertical,
-  Pencil, Copy, ChevronsUpDown, Check
+  Pencil, Copy, ChevronsUpDown, Check, RefreshCw
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -163,6 +163,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
   // Table filtering
   const [filterQuery, setFilterQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'active' | 'intern'>('all');
 
   const [submittingMember, setSubmittingMember] = useState(false);
   const [submittingPos, setSubmittingPos] = useState(false);
@@ -343,14 +344,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
   const calculateDuration = (member: StaffMember) => {
     const today = new Date();
-    let startDate = new Date(member.joined_at);
-    
-    if (member.intern_start_at) {
-      const isPassed = member.intern_end_at ? new Date(member.intern_end_at) <= today : false;
-      if (isPassed) {
-        startDate = new Date(member.intern_start_at);
-      }
-    }
+    const startDate = new Date(member.joined_at);
     
     const diffTime = today.getTime() - startDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -660,13 +654,22 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
   const sortedAndFilteredMembers = useMemo(() => {
     let list = [...members];
 
-    // Query Filter (Nickname, Username)
+    // Quick Stats Filter
+    if (filterCategory === 'active') {
+      list = list.filter(m => m.status === 'Active');
+    } else if (filterCategory === 'intern') {
+      const today = new Date();
+      list = list.filter(m => m.intern_start_at && (!m.intern_end_at || new Date(m.intern_end_at) > today));
+    }
+
+    // Query Filter (Nickname, Username, Discord ID)
     if (filterQuery.trim()) {
       const q = filterQuery.toLowerCase().trim();
       list = list.filter(m => 
         (m.nickname || '').toLowerCase().includes(q) ||
         (m.discord_user?.username || '').toLowerCase().includes(q) ||
-        (m.discord_user?.display_name || '').toLowerCase().includes(q)
+        (m.discord_user?.display_name || '').toLowerCase().includes(q) ||
+        (m.discord_id || '').includes(q)
       );
     }
 
@@ -682,7 +685,7 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
       return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
     });
-  }, [members, filterQuery]);
+  }, [members, filterQuery, filterCategory]);
 
   // Filter and map profiles for selection in "Add Staff" Combobox
   const filteredProfiles = useMemo(() => {
@@ -719,267 +722,297 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#8C6239] dark:text-[#EAD8C8]">จัดการทีมงาน</h1>
-          <p className="text-base text-muted-foreground">ระบบจัดการข้อมูลทีมงาน ลำดับตำแหน่ง/ระดับ และประวัติการเลื่อนยศ (เชื่อมต่อ Discord + Supabase)</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleOpenAuditLogs} variant="outline" className="gap-2 border-latte/40 dark:border-coffee/40 text-sm h-10 px-4 rounded-xl">
-            <History className="w-4.5 h-4.5" />
-            ประวัติระบบ
-          </Button>
-          <Button onClick={handleOpenAddMember} className="gap-2 bg-gradient-to-r from-primary to-bear-brown text-primary-foreground text-sm h-10 px-4 rounded-xl">
-            <UserPlus className="w-4.5 h-4.5" />
-            เพิ่มทีมงาน
-          </Button>
+      {/* ── Header Banner Card ── */}
+      <div className="rounded-3xl bg-[#FDFAF7] dark:bg-[#1E1B18] border-2 border-[#F4EEE5] dark:border-[#382F28] p-6 shadow-sm hover:shadow transition-all duration-300">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+              <span className="text-xl">👥</span>
+              ระบบจัดการทีมงาน (Staff Management)
+            </h2>
+            <p className="text-xs text-[#827160] dark:text-[#A89889]">
+              จัดการข้อมูลทีมงาน ลำดับตำแหน่ง ระดับสตาฟ และติดตามประวัติกิจกรรม
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap self-stretch md:self-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchInitialData()}
+              disabled={loading}
+              className="gap-1.5 h-9 rounded-xl border-[#EFE7DC] dark:border-[#3E3229] text-[#827160] cursor-pointer"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+              รีเฟรช
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenAuditLogs}
+              className="gap-1.5 h-9 rounded-xl border-[#EFE7DC] dark:border-[#3E3229] text-[#827160] cursor-pointer"
+            >
+              <History className="w-3.5 h-3.5" />
+              ประวัติระบบ
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleOpenAddMember}
+              className="gap-1.5 h-9 rounded-xl bg-[#8C6239] hover:bg-[#74502D] text-white font-medium cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-white" />
+              เพิ่มทีมงานใหม่
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* ── Quick Stats Panel (Interactive Quick Filters) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        {[
+          { key: 'all', label: 'ทีมงานทั้งหมด', count: members.length, icon: Users, color: 'text-[#8C6239] bg-[#8C6239]/10 border-[#8C6239]/20' },
+          { key: 'active', label: 'ปฏิบัติงาน (Active)', count: members.filter(m => m.status === 'Active').length, icon: Shield, color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
+          { key: 'positions', label: 'ตำแหน่งสตาฟ', count: positions.length, icon: Settings, color: 'text-blue-600 bg-blue-500/10 border-blue-500/20' },
+          { key: 'levels', label: 'ระดับสตาฟ', count: levels.length, icon: Activity, color: 'text-purple-600 bg-purple-500/10 border-purple-500/20' },
+        ].map((stat) => {
+          const Icon = stat.icon;
+          const isFilterable = stat.key === 'all' || stat.key === 'active';
+          const isActive = filterCategory === stat.key;
+          return (
+            <button
+              key={stat.key}
+              type="button"
+              disabled={!isFilterable}
+              onClick={() => isFilterable && setFilterCategory(stat.key as any)}
+              className={cn(
+                "rounded-2xl p-4 text-left transition-all border-2 flex flex-col gap-2 relative overflow-hidden shadow-sm duration-200",
+                isFilterable ? "cursor-pointer hover:scale-[1.02] active:scale-[0.99]" : "cursor-default",
+                isActive
+                  ? "border-[#8C6239] bg-[#8C6239]/5 ring-2 ring-[#8C6239]/20"
+                  : "bg-white dark:bg-[#1E1B18] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]"
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[11px] font-bold text-muted-foreground">{stat.label}</span>
+                <div className={cn("p-1.5 rounded-xl border", stat.color)}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <p className="text-2xl font-extrabold leading-none text-foreground">{stat.count}</p>
+            </button>
+          );
+        })}
+      </div>
+
       <Tabs defaultValue="staff" className="w-full">
-        <TabsList className="bg-cream/40 dark:bg-card/40 border border-latte/40 dark:border-coffee/40 rounded-2xl p-1 mb-4">
-          <TabsTrigger value="staff" className="rounded-xl px-5 py-2.5 text-sm font-semibold">รายชื่อทีมงาน ({sortedAndFilteredMembers.length})</TabsTrigger>
-          <TabsTrigger value="positions" className="rounded-xl px-5 py-2.5 text-sm font-semibold">ระบบตำแหน่ง ({positions.length})</TabsTrigger>
-          <TabsTrigger value="levels" className="rounded-xl px-5 py-2.5 text-sm font-semibold">ระบบระดับ ({levels.length})</TabsTrigger>
+        <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] border border-[#F0E8DC] dark:border-[#382F28] rounded-2xl p-1 mb-4">
+          <TabsTrigger value="staff" className="rounded-xl px-5 py-2.5 text-xs font-bold data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:text-[#8C6239] data-[state=active]:shadow-sm">
+            รายชื่อทีมงาน ({sortedAndFilteredMembers.length})
+          </TabsTrigger>
+          <TabsTrigger value="positions" className="rounded-xl px-5 py-2.5 text-xs font-bold data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:text-[#8C6239] data-[state=active]:shadow-sm">
+            ระบบตำแหน่ง ({positions.length})
+          </TabsTrigger>
+          <TabsTrigger value="levels" className="rounded-xl px-5 py-2.5 text-xs font-bold data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:text-[#8C6239] data-[state=active]:shadow-sm">
+            ระบบระดับ ({levels.length})
+          </TabsTrigger>
         </TabsList>
 
         {/* TAB 1: STAFF LIST */}
         <TabsContent value="staff" className="space-y-4">
-          <Card className="border-latte/40 dark:border-coffee/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
+          <Card className="border-2 border-[#F4EEE5] dark:border-[#382F28] bg-white dark:bg-[#1E1B18] shadow-sm rounded-3xl overflow-hidden">
             <CardHeader className="pb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <CardTitle className="text-lg font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายชื่อทีมงานทั้งหมด</CardTitle>
-                <CardDescription className="text-sm">จัดเรียงตาม: ลำดับตำแหน่ง → ลำดับระดับ → วันเข้าทีมงาน</CardDescription>
+                <CardTitle className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                  <Users className="w-4.5 h-4.5 text-[#8C6239]" />
+                  รายชื่อทีมงานทั้งหมด
+                </CardTitle>
+                <CardDescription className="text-xs text-[#827160]">
+                  เรียงลำดับตาม: ตำแหน่ง → ระดับ → วันเริ่มงาน
+                </CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <div className="relative w-full sm:w-60">
-                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-3" />
                   <Input
                     value={filterQuery}
                     onChange={e => setFilterQuery(e.target.value)}
                     placeholder="ค้นหาชื่อเล่น / Discord..."
-                    className="pl-9 bg-background/50 border-latte/40 rounded-xl h-10 text-sm"
+                    className="pl-9 bg-[#FAF5EE] dark:bg-[#25201C] border-[#EFE7DC] dark:border-[#3E3229] rounded-xl h-9 text-xs focus-visible:ring-[#8C6239]"
                   />
+                  {filterQuery && (
+                    <button onClick={() => setFilterQuery('')} className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-cream/20 dark:bg-card/60">
-                    <TableRow className="text-sm font-bold">
-                      <TableHead className="pl-6 w-[220px] text-sm font-bold">สมาชิก</TableHead>
-                      <TableHead className="text-sm font-bold">ชื่อเล่น</TableHead>
-                      <TableHead className="text-sm font-bold">ตำแหน่ง</TableHead>
-                      <TableHead className="text-sm font-bold">ระดับ</TableHead>
-                      <TableHead className="text-sm font-bold">วันเดือนปีเปิด / อายุงาน</TableHead>
-                      <TableHead className="text-sm font-bold">การฝึกงาน</TableHead>
-                      <TableHead className="text-right pr-6 text-sm font-bold">จัดการ</TableHead>
+                  <TableHeader className="bg-[#FAF6F0]/70 dark:bg-[#25201C]/60">
+                    <TableRow className="text-xs font-bold border-b border-[#F0E8DC] dark:border-[#382F28]">
+                      <TableHead className="pl-6 w-[220px] text-xs font-bold text-[#827160]">สมาชิก</TableHead>
+                      <TableHead className="text-xs font-bold text-[#827160]">ชื่อเล่น</TableHead>
+                      <TableHead className="text-xs font-bold text-[#827160]">ตำแหน่ง</TableHead>
+                      <TableHead className="text-xs font-bold text-[#827160]">ระดับ</TableHead>
+                      <TableHead className="text-xs font-bold text-[#827160]">วันเริ่มงาน / อายุ</TableHead>
+                      <TableHead className="text-xs font-bold text-[#827160]">การฝึกงาน</TableHead>
+                      <TableHead className="text-right pr-6 text-xs font-bold text-[#827160]">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลดทีมงาน...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center py-12 text-xs text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#8C6239]" />กำลังโหลดทีมงาน...</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center py-12 text-xs text-muted-foreground">ไม่พบข้อมูลทีมงาน</TableCell></TableRow>
                     ) : sortedAndFilteredMembers.map(m => {
                       const isIntern = m.intern_start_at !== null;
                       const hasColor = m.staff_positions?.color;
                       return (
-                        <TableRow key={m.id} className="hover:bg-cream/5 dark:hover:bg-card/40 transition-colors text-sm">
-                          <TableCell className="pl-6">
+                        <TableRow key={m.id} className="hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40 transition-colors text-xs border-b border-[#F4EEE5] dark:border-[#2D2520]">
+                          <TableCell className="pl-6 py-3">
                             <div className="flex items-center gap-3">
                               <img
                                 src={m.discord_user?.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"}
                                 alt="Discord Avatar"
-                                className="w-9 h-9 rounded-full border border-latte/30 dark:border-coffee/30 shrink-0"
+                                className="w-9 h-9 rounded-full border border-[#EFE7DC] dark:border-[#382F28] shrink-0 object-cover shadow-sm"
                               />
                               <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-base truncate">{m.discord_user?.display_name || 'Loading...'}</span>
+                                <span className="font-bold text-xs truncate text-foreground">{m.discord_user?.display_name || '—'}</span>
                                 <div className="flex items-center gap-1 min-w-0">
-                                  <span className="text-xs text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                  <span className="text-[11px] text-muted-foreground truncate">@{m.discord_user?.username || m.discord_id}</span>
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       navigator.clipboard.writeText(m.discord_id);
-                                      toast({ title: 'คัดลอก ID สมาชิกสำเร็จ', description: `ID: ${m.discord_id}` });
+                                      toast({ title: 'คัดลอก Member ID สำเร็จ', description: `ID: ${m.discord_id}` });
                                     }}
-                                    title="คัดลอก Discord ID ของสมาชิก"
+                                    title="คัดลอก Discord ID สมาชิก"
+                                    className="text-muted-foreground hover:text-[#8C6239] transition-colors p-0.5 cursor-pointer shrink-0"
                                   >
-                                    <Copy className="w-2.5 h-2.5" />
-                                  </Button>
+                                    <Copy className="w-3 h-3" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="font-semibold text-base">{m.nickname || '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Badge 
-                                className="text-sm font-semibold py-1 px-2.5"
-                                style={{ 
-                                  backgroundColor: hasColor ? `${hasColor}15` : 'rgba(var(--primary), 0.1)',
-                                  color: hasColor || 'var(--primary)',
-                                  border: `1px solid ${hasColor}30`
-                                }}
-                              >
-                                {m.staff_positions?.name || 'ไม่มี'}
-                              </Badge>
-                              {m.staff_positions?.discord_role_id && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(m.staff_positions!.discord_role_id);
-                                    toast({ title: 'คัดลอก Role ID ตำแหน่งสำเร็จ', description: `Role ID: ${m.staff_positions!.discord_role_id}` });
-                                  }}
-                                  title={`คัดลอก Role ID ตำแหน่ง: ${m.staff_positions.discord_role_id}`}
-                                >
-                                  <Copy className="w-2.5 h-2.5" />
-                                </Button>
-                              )}
-                            </div>
+
+                          <TableCell className="font-bold text-xs py-3">{m.nickname || '-'}</TableCell>
+
+                          {/* ตำแหน่ง: badge only (no copy button) */}
+                          <TableCell className="py-3">
+                            <Badge 
+                              className="text-xs font-semibold py-0.5 px-2.5 rounded-xl shadow-sm"
+                              style={{ 
+                                backgroundColor: hasColor ? `${hasColor}15` : 'rgba(140, 98, 57, 0.1)',
+                                color: hasColor || '#8C6239',
+                                border: `1px solid ${hasColor ? `${hasColor}40` : '#8C623940'}`
+                              }}
+                            >
+                              {m.staff_positions?.name || 'ไม่มี'}
+                            </Badge>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Badge variant="outline" className="text-sm font-medium border-latte/60 py-1 px-2.5">
-                                {m.staff_levels?.name || 'ไม่มี'}
-                              </Badge>
-                              {m.staff_levels?.discord_role_id && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(m.staff_levels!.discord_role_id!);
-                                    toast({ title: 'คัดลอก Role ID ระดับสำเร็จ', description: `Role ID: ${m.staff_levels!.discord_role_id}` });
-                                  }}
-                                  title={`คัดลอก Role ID ระดับ: ${m.staff_levels.discord_role_id}`}
-                                >
-                                  <Copy className="w-2.5 h-2.5" />
-                                </Button>
-                              )}
-                            </div>
+
+                          {/* ระดับ: badge only (no copy button) */}
+                          <TableCell className="py-3">
+                            <Badge variant="outline" className="text-xs font-medium border-[#EFE7DC] dark:border-[#382F28] py-0.5 px-2.5 rounded-xl bg-background/60">
+                              {m.staff_levels?.name || 'ไม่มี'}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-sm">
+
+                          {/* วันเริ่มงาน / อายุ: Strictly joined_at */}
+                          <TableCell className="text-xs py-3">
                             {(() => {
-                              const today = new Date();
-                              let dateToUse = new Date(m.joined_at);
-                              if (m.intern_start_at) {
-                                const isPassed = m.intern_end_at ? new Date(m.intern_end_at) <= today : false;
-                                if (isPassed) {
-                                  dateToUse = new Date(m.intern_start_at);
-                                }
-                              }
-                              const unixTimestamp = Math.floor(dateToUse.getTime() / 1000);
+                              const joinedDate = new Date(m.joined_at);
+                              const unixTimestamp = Math.floor(joinedDate.getTime() / 1000);
                               return (
-                                <>
-                                  <div className="flex items-center gap-1">
-                                    <span>{dateToUse.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-foreground">
+                                      {joinedDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    </span>
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         navigator.clipboard.writeText(String(unixTimestamp));
-                                        toast({ title: 'คัดลอก Unix Timestamp วันเปิด/เริ่มงานสำเร็จ', description: `ค่าที่คัดลอก: ${unixTimestamp}` });
+                                        toast({ title: 'คัดลอก Unix Timestamp สำเร็จ', description: `Timestamp: ${unixTimestamp}` });
                                       }}
-                                      title="คัดลอก Unix Timestamp วันเปิด/เริ่มงาน"
+                                      title="คัดลอก Unix Timestamp ของวันเริ่มงาน (joined_at)"
+                                      className="text-muted-foreground hover:text-[#8C6239] transition-colors p-0.5 cursor-pointer shrink-0"
                                     >
-                                      <Copy className="w-2.5 h-2.5" />
-                                    </Button>
+                                      <Copy className="w-3 h-3" />
+                                    </button>
                                   </div>
-                                  <div className="text-xs text-muted-foreground mt-0.5 font-medium flex items-center gap-1">
-                                    <span>อายุงาน: {calculateDuration(m)}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const joinedUnix = Math.floor(new Date(m.joined_at).getTime() / 1000);
-                                        navigator.clipboard.writeText(String(joinedUnix));
-                                        toast({ title: 'คัดลอก Unix Timestamp วันเข้าทีมงานสำเร็จ', description: `ค่าที่คัดลอก: ${joinedUnix}` });
-                                      }}
-                                      title="คัดลอก Unix Timestamp ของวันเข้าทีมงาน (joined_at)"
-                                    >
-                                      <Copy className="w-2.5 h-2.5" />
-                                    </Button>
+                                  <div className="text-[11px] text-muted-foreground font-medium">
+                                    <span>อายุ: {calculateDuration(m)}</span>
                                   </div>
-                                </>
+                                </div>
                               );
                             })()}
                           </TableCell>
-                          <TableCell className="text-sm">
+
+                          {/* การฝึกงาน: includes copy button for intern_start_at timestamp */}
+                          <TableCell className="text-xs py-3">
                             {isIntern ? (
-                              <div className="flex flex-col">
-                                <span className="font-medium text-[#8C6239] dark:text-[#EAD8C8]">{calculateInternship(m.intern_start_at, m.intern_end_at)}</span>
-                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <span>
-                                      {new Date(m.intern_start_at!).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-[#8C6239] dark:text-[#D4B28C] text-xs">
+                                    {calculateInternship(m.intern_start_at, m.intern_end_at)}
+                                  </span>
+                                  {m.intern_start_at && (
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const unix = Math.floor(new Date(m.intern_start_at!).getTime() / 1000);
-                                        navigator.clipboard.writeText(String(unix));
-                                        toast({ title: 'คัดลอก Unix Timestamp วันเริ่มฝึกงานสำเร็จ', description: `ค่าที่คัดลอก: ${unix}` });
+                                        const internUnix = Math.floor(new Date(m.intern_start_at!).getTime() / 1000);
+                                        navigator.clipboard.writeText(String(internUnix));
+                                        toast({ title: 'คัดลอก Unix Timestamp ฝึกงานสำเร็จ', description: `Timestamp: ${internUnix}` });
                                       }}
                                       title="คัดลอก Unix Timestamp ของวันเริ่มฝึกงาน"
+                                      className="text-muted-foreground hover:text-[#8C6239] transition-colors p-0.5 cursor-pointer shrink-0"
                                     >
-                                      <Copy className="w-2.5 h-2.5" />
-                                    </Button>
-                                  </div>
-                                  <span>-</span>
-                                  <div className="flex items-center gap-1">
-                                    <span>
-                                      {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ปัจจุบัน'}
-                                    </span>
-                                    {m.intern_end_at && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const unix = Math.floor(new Date(m.intern_end_at!).getTime() / 1000);
-                                          navigator.clipboard.writeText(String(unix));
-                                          toast({ title: 'คัดลอก Unix Timestamp วันสิ้นสุดฝึกงานสำเร็จ', description: `ค่าที่คัดลอก: ${unix}` });
-                                        }}
-                                        title="คัดลอก Unix Timestamp ของวันสิ้นสุดฝึกงาน"
-                                      >
-                                        <Copy className="w-2.5 h-2.5" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  )}
                                 </div>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {new Date(m.intern_start_at!).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                  {' - '}
+                                  {m.intern_end_at ? new Date(m.intern_end_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ปัจจุบัน'}
+                                </span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
+                              <span className="text-muted-foreground text-xs font-medium">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right pr-6">
+
+                          <TableCell className="text-right pr-6 py-3">
                             <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => handleOpenTimeline(m)}>
-                                <Activity className="w-4 h-4" />
+                              <Button
+                                size="icon" variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-[#8C6239] hover:bg-[#FAF5EE] dark:hover:bg-[#25201C] rounded-xl cursor-pointer"
+                                onClick={() => handleOpenTimeline(m)}
+                                title="ดู Timeline การทำงาน"
+                              >
+                                <Activity className="w-3.5 h-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-indigo-500 hover:text-indigo-600" onClick={() => handleOpenEditMember(m)}>
-                                <Edit2 className="w-4 h-4" />
+                              <Button
+                                size="icon" variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-[#FAF5EE] dark:hover:bg-[#25201C] rounded-xl cursor-pointer"
+                                onClick={() => handleOpenEditMember(m)}
+                                title="แก้ไขข้อมูลทีมงาน"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
                               </Button>
                               {isOwner && (
-                                <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-cream/20 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50/10" onClick={() => handleDeleteMember(m)}>
-                                  <Trash2 className="w-4 h-4" />
+                                <Button
+                                  size="icon" variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl cursor-pointer"
+                                  onClick={() => handleDeleteMember(m)}
+                                  title="ลบทีมงาน"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                               )}
                             </div>
@@ -996,75 +1029,66 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
         {/* TAB 2: POSITIONS CRUD */}
         <TabsContent value="positions" className="space-y-4">
-          <Card className="border-latte/40 dark:border-coffee/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
+          <Card className="border-2 border-[#F4EEE5] dark:border-[#382F28] bg-white dark:bg-[#1E1B18] shadow-sm rounded-3xl overflow-hidden">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">ระบบตำแหน่ง (Positions)</CardTitle>
-                <CardDescription className="text-xs">ลากและวาง (Drag & Drop) เพื่อเปลี่ยนลำดับตำแหน่งในระบบ (มีผลกับการเรียงข้อมูลและสิทธิ์)</CardDescription>
+                <CardTitle className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                  <Settings className="w-4.5 h-4.5 text-[#8C6239]" />
+                  ระบบตำแหน่ง (Positions)
+                </CardTitle>
+                <CardDescription className="text-xs text-[#827160]">
+                  ลากและวาง (Drag & Drop) เพื่อเปลี่ยนลำดับตำแหน่งในระบบ (มีผลกับการเรียงข้อมูลสตาฟและสิทธิ์)
+                </CardDescription>
               </div>
-              <Button onClick={handleOpenAddPos} size="sm" className="gap-1">
-                <Plus className="w-4 h-4" /> Adding
+              <Button onClick={handleOpenAddPos} size="sm" className="gap-1.5 h-9 rounded-xl bg-[#8C6239] hover:bg-[#74502D] text-white font-medium cursor-pointer">
+                <Plus className="w-4 h-4 text-white" /> เพิ่มตำแหน่ง
               </Button>
             </CardHeader>
             <CardContent className="p-0">
               <DragDropContext onDragEnd={onDragEndPositions}>
                 <Droppable droppableId="positions-list">
                   {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef} className="divide-y divide-latte/20 dark:divide-coffee/20">
+                    <div {...provided.droppableProps} ref={provided.innerRef} className="divide-y divide-[#F4EEE5] dark:divide-[#2D2520]">
                       {positions.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-muted-foreground">ไม่มีตำแหน่งในระบบ</div>
+                        <div className="p-8 text-center text-xs text-muted-foreground">ไม่มีตำแหน่งในระบบ</div>
                       ) : positions.map((pos, idx) => (
                         <Draggable key={pos.id} draggableId={pos.id} index={idx} isDragDisabled={!isOwner}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className={`flex items-center justify-between p-4 ${snapshot.isDragging ? 'bg-cream/10 dark:bg-card/80 shadow-lg' : 'hover:bg-cream/5 dark:hover:bg-card/40'} transition-all`}
+                              className={`flex items-center justify-between p-4 ${snapshot.isDragging ? 'bg-[#FAF6F0] dark:bg-[#25201C] shadow-md' : 'hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40'} transition-all`}
                             >
                               <div className="flex items-center gap-3">
                                 {isOwner && (
-                                  <div {...provided.dragHandleProps} className="text-muted-foreground hover:text-foreground shrink-0 cursor-grab active:cursor-grabbing p-1 rounded">
+                                  <div {...provided.dragHandleProps} className="text-muted-foreground hover:text-foreground shrink-0 cursor-grab active:cursor-grabbing p-1 rounded-lg hover:bg-muted/60">
                                     <GripVertical className="w-4 h-4" />
                                   </div>
                                 )}
-                                <span className="text-xs text-muted-foreground w-6 font-mono">#{pos.display_order}</span>
+                                <span className="text-xs font-mono font-bold text-muted-foreground w-6">#{pos.display_order}</span>
                                 <Badge 
-                                  className="text-xs font-semibold px-2.5 py-1"
+                                  className="text-xs font-bold px-3 py-1 rounded-xl shadow-sm"
                                   style={{ 
-                                    backgroundColor: pos.color ? `${pos.color}15` : 'rgba(var(--primary), 0.1)',
-                                    color: pos.color || 'var(--primary)',
-                                    border: `1px solid ${pos.color}30`
+                                    backgroundColor: pos.color ? `${pos.color}15` : 'rgba(140, 98, 57, 0.1)',
+                                    color: pos.color || '#8C6239',
+                                    border: `1px solid ${pos.color ? `${pos.color}40` : '#8C623940'}`
                                   }}
                                 >
                                   {pos.name}
                                 </Badge>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-muted-foreground">Role ID: {pos.discord_role_id}</span>
-                                  {pos.discord_role_id && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigator.clipboard.writeText(pos.discord_role_id);
-                                        toast({ title: 'คัดลอก Role ID ตำแหน่งสำเร็จ', description: `Role ID: ${pos.discord_role_id}` });
-                                      }}
-                                      title="คัดลอก Role ID"
-                                    >
-                                      <Copy className="w-2.5 h-2.5" />
-                                    </Button>
-                                  )}
-                                </div>
+                                <span className="text-xs text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded-lg border border-border/40">
+                                  Role ID: {pos.discord_role_id}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <Badge variant={pos.is_active ? 'success' : 'secondary'} className="text-[9px] scale-90">
+
+                              <div className="flex items-center gap-2">
+                                <Badge variant={pos.is_active ? 'default' : 'secondary'} className={cn('text-[10px] font-bold px-2.5 py-0.5 rounded-full', pos.is_active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-muted text-muted-foreground')}>
                                   {pos.is_active ? 'ใช้งาน' : 'ปิด'}
                                 </Badge>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-indigo-500 hover:text-indigo-600" onClick={() => handleOpenEditPos(pos)}>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-[#FAF5EE] dark:hover:bg-[#25201C] rounded-xl cursor-pointer" onClick={() => handleOpenEditPos(pos)}>
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-destructive" onClick={() => handleDeletePos(pos.id)}>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl cursor-pointer" onClick={() => handleDeletePos(pos.id)}>
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                               </div>
@@ -1083,61 +1107,51 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
         {/* TAB 3: LEVELS CRUD */}
         <TabsContent value="levels" className="space-y-4">
-          <Card className="border-latte/40 dark:border-coffee/40 bg-card/85 backdrop-blur-sm shadow-md rounded-3xl overflow-hidden">
+          <Card className="border-2 border-[#F4EEE5] dark:border-[#382F28] bg-white dark:bg-[#1E1B18] shadow-sm rounded-3xl overflow-hidden">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">ระบบระดับ (Levels)</CardTitle>
-                <CardDescription className="text-xs">ระดับงานของสตาฟที่ผูกกับยศตกแต่งของ Discord Role โดยตรง</CardDescription>
+                <CardTitle className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                  <Activity className="w-4.5 h-4.5 text-[#8C6239]" />
+                  ระบบระดับ (Levels)
+                </CardTitle>
+                <CardDescription className="text-xs text-[#827160]">
+                  ระดับงานของสตาฟที่ผูกกับยศตกแต่งของ Discord Role โดยตรง
+                </CardDescription>
               </div>
-              <Button onClick={handleOpenAddLevel} size="sm" className="gap-1">
-                <Plus className="w-4 h-4" /> Adding
+              <Button onClick={handleOpenAddLevel} size="sm" className="gap-1.5 h-9 rounded-xl bg-[#8C6239] hover:bg-[#74502D] text-white font-medium cursor-pointer">
+                <Plus className="w-4 h-4 text-white" /> เพิ่มระดับ
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-latte/20 dark:divide-coffee/20">
+              <div className="divide-y divide-[#F4EEE5] dark:divide-[#2D2520]">
                 {levels.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">ไม่มีระดับงานในระบบ</div>
+                  <div className="p-8 text-center text-xs text-muted-foreground">ไม่มีระดับงานในระบบ</div>
                 ) : levels.map((lvl) => {
                   const nextLvl = levels.find(l => l.id === lvl.next_level_id);
                   const prevLvl = levels.find(l => l.id === lvl.prev_level_id);
                   return (
-                    <div key={lvl.id} className="flex items-center justify-between p-4 hover:bg-cream/5 dark:hover:bg-card/40 transition-colors">
+                    <div key={lvl.id} className="flex items-center justify-between p-4 hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40 transition-colors">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
-                          <span className="font-semibold text-sm">{lvl.name}</span>
-                          <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Role ID: {lvl.discord_role_id || 'ไม่ผูกยศ'}</Badge>
-                            {lvl.discord_role_id && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-4.5 w-4.5 p-0 hover:bg-cream/20 text-muted-foreground hover:text-foreground shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(lvl.discord_role_id!);
-                                  toast({ title: 'คัดลอก Role ID ระดับสำเร็จ', description: `Role ID: ${lvl.discord_role_id}` });
-                                }}
-                                title="คัดลอก Role ID"
-                              >
-                                <Copy className="w-2.5 h-2.5" />
-                              </Button>
-                            )}
-                          </div>
+                          <span className="font-bold text-xs text-foreground">{lvl.name}</span>
+                          <span className="text-xs text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded-lg border border-border/40">
+                            Role ID: {lvl.discord_role_id || 'ไม่ผูกยศ'}
+                          </span>
                         </div>
-                        <div className="flex gap-2 items-center text-[10px] text-muted-foreground">
-                          <span>เลื่อนขึ้น: <strong className="text-green-600 dark:text-green-400">{nextLvl ? nextLvl.name : 'ไม่มี'}</strong></span>
+                        <div className="flex gap-2 items-center text-[11px] text-muted-foreground font-medium">
+                          <span>เลื่อนขึ้น: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{nextLvl ? nextLvl.name : 'ไม่มี'}</strong></span>
                           <span>•</span>
-                          <span>ลดลง: <strong className="text-red-600 dark:text-red-400">{prevLvl ? prevLvl.name : 'ไม่มี'}</strong></span>
+                          <span>ลดลง: <strong className="text-rose-600 dark:text-rose-400 font-bold">{prevLvl ? prevLvl.name : 'ไม่มี'}</strong></span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={lvl.is_active ? 'success' : 'secondary'} className="text-[9px] scale-90">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={lvl.is_active ? 'default' : 'secondary'} className={cn('text-[10px] font-bold px-2.5 py-0.5 rounded-full', lvl.is_active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-muted text-muted-foreground')}>
                           {lvl.is_active ? 'ใช้งาน' : 'ปิด'}
                         </Badge>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-indigo-500 hover:text-indigo-600" onClick={() => handleOpenEditLevel(lvl)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-[#FAF5EE] dark:hover:bg-[#25201C] rounded-xl cursor-pointer" onClick={() => handleOpenEditLevel(lvl)}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cream/20 rounded-lg text-destructive" onClick={() => handleDeleteLevel(lvl.id)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl cursor-pointer" onClick={() => handleDeleteLevel(lvl.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -1301,14 +1315,14 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">วันเริ่มฝึกงาน (ถ้ามี)</Label>
+                <Label className="text-xs">วันเริ่มฝึกงาน</Label>
                 <DatePicker
                   value={memberForm.intern_start_at}
                   onChange={date => setMemberForm(prev => ({ ...prev, intern_start_at: date }))}
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">วันสิ้นสุดฝึกงาน (ถ้ามี)</Label>
+                <Label className="text-xs">วันสิ้นสุดฝึกงาน</Label>
                 <DatePicker
                   value={memberForm.intern_end_at}
                   onChange={date => setMemberForm(prev => ({ ...prev, intern_end_at: date }))}

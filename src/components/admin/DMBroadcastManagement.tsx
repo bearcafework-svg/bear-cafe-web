@@ -13,9 +13,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle 
+} from '@/components/ui/dialog';
+import { 
   Send, Users, Mail, AlertCircle, Play, Square, RefreshCw, XCircle, 
   CheckCircle, Shield, FileText, ChevronDown, ChevronUp,
-  Search, Eye, Trash2, ChevronLeft, ChevronRight, Activity, Database, Sparkles
+  Search, Eye, Trash2, ChevronLeft, ChevronRight, Activity, Database, Sparkles,
+  Code, Copy, Clock, Timer
 } from 'lucide-react';
 
 interface CampaignQueue {
@@ -64,6 +68,22 @@ interface DiscordPreviewProps {
   jsonContent: string;
 }
 
+function getFormattedJson(payload: any): string {
+  if (!payload) return '{}';
+  try {
+    let parsed = payload;
+    if (typeof payload === 'string') {
+      parsed = JSON.parse(payload);
+    }
+    if (typeof parsed === 'string') {
+      parsed = JSON.parse(parsed);
+    }
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+  }
+}
+
 function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewProps) {
   let content = '';
   let mediaUrl: string | null = null;
@@ -76,8 +96,8 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
     content = textContent;
   } else {
     try {
-      if (jsonContent.trim()) {
-        const parsed = JSON.parse(jsonContent);
+      if (jsonContent && (typeof jsonContent === 'string' ? jsonContent.trim() : jsonContent)) {
+        const parsed = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
         if (parsed.content) content = parsed.content;
 
         const data = parsed.data || parsed;
@@ -217,6 +237,87 @@ export function DMBroadcastManagement() {
   // Campaigns list
   const [campaigns, setCampaigns] = useState<CampaignQueue[]>([]);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [campaignsPage, setCampaignsPage] = useState(1);
+  const campaignsPageSize = 5;
+
+  // JSON Payload Viewer Modal
+  const [jsonViewCampaign, setJsonViewCampaign] = useState<CampaignQueue | null>(null);
+
+  // Live ETA Completion Calculator
+  const calculateETA = (c: CampaignQueue) => {
+    const total = c.total_targets || 0;
+    const processed = (c.sent_count || 0) + (c.failed_count || 0);
+    const remaining = Math.max(0, total - processed);
+
+    if (remaining === 0 || c.status === 'completed') {
+      return { text: 'เสร็จสิ้นเรียบร้อยแล้ว', isFinished: true, remaining, subText: 'ส่งครบตามเป้าหมาย' };
+    }
+
+    if (c.status === 'cancelled') {
+      return { text: 'ถูกยกเลิกแล้ว', isFinished: true, remaining, subText: 'ยกเลิกก่อนเสร็จสิ้น' };
+    }
+
+    const options = c.message_payload?.options || {};
+    const minDelay = Number(options.min_delay_sec) || 15;
+    const maxDelay = Number(options.max_delay_sec) || 35;
+    const avgDelay = (minDelay + maxDelay) / 2; // Average delay in seconds
+    const hourlyLimit = Number(options.hourly_limit) || 50;
+
+    let totalSeconds = remaining * avgDelay;
+
+    // Account for hourly rate limit pauses if remaining targets exceed quota
+    if (hourlyLimit > 0 && remaining > hourlyLimit) {
+      const extraBatches = Math.floor(remaining / hourlyLimit);
+      totalSeconds += extraBatches * 3600; // Add 1 hour per rate limit quota cycle
+    }
+
+    const targetDate = new Date(Date.now() + totalSeconds * 1000);
+    const now = new Date();
+    const isSameDay = targetDate.toDateString() === now.toDateString();
+
+    const formattedTime = isSameDay
+      ? `ประมาณเวลา ${targetDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`
+      : `ประมาณวันที่ ${targetDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })} เวลา ${targetDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+
+    const totalMinutes = Math.ceil(totalSeconds / 60);
+    const minutesInHour = 60;
+    const minutesInDay = 60 * 24; // 1440 mins
+    const minutesInMonth = 60 * 24 * 30; // 43200 mins
+
+    let durationStr = '';
+
+    if (totalMinutes < 60) {
+      durationStr = `ประมาณ ${totalMinutes} นาที`;
+    } else if (totalMinutes < minutesInDay) {
+      const hours = Math.floor(totalMinutes / minutesInHour);
+      const remMins = totalMinutes % minutesInHour;
+      durationStr = remMins > 0 ? `ประมาณ ${hours} ชม. ${remMins} นาที` : `ประมาณ ${hours} ชม.`;
+    } else if (totalMinutes < minutesInMonth) {
+      const days = Math.floor(totalMinutes / minutesInDay);
+      const remHours = Math.floor((totalMinutes % minutesInDay) / minutesInHour);
+      const remMins = totalMinutes % minutesInHour;
+      let parts = [`${days} วัน`];
+      if (remHours > 0) parts.push(`${remHours} ชม.`);
+      if (remMins > 0 && days < 3) parts.push(`${remMins} นาที`);
+      durationStr = `ประมาณ ${parts.join(' ')}`;
+    } else {
+      const months = Math.floor(totalMinutes / minutesInMonth);
+      const remDays = Math.floor((totalMinutes % minutesInMonth) / minutesInDay);
+      const remHours = Math.floor((totalMinutes % minutesInDay) / minutesInHour);
+      let parts = [`${months} เดือน`];
+      if (remDays > 0) parts.push(`${remDays} วัน`);
+      if (remHours > 0 && months < 3) parts.push(`${remHours} ชม.`);
+      durationStr = `ประมาณ ${parts.join(' ')}`;
+    }
+
+    return {
+      text: `⏱️ ประเมินเวลาเสร็จสิ้น: ~ ${durationStr} (${formattedTime})`,
+      subText: `เหลืออีก ${remaining} คน • เฉลี่ยหน่วง ${Math.round(avgDelay)} วิ/คน`,
+      isFinished: false,
+      remaining,
+      avgDelay
+    };
+  };
   
   // Paginated Campaign Logs
   const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([]);
@@ -956,141 +1057,190 @@ export function DMBroadcastManagement() {
           <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
             <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
               <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการงานบรอดแคสต์ทั้งหมด ({campaigns.length})</CardTitle>
-              <CardDescription className="text-xs">แสดงงานบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนแบบแบ่งหน้า</CardDescription>
+              <CardDescription className="text-xs">แสดงงานบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนและโครงสร้าง JSON แบบแบ่งหน้า</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               {campaigns.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground text-sm">ยังไม่มีงานบรอดแคสต์ใดๆ ถูกสร้างขึ้น</div>
-              ) : (
-                campaigns.map((c) => {
-                  const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
-                  const isExpanded = expandedCampaignId === c.id;
-                  const totalLogPages = Math.ceil(logsTotalCount / logsPageSize) || 1;
+              ) : (() => {
+                const totalCampaignPages = Math.max(1, Math.ceil(campaigns.length / campaignsPageSize));
+                const paginatedCampaigns = campaigns.slice((campaignsPage - 1) * campaignsPageSize, campaignsPage * campaignsPageSize);
 
-                  return (
-                    <Card key={c.id} className="border border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] rounded-2xl overflow-hidden shadow-xs">
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="space-y-1">
-                            <h3 className="font-bold text-sm text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
-                              {c.title}
-                            </h3>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
-                              <span>สร้างเมื่อ: {new Date(c.created_at).toLocaleString('th-TH')}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(c)}
-                            
-                            {c.failed_count > 0 && c.status !== 'processing' && (
-                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 font-bold" onClick={() => handleRetryFailedCampaign(c.id)}>
-                                <RefreshCw className="w-3 h-3" /> ส่งซ่อม ({c.failed_count})
-                              </Button>
-                            )}
+                return (
+                  <div className="space-y-4">
+                    <div className="space-y-4 max-h-[620px] overflow-y-auto pr-1">
+                      {paginatedCampaigns.map((c) => {
+                        const percent = c.total_targets > 0 ? Math.round(((c.sent_count + c.failed_count) / c.total_targets) * 100) : 0;
+                        const isExpanded = expandedCampaignId === c.id;
+                        const totalLogPages = Math.ceil(logsTotalCount / logsPageSize) || 1;
+                        const eta = calculateETA(c);
 
-                            {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
-                              <Button size="sm" variant="destructive" className="h-7 text-xs font-bold gap-1" onClick={() => handleCancelCampaign(c.id)}>
-                                <Square className="w-3 h-3 text-white" /> หยุดส่ง
-                              </Button>
-                            )}
+                        return (
+                          <Card key={c.id} className="border border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] rounded-2xl overflow-hidden shadow-xs">
+                            <CardContent className="p-4 space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="space-y-1">
+                                  <h3 className="font-bold text-sm text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                                    {c.title}
+                                  </h3>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400">{c.token_type === 'token2' ? 'บอทสำรอง' : 'บอทหลัก'}</Badge>
+                                    <span>สร้างเมื่อ: {new Date(c.created_at).toLocaleString('th-TH')}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {getStatusBadge(c)}
+                                  
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs font-bold gap-1 border-[#EAD8C8] dark:border-[#2D2520] hover:bg-white text-[#8C6239] cursor-pointer"
+                                    onClick={() => setJsonViewCampaign(c)}
+                                  >
+                                    <Code className="w-3.5 h-3.5 text-blue-500" /> ดู JSON
+                                  </Button>
 
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => handleToggleExpand(c.id)}>
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              {isExpanded ? 'ซ่อน Log' : 'ดู Log รายคน'}
-                            </Button>
-                          </div>
+                                  {c.failed_count > 0 && c.status !== 'processing' && (
+                                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 font-bold cursor-pointer" onClick={() => handleRetryFailedCampaign(c.id)}>
+                                      <RefreshCw className="w-3 h-3" /> ส่งซ่อม ({c.failed_count})
+                                    </Button>
+                                  )}
+
+                                  {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
+                                    <Button size="sm" variant="destructive" className="h-7 text-xs font-bold gap-1 cursor-pointer" onClick={() => handleCancelCampaign(c.id)}>
+                                      <Square className="w-3 h-3 text-white" /> หยุดส่ง
+                                    </Button>
+                                  )}
+
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-[#EAD8C8] dark:border-[#2D2520] cursor-pointer" onClick={() => handleToggleExpand(c.id)}>
+                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                    {isExpanded ? 'ซ่อน Log' : 'ดู Log รายคน'}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Live ETA Calculation Banner (When running or pending) */}
+                              {(c.status === 'processing' || c.status === 'pending' || c.status === 'paused') && (
+                                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                                    <Clock className="w-4 h-4 text-amber-500 animate-spin shrink-0" />
+                                    <span>{eta.text}</span>
+                                  </div>
+                                  <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                                    {eta.subText}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Progress Bar */}
+                              <div className="space-y-1.5 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
+                                <div className="flex justify-between items-center text-xs text-[#8C6239] dark:text-[#EAD8C8]">
+                                  <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
+                                  <div className="flex gap-3 font-semibold text-xs">
+                                    <span className="text-emerald-600 dark:text-emerald-400">สำเร็จ: {c.sent_count}</span>
+                                    <span className="text-rose-600 dark:text-rose-400">ล้มเหลว: {c.failed_count}</span>
+                                  </div>
+                                </div>
+                                <Progress value={percent} className="h-2 bg-muted [&>div]:bg-emerald-500" />
+                              </div>
+
+                              {/* Paginated Logs Area (Expanded) */}
+                              {isExpanded && (
+                                <div className="pt-3 border-t border-border/40 space-y-3">
+                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                    <h4 className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+                                      <AlertCircle className="w-4 h-4 text-muted-foreground" /> ผลการจัดส่งรายคน (หน้า {logsPage} / {totalLogPages})
+                                    </h4>
+                                    
+                                    <div className="relative w-full sm:w-60">
+                                      <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+                                      <Input
+                                        value={logSearchQuery}
+                                        onChange={(e) => setLogSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && fetchCampaignLogs(c.id, 1)}
+                                        placeholder="ค้นหา User ID หรือชื่อ..."
+                                        className="pl-8 h-7 text-xs rounded-xl"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {loadingLogs ? (
+                                    <div className="text-center py-6 text-xs text-muted-foreground animate-pulse">กำลังโหลดบันทึก...</div>
+                                  ) : campaignLogs.length === 0 ? (
+                                    <div className="text-center py-6 text-xs text-muted-foreground border border-dashed rounded-xl">ไม่พบรายการ Log</div>
+                                  ) : (
+                                    <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-xl overflow-hidden bg-white dark:bg-[#1E1B18]">
+                                      <Table>
+                                        <TableHeader className="bg-[#FAF6F0]/40 dark:bg-[#25201C]/40">
+                                          <TableRow className="h-8">
+                                            <TableHead className="text-xs font-bold">User ID</TableHead>
+                                            <TableHead className="text-xs font-bold">ชื่อสมาชิก</TableHead>
+                                            <TableHead className="text-xs font-bold">สถานะการส่ง</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {campaignLogs.map((log) => (
+                                            <TableRow key={log.id} className="h-8 text-xs">
+                                              <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id}</TableCell>
+                                              <TableCell className="truncate max-w-[120px]">{log.username || '-'}</TableCell>
+                                              <TableCell>
+                                                {log.status === 'success' ? (
+                                                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">สำเร็จ</Badge>
+                                                ) : log.status === 'failed' ? (
+                                                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]" title={log.error_message || ''}>
+                                                    ล้มเหลว ({log.error_message || 'Closed DM'})
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600">รอส่ง</Badge>
+                                                )}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  )}
+
+                                  {/* Pagination Controls for Logs */}
+                                  <div className="flex justify-between items-center pt-2">
+                                    <span className="text-xs text-muted-foreground">รวมทั้งหมด {logsTotalCount} รายการ</span>
+                                    <div className="flex gap-2">
+                                      <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage <= 1} onClick={() => fetchCampaignLogs(c.id, logsPage - 1)}>
+                                        <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
+                                      </Button>
+                                      <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage >= totalLogPages} onClick={() => fetchCampaignLogs(c.id, logsPage + 1)}>
+                                        ถัดไป <ChevronRight className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+
+                    {/* Pagination Controls for Campaigns */}
+                    {totalCampaignPages > 1 && (
+                      <div className="flex justify-between items-center pt-3 border-t border-[#EAD8C8] dark:border-[#2D2520]">
+                        <span className="text-xs text-muted-foreground font-semibold">
+                          หน้า {campaignsPage} จาก {totalCampaignPages} (รวม {campaigns.length} รายการ)
+                        </span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="h-8 text-xs font-bold rounded-xl cursor-pointer" disabled={campaignsPage <= 1} onClick={() => setCampaignsPage(p => p - 1)}>
+                            <ChevronLeft className="w-4 h-4" /> ก่อนหน้า
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs font-bold rounded-xl cursor-pointer" disabled={campaignsPage >= totalCampaignPages} onClick={() => setCampaignsPage(p => p + 1)}>
+                            ถัดไป <ChevronRight className="w-4 h-4" />
+                          </Button>
                         </div>
-
-                        {/* Progress Bar */}
-                        <div className="space-y-1.5 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
-                          <div className="flex justify-between items-center text-xs text-[#8C6239] dark:text-[#EAD8C8]">
-                            <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
-                            <div className="flex gap-3 font-semibold text-xs">
-                              <span className="text-emerald-600 dark:text-emerald-400">สำเร็จ: {c.sent_count}</span>
-                              <span className="text-rose-600 dark:text-rose-400">ล้มเหลว: {c.failed_count}</span>
-                            </div>
-                          </div>
-                          <Progress value={percent} className="h-2 bg-muted [&>div]:bg-emerald-500" />
-                        </div>
-
-                        {/* Paginated Logs Area (Expanded) */}
-                        {isExpanded && (
-                          <div className="pt-3 border-t border-border/40 space-y-3">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                              <h4 className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
-                                <AlertCircle className="w-4 h-4 text-muted-foreground" /> ผลการจัดส่งรายคน (หน้า {logsPage} / {totalLogPages})
-                              </h4>
-                              
-                              <div className="relative w-full sm:w-60">
-                                <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
-                                <Input
-                                  value={logSearchQuery}
-                                  onChange={(e) => setLogSearchQuery(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && fetchCampaignLogs(c.id, 1)}
-                                  placeholder="ค้นหา User ID หรือชื่อ..."
-                                  className="pl-8 h-7 text-xs rounded-xl"
-                                />
-                              </div>
-                            </div>
-
-                            {loadingLogs ? (
-                              <div className="text-center py-6 text-xs text-muted-foreground animate-pulse">กำลังโหลดบันทึก...</div>
-                            ) : campaignLogs.length === 0 ? (
-                              <div className="text-center py-6 text-xs text-muted-foreground border border-dashed rounded-xl">ไม่พบรายการ Log</div>
-                            ) : (
-                              <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-xl overflow-hidden bg-white dark:bg-[#1E1B18]">
-                                <Table>
-                                  <TableHeader className="bg-[#FAF6F0]/40 dark:bg-[#25201C]/40">
-                                    <TableRow className="h-8">
-                                      <TableHead className="text-xs font-bold">User ID</TableHead>
-                                      <TableHead className="text-xs font-bold">ชื่อสมาชิก</TableHead>
-                                      <TableHead className="text-xs font-bold">สถานะการส่ง</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {campaignLogs.map((log) => (
-                                      <TableRow key={log.id} className="h-8 text-xs">
-                                        <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id}</TableCell>
-                                        <TableCell className="truncate max-w-[120px]">{log.username || '-'}</TableCell>
-                                        <TableCell>
-                                          {log.status === 'success' ? (
-                                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">สำเร็จ</Badge>
-                                          ) : log.status === 'failed' ? (
-                                            <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]" title={log.error_message || ''}>
-                                              ล้มเหลว ({log.error_message || 'Closed DM'})
-                                            </Badge>
-                                          ) : (
-                                            <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600">รอส่ง</Badge>
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            )}
-
-                            {/* Pagination Controls for Logs */}
-                            <div className="flex justify-between items-center pt-2">
-                              <span className="text-xs text-muted-foreground">รวมทั้งหมด {logsTotalCount} รายการ</span>
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage <= 1} onClick={() => fetchCampaignLogs(c.id, logsPage - 1)}>
-                                  <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl" disabled={logsPage >= totalLogPages} onClick={() => fetchCampaignLogs(c.id, logsPage + 1)}>
-                                  ถัดไป <ChevronRight className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1271,6 +1421,51 @@ export function DMBroadcastManagement() {
         </TabsContent>
 
       </Tabs>
+
+      {/* JSON Payload Viewer Modal */}
+      {jsonViewCampaign && (() => {
+        const formattedPayload = getFormattedJson(jsonViewCampaign.message_payload);
+        return (
+          <Dialog open onOpenChange={open => !open && setJsonViewCampaign(null)}>
+            <DialogContent className="max-w-2xl bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6 shadow-xl">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-extrabold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
+                  <Code className="w-5 h-5 text-blue-500" />
+                  JSON Payload: {jsonViewCampaign.title}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  โครงสร้างข้อมูล JSON ที่ใช้ส่งไปยัง Discord DM API สำหรับงานบรอดแคสต์นี้
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2">
+                <pre className="bg-[#1E1B18] text-emerald-400 p-4 rounded-2xl overflow-x-auto font-mono text-xs max-h-96 border border-[#2D2520] select-all shadow-inner leading-relaxed whitespace-pre-wrap break-words">
+                  {formattedPayload}
+                </pre>
+              </div>
+
+              <DialogFooter className="gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(formattedPayload);
+                    toast({ title: 'คัดลอก JSON สำเร็จแล้วค่ะ', description: 'คัดลอกโครงสร้าง JSON Payload เข้าสู่คลิปบอร์ดแล้ว' });
+                  }}
+                  className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520] text-xs font-bold h-9 gap-1.5 cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5 text-[#8C6239]" /> คัดลอก JSON
+                </Button>
+                <Button
+                  onClick={() => setJsonViewCampaign(null)}
+                  className="rounded-xl bg-[#8C6239] hover:bg-[#74502D] text-white text-xs font-bold h-9 cursor-pointer"
+                >
+                  ปิดหน้าต่าง
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

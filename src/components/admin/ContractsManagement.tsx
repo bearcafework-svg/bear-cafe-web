@@ -30,18 +30,21 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
+import {
   Plus, Home, User, Clock, Bell, Edit2, Search, RefreshCw,
   Loader2, CheckCircle2, X, Upload, Star, Link, Hash, Users, Calendar,
-  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone
+  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone, Rocket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 
-type ContractType = 'house' | 'personal_role' | 'ad';
+type ContractType = 'house' | 'personal_role' | 'boost_role' | 'ad';
 
 interface Contract {
   id: string;
-  type: 'house' | 'personal_role' | 'ad' | 'role'; // Keep 'role' in interface to filter legacy records
+  type: 'house' | 'personal_role' | 'boost_role' | 'ad' | 'role'; // Keep 'role' in interface to filter legacy records
   member_id: string;
   start_at: string;
   end_at: string | null;
@@ -59,12 +62,14 @@ interface Contract {
 interface TypeIcons {
   house: string | null;
   personal_role: string | null;
+  boost_role: string | null;
   ad: string | null;
 }
 
 const typeIconsMap: Record<ContractType, React.ComponentType<any>> = {
   house: Home,
   personal_role: Star,
+  boost_role: Rocket,
   ad: Megaphone,
 };
 
@@ -77,11 +82,15 @@ function formatRemaining(endAt: string) {
   const months = Math.floor(totalDays / 30);
   const days = totalDays % 30;
   const hours = totalHours % 24;
+  const mins = totalMinutes % 60;
+
   if (months > 0 && days > 0) return `เหลือ ${months} เดือน ${days} วัน`;
   if (months > 0) return `เหลือ ${months} เดือน`;
   if (days > 0 && hours > 0) return `เหลือ ${days} วัน ${hours} ชม.`;
   if (days > 0) return `เหลือ ${days} วัน`;
-  return `เหลือ ${hours} ชม.`;
+  if (hours > 0 && mins > 0) return `เหลือ ${hours} ชม. ${mins} นาที`;
+  if (hours > 0) return `เหลือ ${hours} ชม.`;
+  return `เหลือ ${mins} นาที`;
 }
 
 // Helper to format remaining days purely as a number for internal color boundaries
@@ -136,6 +145,8 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
   const typeLabel: Record<ContractType, string> = {
     house: 'บ้าน',
     personal_role: 'ยศส่วนตัว',
+    boost_role: 'ยศบูสต์',
+    ad: 'โฆษณา',
   };
 
   function handleClick(type: ContractType) {
@@ -189,7 +200,7 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
   return (
     <div className="flex items-center gap-2 bg-[#FAF6F0] dark:bg-[#2C241E] px-3 py-1 rounded-xl border border-[#F0E8DC] dark:border-[#42352B]">
       <span className="text-[11px] font-medium text-[#827160] dark:text-[#A89889]">ไอคอน:</span>
-      {(['house', 'personal_role'] as ContractType[]).map(type => (
+      {(['house', 'personal_role', 'boost_role', 'ad'] as ContractType[]).map(type => (
         <div key={type} className="relative group">
           <button
             onClick={() => handleClick(type)}
@@ -252,6 +263,14 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [roomLink, setRoomLink] = useState('');
   const [packageName, setPackageName] = useState('');
 
+  // Promo Packages catalog
+  const [promoPackages, setPromoPackages] = useState<string[]>([]);
+  const [isCustomPackage, setIsCustomPackage] = useState(false);
+
+  // End Date Dual Mode ('picker' | 'days')
+  const [endMode, setEndMode] = useState<'picker' | 'days'>('picker');
+  const [daysInput, setDaysInput] = useState('');
+
   const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [roleSearch, setRoleSearch] = useState('');
@@ -277,10 +296,42 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   }
 
   useEffect(() => {
-    if (open && type === 'personal_role' && discordRoles.length === 0) {
+    if (open && (type === 'personal_role' || type === 'boost_role') && discordRoles.length === 0) {
       fetchDiscordRoles();
     }
   }, [open, type]);
+
+  useEffect(() => {
+    if (open) {
+      (supabase as any)
+        .from('product_catalog')
+        .select('display_name')
+        .eq('product_type', 'promo_package')
+        .eq('is_active', true)
+        .order('display_name', { ascending: true })
+        .then(({ data, error }: any) => {
+          if (!error && data) {
+            setPromoPackages(data.map((p: any) => p.display_name));
+          }
+        });
+    }
+  }, [open]);
+
+  const handleDaysChange = (val: string) => {
+    setDaysInput(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0 && startAt) {
+      const startDate = new Date(startAt);
+      const endDate = new Date(startDate.getTime() + num * 86400000);
+      setEndAt(toLocalDatetimeValue(endDate.toISOString()));
+    }
+  };
+
+  useEffect(() => {
+    if (endMode === 'days' && daysInput && startAt) {
+      handleDaysChange(daysInput);
+    }
+  }, [startAt]);
 
   const filteredDiscordRoles = discordRoles.filter(r =>
     !roleSearch || r.name.toLowerCase().includes(roleSearch.toLowerCase())
@@ -289,6 +340,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   function reset() {
     setType('house'); setMemberId(''); setStartAt(''); setEndAt('');
     setRoomLink(''); setRoleSearch(''); setPackageName('');
+    setEndMode('picker'); setDaysInput(''); setIsCustomPackage(false);
     setSelectedDiscordRole(null);
   }
 
@@ -298,11 +350,11 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
     if (!memberId.trim() || !startAt) {
       toast({ title: 'กรุณากรอกข้อมูลให้ครบ', variant: 'destructive' }); return;
     }
-    if (type === 'personal_role' && !selectedDiscordRole) {
+    if ((type === 'personal_role' || type === 'boost_role') && !selectedDiscordRole) {
       toast({ title: 'กรุณาเลือกยศ Discord', variant: 'destructive' }); return;
     }
     if (type === 'ad' && !packageName.trim()) {
-      toast({ title: 'กรุณากรอกชื่อแพ็กเกจโฆษณา', variant: 'destructive' }); return;
+      toast({ title: 'กรุณากรอก/เลือกชื่อแพ็กเกจโฆษณา', variant: 'destructive' }); return;
     }
     setSaving(true);
 
@@ -334,14 +386,16 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       console.error('Error resolving member ID:', e);
     }
 
+    const isRoleType = (type === 'personal_role' || type === 'boost_role');
+
     const payload: Record<string, unknown> = {
       type,
       member_id: resolvedMemberId,
       start_at: new Date(startAt).toISOString(),
-      end_at: (type === 'house' || type === 'ad') && endAt ? new Date(endAt).toISOString() : null,
-      room_link: type !== 'personal_role' && roomLink.trim() ? roomLink.trim() : null,
-      role_name: type === 'personal_role' ? selectedDiscordRole?.name ?? null : null,
-      discord_role_id: type === 'personal_role' ? selectedDiscordRole?.id ?? null : null,
+      end_at: endAt ? new Date(endAt).toISOString() : null,
+      room_link: !isRoleType && roomLink.trim() ? roomLink.trim() : null,
+      role_name: isRoleType ? selectedDiscordRole?.name ?? null : null,
+      discord_role_id: isRoleType ? selectedDiscordRole?.id ?? null : null,
       package_name: type === 'ad' ? packageName.trim() : null,
       operator_id: operatorId,
       operator_name: operatorName,
@@ -356,145 +410,248 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
 
   return (
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
-      <DialogContent className="max-w-md bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6">
+      <DialogContent className="max-w-lg bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6 shadow-xl">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
-            <Plus className="w-5 h-5 text-[#8C6239]" />
+          <DialogTitle className="text-xl font-extrabold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2.5">
+            <Plus className="w-6 h-6 text-[#8C6239]" />
             เพิ่มสัญญาเช่าใหม่
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#827160] dark:text-[#A89889]">
+          <DialogDescription className="text-sm text-[#827160] dark:text-[#A89889]">
             ระบุประเภทและรายละเอียดสัญญาเพื่อลงทะเบียนในระบบ
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Card Selector for Contract Type */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2.5">
             <button
               type="button"
               onClick={() => setType('house')}
               className={cn(
-                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
+                'flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all text-center justify-center min-h-[80px] cursor-pointer',
                 type === 'house'
-                  ? 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239] shadow-sm'
+                  ? 'border-[#8C6239] bg-[#8C6239]/10 text-[#8C6239] shadow-sm font-bold'
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Home className="w-5.5 h-5.5 shrink-0" />
-              <span className="text-[10px] font-bold">สัญญาเช่าบ้าน</span>
+              <Home className="w-5 h-5 shrink-0" />
+              <span className="text-xs font-bold">เช่าบ้าน</span>
             </button>
 
             <button
               type="button"
               onClick={() => setType('personal_role')}
               className={cn(
-                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
+                'flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all text-center justify-center min-h-[80px] cursor-pointer',
                 type === 'personal_role'
-                  ? 'border-[#D97706] bg-[#D97706]/5 text-[#D97706] shadow-sm'
+                  ? 'border-[#D97706] bg-[#D97706]/10 text-[#D97706] shadow-sm font-bold'
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Star className="w-5.5 h-5.5 shrink-0" />
-              <span className="text-[10px] font-bold">สัญญายศส่วนตัว</span>
+              <Star className="w-5 h-5 shrink-0" />
+              <span className="text-xs font-bold">ยศส่วนตัว</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setType('boost_role')}
+              className={cn(
+                'flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all text-center justify-center min-h-[80px] cursor-pointer',
+                type === 'boost_role'
+                  ? 'border-purple-500 bg-purple-500/10 text-purple-600 shadow-sm font-bold'
+                  : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
+              )}
+            >
+              <Rocket className="w-5 h-5 shrink-0" />
+              <span className="text-xs font-bold">ยศบูสต์</span>
             </button>
 
             <button
               type="button"
               onClick={() => setType('ad')}
               className={cn(
-                'flex flex-col items-center gap-1.5 p-2 rounded-2xl border-2 transition-all text-center justify-center min-h-[75px]',
+                'flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all text-center justify-center min-h-[80px] cursor-pointer',
                 type === 'ad'
-                  ? 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1] shadow-sm'
+                  ? 'border-[#6366F1] bg-[#6366F1]/10 text-[#6366F1] shadow-sm font-bold'
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Megaphone className="w-5.5 h-5.5 shrink-0" />
-              <span className="text-[10px] font-bold">สัญญาโฆษณา</span>
+              <Megaphone className="w-5 h-5 shrink-0" />
+              <span className="text-xs font-bold">โฆษณา</span>
             </button>
           </div>
 
           {/* Form Fields */}
-          <div className="space-y-3.5 pt-1">
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-[#827160]">Discord Member ID</Label>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">Discord Member ID</Label>
               <Input
                 value={memberId}
                 onChange={e => setMemberId(e.target.value)}
                 placeholder="ป้อน Discord User ID (ตัวเลข)"
-                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-10 text-sm font-medium focus-visible:ring-offset-0"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-[#827160]">วันที่เริ่มต้น</Label>
-                <DateTimePicker
-                  value={startAt}
-                  onChange={setStartAt}
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
-                />
+            <div className="space-y-1.5">
+              <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">วันที่เริ่มต้นสัญญา</Label>
+              <DateTimePicker
+                value={startAt}
+                onChange={setStartAt}
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
+              />
+            </div>
+
+            {/* End Date Dual Input Mode */}
+            <div className="space-y-2 pt-2 border-t border-dashed border-border/60">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">วันที่สิ้นสุดสัญญา (ถ้ามี)</Label>
+                <div className="flex items-center gap-1 bg-[#FAF6F0] dark:bg-[#25201C] p-1 rounded-xl border border-[#F0E8DC] dark:border-[#382F28]">
+                  <button
+                    type="button"
+                    onClick={() => setEndMode('picker')}
+                    className={cn('px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer', endMode === 'picker' ? 'bg-white dark:bg-[#1E1B18] shadow-sm text-foreground' : 'text-muted-foreground')}
+                  >
+                    📅 เลือกปฏิทิน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEndMode('days')}
+                    className={cn('px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer', endMode === 'days' ? 'bg-white dark:bg-[#1E1B18] shadow-sm text-foreground' : 'text-muted-foreground')}
+                  >
+                    ⏱️ ระบุจำนวนวัน
+                  </button>
+                </div>
               </div>
 
-              {(type === 'house' || type === 'ad') && (
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-[#827160]">วันที่สิ้นสุด</Label>
-                  <DateTimePicker
-                    value={endAt}
-                    onChange={setEndAt}
-                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
-                  />
+              {endMode === 'picker' ? (
+                <DateTimePicker
+                  value={endAt}
+                  onChange={setEndAt}
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28]"
+                />
+              ) : (
+                <div className="space-y-2.5 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3 rounded-2xl border border-[#F0E8DC] dark:border-[#382F28]">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="เช่น 2 หรือ 7 หรือ 30"
+                      value={daysInput}
+                      onChange={e => handleDaysChange(e.target.value)}
+                      className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] text-sm h-9 w-40 font-bold"
+                    />
+                    <span className="text-sm font-bold text-foreground">วัน</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[1, 2, 3, 7, 14, 30, 90, 365].map((d) => (
+                      <Button
+                        key={d}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDaysChange(String(d))}
+                        className={cn('h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer', daysInput === String(d) ? 'bg-[#8C6239] text-white border-[#8C6239]' : 'border-[#EFE7DC] dark:border-[#382F28]')}
+                      >
+                        +{d} วัน
+                      </Button>
+                    ))}
+                  </div>
+                  {endAt && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold pt-0.5">
+                      ✓ วันสิ้นสุด: {formatDateThai(endAt, true)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Fields for House */}
             {type === 'house' && (
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-[#827160]">Room Link (ช่อง Discord)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">Room Link (ช่อง Discord)</Label>
                 <Input
                   value={roomLink}
                   onChange={e => setRoomLink(e.target.value)}
                   placeholder="https://discord.com/channels/..."
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-medium h-10 focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
                 />
               </div>
             )}
 
             {/* Fields for Ad */}
             {type === 'ad' && (
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-[#827160]">ชื่อแพ็กเกจโฆษณา</Label>
-                <Input
-                  value={packageName}
-                  onChange={e => setPackageName(e.target.value)}
-                  placeholder="เช่น แพ็ก Banner A"
-                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl focus-visible:ring-[#8C6239] h-9.5 text-sm focus-visible:ring-offset-0"
-                />
+              <div className="space-y-1.5">
+                <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
+                {promoPackages.length > 0 && !isCustomPackage ? (
+                  <div className="space-y-1.5">
+                    <Select value={packageName} onValueChange={(val) => {
+                      if (val === '__custom__') {
+                        setIsCustomPackage(true);
+                        setPackageName('');
+                      } else {
+                        setPackageName(val);
+                      }
+                    }}>
+                      <SelectTrigger className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-10 font-bold">
+                        <SelectValue placeholder="เลือกแพ็กเกจจาก Catalog..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {promoPackages.map((pkg) => (
+                          <SelectItem key={pkg} value={pkg} className="text-sm font-semibold">{pkg}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-sm font-semibold">✏️ กรอกชื่อแพ็กเกจด้วยตัวเอง...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {promoPackages.length > 0 && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomPackage(false)}
+                          className="text-xs text-blue-500 hover:underline font-bold"
+                        >
+                          ← เลือกแพ็กเกจจาก Catalog
+                        </button>
+                      </div>
+                    )}
+                    <Input
+                      value={packageName}
+                      onChange={e => setPackageName(e.target.value)}
+                      placeholder="เช่น แพ็ก Banner A"
+                      className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl h-10 text-sm font-medium focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Fields for Personal Role */}
-            {type === 'personal_role' && (
-              <div className="space-y-2.5 bg-[#FAF6F0] dark:bg-[#24201E] p-3 rounded-xl border border-[#F0E8DC] dark:border-[#3C322A]">
+            {/* Fields for Personal Role & Boost Role */}
+            {(type === 'personal_role' || type === 'boost_role') && (
+              <div className="space-y-3 bg-[#FAF6F0] dark:bg-[#24201E] p-3.5 rounded-2xl border border-[#F0E8DC] dark:border-[#3C322A]">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-[#827160]">เชื่อมโยงยศ Discord</Label>
+                  <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">
+                    เชื่อมโยงยศ Discord ({type === 'boost_role' ? 'ยศบูสต์' : 'ยศส่วนตัว'})
+                  </Label>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={fetchDiscordRoles}
                     disabled={rolesLoading}
-                    className="h-6.5 text-[10px] gap-1 px-2 border-[#DFD5C0] dark:border-[#3E3229] hover:bg-white text-[#827160]"
+                    className="h-7.5 text-xs font-bold gap-1.5 px-2.5 border-[#DFD5C0] dark:border-[#3E3229] hover:bg-white text-[#827160] cursor-pointer"
                   >
-                    <RefreshCw className={cn('w-2.5 h-2.5', rolesLoading && 'animate-spin')} />
+                    <RefreshCw className={cn('w-3.5 h-3.5', rolesLoading && 'animate-spin')} />
                     ซิงค์ยศจาก Discord
                   </Button>
                 </div>
 
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
                   <Input
-                    className="pl-8 h-7.5 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3E3229]"
+                    className="pl-9 h-9 text-xs font-medium bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3E3229]"
                     placeholder="ค้นหาชื่อบทบาท/ยศ..."
                     value={roleSearch}
                     onChange={e => setRoleSearch(e.target.value)}
@@ -502,13 +659,13 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                 </div>
 
                 {rolesLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-[#8C6239]" />
+                  <div className="flex justify-center py-5">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#8C6239]" />
                   </div>
                 ) : (
-                  <div className="max-h-36 overflow-y-auto rounded-lg border bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520] divide-y divide-[#EAD8C8] dark:divide-[#2D2520] text-xs">
+                  <div className="max-h-40 overflow-y-auto rounded-xl border bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520] divide-y divide-[#EAD8C8] dark:divide-[#2D2520] text-sm">
                     {filteredDiscordRoles.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-4">
+                      <p className="text-xs text-muted-foreground text-center py-5">
                         {discordRoles.length === 0 ? 'กดปุ่มซิงค์ด้านบนเพื่อโหลดยศ' : 'ไม่พบยศที่ตรงกัน'}
                       </p>
                     ) : filteredDiscordRoles.map(r => (
@@ -517,18 +674,18 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                         type="button"
                         onClick={() => setSelectedDiscordRole(r)}
                         className={cn(
-                          'w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-accent transition-colors',
-                          selectedDiscordRole?.id === r.id && 'bg-[#D97706]/10'
+                          'w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-accent transition-colors cursor-pointer',
+                          selectedDiscordRole?.id === r.id && 'bg-[#D97706]/15 font-bold'
                         )}
                       >
                         {r.color ? (
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
                         ) : (
-                          <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
                         )}
-                        <span className="truncate flex-1 font-medium">{r.name}</span>
+                        <span className="truncate flex-1 font-semibold text-sm">{r.name}</span>
                         {selectedDiscordRole?.id === r.id && (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#D97706] shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-[#D97706] shrink-0" />
                         )}
                       </button>
                     ))}
@@ -536,9 +693,9 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                 )}
 
                 {selectedDiscordRole && (
-                  <div className="text-[11px] text-[#827160] flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-[#827160] flex items-center gap-2">
                     <span>ยศที่เลือก:</span>
-                    <Badge className="bg-[#D97706]/15 hover:bg-[#D97706]/20 text-[#A66E2E] border-[#FAE3C1] font-semibold text-[10px] rounded-md px-1.5 py-0">
+                    <Badge className="bg-[#D97706]/15 hover:bg-[#D97706]/20 text-[#A66E2E] border-[#FAE3C1] font-bold text-xs rounded-lg px-2 py-0.5">
                       {selectedDiscordRole.name}
                     </Badge>
                   </div>
@@ -548,13 +705,13 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
           </div>
         </div>
 
-        <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" onClick={handleClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520]">ยกเลิก</Button>
+        <DialogFooter className="gap-2 pt-3">
+          <Button variant="outline" onClick={handleClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520] h-10 px-4 text-sm font-bold cursor-pointer">ยกเลิก</Button>
           <Button
             onClick={handleSave}
             disabled={saving}
             className={cn(
-              'rounded-xl text-white font-semibold shadow-sm transition-all',
+              'rounded-xl text-white font-bold h-10 px-5 shadow-sm transition-all cursor-pointer',
               type === 'house'
                 ? 'bg-[#8C6239] hover:bg-[#76522E] text-white'
                 : type === 'personal_role'
@@ -562,7 +719,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white'
             )}
           >
-            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin text-white" />}
+            {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin text-white" />}
             บันทึกสัญญา
           </Button>
         </DialogFooter>
@@ -617,20 +774,20 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
 
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-sm bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6">
+      <DialogContent className="max-w-md bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6 shadow-xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2">
-            {isAd ? <Megaphone className="w-4 h-4 text-[#6366F1]" /> : <Edit2 className="w-4 h-4 text-[#8C6239]" />}
+          <DialogTitle className="text-xl font-extrabold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2.5">
+            {isAd ? <Megaphone className="w-5 h-5 text-[#6366F1]" /> : <Edit2 className="w-5 h-5 text-[#8C6239]" />}
             {isAd ? 'แก้ไขสัญญาโฆษณา' : 'แก้ไขสัญญาเช่าบ้าน'}
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#827160]">
+          <DialogDescription className="text-sm font-semibold text-[#827160]">
             สมาชิก ID: {contract.member_id}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3.5 py-1">
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold text-[#827160]">วันที่สิ้นสุดสัญญา</Label>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">วันที่สิ้นสุดสัญญา</Label>
             <DateTimePicker
               value={endAt}
               onChange={setEndAt}
@@ -639,32 +796,32 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
           </div>
           
           {!isAd ? (
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-[#827160]">Room Link (ช่อง Discord)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">Room Link (ช่อง Discord)</Label>
               <Input
                 value={roomLink}
                 onChange={e => setRoomLink(e.target.value)}
                 placeholder="https://discord.com/channels/..."
-                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-medium h-10 focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
               />
             </div>
           ) : (
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-[#827160]">ชื่อแพ็กเกจโฆษณา</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
               <Input
                 value={packageName}
                 onChange={e => setPackageName(e.target.value)}
                 placeholder="เช่น แพ็ก Banner A"
-                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-9.5 focus-visible:ring-[#FAC4CD] focus-visible:ring-offset-0"
+                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-medium h-10 focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
               />
             </div>
           )}
         </div>
 
-        <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520]">ยกเลิก</Button>
-          <Button onClick={handleSave} disabled={saving} className={cn("text-white rounded-xl font-semibold shadow-sm transition-all", themeColor)}>
-            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin text-white" />}บันทึก
+        <DialogFooter className="gap-2 pt-3">
+          <Button variant="outline" onClick={onClose} className="rounded-xl border-[#EFE7DC] dark:border-[#2D2520] h-10 px-4 text-sm font-bold cursor-pointer">ยกเลิก</Button>
+          <Button onClick={handleSave} disabled={saving} className={cn("text-white rounded-xl font-bold h-10 px-5 shadow-sm transition-all cursor-pointer", themeColor)}>
+            {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin text-white" />}บันทึก
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -774,7 +931,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const [loadingExtra, setLoadingExtra] = useState(false);
 
   useEffect(() => {
-    if (contract.type !== 'personal_role') return;
+    if (contract.type !== 'personal_role' && contract.type !== 'boost_role') return;
 
     async function fetchExtra() {
       setLoadingExtra(true);
@@ -803,7 +960,6 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
         if (data.channel_name) setChannelName(data.channel_name);
         if (data.role_name) {
           setDiscordRoleName(data.role_name);
-          // Sync with DB if role_name changed or was empty
           if (contract.role_name !== data.role_name) {
             (supabase as any)
               .from('contracts')
@@ -860,31 +1016,31 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const isUrgent = days !== null && days <= 3 && !isExpired;
   const isWarning = days !== null && days <= 7 && !isExpired && !isUrgent;
 
-  const isEvalType = contract.type === 'house' || contract.type === 'ad';
+  const hasEndAt = Boolean(contract.end_at);
 
   const cardBorder =
-    !isEvalType ? 'border-[#F4EEE5] dark:border-[#382F28]' :
+    !hasEndAt ? 'border-[#F4EEE5] dark:border-[#382F28]' :
       isExpired ? 'border-red-300 dark:border-red-900/60 shadow-red-50/30' :
         isUrgent ? 'border-rose-300 dark:border-rose-900/60 shadow-rose-50/30' :
           isWarning ? 'border-amber-300 dark:border-amber-900/60' :
             'border-[#F4EEE5] dark:border-[#382F28]';
 
   const cardBackground =
-    !isEvalType ? 'bg-white dark:bg-[#1E1B18]' :
+    !hasEndAt ? 'bg-white dark:bg-[#1E1B18]' :
       isExpired ? 'bg-red-50/20 dark:bg-red-950/20' :
         isUrgent ? 'bg-rose-50/25 dark:bg-rose-950/20' :
           isWarning ? 'bg-amber-50/20 dark:bg-amber-950/20' :
             'bg-white dark:bg-[#1E1B18]';
 
   const statusBadgeColor =
-    !isEvalType ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400' :
+    !hasEndAt ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400' :
       isExpired ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 font-bold' :
         isUrgent ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 font-bold animate-pulse' :
           isWarning ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 font-semibold' :
             'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400';
 
   const statusText =
-    !isEvalType ? 'ปกติ' :
+    !hasEndAt ? 'ถาวร/ไม่กำหนด' :
       isExpired ? 'หมดอายุแล้ว' :
         isUrgent ? 'ใกล้หมดอายุ (วิกฤต)' :
           isWarning ? 'ใกล้หมดอายุ' :
@@ -893,6 +1049,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const typeLabel = 
     contract.type === 'house' ? 'สัญญาเช่าบ้าน' : 
     contract.type === 'personal_role' ? 'สัญญายศส่วนตัว' : 
+    contract.type === 'boost_role' ? 'สัญญายศบูสต์' :
     'สัญญาโฆษณา';
 
   const typeBadgeStyle =
@@ -900,7 +1057,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
       ? 'bg-[#8B5E3C]/10 text-[#8B5E3C] border-[#8B5E3C]/20 dark:bg-[#36261A]/40 dark:text-[#B8956A]'
       : contract.type === 'personal_role'
         ? 'bg-[#D97706]/10 text-[#D97706] border-[#D97706]/30 dark:bg-[#3A2208]/40 dark:text-[#E9A84E]'
-        : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/40 dark:text-[#A5B4FC]';
+        : contract.type === 'boost_role'
+          ? 'bg-purple-500/10 text-purple-600 border-purple-500/30 dark:bg-purple-950/40 dark:text-purple-300'
+          : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/40 dark:text-[#A5B4FC]';
 
   const TypeIcon = typeIconsMap[contract.type as ContractType] || HelpCircle;
   const iconUrl = typeIcons[contract.type as ContractType];
@@ -933,7 +1092,7 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const endMs = contract.end_at ? new Date(contract.end_at).getTime() : 0;
   const nowMs = Date.now();
   let progressPercent = 0;
-  if ((contract.type === 'house' || contract.type === 'ad') && endMs > startMs) {
+  if (contract.end_at && endMs > startMs) {
     progressPercent = Math.min(100, Math.max(0, ((nowMs - startMs) / (endMs - startMs)) * 100));
   }
 
@@ -951,223 +1110,169 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   return (
     <>
       <div className={cn(
-        'group relative rounded-3xl border-2 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.002]',
+        'group relative rounded-3xl border-2 p-5 flex flex-col justify-between gap-4 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01] h-full',
         cardBorder,
         cardBackground
       )}>
-        {/* Left Side: Avatar + Main Content Details */}
-        <div className="flex items-start gap-4 flex-1 min-w-0">
-          <div className="shrink-0 w-14 h-14 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] relative overflow-hidden shadow-inner">
-            {iconUrl ? (
-              <img src={iconUrl} alt={contract.type} className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            ) : (
-              <TypeIcon className="w-6 h-6 text-[#827160] dark:text-[#A89889]" />
-            )}
-          </div>
-
-          <div className="space-y-3 flex-1 min-w-0">
-            {/* Top row: Badges, ID, Copy button */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono font-bold text-xs bg-[#FAF5EE] dark:bg-[#2B231D] px-2.5 py-1 rounded-xl text-[#8C6239] dark:text-[#B8956A] border border-[#EFE7DC] dark:border-[#3E3229] flex items-center gap-1.5 shadow-sm">
-                <span>ID: {contract.member_id}</span>
-                <button
-                  onClick={copyToClipboard}
-                  title="คัดลอก Member ID"
-                  className="text-muted-foreground hover:text-[#8C6239] transition-colors p-0.5 cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-              </span>
-              {discordName && (
-                <span className="text-xs font-bold text-[#64748B] dark:text-[#94A3B8] bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                  @{discordName}
-                </span>
-              )}
-              <Badge variant="outline" className={cn('text-xs px-2.5 py-0.5 rounded-full font-bold', typeBadgeStyle)}>
-                {typeLabel}
-              </Badge>
+        {/* Top Card Section: Icon, Badges, Member ID */}
+        <div className="space-y-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="shrink-0 w-12 h-12 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] relative overflow-hidden shadow-inner">
+                {iconUrl ? (
+                  <img src={iconUrl} alt={contract.type} className="w-full h-full object-cover"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <TypeIcon className="w-5 h-5 text-[#827160] dark:text-[#A89889]" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <Badge variant="outline" className={cn('text-[10px] px-2 py-0.5 rounded-full font-bold mb-1', typeBadgeStyle)}>
+                  {typeLabel}
+                </Badge>
+                {discordName ? (
+                  <p className="text-xs font-bold text-foreground truncate max-w-[150px]">@{discordName}</p>
+                ) : (
+                  <p className="text-xs font-bold text-muted-foreground italic">ผู้ใช้ท่านนี้ยังไม่ได้ล็อคอิน</p>
+                )}
+              </div>
             </div>
 
-            {/* Middle Row: Details depending on type */}
-            {(contract.type === 'house' || contract.type === 'ad') && (
-              <div className="space-y-2.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {contract.type === 'ad' && contract.package_name && (
-                    <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 dark:border-[#6366F1]/30 text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm">
-                      <Megaphone className="w-3.5 h-3.5 text-[#6366F1]" />
-                      {contract.package_name}
-                    </Badge>
-                  )}
+            <Badge className={cn('text-[10px] font-bold px-2.5 py-0.5 border rounded-full shrink-0 shadow-sm', statusBadgeColor)}>
+              {statusText}
+            </Badge>
+          </div>
 
-                  {contract.room_link ? (
-                    <a
-                      href={contract.room_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] dark:text-[#D4B28C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/10 transition-all font-bold shadow-sm"
-                    >
-                      <Link className="w-3.5 h-3.5 shrink-0" />
-                      {loadingHouseChannel ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <span>{houseChannelName ?? 'ดูห้องในเซิร์ฟเวอร์'}</span>
-                      )}
-                    </a>
-                  ) : contract.type === 'house' ? (
-                    <span className="text-xs text-muted-foreground italic bg-muted/40 px-2.5 py-1 rounded-xl border border-border/40">ไม่มีลิงก์ห้อง</span>
-                  ) : null}
+          <div className="flex items-center justify-between gap-2 bg-[#FAF5EE] dark:bg-[#2B231D] px-3 py-1.5 rounded-xl border border-[#EFE7DC] dark:border-[#3E3229]">
+            <span className="font-mono font-bold text-xs text-[#8C6239] dark:text-[#B8956A] truncate">
+              ID: {contract.member_id}
+            </span>
+            <button
+              onClick={copyToClipboard}
+              title="คัดลอก Member ID"
+              className="text-muted-foreground hover:text-[#8C6239] transition-colors p-1 cursor-pointer shrink-0"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-                  {/* Date range display */}
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-semibold bg-background/60 dark:bg-card/60 px-2.5 py-1 rounded-xl border border-border/50">
-                    <Calendar className="w-3.5 h-3.5 text-[#8C6239]" />
-                    <span>{formatDateThai(contract.start_at)}</span>
-                    <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                    <span>{contract.end_at ? formatDateThai(contract.end_at) : 'ไม่ระบุ'}</span>
+          {/* Details based on contract type */}
+          <div className="space-y-2 text-xs pt-1">
+            {contract.type === 'ad' && contract.package_name && (
+              <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm w-fit">
+                <Megaphone className="w-3.5 h-3.5 text-[#6366F1]" />
+                {contract.package_name}
+              </Badge>
+            )}
+
+            {(contract.type === 'personal_role' || contract.type === 'boost_role') && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {(discordRoleName || contract.role_name) && (
+                  <Badge variant="secondary" className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs px-2.5 py-1 rounded-xl font-extrabold flex items-center gap-1.5 shadow-sm">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    {discordRoleName || contract.role_name}
+                  </Badge>
+                )}
+
+                {roleTotal !== null && (
+                  <span className={cn(
+                    'text-[10px] font-extrabold px-2 py-0.5 rounded-lg flex items-center gap-1 border',
+                    roleTotal > 5
+                      ? 'bg-red-100 text-red-700 border-red-300'
+                      : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                  )}>
+                    <Users className="w-3 h-3 shrink-0" />
+                    <span>{roleTotal} / 5 คน</span>
                   </span>
-                </div>
-
-                {/* Cozy Lease Timeline Progress Bar */}
-                {contract.end_at && (
-                  <div className="space-y-1.5 max-w-lg pt-1">
-                    <div className="flex justify-between items-center text-xs font-semibold">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> ระยะเวลาสัญญา
-                      </span>
-                      <span className={cn('font-bold', isExpired ? 'text-red-500' : 'text-[#827160] dark:text-[#C5B4A5]')}>
-                        {isExpired ? 'หมดอายุสัญญาแล้ว' : `${Math.round(progressPercent)}% ผ่านไป`}
-                      </span>
-                    </div>
-                    <div className="w-full bg-[#EFE8DD] dark:bg-[#302720] h-2 rounded-full overflow-hidden shadow-inner">
-                      <div
-                        className={cn('h-full transition-all duration-500 rounded-full', progressBarColor)}
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
                 )}
               </div>
             )}
 
-            {contract.type === 'personal_role' && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {(discordRoleName || contract.role_name) && (
-                    <Badge variant="secondary" className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs px-3 py-1 rounded-xl font-extrabold flex items-center gap-1.5 shadow-sm">
-                      <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      {discordRoleName || contract.role_name}
-                    </Badge>
-                  )}
+            {contract.room_link && (
+              <a
+                href={contract.room_link}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] dark:text-[#D4B28C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/10 transition-all font-bold shadow-sm w-fit truncate max-w-full"
+              >
+                <Link className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{houseChannelName ?? channelName ?? 'ดูช่อง Discord'}</span>
+              </a>
+            )}
 
-                  {contract.room_link && (
-                    <a
-                      href={contract.room_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs bg-[#FAF5EE] dark:bg-[#25201C] text-[#8B5E3C] dark:text-[#D4B28C] border border-[#EFE8DD] dark:border-[#382F28] hover:bg-[#8B5E3C]/10 transition-all font-bold shadow-sm"
-                    >
-                      <Hash className="w-3.5 h-3.5 shrink-0 text-[#8B5E3C]" />
-                      {loadingExtra ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <span>{channelName ?? 'ดูห้องในดิส'}</span>
-                      )}
-                    </a>
-                  )}
+            {/* Date range display */}
+            <div className="space-y-1 text-muted-foreground text-[11px] font-medium pt-1 border-t border-border/40">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-[#8C6239]" /> เริ่มต้น:</span>
+                <span className="font-semibold text-foreground">{formatDateThai(contract.start_at)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-[#8C6239]" /> สิ้นสุด:</span>
+                <span className="font-semibold text-foreground">{contract.end_at ? formatDateThai(contract.end_at) : 'ถาวร/ไม่กำหนด'}</span>
+              </div>
+            </div>
 
-                  {loadingExtra && roleTotal === null ? (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />กำลังโหลดสิทธิ์ผู้ใช้...
-                    </span>
-                  ) : roleTotal !== null ? (
-                    <span className={cn(
-                      'text-xs font-extrabold px-3 py-1 rounded-xl flex items-center gap-1.5 border shadow-sm',
-                      roleTotal > 5
-                        ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-300'
-                        : 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300'
-                    )}>
-                      <Users className="w-3.5 h-3.5 shrink-0" />
-                      <span>{roleTotal} / 5 คน</span>
-                      {roleTotal > 5 && <span className="animate-pulse text-red-600">(เกินสิทธิ์!)</span>}
-                    </span>
-                  ) : null}
+            {/* Remaining time countdown & progress bar */}
+            {contract.end_at && (
+              <div className="space-y-1.5 pt-1.5">
+                <div className="flex justify-between items-center text-xs font-semibold">
+                  <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                    <Clock className="w-3 h-3 text-amber-500" /> เวลาคงเหลือ:
+                  </span>
+                  <span className={cn('font-bold text-xs', isExpired ? 'text-red-500' : 'text-[#827160] dark:text-[#C5B4A5]')}>
+                    {formatRemaining(contract.end_at)}
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
-                  <Clock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>เริ่มเมื่อ: {formatDateThai(contract.start_at)}</span>
-                  <span>•</span>
-                  <span>{formatElapsed(contract.start_at)}</span>
+                <div className="w-full bg-[#EFE8DD] dark:bg-[#302720] h-1.5 rounded-full overflow-hidden shadow-inner">
+                  <div
+                    className={cn('h-full transition-all duration-500 rounded-full', progressBarColor)}
+                    style={{ width: `${progressPercent}%` }}
+                  />
                 </div>
               </div>
             )}
-
-            {/* Operator and Edit history triggers */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap pt-1 font-medium border-t border-border/40">
-              <span>ผู้บันทึก: <span className="font-bold text-foreground">{contract.operator_name ?? '—'}</span></span>
-              {contract.edit_log && contract.edit_log.length > 0 && (
-                <>
-                  <span>•</span>
-                  <button
-                    onClick={() => onShowLogs(contract)}
-                    className="flex items-center gap-1.5 text-[#8C6239] dark:text-[#B8956A] hover:underline cursor-pointer font-bold"
-                  >
-                    <History className="w-3.5 h-3.5" />
-                    ประวัติการแก้ไข ({contract.edit_log.length})
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         </div>
 
-        {/* Right Side: Status & Action triggers */}
-        <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-3 border-t lg:border-t-0 pt-3 lg:pt-0 border-[#F4EEE5] dark:border-[#2D2520] shrink-0 min-w-[160px]">
-          <div className="flex flex-col items-start lg:items-end gap-1.5">
-            <Badge className={cn('text-xs font-bold px-3 py-1 border rounded-full shadow-sm', statusBadgeColor)}>
-              {statusText}
-            </Badge>
-
-            {contract.type === 'house' && contract.end_at && (
-              <span className={cn(
-                'text-xs font-bold',
-                isExpired ? 'text-red-600' :
-                  isUrgent ? 'text-rose-600' :
-                    isWarning ? 'text-amber-600' :
-                      'text-muted-foreground'
-              )}>
-                {formatRemaining(contract.end_at)}
-              </span>
+        {/* Bottom Action Footer */}
+        <div className="space-y-2 pt-2 border-t border-[#F4EEE5] dark:border-[#2D2520]">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>ผู้บันทึก: <strong className="text-foreground">{contract.operator_name ?? '—'}</strong></span>
+            {contract.edit_log && contract.edit_log.length > 0 && (
+              <button
+                onClick={() => onShowLogs(contract)}
+                className="flex items-center gap-1 text-[#8C6239] dark:text-[#B8956A] hover:underline font-bold"
+              >
+                <History className="w-3 h-3" />
+                ประวัติ ({contract.edit_log.length})
+              </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Notify Trigger */}
-            {contract.type === 'house' && days !== null && days <= 3 && days > 0 && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            {contract.end_at && days !== null && days <= 3 && days > 0 ? (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 px-2.5 gap-1.5 border-rose-300 hover:bg-rose-50 text-rose-600 text-xs rounded-xl shadow-sm cursor-pointer"
+                className="h-7 px-2 gap-1 border-rose-300 hover:bg-rose-50 text-rose-600 text-[11px] rounded-lg shadow-sm cursor-pointer"
                 disabled={sending}
                 onClick={() => setNotifyOpen(true)}
               >
-                <Bell className={cn('w-3.5 h-3.5 text-rose-500', sending && 'animate-spin')} />
-                ส่งแจ้งเตือน
+                <Bell className={cn('w-3 h-3 text-rose-500', sending && 'animate-spin')} />
+                แจ้งเตือน
               </Button>
-            )}
+            ) : <div />}
 
-            <div className="flex items-center gap-1 bg-[#FAF5EE] dark:bg-[#25201C] p-1 rounded-xl border border-[#EFE8DD] dark:border-[#382F28]">
-              {contract.type === 'house' && (
-                <Button size="icon" variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-[#8C6239] hover:bg-white dark:hover:bg-[#1E1B18] rounded-lg cursor-pointer"
-                  onClick={() => onEdit(contract)}>
-                  <Edit2 className="w-3.5 h-3.5" />
-                </Button>
-              )}
+            <div className="flex items-center gap-1 bg-[#FAF5EE] dark:bg-[#25201C] p-0.5 rounded-xl border border-[#EFE8DD] dark:border-[#382F28]">
+              <Button size="icon" variant="ghost"
+                className="h-7 w-7 text-muted-foreground hover:text-[#8C6239] hover:bg-white dark:hover:bg-[#1E1B18] rounded-lg cursor-pointer"
+                onClick={() => onEdit(contract)}>
+                <Edit2 className="w-3.5 h-3.5" />
+              </Button>
               <Button size="icon" variant="ghost"
                 className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-white dark:hover:bg-[#1E1B18] rounded-lg cursor-pointer"
                 onClick={() => setDeleteOpen(true)}>
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
@@ -1311,7 +1416,6 @@ export function ContractsManagement() {
   const filtered = contracts.filter(c => {
     // Quick filter check
     if (filterType === 'urgent') {
-      if (c.type !== 'house') return false;
       if (!c.end_at) return false;
       const days = daysRemaining(c.end_at);
       if (days > 3) return false;
@@ -1319,13 +1423,22 @@ export function ContractsManagement() {
       return false;
     }
 
-    // Search by Member ID or discord name
-    if (searchMember) {
-      const memberIdMatch = c.member_id.toLowerCase().includes(searchMember.toLowerCase());
+    // Enhanced Search: Member ID, Discord Username, Role Name, Package Name, Room Link
+    if (searchMember.trim()) {
+      const q = searchMember.trim().toLowerCase();
+      const memberIdMatch = c.member_id.toLowerCase().includes(q);
       const profile = memberProfiles[c.member_id];
-      const usernameMatch = profile?.username?.toLowerCase().includes(searchMember.toLowerCase()) ||
-        profile?.discord_username?.toLowerCase().includes(searchMember.toLowerCase());
-      if (!memberIdMatch && !usernameMatch) return false;
+      const usernameMatch = Boolean(
+        profile?.username?.toLowerCase().includes(q) ||
+        profile?.discord_username?.toLowerCase().includes(q)
+      );
+      const roleNameMatch = Boolean((c.role_name ?? '').toLowerCase().includes(q));
+      const packageNameMatch = Boolean((c.package_name ?? '').toLowerCase().includes(q));
+      const roomLinkMatch = Boolean((c.room_link ?? '').toLowerCase().includes(q));
+
+      if (!memberIdMatch && !usernameMatch && !roleNameMatch && !packageNameMatch && !roomLinkMatch) {
+        return false;
+      }
     }
 
     // Search by Operator name
@@ -1351,10 +1464,11 @@ export function ContractsManagement() {
   const countByType = {
     house: contracts.filter(c => c.type === 'house').length,
     personal_role: contracts.filter(c => c.type === 'personal_role').length,
+    boost_role: contracts.filter(c => c.type === 'boost_role').length,
     ad: contracts.filter(c => c.type === 'ad').length,
   };
   const urgentCount = contracts.filter(c => {
-    if (c.type !== 'house' || !c.end_at) return false;
+    if (!c.end_at) return false;
     return daysRemaining(c.end_at) <= 3;
   }).length;
 
@@ -1369,7 +1483,7 @@ export function ContractsManagement() {
               ระบบจัดการสัญญาเช่า
             </h2>
             <p className="text-xs text-[#827160] dark:text-[#A89889]">
-              ลงทะเบียน ดูแล และบันทึกสัญญาเช่าบ้านและสัญญายศส่วนตัวของคอมมูนิตี้
+              ลงทะเบียน ดูแล และบันทึกสัญญาเช่าบ้าน สัญญายศส่วนตัว ยศบูสต์ และโฆษณา
             </p>
           </div>
 
@@ -1400,11 +1514,12 @@ export function ContractsManagement() {
       </div>
 
       {/* ── Stats Panel (Interactive Quick Filters) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {([
           { key: 'all', label: 'สัญญาทั้งหมด', count: contracts.length, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239]', icon: Home },
           { key: 'house', label: 'สัญญาเช่าบ้าน', count: countByType.house, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8B5E3C] bg-[#8B5E3C]/5 text-[#8B5E3C]', icon: Home },
           { key: 'personal_role', label: 'สัญญายศส่วนตัว', count: countByType.personal_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#D97706] bg-[#D97706]/5 text-[#D97706]', icon: Star },
+          { key: 'boost_role', label: 'สัญญายศบูสต์', count: countByType.boost_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-purple-500 bg-purple-500/5 text-purple-600', icon: Rocket },
           { key: 'ad', label: 'สัญญาโฆษณา', count: countByType.ad, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1]', icon: Megaphone },
           { key: 'urgent', label: 'ใกล้หมดอายุ/หมดอายุ', count: urgentCount, color: 'bg-white dark:bg-[#1E1B18] text-[#C23B51] dark:text-red-400 border-[#F4EEE5] dark:border-[#2D2520] hover:border-red-200', activeBg: 'border-red-500 bg-red-500/5 text-red-600', icon: AlertTriangle },
         ] as const).map(({ key, label, count, color, activeBg, icon: IconComponent }) => {
@@ -1414,7 +1529,7 @@ export function ContractsManagement() {
               key={key}
               onClick={() => { setFilterType(key); setPage(1); }}
               className={cn(
-                'rounded-2xl p-4 text-left transition-all border-2 flex flex-col gap-2.5 relative overflow-hidden shadow-sm hover:scale-[1.01] active:scale-[0.99] duration-200 cursor-pointer',
+                'rounded-2xl p-3.5 text-left transition-all border-2 flex flex-col gap-2 relative overflow-hidden shadow-sm hover:scale-[1.01] active:scale-[0.99] duration-200 cursor-pointer',
                 isActive ? activeBg : color
               )}
             >
@@ -1422,7 +1537,7 @@ export function ContractsManagement() {
                 <span className="text-[11px] font-bold tracking-tight opacity-75">{label}</span>
                 <IconComponent className="w-3.5 h-3.5 opacity-60 shrink-0" />
               </div>
-              <p className="text-2xl font-bold leading-none tracking-tight">{count}</p>
+              <p className="text-xl font-bold leading-none tracking-tight">{count}</p>
             </button>
           );
         })}
@@ -1430,12 +1545,12 @@ export function ContractsManagement() {
 
       {/* ── Filters Bar ── */}
       <div className="rounded-2xl bg-[#FAF6F0]/60 dark:bg-[#25201C]/40 p-4 border border-[#F0E8DC] dark:border-[#382F28] flex flex-wrap items-center gap-3">
-        {/* Search member */}
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
+        {/* Search member & details */}
+        <div className="relative flex-1 min-w-[240px] max-w-sm">
           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             className="pl-9 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3A322C] rounded-xl focus-visible:ring-[#8C6239]"
-            placeholder="ค้นหา Member ID หรือชื่อ..."
+            placeholder="ค้นหา ID, ชื่อผู้ใช้, ยศ, แพ็กเกจ..."
             value={searchMember}
             onChange={e => setSearchMember(e.target.value)}
           />
@@ -1478,7 +1593,7 @@ export function ContractsManagement() {
         </span>
       </div>
 
-      {/* ── Main List Panel ── */}
+      {/* ── Main List Panel (Responsive Compact Grid) ── */}
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="w-7 h-7 animate-spin text-[#8C6239]" />
@@ -1488,7 +1603,7 @@ export function ContractsManagement() {
           ไม่พบข้อมูลสัญญาที่ค้นหา
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {paginated.map(c => (
             <ContractCard
               key={c.id}
