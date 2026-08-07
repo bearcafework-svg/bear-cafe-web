@@ -838,19 +838,19 @@ export function TradingHistoryManagement() {
   const handleSendEmbed = async (r: UnifiedRecord) => {
     setIsSendingEmbed(true);
     try {
-      const res = await fetch(EDGE_SEND_TRADING_EMBED, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-trading-embed', {
+        body: {
           member_id: r.member_id,
           latest_amount: r.total_amount,
           total_amount: totalAmountByMember.get(r.member_id) ?? r.total_amount,
           avatar_url: profileMap.get(r.member_id)?.avatar_url ?? '',
-        }),
+        },
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error((e as any).details || (e as any).error || `HTTP ${res.status}`);
+      if (error) {
+        throw new Error(error.message || 'ส่ง embed ไม่สำเร็จ');
+      }
+      if (data && data.ok === false) {
+        throw new Error(data.message || data.error || 'ส่ง embed ไม่สำเร็จ');
       }
       toast({ title: 'ส่ง embed สำเร็จ', className: 'bg-success text-success-foreground' });
     } catch (err: any) {

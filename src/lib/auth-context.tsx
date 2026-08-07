@@ -152,12 +152,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUserProfile(sessionUser)
       .then((profile) => {
         if (!isMounted) return;
-        setUser(prev => profile ?? prev ?? buildFallbackUser(sessionUser));
-        setIsLoading(false);
+        if (profile) {
+          setUser(profile);
+        } else {
+          setUser(prev => prev ?? buildFallbackUser(sessionUser));
+        }
+        if (setLoading) setIsLoading(false);
       })
       .catch((error) => {
         console.error('[Auth] Failed to fetch user profile:', error);
         if (!isMounted) return;
+        // Keep previous valid profile state if it exists instead of wiping permissions
         setUser(prev => prev ?? buildFallbackUser(sessionUser));
         if (setLoading) setIsLoading(false);
       });
@@ -199,6 +204,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { console.log('[Auth] Cleaning up real-time profile subscription'); supabase.removeChannel(channel); };
   }, [syncDiscordProfile, user?.id]);
 
+  // Tab visibility change handler to refresh session & restore profile if missing perms
+  useEffect(() => {
+    let lastVisibilityCheck = 0;
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastVisibilityCheck < 10000) return; // Throttle 10s
+        lastVisibilityCheck = now;
+        console.log('[Auth] Tab became visible. Verifying session freshness...');
+        try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (currentSession?.user) {
+            setSession(currentSession);
+            setUser(prevUser => {
+              const isFallbackOrMissing = !prevUser || (prevUser.allowed_pages.length === 0 && !prevUser.is_owner && !prevUser.is_admin);
+              if (isFallbackOrMissing) {
+                console.log('[Auth] Tab visible and user has fallback/missing perms. Re-fetching profile...');
+                loadUserProfile(currentSession.user, true, false);
+              }
+              return prevUser;
+            });
+          }
+        } catch (e) {
+          console.warn('[Auth] Visibility change session check error:', e);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadUserProfile]);
+
   useEffect(() => {
     let isMounted = true;
     let profileLoaded = false;
@@ -213,7 +252,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null); setSession(null); setIsLoading(false); profileLoaded = false; return;
       }
       if (newSession?.user) {
-        if (event === 'TOKEN_REFRESHED' && profileLoaded) { console.log('[Auth] Token refreshed, skipping profile reload'); return; }
+        if (event === 'TOKEN_REFRESHED') {
+          setUser(prevUser => {
+            const hasValidPermissions = prevUser && (prevUser.allowed_pages.length > 0 || prevUser.is_owner || prevUser.is_admin);
+            if (hasValidPermissions && profileLoaded) {
+              console.log('[Auth] Token refreshed, profile already valid. Skipping reload.');
+              return prevUser;
+            }
+            console.log('[Auth] Token refreshed with missing/fallback permissions. Reloading profile...');
+            profileLoaded = true;
+            setTimeout(() => { if (!isMounted) return; loadUserProfile(newSession.user, isMounted, false); }, 0);
+            return prevUser;
+          });
+          return;
+        }
         if (event === 'INITIAL_SESSION') return;
         profileLoaded = true;
         setTimeout(() => { if (!isMounted) return; loadUserProfile(newSession.user, isMounted, true); }, 0);
