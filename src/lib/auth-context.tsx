@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { useLocation } from 'react-router-dom';
@@ -50,6 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Operation version counter to ensure LOGOUT MUST WIN and stale promises are ignored
+  const authOpVersionRef = useRef<number>(1);
+  // Track loaded user ID to prevent duplicate initialization fetches
+  const loadedUserIdRef = useRef<string | null>(null);
 
   const buildFallbackUser = useCallback((sessionUser: SupabaseUser): User => {
     const metadata = sessionUser.user_metadata || {};
@@ -148,10 +153,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return profile;
   }, [buildFallbackUser, fetchUserProfile]);
 
-  const loadUserProfile = useCallback((sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean) => {
+  const loadUserProfile = useCallback((sessionUser: SupabaseUser, isMounted: boolean, setLoading: boolean, opVersion: number) => {
+    if (opVersion !== authOpVersionRef.current) {
+      console.log('[Auth] Skipping loadUserProfile — stale operation version:', opVersion);
+      return;
+    }
     fetchUserProfile(sessionUser)
       .then((profile) => {
-        if (!isMounted) return;
+        if (!isMounted || opVersion !== authOpVersionRef.current) return;
         if (profile) {
           setUser(profile);
         } else {
@@ -161,20 +170,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error) => {
         console.error('[Auth] Failed to fetch user profile:', error);
-        if (!isMounted) return;
+        if (!isMounted || opVersion !== authOpVersionRef.current) return;
         // Keep previous valid profile state if it exists instead of wiping permissions
         setUser(prev => prev ?? buildFallbackUser(sessionUser));
         if (setLoading) setIsLoading(false);
       });
   }, [buildFallbackUser, fetchUserProfile]);
 
-  const syncDiscordProfile = useCallback(async () => {
+  const syncDiscordProfile = useCallback(async (opVersion: number) => {
     try {
+      if (opVersion !== authOpVersionRef.current) return;
       const { data, error } = await supabase.functions.invoke('sync-discord-profile');
+      if (opVersion !== authOpVersionRef.current) return;
       if (error) { console.warn('[Auth] Profile sync failed:', error.message); return; }
       if (data?.updated) {
         console.log('[Auth] Discord profile synced:', data.username);
-        setUser(prev => prev ? { ...prev, username: data.username, avatar_url: data.avatar_url, banner_url: data.banner_url } : null);
+        setUser(prev => (prev && opVersion === authOpVersionRef.current) ? { ...prev, username: data.username, avatar_url: data.avatar_url, banner_url: data.banner_url } : prev);
       }
     } catch (e) {
       console.warn('[Auth] Profile sync error:', e);
@@ -182,15 +193,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !session) return;
+    const currentOpVersion = authOpVersionRef.current;
+
+    // Check token readiness: if token expires in less than 5 seconds, skip background sync until token refreshed
+    const isExpired = session.expires_at ? (session.expires_at * 1000 <= Date.now() + 5000) : false;
+    if (isExpired) {
+      console.warn('[Auth] Token is near expiration. Skipping background profile sync until token is refreshed.');
+      return;
+    }
+
     console.log('[Auth] Setting up real-time profile watch for user:', user.id);
-    syncDiscordProfile();
+    syncDiscordProfile(currentOpVersion);
+
     const channel = supabase
       .channel(`profile-watch-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, (payload) => {
+        if (currentOpVersion !== authOpVersionRef.current) return;
         const p = payload.new as { is_banned: boolean; ban_reason: string | null; username: string; avatar_url: string | null; banner_url: string | null; role?: string | null };
         console.log('[Auth] Profile update received');
-        setUser(prev => prev ? {
+        setUser(prev => (prev && currentOpVersion === authOpVersionRef.current) ? {
           ...prev,
           is_banned: p.is_banned,
           ban_reason: p.ban_reason,
@@ -201,27 +223,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } : null);
       })
       .subscribe((status) => { console.log('[Auth] Realtime subscription status:', status); });
-    return () => { console.log('[Auth] Cleaning up real-time profile subscription'); supabase.removeChannel(channel); };
-  }, [syncDiscordProfile, user?.id]);
+
+    return () => {
+      console.log('[Auth] Cleaning up real-time profile subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [session, syncDiscordProfile, user?.id]);
 
   // Tab visibility change handler to refresh session & restore profile if missing perms
   useEffect(() => {
     let lastVisibilityCheck = 0;
     const handleVisibilityChange = async () => {
+      const currentOpVersion = authOpVersionRef.current;
       if (document.visibilityState === 'visible') {
         const now = Date.now();
         if (now - lastVisibilityCheck < 10000) return; // Throttle 10s
         lastVisibilityCheck = now;
+
+        if (currentOpVersion !== authOpVersionRef.current) return;
+
         console.log('[Auth] Tab became visible. Verifying session freshness...');
         try {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (currentOpVersion !== authOpVersionRef.current) return;
+
           if (currentSession?.user) {
             setSession(currentSession);
             setUser(prevUser => {
+              if (currentOpVersion !== authOpVersionRef.current) return prevUser;
               const isFallbackOrMissing = !prevUser || (prevUser.allowed_pages.length === 0 && !prevUser.is_owner && !prevUser.is_admin);
               if (isFallbackOrMissing) {
                 console.log('[Auth] Tab visible and user has fallback/missing perms. Re-fetching profile...');
-                loadUserProfile(currentSession.user, true, false);
+                loadUserProfile(currentSession.user, true, false, currentOpVersion);
               }
               return prevUser;
             });
@@ -240,51 +273,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    let profileLoaded = false;
-    console.log('[Auth] Initializing auth context');
+    console.log('[Auth] Initializing auth context single listener');
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      const currentOpVersion = authOpVersionRef.current;
       console.log('[Auth] State change:', event, 'user:', newSession?.user?.id);
-      if (!isMounted) return;
+      if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
+
+      if (event === 'SIGNED_OUT' || !newSession?.user) {
+        authOpVersionRef.current += 1;
+        loadedUserIdRef.current = null;
+        setUser(null);
+        setSession(null);
+        setIsLoading(false);
+        return;
+      }
+
       setSession(newSession);
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null); setSession(null); setIsLoading(false); profileLoaded = false; return;
-      }
-      if (newSession?.user) {
-        if (event === 'TOKEN_REFRESHED') {
-          setUser(prevUser => {
-            const hasValidPermissions = prevUser && (prevUser.allowed_pages.length > 0 || prevUser.is_owner || prevUser.is_admin);
-            if (hasValidPermissions && profileLoaded) {
-              console.log('[Auth] Token refreshed, profile already valid. Skipping reload.');
-              return prevUser;
-            }
-            console.log('[Auth] Token refreshed with missing/fallback permissions. Reloading profile...');
-            profileLoaded = true;
-            setTimeout(() => { if (!isMounted) return; loadUserProfile(newSession.user, isMounted, false); }, 0);
-            return prevUser;
-          });
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+        // Single initialization flow: avoid duplicate fetches for the same user ID
+        if (loadedUserIdRef.current === newSession.user.id) {
+          console.log('[Auth] Profile already loaded or loading for user:', newSession.user.id);
+          setIsLoading(false);
           return;
         }
-        if (event === 'INITIAL_SESSION') return;
-        profileLoaded = true;
-        setTimeout(() => { if (!isMounted) return; loadUserProfile(newSession.user, isMounted, true); }, 0);
-      } else {
-        setUser(null); setIsLoading(false); profileLoaded = false;
+        loadedUserIdRef.current = newSession.user.id;
+        setTimeout(() => {
+          if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
+          loadUserProfile(newSession.user, isMounted, true, currentOpVersion);
+        }, 0);
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        setUser(prevUser => {
+          if (currentOpVersion !== authOpVersionRef.current) return prevUser;
+          const hasValidPermissions = prevUser && (prevUser.allowed_pages.length > 0 || prevUser.is_owner || prevUser.is_admin);
+          if (hasValidPermissions) {
+            console.log('[Auth] Token refreshed, valid profile exists. Skipping reload.');
+            return prevUser;
+          }
+          console.log('[Auth] Token refreshed with missing/fallback permissions. Reloading profile...');
+          setTimeout(() => {
+            if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
+            loadUserProfile(newSession.user, isMounted, false, currentOpVersion);
+          }, 0);
+          return prevUser;
+        });
+        return;
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: existingSession }, error }) => {
-      console.log('[Auth] Initial session check:', existingSession?.user?.id, 'error:', error?.message);
-      if (!isMounted) return;
-      if (error) { console.error('[Auth] Session error:', error); setIsLoading(false); return; }
-      setSession(existingSession);
-      if (existingSession?.user) { profileLoaded = true; loadUserProfile(existingSession.user, isMounted, true); }
-      else { console.log('[Auth] No existing session, user not logged in'); setIsLoading(false); }
-    }).catch((error) => { console.error('[Auth] Init error:', error); if (isMounted) setIsLoading(false); });
-
-    return () => { isMounted = false; subscription.unsubscribe(); };
-  }, [loadUserProfile]);
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [loadUserProfile, user]);
 
   const isInIframe = useCallback(() => { try { return window.self !== window.top; } catch (e) { return true; } }, []);
 
@@ -306,16 +351,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isInIframe, isRedirecting]);
 
   const logout = useCallback(async () => {
-    console.log('[Auth] Logging out');
-    try { setUser(null); setSession(null); await supabase.auth.signOut(); window.location.href = '/login'; }
-    catch (error) { console.error('[Auth] Logout error:', error); window.location.href = '/login'; }
+    console.log('[Auth] Logging out (LOGOUT MUST WIN)');
+    authOpVersionRef.current += 1;
+    loadedUserIdRef.current = null;
+    setUser(null);
+    setSession(null);
+    setIsLoading(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('[Auth] Logout error:', error);
+    } finally {
+      window.location.href = '/login';
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {
     if (!session?.user) return;
+    const currentOpVersion = authOpVersionRef.current;
     console.log('[Auth] Refreshing user profile');
-    try { const profile = await fetchUserProfileWithTimeout(session.user); setUser(profile); }
-    catch (error) { console.error('[Auth] Failed to refresh user profile:', error); }
+    try {
+      const profile = await fetchUserProfileWithTimeout(session.user);
+      if (currentOpVersion === authOpVersionRef.current && profile) {
+        setUser(profile);
+      }
+    } catch (error) {
+      console.error('[Auth] Failed to refresh user profile:', error);
+    }
   }, [fetchUserProfileWithTimeout, session?.user]);
 
   const location = useLocation();
