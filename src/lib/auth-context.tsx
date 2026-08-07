@@ -286,38 +286,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setSession(null);
         setIsLoading(false);
+        // Clear potential supabase auth data from localStorage on manual signout
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+        return;
+      }
+
+      // Check if session token is expired or about to expire in 5 seconds
+      const isTokenExpired = newSession.expires_at ? (newSession.expires_at * 1000 <= Date.now() + 5000) : false;
+
+      if (isTokenExpired) {
+        console.warn('[Auth] Session token is expired/expiring. Waiting for Supabase SDK token refresh before setting session...');
+        // Do not trigger profile load or set expired session; wait for TOKEN_REFRESHED
         return;
       }
 
       setSession(newSession);
 
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-        // Single initialization flow: avoid duplicate fetches for the same user ID
-        if (loadedUserIdRef.current === newSession.user.id) {
-          console.log('[Auth] Profile already loaded or loading for user:', newSession.user.id);
-          setIsLoading(false);
-          return;
-        }
-        loadedUserIdRef.current = newSession.user.id;
-        setTimeout(() => {
-          if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
-          loadUserProfile(newSession.user, isMounted, true, currentOpVersion);
-        }, 0);
-        return;
-      }
-
-      if (event === 'TOKEN_REFRESHED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Single initialization flow: avoid duplicate fetches for the same user ID if profile is valid
         setUser(prevUser => {
           if (currentOpVersion !== authOpVersionRef.current) return prevUser;
           const hasValidPermissions = prevUser && (prevUser.allowed_pages.length > 0 || prevUser.is_owner || prevUser.is_admin);
-          if (hasValidPermissions) {
-            console.log('[Auth] Token refreshed, valid profile exists. Skipping reload.');
+
+          if (loadedUserIdRef.current === newSession.user.id && hasValidPermissions) {
+            console.log('[Auth] Profile already loaded and valid for user:', newSession.user.id);
+            setIsLoading(false);
             return prevUser;
           }
-          console.log('[Auth] Token refreshed with missing/fallback permissions. Reloading profile...');
+
+          console.log('[Auth] Loading profile for session event:', event, 'user:', newSession.user.id);
+          loadedUserIdRef.current = newSession.user.id;
           setTimeout(() => {
             if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
-            loadUserProfile(newSession.user, isMounted, false, currentOpVersion);
+            loadUserProfile(newSession.user, isMounted, true, currentOpVersion);
           }, 0);
           return prevUser;
         });
@@ -329,7 +332,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [loadUserProfile, user]);
+  }, [loadUserProfile]);
 
   const isInIframe = useCallback(() => { try { return window.self !== window.top; } catch (e) { return true; } }, []);
 
@@ -362,6 +365,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[Auth] Logout error:', error);
     } finally {
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+      } catch (e) {
+        console.warn('[Auth] Error clearing storage:', e);
+      }
       window.location.href = '/login';
     }
   }, []);
