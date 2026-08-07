@@ -1343,7 +1343,7 @@ export function ContractsManagement() {
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
   const [selectedLogContract, setSelectedLogContract] = useState<Contract | null>(null);
 
-  const [typeIcons, setTypeIcons] = useState<TypeIcons>({ house: null, personal_role: null });
+  const [typeIcons, setTypeIcons] = useState<TypeIcons>({ house: null, personal_role: null, boost_role: null, ad: null });
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { username: string; discord_username: string | null }>>({});
 
   // Filters state
@@ -1354,9 +1354,9 @@ export function ContractsManagement() {
 
   // Load stored icon URLs from storage
   useEffect(() => {
-    const types: ContractType[] = ['house', 'personal_role'];
+    const types: ContractType[] = ['house', 'personal_role', 'boost_role', 'ad'];
     const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
-    const result: TypeIcons = { house: null, personal_role: null };
+    const result: TypeIcons = { house: null, personal_role: null, boost_role: null, ad: null };
 
     for (const type of types) {
       for (const ext of exts) {

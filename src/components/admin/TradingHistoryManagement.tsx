@@ -617,7 +617,9 @@ export function TradingHistoryManagement() {
       const imageUrls: string[] = [];
       for (const file of selectedFiles) {
         const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true });
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${compressed.type.split('/')[1]}`;
+        const rawExt = compressed.type ? compressed.type.split('/')[1] : 'jpg';
+        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt || 'jpg';
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
         const { error: uploadError } = await supabase.storage.from('slip-images').upload(fileName, compressed, { cacheControl: '86400' });
         if (uploadError) throw uploadError;
         imageUrls.push(supabase.storage.from('slip-images').getPublicUrl(fileName).data.publicUrl);
