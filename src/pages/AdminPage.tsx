@@ -60,6 +60,8 @@ import type { Tables } from '@/integrations/supabase/types';
 import { Gamepad2 } from 'lucide-react';
 import { MinigamesManagement } from '@/components/admin/MinigamesManagement';
 import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
+import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
+import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
