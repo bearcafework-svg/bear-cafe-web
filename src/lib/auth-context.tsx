@@ -31,6 +31,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PROFILE_FETCH_TIMEOUT_MS = 15000;
 
+function isJwtExpired(token?: string | null): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return true;
+    const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = atob(payloadBase64);
+    const decoded = JSON.parse(jsonPayload);
+    if (typeof decoded.exp === 'number') {
+      return decoded.exp * 1000 <= Date.now() + 10000;
+    }
+  } catch (e) {
+    console.warn('[Auth] Failed to parse JWT exp:', e);
+  }
+  return false;
+}
+
 type UserRoleRow = { role: string | null };
 type PermissionIdRow = { permission_id: string | null };
 type CustomPermissionRow = { allowed_pages: string[] | null };
@@ -168,11 +185,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (setLoading) setIsLoading(false);
       })
-      .catch((error) => {
+      .catch((error: any) => {
         console.error('[Auth] Failed to fetch user profile:', error);
         if (!isMounted || opVersion !== authOpVersionRef.current) return;
-        // Keep previous valid profile state if it exists instead of wiping permissions
-        setUser(prev => prev ?? buildFallbackUser(sessionUser));
+        // Do NOT create fallback user if failure was caused by expired JWT / 401 Unauthorized
+        const isAuthError = error?.code === 'PGRST303' || error?.message?.includes('JWT expired') || error?.status === 401;
+        if (!isAuthError) {
+          setUser(prev => prev ?? buildFallbackUser(sessionUser));
+        }
         if (setLoading) setIsLoading(false);
       });
   }, [buildFallbackUser, fetchUserProfile]);
@@ -196,10 +216,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user?.id || !session) return;
     const currentOpVersion = authOpVersionRef.current;
 
-    // Check token readiness: if token expires in less than 5 seconds, skip background sync until token refreshed
-    const isExpired = session.expires_at ? (session.expires_at * 1000 <= Date.now() + 5000) : false;
-    if (isExpired) {
-      console.warn('[Auth] Token is near expiration. Skipping background profile sync until token is refreshed.');
+    // Check token readiness via JWT exp claim directly
+    if (isJwtExpired(session.access_token)) {
+      console.warn('[Auth] Token is expired in session state. Skipping background profile sync.');
       return;
     }
 
@@ -247,7 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
           if (currentOpVersion !== authOpVersionRef.current) return;
 
-          if (currentSession?.user) {
+          if (currentSession?.user && !isJwtExpired(currentSession.access_token)) {
             setSession(currentSession);
             setUser(prevUser => {
               if (currentOpVersion !== authOpVersionRef.current) return prevUser;
@@ -280,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[Auth] State change:', event, 'user:', newSession?.user?.id);
       if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
 
-      if (event === 'SIGNED_OUT' || !newSession?.user) {
+      if (event === 'SIGNED_OUT' || !newSession?.user || !newSession?.access_token) {
         authOpVersionRef.current += 1;
         loadedUserIdRef.current = null;
         setUser(null);
@@ -293,12 +312,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Check if session token is expired or about to expire in 5 seconds
-      const isTokenExpired = newSession.expires_at ? (newSession.expires_at * 1000 <= Date.now() + 5000) : false;
-
-      if (isTokenExpired) {
-        console.warn('[Auth] Session token is expired/expiring. Waiting for Supabase SDK token refresh before setting session...');
-        // Do not trigger profile load or set expired session; wait for TOKEN_REFRESHED
+      // Check if session JWT token payload exp claim is expired
+      if (isJwtExpired(newSession.access_token)) {
+        console.warn('[Auth] Session access_token JWT is expired! Waiting for Supabase SDK token refresh...');
+        // If refresh_token exists, proactively trigger session refresh
+        if (newSession.refresh_token) {
+          supabase.auth.refreshSession({ refresh_token: newSession.refresh_token }).then(({ data, error }) => {
+            if (error || !data.session) {
+              console.warn('[Auth] Refresh session failed during init:', error?.message);
+              authOpVersionRef.current += 1;
+              loadedUserIdRef.current = null;
+              setUser(null);
+              setSession(null);
+              setIsLoading(false);
+            }
+          }).catch(err => console.warn('[Auth] Refresh session exception:', err));
+        }
         return;
       }
 
@@ -306,24 +335,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // Single initialization flow: avoid duplicate fetches for the same user ID if profile is valid
-        setUser(prevUser => {
-          if (currentOpVersion !== authOpVersionRef.current) return prevUser;
-          const hasValidPermissions = prevUser && (prevUser.allowed_pages.length > 0 || prevUser.is_owner || prevUser.is_admin);
+        if (loadedUserIdRef.current === newSession.user.id && user) {
+          console.log('[Auth] Profile already loaded and valid for user:', newSession.user.id);
+          setIsLoading(false);
+          return;
+        }
 
-          if (loadedUserIdRef.current === newSession.user.id && hasValidPermissions) {
-            console.log('[Auth] Profile already loaded and valid for user:', newSession.user.id);
-            setIsLoading(false);
-            return prevUser;
-          }
-
-          console.log('[Auth] Loading profile for session event:', event, 'user:', newSession.user.id);
-          loadedUserIdRef.current = newSession.user.id;
-          setTimeout(() => {
-            if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
-            loadUserProfile(newSession.user, isMounted, true, currentOpVersion);
-          }, 0);
-          return prevUser;
-        });
+        console.log('[Auth] Loading profile for session event:', event, 'user:', newSession.user.id);
+        loadedUserIdRef.current = newSession.user.id;
+        setTimeout(() => {
+          if (!isMounted || currentOpVersion !== authOpVersionRef.current) return;
+          loadUserProfile(newSession.user, isMounted, true, currentOpVersion);
+        }, 0);
         return;
       }
     });
