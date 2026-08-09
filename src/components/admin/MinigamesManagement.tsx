@@ -127,9 +127,31 @@ export function MinigamesManagement() {
   const fetchLeaderboard = async () => {
     setLoadingLb(true);
     try {
+      const daysParam = lbTimeFilter === '30d' ? 30 : null;
+      const gameParam = lbGameFilter !== 'all' ? Number(lbGameFilter) : null;
+
+      // 1. Try RPC get_minigame_leaderboard
+      const { data: rpcData, error: rpcErr } = await (supabase as any).rpc('get_minigame_leaderboard', {
+        days_limit: daysParam,
+        filter_game_id: gameParam
+      });
+
+      if (!rpcErr && rpcData) {
+        const sorted: LeaderboardItem[] = rpcData.map((row: any) => ({
+          discord_id: row.discord_id,
+          total_wins: Number(row.wins || 0),
+          total_points: Number(row.points || 0),
+          last_win: row.last_win || new Date().toISOString()
+        }));
+        setLeaderboard(sorted);
+        return;
+      }
+
+      // 2. Fallback query with extended range
       let query = (supabase as any)
         .from('minigame_wins')
-        .select('discord_id, game_id, points_earned, created_at');
+        .select('discord_id, game_id, points_earned, created_at')
+        .range(0, 49999);
 
       if (lbTimeFilter === '30d') {
         const thirtyDaysAgo = new Date();
