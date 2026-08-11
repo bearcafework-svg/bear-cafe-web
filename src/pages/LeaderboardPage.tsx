@@ -164,6 +164,9 @@ export default function LeaderboardPage() {
                 <SelectItem value="8">8. พิมพ์คำต่อไปนี้ (อังกฤษ)</SelectItem>
                 <SelectItem value="9">9. ทายคำแปลภาษาอังกฤษ</SelectItem>
                 <SelectItem value="10">10. ทายคำแปลภาษาไทย</SelectItem>
+                <SelectItem value="11">11. เกมต่อคำ</SelectItem>
+                <SelectItem value="12">12. ข้อไหนไม่เข้าพวก</SelectItem>
+                <SelectItem value="13">13. จริงหรือเท็จ</SelectItem>
               </SelectContent>
             </Select>
 
