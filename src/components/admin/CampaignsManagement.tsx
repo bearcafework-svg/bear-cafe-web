@@ -34,6 +34,13 @@ import {
   type DropResult,
 } from '@hello-pangea/dnd';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   GripVertical,
   Plus,
   Trash2,
@@ -53,6 +60,7 @@ import {
   Sparkles,
   Copy,
   FileCode,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -261,9 +269,90 @@ export function CampaignsManagement() {
     setDialogOpen(true);
   };
 
+  const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
+  const [testSendCampaign, setTestSendCampaign] = useState<BroadcastAdMessage | null>(null);
+  const [testSendPayload, setTestSendPayload] = useState<any>(null);
+  const [testSendChannelId, setTestSendChannelId] = useState<string>('');
+  const [customTestChannelId, setCustomTestChannelId] = useState<string>('');
+  const [isTestSending, setIsTestSending] = useState(false);
+
   const openPreviewDialog = (item: BroadcastAdMessage) => {
     setPreviewCampaign(item);
     setPreviewDialogOpen(true);
+  };
+
+  const openTestSendDialog = (item?: BroadcastAdMessage, customPayload?: any, defaultChannels?: string[]) => {
+    if (item) {
+      setTestSendCampaign(item);
+      setTestSendPayload(item.payload);
+      const defaultChan = item.target_channels?.[0] || channels[0]?.id || '';
+      setTestSendChannelId(defaultChan);
+    } else if (customPayload) {
+      setTestSendCampaign(null);
+      setTestSendPayload(customPayload);
+      const defaultChan = defaultChannels?.[0] || channels[0]?.id || '';
+      setTestSendChannelId(defaultChan);
+    }
+    setCustomTestChannelId('');
+    setTestSendDialogOpen(true);
+  };
+
+  const handleExecuteTestSend = async () => {
+    const finalChannelId = (testSendChannelId === 'custom' ? customTestChannelId : testSendChannelId).trim();
+    if (!finalChannelId) {
+      toast({ title: 'กรุณาเลือกหรือกรอก ID ช่อง Discord ที่ต้องการส่งทดสอบ', variant: 'destructive' });
+      return;
+    }
+    if (!testSendPayload) {
+      toast({ title: 'ไม่พบ JSON Payload สำหรับส่งทดสอบ', variant: 'destructive' });
+      return;
+    }
+
+    setIsTestSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: 'กรุณาเข้าสู่ระบบก่อน', variant: 'destructive' });
+        setIsTestSending(false);
+        return;
+      }
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-broadcast-test`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({
+            channel_id: finalChannelId,
+            payload: testSendPayload,
+          }),
+        }
+      );
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.details || json.error || `HTTP ${res.status}`);
+      }
+
+      toast({
+        title: '✅ ส่งข้อความทดสอบสำเร็จ!',
+        description: `ส่งข้อความไปยังช่อง Discord (${finalChannelId}) เรียบร้อยแล้ว`,
+        className: 'bg-green-500 text-white',
+      });
+      setTestSendDialogOpen(false);
+    } catch (err: any) {
+      toast({
+        title: '❌ ส่งข้อความทดสอบไม่สำเร็จ',
+        description: err.message || 'เกิดข้อผิดพลาดในการส่งไปยัง Discord',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestSending(false);
+    }
   };
 
   // ── Toggle Active Switch Quick Action ───────────────────────────────────────
@@ -746,6 +835,17 @@ export function CampaignsManagement() {
                                       type="button"
                                       variant="outline"
                                       size="sm"
+                                      onClick={() => openTestSendDialog(item)}
+                                      className="h-8 text-xs rounded-xl gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400 font-medium"
+                                      title="ส่งข้อความทดสอบไปยัง Discord"
+                                    >
+                                      <Send className="w-3.5 h-3.5" />
+                                      ส่งทดสอบ
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
                                       onClick={() => openPreviewDialog(item)}
                                       className="h-8 text-xs rounded-xl gap-1"
                                       title="ดูโค้ด JSON"
@@ -922,10 +1022,27 @@ export function CampaignsManagement() {
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} className="rounded-xl">
               ยกเลิก
             </Button>
-            <Button size="sm" onClick={handleSaveCampaign} className="rounded-xl font-bold gap-1.5">
-              <Save className="w-4 h-4" />
-              บันทึกข้อความ
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const valid = validateForm();
+                  if (valid) {
+                    openTestSendDialog(undefined, valid.payloadObj, formData.target_channels);
+                  }
+                }}
+                className="rounded-xl text-xs gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400 font-medium"
+              >
+                <Send className="w-3.5 h-3.5" />
+                ส่งทดสอบ
+              </Button>
+              <Button size="sm" onClick={handleSaveCampaign} className="rounded-xl font-bold gap-1.5">
+                <Save className="w-4 h-4" />
+                บันทึกข้อความ
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1026,6 +1143,90 @@ export function CampaignsManagement() {
             >
               {isUpdatingSchedule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               บันทึกการตั้งค่า
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Test Send ─── */}
+      <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-emerald-600 dark:text-emerald-400">
+              <Send className="w-5 h-5" />
+              ส่งข้อความทดสอบไป Discord
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {testSendCampaign
+                ? `ทดสอบส่งโฆษณา: "${testSendCampaign.internal_name}"`
+                : 'ทดสอบส่งข้อความบรอดแคสต์ที่กำลังแก้ไข'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">เลือกช่องแชท Discord ปลายทาง</Label>
+              <Select
+                value={testSendChannelId}
+                onValueChange={(val) => setTestSendChannelId(val)}
+              >
+                <SelectTrigger className="rounded-xl h-9 text-xs">
+                  <SelectValue placeholder="เลือกช่องแชท..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-56 rounded-xl">
+                  {testSendCampaign?.target_channels && testSendCampaign.target_channels.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase">ช่องเป้าหมายของโฆษณานี้</div>
+                      {testSendCampaign.target_channels.map((cid) => {
+                        const ch = channels.find((c) => c.id === cid);
+                        return (
+                          <SelectItem key={cid} value={cid} className="text-xs">
+                            #{ch?.name || cid} ({cid})
+                          </SelectItem>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase">ช่อง Discord ทั้งหมด</div>
+                  {channels.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.id} className="text-xs">
+                      #{ch.name} ({ch.id})
+                    </SelectItem>
+                  ))}
+
+                  <SelectItem value="custom" className="text-xs font-bold text-primary">
+                    + ระบุ ID ช่องแชทอื่นๆ (Custom Channel ID)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {testSendChannelId === 'custom' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Discord Channel ID (ตัวเลข)</Label>
+                <Input
+                  placeholder="เช่น 1168874550889566228"
+                  value={customTestChannelId}
+                  onChange={(e) => setCustomTestChannelId(e.target.value)}
+                  className="rounded-xl h-9 text-xs font-mono"
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 border-t flex items-center justify-between gap-2">
+            <Button variant="outline" size="sm" onClick={() => setTestSendDialogOpen(false)} className="rounded-xl">
+              ยกเลิก
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExecuteTestSend}
+              disabled={isTestSending}
+              className="rounded-xl font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isTestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              ส่งข้อความทดสอบ
             </Button>
           </DialogFooter>
         </DialogContent>
