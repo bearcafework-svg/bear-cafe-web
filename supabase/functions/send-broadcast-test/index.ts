@@ -58,7 +58,37 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const result = await sendDiscordBotMessage(channelId, payload);
+function sanitizeDiscordComponents(obj: any): any {
+  if (!obj || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeDiscordComponents);
+  }
+
+  const copy = { ...obj };
+
+  // If it's a Button component (type 2)
+  if (copy.type === 2) {
+    if (copy.style === 5 || (copy.url && typeof copy.url === "string" && copy.url.trim() !== "")) {
+      // Link button (style 5) MUST NOT have custom_id
+      delete copy.custom_id;
+      copy.style = 5;
+    } else if (copy.custom_id && typeof copy.custom_id === "string" && copy.custom_id.trim() !== "") {
+      // Action button (style 1-4) MUST NOT have url
+      delete copy.url;
+    }
+  }
+
+  for (const key of Object.keys(copy)) {
+    if (typeof copy[key] === "object" && copy[key] !== null) {
+      copy[key] = sanitizeDiscordComponents(copy[key]);
+    }
+  }
+
+  return copy;
+}
+
+    const cleanPayload = sanitizeDiscordComponents(payload);
+    const result = await sendDiscordBotMessage(channelId, cleanPayload);
 
     if (!result.success) {
       console.error("[send-broadcast-test] Discord send failed", result);

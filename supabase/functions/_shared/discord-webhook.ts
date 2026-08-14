@@ -76,6 +76,16 @@ function responseSuggestsInvalidComponentUrl(errorPayload: DiscordApiErrorPayloa
 function classifyBotApiFailure(status: number, errorPayload: DiscordApiErrorPayload, rawText: string): Pick<WebhookSendResult, 'error' | 'errorCode' | 'errorCategory' | 'status' | 'discordErrorCode'> {
   const discordErrorCode = errorPayload.code;
 
+  if (rawText.includes('BUTTON_COMPONENT_CUSTOM_ID_URL_MUTUALLY_EXCLUSIVE') || rawText.includes('cannot both be specified')) {
+    return {
+      error: 'Button cannot have both custom_id and url (Link button style 5 must not have custom_id)',
+      errorCode: 'button_custom_id_url_conflict',
+      errorCategory: 'discord_api',
+      status,
+      discordErrorCode,
+    };
+  }
+
   if (responseSuggestsInvalidComponentUrl(errorPayload, rawText)) {
     return {
       error: 'invalid component URL rejected by Discord',
