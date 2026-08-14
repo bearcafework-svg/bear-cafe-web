@@ -545,9 +545,13 @@ export function TagWarnLogsManagement() {
         const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
         const ext = file.name.split('.').pop() ?? 'jpg';
         const path = `tag-warn/${Date.now()}-${idx}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('evidence').upload(path, compressed, { upsert: false });
+        const contentType = compressed.type || (ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg');
+        const { error: upErr } = await supabase.storage.from('warn-images').upload(path, compressed, {
+          contentType,
+          upsert: false,
+        });
         if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from('warn-images').getPublicUrl(path);
         return urlData.publicUrl;
       };
 
@@ -677,8 +681,13 @@ export function TagWarnLogsManagement() {
     setIsDeleting(true);
     try {
       for (const url of [deleteTarget.image_url, deleteTarget.image_url_2].filter(Boolean) as string[]) {
-        const path = url.split('/evidence/')[1];
-        if (path) await supabase.storage.from('evidence').remove([path]);
+        if (url.includes('/warn-images/')) {
+          const path = url.split('/warn-images/')[1];
+          if (path) await supabase.storage.from('warn-images').remove([path]);
+        } else if (url.includes('/evidence/')) {
+          const path = url.split('/evidence/')[1];
+          if (path) await supabase.storage.from('evidence').remove([path]);
+        }
       }
       const { error: delErr } = await supabase.from('tag_warn_logs').delete().eq('id', deleteTarget.id);
       if (delErr) throw delErr;
