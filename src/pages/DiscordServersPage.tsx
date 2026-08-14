@@ -726,11 +726,16 @@ export default function DiscordServersPage() {
         ...freshData,
       };
 
-      const { error } = await (supabase
+      const { data: updatedRows, error } = await (supabase
         .from('discord_servers' as any)
         .update(updatePayload as any)
-        .eq('id', serverId)) as any;
+        .eq('id', serverId)
+        .select()) as any;
       if (error) throw error;
+
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('ไม่สามารถดันเซิร์ฟเวอร์ได้ เนื่องจากคุณไม่มีสิทธิ์แก้ไขเซิร์ฟเวอร์นี้ (กรุณาตรวจสอบสิทธิ์เจ้าของเซิร์ฟเวอร์)');
+      }
 
       toast({ title: 'ดันเซิร์ฟเวอร์สำเร็จ!', description: freshData.member_count ? `อัปเดตข้อมูลล่าสุด: ${freshData.member_count.toLocaleString()} สมาชิก` : undefined, className: 'bg-green-500 text-white' });
       fetchData();
