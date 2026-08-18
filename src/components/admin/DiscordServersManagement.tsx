@@ -18,7 +18,9 @@ import {
   Loader2, Check, X, ExternalLink, Users, Trash2, Pencil, Plus,
   MousePointerClick, FolderOpen, Star, ShieldCheck, Handshake,
   GripVertical, LayoutList, Clock, CheckCircle2, XCircle, RefreshCw,
+  Flame, Trophy, Zap, AlertTriangle, Info, Sparkles, SlidersHorizontal,
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 
@@ -37,11 +39,13 @@ interface DiscordServer {
   qc_comment: string | null;
   click_count: number | null;
   bumped_at: string | null;
+  bump_count?: number | null;
   is_featured: boolean | null;
   is_verified: boolean;
   is_partner: boolean;
   highlight_color: string | null;
   carousel_order: number | null;
+  invite_status?: "valid" | "expired" | "unknown";
 }
 
 interface Category {
@@ -105,6 +109,18 @@ export function DiscordServersManagement() {
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
   const [carouselSaving, setCarouselSaving] = useState(false);
   const [carouselOrder, setCarouselOrder] = useState<DiscordServer[]>([]);
+  const [carouselTab, setCarouselTab] = useState<'auto' | 'manual'>('auto');
+  const [carouselSettings, setCarouselSettings] = useState<{
+    mode: 'manual' | 'auto_top7';
+    window_days: number;
+    limit: number;
+    prioritize_partners: boolean;
+  }>({
+    mode: 'auto_top7',
+    window_days: 7,
+    limit: 7,
+    prioritize_partners: false,
+  });
 
   // Profile map
   const [profileMap, setProfileMap] = useState<Map<string, { username: string; avatar_url: string | null }>>(new Map());
@@ -328,7 +344,29 @@ export function DiscordServersManagement() {
   };
 
   // ── Carousel manager ───────────────────────────────────────────────────────
-  const openCarousel = () => {
+  const openCarousel = async () => {
+    try {
+      const { data } = await (supabase
+        .from('site_settings' as any)
+        .select('value')
+        .eq('key', 'discord_carousel_settings')
+        .maybeSingle()) as any;
+
+      if (data?.value) {
+        const val = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        const currentMode = val.mode === 'manual' ? 'manual' : 'auto_top7';
+        setCarouselSettings({
+          mode: currentMode,
+          window_days: val.window_days || 7,
+          limit: val.limit || 7,
+          prioritize_partners: !!val.prioritize_partners,
+        });
+        setCarouselTab(currentMode === 'manual' ? 'manual' : 'auto');
+      }
+    } catch (err) {
+      console.error('Failed to load carousel settings', err);
+    }
+
     const featured = servers
       .filter((s) => s.is_featured)
       .sort((a, b) => (a.carousel_order ?? 999) - (b.carousel_order ?? 999));
@@ -356,20 +394,45 @@ export function DiscordServersManagement() {
   const saveCarouselOrder = async () => {
     setCarouselSaving(true);
     try {
-      // Mark all servers: set is_featured + carousel_order for those in list, clear others
-      const inCarousel = new Set(carouselOrder.map((s) => s.id));
-      const updates = servers.map((s) => {
-        const idx = carouselOrder.findIndex((c) => c.id === s.id);
-        return supabase
-          .from('discord_servers' as any)
-          .update({
-            is_featured: inCarousel.has(s.id),
-            carousel_order: idx >= 0 ? idx : null,
-          } as any)
-          .eq('id', s.id) as any;
+      const activeMode = carouselTab === 'manual' ? 'manual' : 'auto_top7';
+
+      // Save settings to site_settings
+      const { error: settingsError } = await (supabase
+        .from('site_settings' as any)
+        .upsert({
+          key: 'discord_carousel_settings',
+          value: {
+            ...carouselSettings,
+            mode: activeMode,
+          },
+          updated_at: new Date().toISOString(),
+        } as any)) as any;
+
+      if (settingsError) throw settingsError;
+
+      // In manual mode, update discord_servers is_featured + carousel_order
+      if (activeMode === 'manual') {
+        const inCarousel = new Set(carouselOrder.map((s) => s.id));
+        const updates = servers.map((s) => {
+          const idx = carouselOrder.findIndex((c) => c.id === s.id);
+          return supabase
+            .from('discord_servers' as any)
+            .update({
+              is_featured: inCarousel.has(s.id),
+              carousel_order: idx >= 0 ? idx : null,
+            } as any)
+            .eq('id', s.id) as any;
+        });
+        await Promise.all(updates);
+      }
+
+      toast({
+        title: 'บันทึกการตั้งค่า Carousel สำเร็จ',
+        description: activeMode === 'auto_top7'
+          ? `เปิดใช้งานโหมด อัตโนมัติ Top ${carouselSettings.limit || 7} (ดันเซิร์ฟใน ${carouselSettings.window_days || 7} วันล่าสุด)`
+          : 'เปิดใช้งานโหมด กำหนดเอง (Manual)',
+        className: 'bg-success text-success-foreground',
       });
-      await Promise.all(updates);
-      toast({ title: 'บันทึก Carousel เรียบร้อย', className: 'bg-success text-success-foreground' });
       setIsCarouselOpen(false);
       fetchData();
     } catch (error: any) {
@@ -779,76 +842,306 @@ export function DiscordServersManagement() {
 
       {/* ── Carousel Manager Dialog ── */}
       <Dialog open={isCarouselOpen} onOpenChange={(o) => !o && setIsCarouselOpen(false)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <LayoutList className="h-5 w-5" /> จัดการ Carousel
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <LayoutList className="h-5 w-5 text-primary" /> จัดการระบบ Discord Carousel
             </DialogTitle>
-            <DialogDescription>เลือกและเรียงลำดับเซิร์ฟเวอร์ที่จะแสดงใน Carousel</DialogDescription>
+            <DialogDescription>
+              เลือกรูปแบบการแสดงผล Carousel ระหว่างระบบอัตโนมัติ Top 7 ดันบ่อย หรือกำหนดเอง
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            {/* Current carousel list */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                ลำดับปัจจุบัน ({carouselOrder.length} เซิร์ฟเวอร์)
-              </p>
-              {carouselOrder.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4 border rounded-xl border-dashed">
-                  ยังไม่มีเซิร์ฟเวอร์ใน Carousel
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {carouselOrder.map((s, i) => (
-                    <div key={s.id} className="flex items-center gap-2 p-2 border rounded-xl bg-muted/30">
-                      <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">{i + 1}</span>
-                      {s.icon_url ? (
-                        <img src={s.icon_url} alt={s.name} className="w-7 h-7 rounded-lg object-cover shrink-0" />
-                      ) : (
-                        <div className="w-7 h-7 rounded-lg bg-peach flex items-center justify-center text-xs font-bold text-white shrink-0">{s.name[0]}</div>
-                      )}
-                      <span className="flex-1 text-sm font-medium truncate">{s.name}</span>
-                      <div className="flex gap-1 shrink-0">
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => moveCarouselItem(i, -1)} disabled={i === 0}>▲</Button>
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => moveCarouselItem(i, 1)} disabled={i === carouselOrder.length - 1}>▼</Button>
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeFromCarousel(s.id)}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+          <Tabs value={carouselTab} onValueChange={(v: any) => setCarouselTab(v)} className="w-full pt-2">
+            <TabsList className="grid grid-cols-2 w-full mb-4">
+              <TabsTrigger value="auto" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span>อัตโนมัติ Top {carouselSettings.limit || 7} (ดันใน 7 วัน)</span>
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <LayoutList className="w-4 h-4" />
+                <span>กำหนดเอง (Manual)</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Tab 1: Auto Mode (Top 7 Active Bumps) ── */}
+            <TabsContent value="auto" className="space-y-4 m-0">
+              <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs text-foreground space-y-1.5">
+                <div className="flex items-center gap-1.5 font-semibold text-orange-600 dark:text-orange-400 text-sm">
+                  <Flame className="w-4 h-4" /> เงื่อนไขระบบอัตโนมัติ (Top {carouselSettings.limit || 7})
                 </div>
-              )}
-            </div>
-
-            {/* Add from approved servers */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                เพิ่มเซิร์ฟเวอร์ที่อนุมัติแล้ว
-              </p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {servers
-                  .filter((s) => s.status === 'approved' && !carouselOrder.find((c) => c.id === s.id))
-                  .map((s) => (
-                    <div key={s.id} className="flex items-center gap-2 p-2 border rounded-xl hover:bg-muted/30 cursor-pointer" onClick={() => addToCarousel(s)}>
-                      {s.icon_url ? (
-                        <img src={s.icon_url} alt={s.name} className="w-6 h-6 rounded-md object-cover shrink-0" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-md bg-peach flex items-center justify-center text-xs font-bold text-white shrink-0">{s.name[0]}</div>
-                      )}
-                      <span className="flex-1 text-sm truncate">{s.name}</span>
-                      <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                  ))}
+                <p className="text-muted-foreground leading-relaxed">
+                  • เฉพาะเซิร์ฟเวอร์ที่มีการกดดันในรอบ <strong>{carouselSettings.window_days || 7} วันล่าสุด</strong> เท่านั้นที่จะมีสิทธิ์แสดงผล<br />
+                  • หากเซิร์ฟเวอร์ใดไม่ได้กดดันเกิน {carouselSettings.window_days || 7} วัน จะ <strong>หลุดออกจาก Carousel ทันทีโดยอัตโนมัติ</strong><br />
+                  • ระบบจัดอันดับตาม <strong>จำนวนครั้งที่กดดันสะสม (🔥 Total Bumps)</strong> และเวลาที่เพิ่งดันล่าสุด คัดเฉพาะ <strong>Top {carouselSettings.limit || 7}</strong> ขึ้นแสดง
+                </p>
               </div>
-            </div>
-          </div>
 
-          <DialogFooter>
+              {/* Settings Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border bg-muted/20">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">จำนวนเซิร์ฟเวอร์สูงสุด (Top N)</Label>
+                  <Select
+                    value={String(carouselSettings.limit || 7)}
+                    onValueChange={(val) => setCarouselSettings((prev) => ({ ...prev, limit: Number(val) }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">Top 5 รายการ</SelectItem>
+                      <SelectItem value="7">Top 7 รายการ (แนะนำ)</SelectItem>
+                      <SelectItem value="10">Top 10 รายการ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">ช่วงเวลา Active ตรวจสอบ</Label>
+                  <Select
+                    value={String(carouselSettings.window_days || 7)}
+                    onValueChange={(val) => setCarouselSettings((prev) => ({ ...prev, window_days: Number(val) }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 วันล่าสุด</SelectItem>
+                      <SelectItem value="7">7 วันล่าสุด (แนะนำตามรอบ Cooldown)</SelectItem>
+                      <SelectItem value="14">14 วันล่าสุด</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Live Preview List */}
+              {(() => {
+                const windowDays = carouselSettings.window_days || 7;
+                const cutoffTime = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+                const limitCount = carouselSettings.limit || 7;
+                const approved = servers.filter((s) => s.status === 'approved');
+
+                const activeBumpServers = approved
+                  .filter((s) => s.bumped_at && new Date(s.bumped_at).getTime() >= cutoffTime)
+                  .sort((a, b) => {
+                    if (carouselSettings.prioritize_partners && a.is_partner !== b.is_partner) {
+                      return a.is_partner ? -1 : 1;
+                    }
+                    const bumpA = a.bump_count ?? 0;
+                    const bumpB = b.bump_count ?? 0;
+                    if (bumpB !== bumpA) return bumpB - bumpA;
+                    return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
+                  });
+
+                const topList = activeBumpServers.slice(0, limitCount);
+                const waitList = activeBumpServers.slice(limitCount);
+                const inactiveList = approved.filter(
+                  (s) => !s.bumped_at || new Date(s.bumped_at).getTime() < cutoffTime
+                );
+
+                const getRemainingTime = (dateStr: string | null) => {
+                  if (!dateStr) return 'หมดอายุแล้ว';
+                  const expireMs = new Date(dateStr).getTime() + windowDays * 24 * 60 * 60 * 1000;
+                  const rem = expireMs - Date.now();
+                  if (rem <= 0) return 'หมดอายุแล้ว';
+                  const hours = Math.floor(rem / (1000 * 60 * 60));
+                  const d = Math.floor(hours / 24);
+                  const h = hours % 24;
+                  return d > 0 ? `${d} วัน ${h} ชม.` : `${h} ชม.`;
+                };
+
+                const getTimeSince = (dateStr: string | null) => {
+                  if (!dateStr) return 'ไม่เคยดัน';
+                  const hours = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60));
+                  if (hours < 1) return 'เมื่อสักครู่';
+                  if (hours < 24) return `${hours} ชม. ที่แล้ว`;
+                  return `${Math.floor(hours / 24)} วันที่แล้ว`;
+                };
+
+                return (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+                          <span>อันดับที่จะได้ขึ้น Carousel ({topList.length}/{limitCount} เซิร์ฟเวอร์)</span>
+                        </p>
+                        <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">
+                          Active ใน {windowDays} วัน
+                        </Badge>
+                      </div>
+
+                      {topList.length === 0 ? (
+                        <div className="p-6 text-center border rounded-xl border-dashed bg-muted/10 space-y-1">
+                          <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto" />
+                          <p className="text-sm font-medium text-foreground">ยังไม่มีเซิร์ฟเวอร์ที่ดันในรอบ {windowDays} วัน</p>
+                          <p className="text-xs text-muted-foreground">เมื่อเจ้าของเซิร์ฟเวอร์กดปุ่มดัน จะขึ้นแสดงที่นี่ทันที</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {topList.map((s, idx) => (
+                            <div
+                              key={s.id}
+                              className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-card/60 hover:bg-muted/30 transition-colors"
+                            >
+                              <span className={cn(
+                                'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                                idx === 0 ? 'bg-yellow-500 text-black shadow-sm' :
+                                idx === 1 ? 'bg-slate-300 text-black' :
+                                idx === 2 ? 'bg-amber-600 text-white' :
+                                'bg-muted text-muted-foreground font-mono'
+                              )}>
+                                {idx + 1}
+                              </span>
+
+                              {s.icon_url ? (
+                                <img src={s.icon_url} alt={s.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                                  {s.name[0]}
+                                </div>
+                              )}
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm font-semibold text-foreground truncate">{s.name}</span>
+                                  {s.is_verified && <ShieldCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                                  {s.is_partner && <Handshake className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400 font-medium">
+                                    <Flame className="w-3 h-3" /> ดัน {s.bump_count || 1} ครั้ง
+                                  </span>
+                                  <span>•</span>
+                                  <span>ดัน {getTimeSince(s.bumped_at)}</span>
+                                  <span>•</span>
+                                  <span className="text-green-600 dark:text-green-400">เหลือ {getRemainingTime(s.bumped_at)}</span>
+                                </div>
+                              </div>
+
+                              <Badge className="bg-green-500 text-white text-[10px] shrink-0">
+                                แสดงบน Carousel
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Waiting List (Rank 8+) */}
+                    {waitList.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> รายการรออันดับถัดไป ({waitList.length} เซิร์ฟเวอร์)
+                        </p>
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                          {waitList.map((s, idx) => (
+                            <div key={s.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/20 text-xs">
+                              <span className="font-mono text-muted-foreground w-6 text-center shrink-0">#{limitCount + idx + 1}</span>
+                              <span className="flex-1 font-medium truncate">{s.name}</span>
+                              <span className="text-muted-foreground shrink-0">ดัน {s.bump_count || 1} ครั้ง</span>
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground shrink-0">รออันดับ</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inactive Servers */}
+                    {inactiveList.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1 text-red-500/80">
+                          <XCircle className="w-3.5 h-3.5" /> เซิร์ฟเวอร์ที่หลุดจาก Carousel (ไม่ได้ดันเกิน {windowDays} วัน) ({inactiveList.length} เซิร์ฟเวอร์)
+                        </p>
+                        <div className="space-y-1 max-h-28 overflow-y-auto">
+                          {inactiveList.slice(0, 10).map((s) => (
+                            <div key={s.id} className="flex items-center justify-between p-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted/20">
+                              <span className="truncate flex-1">{s.name}</span>
+                              <span className="text-[10px] shrink-0 text-red-500/70">
+                                {s.bumped_at ? `ดันล่าสุด ${getTimeSince(s.bumped_at)}` : 'ยังไม่เคยดัน'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </TabsContent>
+
+            {/* ── Tab 2: Manual Mode ── */}
+            <TabsContent value="manual" className="space-y-4 m-0">
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-foreground flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-muted-foreground leading-relaxed">
+                  ในโหมดกำหนดเอง แอดมินสามารถเลือกและสลับลำดับเซิร์ฟเวอร์ใน Carousel ได้ด้วยตนเองอย่างอิสระ
+                </p>
+              </div>
+
+              {/* Current carousel list */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  ลำดับปัจจุบัน ({carouselOrder.length} เซิร์ฟเวอร์)
+                </p>
+                {carouselOrder.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border rounded-xl border-dashed">
+                    ยังไม่มีเซิร์ฟเวอร์ใน Carousel (เลือกเพิ่มจากรายการด้านล่าง)
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {carouselOrder.map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-2 p-2 border rounded-xl bg-card">
+                        <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">{i + 1}</span>
+                        {s.icon_url ? (
+                          <img src={s.icon_url} alt={s.name} className="w-7 h-7 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">{s.name[0]}</div>
+                        )}
+                        <span className="flex-1 text-sm font-medium truncate">{s.name}</span>
+                        <div className="flex gap-1 shrink-0">
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => moveCarouselItem(i, -1)} disabled={i === 0}>▲</Button>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => moveCarouselItem(i, 1)} disabled={i === carouselOrder.length - 1}>▼</Button>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10" onClick={() => removeFromCarousel(s.id)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add from approved servers */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  เพิ่มเซิร์ฟเวอร์ที่อนุมัติแล้ว
+                </p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {servers
+                    .filter((s) => s.status === 'approved' && !carouselOrder.find((c) => c.id === s.id))
+                    .map((s) => (
+                      <div key={s.id} className="flex items-center gap-2 p-2 border rounded-xl hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => addToCarousel(s)}>
+                        {s.icon_url ? (
+                          <img src={s.icon_url} alt={s.name} className="w-6 h-6 rounded-md object-cover shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-md bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">{s.name[0]}</div>
+                        )}
+                        <span className="flex-1 text-sm truncate">{s.name}</span>
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="pt-2 border-t mt-4 gap-2">
             <Button variant="outline" onClick={() => setIsCarouselOpen(false)}>ยกเลิก</Button>
-            <Button onClick={saveCarouselOrder} disabled={carouselSaving}>
-              {carouselSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} บันทึกลำดับ
+            <Button onClick={saveCarouselOrder} disabled={carouselSaving} className="gap-1.5">
+              {carouselSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>บันทึกการตั้งค่า</span>
             </Button>
           </DialogFooter>
         </DialogContent>

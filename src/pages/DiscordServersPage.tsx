@@ -18,7 +18,7 @@ import {
   ArrowLeft, Plus, Users, Info, Loader2,
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
-  Filter, LogIn, ShieldCheck, Handshake, RefreshCw,
+  Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -44,6 +44,7 @@ interface DiscordServer {
   owner_id: string;
   category_id: string | null;
   bumped_at: string | null;
+  bump_count?: number | null;
   click_count: number | null;
   impression_count: number | null;
   is_featured: boolean | null;
@@ -180,8 +181,14 @@ function StarRating({
 }
 
 // ─── Featured Carousel ────────────────────────────────────────────────────────
-function FeaturedCarousel({ servers, onClickJoin }: {
-  servers: DiscordServer[]; onClickJoin: (s: DiscordServer) => void;
+function FeaturedCarousel({
+  servers,
+  onClickJoin,
+  carouselConfig,
+}: {
+  servers: DiscordServer[];
+  onClickJoin: (s: DiscordServer) => void;
+  carouselConfig?: { mode: 'manual' | 'auto_top7'; window_days: number; limit: number };
 }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -200,6 +207,8 @@ function FeaturedCarousel({ servers, onClickJoin }: {
 
   if (len === 0) return null;
 
+  const isAutoMode = carouselConfig?.mode !== 'manual';
+
   const getStyle = (index: number) => {
     const diff = ((index - active) % len + len) % len;
     const n = diff > len / 2 ? diff - len : diff;
@@ -217,10 +226,23 @@ function FeaturedCarousel({ servers, onClickJoin }: {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-6 sm:mb-10">
-      <div className="flex items-center gap-2 mb-3 sm:mb-4">
-        <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary fill-primary" />
-        <div>
-          <h3 className="text-sm sm:text-lg font-bold text-foreground">เซิร์ฟเวอร์แนะนำ</h3>
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div className="flex items-center gap-2">
+          {isAutoMode ? (
+            <Flame className="w-5 h-5 text-orange-500 fill-orange-500 animate-pulse" />
+          ) : (
+            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary fill-primary" />
+          )}
+          <div>
+            <h3 className="text-sm sm:text-lg font-bold text-foreground flex items-center gap-2">
+              <span>{isAutoMode ? `Top ${len} เซิร์ฟเวอร์ดันบ่อยสุด` : 'เซิร์ฟเวอร์แนะนำ'}</span>
+              {isAutoMode && (
+                <Badge variant="outline" className="text-[10px] py-0.5 px-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 rounded-full font-medium">
+                  Active 7 วัน
+                </Badge>
+              )}
+            </h3>
+          </div>
         </div>
       </div>
 
@@ -247,6 +269,26 @@ function FeaturedCarousel({ servers, onClickJoin }: {
                   ? <img src={server.banner_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/30" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+
+                {/* Top Badge */}
+                {isAutoMode && (
+                  <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 z-10 flex items-center gap-1.5 bg-black/65 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-[10px] sm:text-xs font-bold border border-white/20 shadow-md">
+                    <span className={cn(
+                      'w-4 h-4 rounded-full flex items-center justify-center text-[10px]',
+                      index === 0 ? 'bg-yellow-500 text-black font-extrabold' :
+                      index === 1 ? 'bg-slate-300 text-black' :
+                      index === 2 ? 'bg-amber-600 text-white' :
+                      'bg-white/20 text-white'
+                    )}>
+                      #{index + 1}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-orange-300 font-semibold">
+                      <Flame className="w-3 h-3 fill-orange-400 text-orange-400" />
+                      {server.bump_count || 1} ดัน
+                    </span>
+                  </div>
+                )}
+
                 <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex items-end gap-3 sm:gap-4">
                   <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 border-white/30 shadow-lg shrink-0 bg-white/10 backdrop-blur-sm">
                     {server.icon_url
@@ -525,6 +567,12 @@ export default function DiscordServersPage() {
   const [showMyOnly, setShowMyOnly] = useState(false);
   const [inviteUrl, setInviteUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [carouselConfig, setCarouselConfig] = useState<{
+    mode: 'manual' | 'auto_top7';
+    window_days: number;
+    limit: number;
+    prioritize_partners?: boolean;
+  }>({ mode: 'auto_top7', window_days: 7, limit: 7 });
 
   // ── Invite status state ───────────────────────────────────────────────────
   const [ownerExpiredServers, setOwnerExpiredServers] = useState<DiscordServer[]>([]);
@@ -538,11 +586,22 @@ export default function DiscordServersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [catRes, serverRes, ratingRes] = await Promise.all([
+      const [catRes, serverRes, ratingRes, settingRes] = await Promise.all([
         (supabase.from('discord_server_categories' as any).select('*').order('sort_order', { ascending: true })) as any,
         (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').neq('invite_status', 'expired').order('bumped_at', { ascending: false })) as any,
         (supabase.from('server_ratings' as any).select('server_id, rating, user_id')) as any,
+        (supabase.from('site_settings' as any).select('value').eq('key', 'discord_carousel_settings').maybeSingle()) as any,
       ]);
+
+      if (settingRes?.data?.value) {
+        const val = typeof settingRes.data.value === 'string' ? JSON.parse(settingRes.data.value) : settingRes.data.value;
+        setCarouselConfig({
+          mode: val.mode || 'auto_top7',
+          window_days: val.window_days || 7,
+          limit: val.limit || 7,
+          prioritize_partners: !!val.prioritize_partners,
+        });
+      }
 
       setCategories((catRes.data || []) as Category[]);
 
@@ -720,9 +779,11 @@ export default function DiscordServersPage() {
         // ถ้าดึงไม่ได้ก็ bump ต่อได้ ไม่ต้อง block
       }
 
-      // ── อัปเดต bumped_at + ข้อมูลใหม่ ──────────────────────────────────────
+      // ── อัปเดต bumped_at + bump_count + ข้อมูลใหม่ ──────────────────────────────────────
+      const currentBumpCount = (server.bump_count ?? 0) + 1;
       const updatePayload = {
         bumped_at: new Date().toISOString(),
+        bump_count: currentBumpCount,
         ...freshData,
       };
 
@@ -737,7 +798,22 @@ export default function DiscordServersPage() {
         throw new Error('ไม่สามารถดันเซิร์ฟเวอร์ได้ เนื่องจากคุณไม่มีสิทธิ์แก้ไขเซิร์ฟเวอร์นี้ (กรุณาตรวจสอบสิทธิ์เจ้าของเซิร์ฟเวอร์)');
       }
 
-      toast({ title: 'ดันเซิร์ฟเวอร์สำเร็จ!', description: freshData.member_count ? `อัปเดตข้อมูลล่าสุด: ${freshData.member_count.toLocaleString()} สมาชิก` : undefined, className: 'bg-green-500 text-white' });
+      // Track individual bump in discord_server_bumps log table
+      try {
+        await (supabase.from('discord_server_bumps' as any).insert({
+          server_id: serverId,
+          user_id: user.discord_id,
+          created_at: new Date().toISOString(),
+        } as any)) as any;
+      } catch (logErr) {
+        console.warn('Could not record bump log', logErr);
+      }
+
+      toast({
+        title: '🔥 ดันเซิร์ฟเวอร์สำเร็จ!',
+        description: `บันทึกการดันครั้งที่ ${currentBumpCount} แล้ว${freshData.member_count ? ` • อัปเดต: ${freshData.member_count.toLocaleString()} สมาชิก` : ''}`,
+        className: 'bg-green-500 text-white',
+      });
       fetchData();
     } catch (error: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' });
@@ -834,9 +910,34 @@ export default function DiscordServersPage() {
   };
 
   // ── Filter + Sort ─────────────────────────────────────────────────────────────
-  const featuredServers = [...servers]
-    .filter((s) => s.is_featured && s.invite_status !== 'expired')
-    .sort((a, b) => (a.carousel_order ?? 999) - (b.carousel_order ?? 999));
+  let featuredServers: DiscordServer[] = [];
+  if (carouselConfig.mode === 'manual') {
+    featuredServers = [...servers]
+      .filter((s) => s.is_featured && s.invite_status !== 'expired')
+      .sort((a, b) => (a.carousel_order ?? 999) - (b.carousel_order ?? 999));
+  } else {
+    // Auto Top 7 mode: Active within window_days (default 7 days) and ranked by bump_count DESC, bumped_at DESC
+    const windowDays = carouselConfig.window_days || 7;
+    const cutoffTime = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+    const limitCount = carouselConfig.limit || 7;
+
+    featuredServers = [...servers]
+      .filter((s) => {
+        if (s.invite_status === 'expired') return false;
+        if (!s.bumped_at) return false;
+        return new Date(s.bumped_at).getTime() >= cutoffTime;
+      })
+      .sort((a, b) => {
+        if (carouselConfig.prioritize_partners && a.is_partner !== b.is_partner) {
+          return a.is_partner ? -1 : 1;
+        }
+        const bumpA = a.bump_count ?? 0;
+        const bumpB = b.bump_count ?? 0;
+        if (bumpB !== bumpA) return bumpB - bumpA;
+        return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
+      })
+      .slice(0, limitCount);
+  }
 
   const filteredServers = servers
     .filter((server) => {
@@ -893,7 +994,11 @@ export default function DiscordServersPage() {
 
         {/* UI Design Switcher (Kawaii Shop vs Classic Grid) */}
         {/* Featured Carousel */}
-        <FeaturedCarousel servers={featuredServers} onClickJoin={handleClickJoin} />
+        <FeaturedCarousel
+          servers={featuredServers}
+          onClickJoin={handleClickJoin}
+          carouselConfig={carouselConfig}
+        />
 
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-8">
