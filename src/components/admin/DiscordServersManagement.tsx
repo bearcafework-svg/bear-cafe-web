@@ -18,11 +18,13 @@ import {
   Loader2, Check, X, ExternalLink, Users, Trash2, Pencil, Plus,
   MousePointerClick, FolderOpen, Star, ShieldCheck, Handshake,
   GripVertical, LayoutList, Clock, CheckCircle2, XCircle, RefreshCw,
-  Flame, Trophy, Zap, AlertTriangle, Info, Sparkles, SlidersHorizontal,
+  Flame, Trophy, Zap, AlertTriangle, Info, Sparkles, SlidersHorizontal, Search,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
+import { batchScanDiscordServers, validateAndUpdateServerInvite } from '@/lib/discord-invite-checker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DiscordServer {
@@ -125,15 +127,28 @@ export function DiscordServersManagement() {
   // Profile map
   const [profileMap, setProfileMap] = useState<Map<string, { username: string; avatar_url: string | null }>>(new Map());
 
+  // Per-card refresh state
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
+  // Scan invites state
+  const [isScanOpen, setIsScanOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSummary, setScanSummary] = useState<{
+    total: number;
+    current: number;
+    currentName: string;
+    validCount: number;
+    expiredCount: number;
+    errorCount: number;
+    expiredList: Array<{ id: string; name: string; invite_url: string; reason?: string }>;
+  } | null>(null);
+
   // Tab state
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   // Confirm status dialog
   const [confirmTarget, setConfirmTarget] = useState<{ server: DiscordServer; status: 'approved' | 'rejected' } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
-
-  // Per-card refresh state
-  const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -169,6 +184,68 @@ export function DiscordServersManagement() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // ── Batch scan all invites ────────────────────────────────────────────────
+  const handleStartScan = async () => {
+    setIsScanning(true);
+    const targets = servers.map((s) => ({ id: s.id, invite_url: s.invite_url, name: s.name }));
+    setScanSummary({
+      total: targets.length,
+      current: 0,
+      currentName: 'กำลังเริ่มต้นตรวจสอบ...',
+      validCount: 0,
+      expiredCount: 0,
+      errorCount: 0,
+      expiredList: [],
+    });
+
+    const res = await batchScanDiscordServers(
+      targets,
+      (current, total, s, result) => {
+        setScanSummary((prev) => {
+          if (!prev) return prev;
+          const isExp = result.status === 'expired';
+          const isVal = result.status === 'valid';
+          return {
+            ...prev,
+            current,
+            currentName: s.name,
+            validCount: isVal ? prev.validCount + 1 : prev.validCount,
+            expiredCount: isExp ? prev.expiredCount + 1 : prev.expiredCount,
+            errorCount: !isVal && !isExp ? prev.errorCount + 1 : prev.errorCount,
+            expiredList: isExp
+              ? [...prev.expiredList, { id: s.id, name: s.name, invite_url: s.name, reason: result.error }]
+              : prev.expiredList,
+          };
+        });
+
+        // Optimistically update local servers array
+        setServers((prev) =>
+          prev.map((item) =>
+            item.id === s.id
+              ? {
+                  ...item,
+                  invite_status:
+                    result.status === 'valid'
+                      ? 'valid'
+                      : result.status === 'expired'
+                      ? 'expired'
+                      : item.invite_status,
+                }
+              : item
+          )
+        );
+      },
+      500
+    );
+
+    setIsScanning(false);
+    toast({
+      title: '🔍 ตรวจสอบลิงก์เสร็จสิ้น',
+      description: `พบลิงก์ปกติ ${res.validCount} | ลิงก์พัง ${res.expiredCount} | ข้อผิดพลาด ${res.errorCount}`,
+      className: res.expiredCount > 0 ? 'bg-amber-500 text-white' : 'bg-green-500 text-white',
+    });
+  };
 
   // ── Status update ──────────────────────────────────────────────────────────
   const handleUpdateStatus = async (id: string, status: 'approved' | 'rejected') => {
@@ -221,11 +298,11 @@ export function DiscordServersManagement() {
     if (result.success && result.updated) {
       // Optimistic update
       setServers((prev) => prev.map((s) =>
-        s.id === server.id ? { ...s, ...result.updated } : s
+        s.id === server.id ? { ...s, ...result.updated, invite_status: 'valid' } : s
       ));
       toast({
         title: 'อัปเดตข้อมูลสำเร็จ',
-        description: `${result.updated.name} — ${(result.updated.member_count ?? 0).toLocaleString()} สมาชิก`,
+        description: `${result.updated.name} — ${(result.updated.member_count ?? 0).toLocaleString()} สมาชิก (ลิงก์ปกติ)`,
         className: 'bg-success text-success-foreground',
       });
     } else {
@@ -468,7 +545,10 @@ export function DiscordServersManagement() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">จัดการเซิร์ฟเวอร์</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => setIsScanOpen(true)} className="gap-1 text-primary border-primary/40 hover:bg-primary/10">
+            <Search className="h-4 w-4" /> ตรวจเช็กลิงก์ทั้งหมด
+          </Button>
           <Button size="sm" variant="outline" onClick={fetchData} disabled={loading} className="gap-1">
             <Loader2 className={cn('h-4 w-4', loading && 'animate-spin')} /> รีเฟรช
           </Button>
@@ -528,7 +608,10 @@ export function DiscordServersManagement() {
           tabServers.map((server) => (
             <Card
               key={server.id}
-              className="overflow-hidden border-2 border-latte/20 dark:border-coffee/20"
+              className={cn(
+                'overflow-hidden border-2 border-latte/20 dark:border-coffee/20',
+                server.invite_status === 'expired' && 'border-red-500/40 dark:border-red-800/50'
+              )}
               style={highlightStyle(server.highlight_color)}
             >
               {server.banner_url ? (
@@ -549,6 +632,16 @@ export function DiscordServersManagement() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1 justify-end">
+                    {server.invite_status === 'expired' && (
+                      <Badge variant="destructive" className="text-[10px] gap-0.5">
+                        <AlertTriangle className="h-2.5 w-2.5" />ลิงก์พัง
+                      </Badge>
+                    )}
+                    {server.invite_status === 'valid' && (
+                      <Badge className="bg-emerald-600/90 text-white text-[10px] gap-0.5">
+                        <Check className="h-2.5 w-2.5" />ลิงก์ปกติ
+                      </Badge>
+                    )}
                     {server.is_featured && <Badge className="bg-yellow-400 text-yellow-900 text-[10px]"><Star className="h-2.5 w-2.5 mr-0.5" />Featured</Badge>}
                     {server.is_verified && <Badge className="bg-blue-500 text-white text-[10px]"><ShieldCheck className="h-2.5 w-2.5 mr-0.5" />Verified</Badge>}
                     {server.is_partner && <Badge className="bg-purple-500 text-white text-[10px]"><Handshake className="h-2.5 w-2.5 mr-0.5" />Partner</Badge>}
@@ -1191,6 +1284,109 @@ export function DiscordServersManagement() {
               {categories.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">ยังไม่มีหมวดหมู่</p>}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Batch Scan Invites Dialog ── */}
+      <Dialog open={isScanOpen} onOpenChange={(open) => { if (!isScanning) setIsScanOpen(open); }}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              ตรวจสอบลิงก์เชิญทั้งหมด (Batch Scan)
+            </DialogTitle>
+            <DialogDescription>
+              ระบบจะยิงตรวจสอบลิงก์เชิญ Discord ของทุกเซิร์ฟเวอร์ และอัปเดตสถานะ (ลิงก์ปกติ / ลิงก์พัง) ให้อัตโนมัติ
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3 space-y-4">
+            {/* Action explanation */}
+            {!scanSummary && (
+              <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 border border-primary/20 space-y-2">
+                <p className="text-sm font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary" /> ตรวจสอบทั้งหมด {servers.length} เซิร์ฟเวอร์
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  ระบบจะเว้นระยะเวลา 500ms ต่อลิงก์เพื่อป้องกัน Discord API Rate limit (429) โดยจะอัปเดตข้อมูลสมาชิกและรูปภาพล่าสุดให้อัตโนมัติด้วย
+                </p>
+              </div>
+            )}
+
+            {/* Scanning progress */}
+            {scanSummary && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground truncate max-w-[280px]">
+                    {isScanning ? `กำลังตรวจสอบ: ${scanSummary.currentName}` : '✅ ตรวจสอบเสร็จสิ้นแล้ว'}
+                  </span>
+                  <span className="font-semibold">{scanSummary.current} / {scanSummary.total}</span>
+                </div>
+                <Progress value={scanSummary.total > 0 ? (scanSummary.current / scanSummary.total) * 100 : 0} className="h-2 rounded-full" />
+
+                {/* Counter boxes */}
+                <div className="grid grid-cols-3 gap-2 pt-2 text-center">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">ลิงก์ปกติ</p>
+                    <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{scanSummary.validCount}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/30">
+                    <p className="text-xs text-destructive font-medium">ลิงก์พัง</p>
+                    <p className="text-lg font-bold text-destructive">{scanSummary.expiredCount}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-muted border">
+                    <p className="text-xs text-muted-foreground font-medium">ข้อผิดพลาด</p>
+                    <p className="text-lg font-bold text-foreground">{scanSummary.errorCount}</p>
+                  </div>
+                </div>
+
+                {/* List of broken servers if any */}
+                {scanSummary.expiredList.length > 0 && (
+                  <div className="space-y-1.5 pt-2">
+                    <Label className="text-xs font-semibold text-destructive flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> พบบริการที่ลิงก์พัง/หมดอายุ:
+                    </Label>
+                    <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                      {scanSummary.expiredList.map((exp) => (
+                        <div key={exp.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                          <span className="font-medium truncate max-w-[200px]">{exp.name}</span>
+                          <Badge variant="destructive" className="text-[10px] shrink-0">ลิงก์หมดอายุ</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              disabled={isScanning}
+              onClick={() => { setIsScanOpen(false); setScanSummary(null); }}
+              className="rounded-xl"
+            >
+              {isScanning ? 'กำลังสแกน...' : 'ปิด'}
+            </Button>
+            <Button
+              onClick={handleStartScan}
+              disabled={isScanning || servers.length === 0}
+              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>กำลังตรวจสอบ...</span>
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4" />
+                  <span>เริ่มตรวจสอบ ({servers.length} รายการ)</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

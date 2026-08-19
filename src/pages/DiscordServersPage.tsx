@@ -309,10 +309,26 @@ function FeaturedCarousel({
                       )}
                     </div>
                   </div>
-                  <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3 sm:px-5 shrink-0 text-xs sm:text-sm" onClick={() => onClickJoin(server)}>
-                    <span className="hidden sm:inline">เข้าดิสคอร์ด</span>
-                    <span className="sm:hidden">เข้าร่วม</span>
-                  </Button>
+                  {server.invite_status === 'expired' ? (
+                    <Button
+                      size="sm"
+                      disabled
+                      className="rounded-full bg-red-600/70 text-white border border-red-500/60 shadow-lg px-3 sm:px-4 shrink-0 text-xs sm:text-sm cursor-not-allowed font-medium select-none"
+                      title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
+                    >
+                      <AlertTriangle className="w-3 h-3 mr-1 text-red-200" />
+                      <span>ลิงก์พัง</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3 sm:px-5 shrink-0 text-xs sm:text-sm"
+                      onClick={() => onClickJoin(server)}
+                    >
+                      <span className="hidden sm:inline">เข้าดิสคอร์ด</span>
+                      <span className="sm:hidden">เข้าร่วม</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -400,16 +416,18 @@ interface ServerCardProps {
   handleRated: (serverId: string, rating: number) => void;
   onRefresh: (server: DiscordServer) => void;
   refreshingId: string | null;
+  onEditLink?: (server: DiscordServer) => void;
 }
 
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
-  onRefresh, refreshingId,
+  onRefresh, refreshingId, onEditLink,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
   const canAnimate = server.is_verified === true;
+  const isExpired = server.invite_status === 'expired';
 
   const handleCardMouseEnter = () => {
     if (!canAnimate || !bannerRef.current) return;
@@ -431,7 +449,7 @@ function ServerCard({
       <Card
         className={[
           'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
-          isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
+          isExpired ? 'opacity-90 border-red-500/30' : isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
         ].join(' ')}
         style={getHighlightStyle(server.highlight_color)}
       >
@@ -442,7 +460,7 @@ function ServerCard({
                 ref={bannerRef}
                 src={server.banner_url}
                 alt=""
-                className="w-full h-full object-cover"
+                className={cn('w-full h-full object-cover', isExpired && 'grayscale-[40%]')}
                 style={canAnimate ? {
                   transition: 'transform 700ms ease-out',
                   willChange: 'transform',
@@ -452,8 +470,13 @@ function ServerCard({
               />
             : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
           <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
-          {/* Category + Partner badge */}
+          {/* Category + Partner + Expired badge */}
           <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 flex-wrap justify-end">
+            {isExpired && (
+              <Badge className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" />ลิงก์หมดอายุ
+              </Badge>
+            )}
             {server.is_partner && (
               <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Handshake className="w-2.5 h-2.5" />Partner
@@ -471,7 +494,7 @@ function ServerCard({
           {/* Icon */}
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
             {server.icon_url
-              ? <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+              ? <img src={server.icon_url} alt={server.name} className={cn('w-full h-full object-cover', isExpired && 'grayscale-[30%]')} loading="lazy" decoding="async" />
               : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
           </div>
 
@@ -534,13 +557,39 @@ function ServerCard({
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === server.id ? 'animate-spin' : ''}`} />
               </Button>
             )}
-            <Button
-              size="sm"
-              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm"
-              onClick={() => handleClickJoin(server)}
-            >
-              เข้าดิสคอร์ด
-            </Button>
+            {/* Edit link for owner if expired */}
+            {user && server.owner_id === user.discord_id && isExpired && onEditLink && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full border-orange-400/80 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-xs px-2.5 h-8 font-medium"
+                onClick={() => onEditLink(server)}
+                title="แก้ไขลิงก์เชิญใหม่"
+              >
+                <LinkIcon className="w-3 h-3 mr-1" />
+                แก้ลิงก์
+              </Button>
+            )}
+            {/* Join button / Broken link button */}
+            {isExpired ? (
+              <Button
+                size="sm"
+                disabled
+                className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-4 ml-auto text-xs sm:text-sm cursor-not-allowed opacity-90 font-medium select-none"
+                title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-destructive shrink-0" />
+                <span>ลิงก์พัง</span>
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm"
+                onClick={() => handleClickJoin(server)}
+              >
+                เข้าดิสคอร์ด
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -588,7 +637,7 @@ export default function DiscordServersPage() {
       setLoading(true);
       const [catRes, serverRes, ratingRes, settingRes] = await Promise.all([
         (supabase.from('discord_server_categories' as any).select('*').order('sort_order', { ascending: true })) as any,
-        (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').neq('invite_status', 'expired').order('bumped_at', { ascending: false })) as any,
+        (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').order('bumped_at', { ascending: false })) as any,
         (supabase.from('server_ratings' as any).select('server_id, rating, user_id')) as any,
         (supabase.from('site_settings' as any).select('value').eq('key', 'discord_carousel_settings').maybeSingle()) as any,
       ]);
@@ -763,6 +812,7 @@ export default function DiscordServersPage() {
           if (discordRes.ok) {
             const data = await discordRes.json();
             freshData = {
+              invite_status: 'valid',
               member_count: data.approximate_member_count ?? server.member_count,
               icon_url: data.guild?.icon
                 ? `https://cdn.discordapp.com/icons/${data.guild.id}/${data.guild.icon}.${data.guild.icon.startsWith('a_') ? 'gif' : 'png'}?size=256`
@@ -773,6 +823,8 @@ export default function DiscordServersPage() {
                 ? `https://cdn.discordapp.com/splashes/${data.guild.id}/${data.guild.splash}.png?size=512`
                 : server.banner_url,
             };
+          } else if (discordRes.status === 404 || discordRes.status === 403) {
+            freshData = { invite_status: 'expired' };
           }
         }
       } catch {
@@ -829,12 +881,21 @@ export default function DiscordServersPage() {
     setRefreshingId(null);
     if (result.success && result.updated) {
       setServers((prev) => prev.map((s) =>
-        s.id === server.id ? { ...s, ...result.updated } : s
+        s.id === server.id ? { ...s, ...result.updated, invite_status: 'valid' } : s
       ));
       toast({
         title: '✅ อัปเดตข้อมูลสำเร็จ',
         description: `${result.updated.member_count != null ? `${result.updated.member_count.toLocaleString()} สมาชิก` : ''}`,
         className: 'bg-green-500 text-white',
+      });
+    } else if (result.isExpired) {
+      setServers((prev) => prev.map((s) =>
+        s.id === server.id ? { ...s, invite_status: 'expired' } : s
+      ));
+      toast({
+        title: '⚠️ ลิงก์เชิญหมดอายุ',
+        description: 'ลิงก์เชิญเซิร์ฟเวอร์นี้ใช้งานไม่ได้แล้วใน Discord',
+        variant: 'destructive',
       });
     } else {
       toast({ title: 'อัปเดตไม่สำเร็จ', description: result.error, variant: 'destructive' });
@@ -843,6 +904,15 @@ export default function DiscordServersPage() {
 
   // ── Click tracking ───────────────────────────────────────────────────────────
   const handleClickJoin = async (server: DiscordServer) => {
+    if (server.invite_status === 'expired') {
+      toast({
+        title: '⚠️ ลิงก์เชิญหมดอายุแล้ว',
+        description: 'เซิร์ฟเวอร์นี้ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้ เจ้าของเซิร์ฟเวอร์ต้องอัปเดตลิงก์ใหม่',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Open the invite immediately — don't block on tracking
     window.open(server.invite_url, '_blank', 'noopener,noreferrer');
 
@@ -1067,6 +1137,10 @@ export default function DiscordServersPage() {
                       handleRated={handleRated}
                       onRefresh={handleRefreshServer}
                       refreshingId={refreshingId}
+                      onEditLink={(s) => {
+                        setEditLinkServer(s);
+                        setIsEditLinkOpen(true);
+                      }}
                     />
                   </motion.div>
                 ))}
