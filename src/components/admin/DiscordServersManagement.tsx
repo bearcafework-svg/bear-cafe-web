@@ -25,10 +25,12 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 import { batchScanDiscordServers, validateAndUpdateServerInvite } from '@/lib/discord-invite-checker';
+import { DiscoveryAnalyticsSection } from './DiscoveryAnalyticsSection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DiscordServer {
   id: string;
+  discord_id: string;
   name: string;
   description: string | null;
   member_count: number | null;
@@ -144,7 +146,11 @@ export function DiscordServersManagement() {
   } | null>(null);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'analytics'>('pending');
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Confirm status dialog
   const [confirmTarget, setConfirmTarget] = useState<{ server: DiscordServer; status: 'approved' | 'rejected' } | null>(null);
@@ -540,6 +546,26 @@ export function DiscordServersManagement() {
   const rejectedServers = servers.filter((s) => s.status === 'rejected');
   const tabServers = activeTab === 'pending' ? pendingServers : activeTab === 'approved' ? approvedServers : rejectedServers;
 
+  const filteredServers = tabServers.filter((server) => {
+    const q = searchQuery.trim().toLowerCase();
+    const serverName = (server.name || '').toLowerCase();
+    const guildId = (server.discord_id || '').toLowerCase();
+    const ownerId = (server.owner_id || '').toLowerCase();
+    const ownerName = (profileMap.get(server.owner_id)?.username || '').toLowerCase();
+
+    const matchesSearch =
+      !q ||
+      serverName.includes(q) ||
+      guildId.includes(q) ||
+      ownerName.includes(q) ||
+      ownerId.includes(q);
+
+    const matchesCategory =
+      selectedCategory === 'all' || server.category_id === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -561,51 +587,125 @@ export function DiscordServersManagement() {
         </div>
       </div>
 
-      {/* ── Status Tabs ── */}
-      <div className="flex gap-1 p-1 bg-muted/40 rounded-xl w-fit">
-        {([
-          { key: 'pending', label: 'รอตรวจสอบ', count: pendingServers.length, icon: Clock, color: 'text-amber-500' },
-          { key: 'approved', label: 'อนุมัติแล้ว', count: approvedServers.length, icon: CheckCircle2, color: 'text-green-500' },
-          { key: 'rejected', label: 'ปฏิเสธ', count: rejectedServers.length, icon: XCircle, color: 'text-red-500' },
-        ] as const).map(({ key, label, count, icon: Icon, color }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-              activeTab === key
-                ? 'bg-background shadow-sm text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+      {/* ── Status Tabs & Search Filters ── */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-muted/40 rounded-xl w-fit flex-wrap">
+          {([
+            { key: 'pending', label: 'รอตรวจสอบ', count: pendingServers.length, icon: Clock, color: 'text-amber-500' },
+            { key: 'approved', label: 'อนุมัติแล้ว', count: approvedServers.length, icon: CheckCircle2, color: 'text-green-500' },
+            { key: 'rejected', label: 'ปฏิเสธ', count: rejectedServers.length, icon: XCircle, color: 'text-red-500' },
+            { key: 'analytics', label: '📊 สถิติ Discovery', count: undefined, icon: Flame, color: 'text-primary' },
+          ] as const).map(({ key, label, count, icon: Icon, color }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as any)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                activeTab === key
+                  ? 'bg-background shadow-sm text-foreground font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Icon className={cn('h-3.5 w-3.5', activeTab === key ? color : '')} />
+              {label}
+              {count !== undefined && (
+                <span className={cn(
+                  'text-xs px-1.5 py-0.5 rounded-full font-semibold',
+                  activeTab === key
+                    ? key === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                      : key === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                    : 'bg-muted text-muted-foreground'
+                )}>
+                  {count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Search & Category Filter Controls (Hide on Analytics tab) */}
+        {activeTab !== 'analytics' && (
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="ค้นหาชื่อ, Guild ID, Owner, Owner ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 rounded-xl h-9 text-xs"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[170px] h-9 rounded-xl text-xs">
+                <SelectValue placeholder="หมวดหมู่ทั้งหมด" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">📁 หมวดหมู่ทั้งหมด</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(searchQuery || selectedCategory !== 'all') && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}
+                className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
+              >
+                ล้างตัวกรอง
+              </Button>
             )}
-          >
-            <Icon className={cn('h-3.5 w-3.5', activeTab === key ? color : '')} />
-            {label}
-            <span className={cn(
-              'text-xs px-1.5 py-0.5 rounded-full font-semibold',
-              activeTab === key
-                ? key === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
-                  : key === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
-                : 'bg-muted text-muted-foreground'
-            )}>
-              {count}
-            </span>
-          </button>
-        ))}
+          </div>
+        )}
       </div>
 
-      {/* Server Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Main View: Analytics vs Server Grid */}
+      {activeTab === 'analytics' ? (
+        <DiscoveryAnalyticsSection />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           <div className="col-span-full flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
-        ) : tabServers.length === 0 ? (
-          <div className="col-span-full text-center py-16 text-muted-foreground">
-            {activeTab === 'pending' ? 'ไม่มีเซิร์ฟเวอร์รอตรวจสอบ' : activeTab === 'approved' ? 'ยังไม่มีเซิร์ฟเวอร์ที่อนุมัติ' : 'ไม่มีเซิร์ฟเวอร์ที่ถูกปฏิเสธ'}
+        ) : filteredServers.length === 0 ? (
+          <div className="col-span-full text-center py-16 text-muted-foreground space-y-2">
+            <p className="text-base font-medium">
+              {searchQuery || selectedCategory !== 'all'
+                ? 'ไม่พบเซิร์ฟเวอร์ที่ตรงกับคำค้นหาหรือตัวกรอง'
+                : activeTab === 'pending' ? 'ไม่มีเซิร์ฟเวอร์รอตรวจสอบ' : activeTab === 'approved' ? 'ยังไม่มีเซิร์ฟเวอร์ที่อนุมัติ' : 'ไม่มีเซิร์ฟเวอร์ที่ถูกปฏิเสธ'}
+            </p>
+            {(searchQuery || selectedCategory !== 'all') && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}
+                className="text-xs rounded-xl"
+              >
+                ล้างคำค้นหา
+              </Button>
+            )}
           </div>
         ) : (
-          tabServers.map((server) => (
+          filteredServers.map((server) => (
             <Card
               key={server.id}
               className={cn(
@@ -656,8 +756,16 @@ export function DiscordServersManagement() {
                   {server.category_id && (
                     <Badge variant="outline" className="text-[10px]">{getCategoryName(server.category_id)}</Badge>
                   )}
-                  <div className="text-xs text-muted-foreground">
-                    เจ้าของ: <span className="font-medium text-foreground">{getOwnerName(server.owner_id)}</span>
+
+                  {/* Server & Owner Details */}
+                  <div className="text-xs text-muted-foreground space-y-0.5 pt-1">
+                    <div>
+                      เจ้าของ: <span className="font-medium text-foreground">{getOwnerName(server.owner_id)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 text-[10px] font-mono text-muted-foreground/80">
+                      <span>Guild ID: <span className="text-foreground">{server.discord_id || '-'}</span></span>
+                      <span>Owner ID: <span className="text-foreground">{server.owner_id || '-'}</span></span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground py-1.5 border-y border-latte/10 dark:border-coffee/10">
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(server.member_count || 0).toLocaleString()}</span>
@@ -732,6 +840,7 @@ export function DiscordServersManagement() {
           ))
         )}
       </div>
+      )}
 
       {/* ── Edit Dialog ── */}
       <Dialog open={!!editServer} onOpenChange={(o) => !o && setEditServer(null)}>

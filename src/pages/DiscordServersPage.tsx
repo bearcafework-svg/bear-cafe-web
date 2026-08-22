@@ -18,7 +18,7 @@ import {
   ArrowLeft, Plus, Users, Info, Loader2,
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
-  Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy,
+  Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +27,19 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import {
+  trackDiscoveryEvent,
+  trackSearchIntent,
+  calculateRisingGrowth,
+  DISCOVERY_CONSTANTS,
+} from '@/lib/discovery-tracker';
+import {
+  calculateListingFreshness,
+  normalizeDiscoveryQuality,
+  calculateDecayedPenalty,
+  RECOMMENDATION_CONSTANTS,
+  UserStateType,
+} from '@/lib/recommendation-engine';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; icon: string; }
@@ -54,10 +67,27 @@ interface DiscordServer {
   carousel_order: number | null;
   invite_status: "valid" | "expired" | "unknown";
   invite_last_checked_at: string | null;
-  // joined client-side
+  created_at?: string;
+  // joined client-side / discovery engine
   avg_rating?: number;
   rating_count?: number;
   my_rating?: number;
+  save_count?: number;
+  is_saved?: boolean;
+  discovery_score?: number;
+  recent_clicks?: number;
+  recent_saves?: number;
+  previous_clicks?: number;
+  previous_saves?: number;
+  growth_rate?: number | null;
+  is_new_breakout?: boolean;
+  is_rising?: boolean;
+  is_new?: boolean;
+  // Plan 2: Personalized Recommendation
+  recommendation_score?: number;
+  recommendation_reason?: string;
+  is_exploration?: boolean;
+  user_state?: UserStateType | string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -374,6 +404,8 @@ const rainbowStyle = `
 `;
 
 // ─── Impression Observer Hook ─────────────────────────────────────────────────
+const sessionViewedServers = new Set<string>();
+
 function useImpressionObserver(serverId: string) {
   const ref = useRef<HTMLDivElement>(null);
   const tracked = useRef(false);
@@ -387,10 +419,17 @@ function useImpressionObserver(serverId: string) {
         if (entries[0].isIntersecting && !tracked.current) {
           tracked.current = true;
           observer.disconnect();
-          // Fire-and-forget — don't block render
-          supabase.rpc('increment_impression', { _server_id: serverId }).then(({ error }) => {
-            if (error) console.warn('impression rpc error:', error.message);
-          });
+
+          // Session-level deduplication to avoid duplicate impressions during re-sorting/filtering
+          if (!sessionViewedServers.has(serverId)) {
+            sessionViewedServers.add(serverId);
+            // Fire-and-forget — don't block render
+            supabase.rpc('increment_impression', { _server_id: serverId }).then(({ error }) => {
+              if (error) console.warn('impression rpc error:', error.message);
+            });
+            // Discovery Funnel Event (impression = Card shown in >= 50% viewport)
+            trackDiscoveryEvent({ event_type: 'impression', server_id: serverId });
+          }
         }
       },
       { threshold: 0.5 }
@@ -417,12 +456,14 @@ interface ServerCardProps {
   onRefresh: (server: DiscordServer) => void;
   refreshingId: string | null;
   onEditLink?: (server: DiscordServer) => void;
+  onDelete?: (server: DiscordServer) => void;
+  onToggleSave?: (serverId: string) => void;
 }
 
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
-  onRefresh, refreshingId, onEditLink,
+  onRefresh, refreshingId, onEditLink, onDelete, onToggleSave,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
@@ -470,13 +511,59 @@ function ServerCard({
               />
             : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
           <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
-          {/* Category + Partner + Expired badge */}
+
+          {/* Top-Left Save Button (Micro-interaction) */}
+          {onToggleSave && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleSave(server.id);
+              }}
+              className={cn(
+                'absolute top-2 sm:top-2.5 left-2 sm:left-2.5 z-10 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 shadow-sm flex items-center gap-1 group/save',
+                server.is_saved
+                  ? 'bg-rose-500 text-white hover:bg-rose-600 scale-105 ring-2 ring-white/40'
+                  : 'bg-black/40 hover:bg-black/60 text-white/90 hover:text-white'
+              )}
+              title={server.is_saved ? 'บันทึกไว้แล้ว (คลิกเพื่อยกเลิก)' : 'บันทึกไว้ดูทีหลัง'}
+              aria-label={server.is_saved ? 'บันทึกไว้แล้ว' : 'บันทึกเซิร์ฟเวอร์'}
+            >
+              <Heart
+                className={cn(
+                  'w-3.5 h-3.5 transition-transform group-active/save:scale-125',
+                  server.is_saved && 'fill-white'
+                )}
+              />
+              {(server.save_count || 0) > 0 && (
+                <span className="text-[10px] font-bold pr-0.5 leading-none">
+                  {server.save_count}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Badges: Expired, Trending, Rising, New, Partner, Category */}
           <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 flex-wrap justify-end">
-            {isExpired && (
+            {isExpired ? (
               <Badge className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" />ลิงก์หมดอายุ
               </Badge>
-            )}
+            ) : server.is_rising ? (
+              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+                <Flame className="w-2.5 h-2.5 fill-white" />โตเร็ว
+              </Badge>
+            ) : (server.discovery_score || 0) >= 8 ? (
+              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+                <Flame className="w-2.5 h-2.5 fill-white" />กำลังมาแรง
+              </Badge>
+            ) : server.is_new ? (
+              <Badge className="text-[9px] sm:text-[10px] bg-emerald-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+                <Sparkles className="w-2.5 h-2.5" />ใหม่
+              </Badge>
+            ) : null}
+
             {server.is_partner && (
               <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Handshake className="w-2.5 h-2.5" />Partner
@@ -511,6 +598,13 @@ function ServerCard({
             {server.description || 'ไม่มีคำอธิบาย'}
           </p>
 
+          {/* Recommendation Reason (Plan 2) */}
+          {server.recommendation_reason && (
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-primary dark:text-primary-foreground font-medium bg-primary/10 dark:bg-primary/20 rounded-lg px-2.5 py-1 w-fit border border-primary/20">
+              <span>{server.recommendation_reason}</span>
+            </div>
+          )}
+
           {/* Star rating */}
           <div className="mt-2 sm:mt-3">
             <StarRating
@@ -529,7 +623,7 @@ function ServerCard({
               <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
               <span className="font-medium">{(server.member_count || 0).toLocaleString()}</span>
             </span>
-            <span className="flex items-center gap-1" title="จำนวนครั้งที่การ์ดถูกมองเห็น">
+            <span className="flex items-center gap-1" title="จำนวนครั้งที่การ์ดถูกแสดง (Impression)">
               <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
               <span className="font-medium">{(server.impression_count || 0).toLocaleString()}</span>
             </span>
@@ -542,8 +636,9 @@ function ServerCard({
           </div>
 
           {/* Actions */}
-          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-2">
+          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-1.5 sm:gap-2">
             <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
+
             {/* Refresh — only for owner */}
             {user && server.owner_id === user.discord_id && (
               <Button
@@ -557,34 +652,50 @@ function ServerCard({
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === server.id ? 'animate-spin' : ''}`} />
               </Button>
             )}
-            {/* Edit link for owner if expired */}
-            {user && server.owner_id === user.discord_id && isExpired && onEditLink && (
+
+            {/* Delete button — strictly for owner only */}
+            {user && server.owner_id === user.discord_id && onDelete && (
               <Button
                 size="sm"
-                variant="outline"
-                className="rounded-full border-orange-400/80 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-xs px-2.5 h-8 font-medium"
-                onClick={() => onEditLink(server)}
-                title="แก้ไขลิงก์เชิญใหม่"
+                variant="ghost"
+                className="rounded-full h-8 w-8 p-0 shrink-0 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(server)}
+                title="ลบเซิร์ฟเวอร์ออกจากระบบ"
               >
-                <LinkIcon className="w-3 h-3 mr-1" />
-                แก้ลิงก์
+                <Trash2 className="w-3.5 h-3.5" />
               </Button>
             )}
-            {/* Join button / Broken link button */}
+
+            {/* Main Action Button (Right aligned) */}
             {isExpired ? (
-              <Button
-                size="sm"
-                disabled
-                className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-4 ml-auto text-xs sm:text-sm cursor-not-allowed opacity-90 font-medium select-none"
-                title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
-              >
-                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-destructive shrink-0" />
-                <span>ลิงก์พัง</span>
-              </Button>
+              user && server.owner_id === user.discord_id && onEditLink ? (
+                /* For Owner: Direct "แก้ลิงก์" button */
+                <Button
+                  size="sm"
+                  className="rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 px-3.5 sm:px-4 ml-auto text-xs sm:text-sm font-medium shrink-0 gap-1"
+                  onClick={() => onEditLink(server)}
+                  title="แก้ไขลิงก์เชิญใหม่"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>แก้ลิงก์</span>
+                </Button>
+              ) : (
+                /* For Visitors: Disabled "ลิงก์พัง" button */
+                <Button
+                  size="sm"
+                  disabled
+                  className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-4 ml-auto text-xs sm:text-sm cursor-not-allowed opacity-90 font-medium select-none shrink-0"
+                  title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 mr-1 text-destructive shrink-0" />
+                  <span>ลิงก์พัง</span>
+                </Button>
+              )
             ) : (
+              /* Normal Join button */
               <Button
                 size="sm"
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm shrink-0"
                 onClick={() => handleClickJoin(server)}
               >
                 เข้าดิสคอร์ด
@@ -612,8 +723,11 @@ export default function DiscordServersPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [bumpingId, setBumpingId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<'recent' | 'popular' | 'rating'>('recent');
+  const [sortMode, setSortMode] = useState<'recommendation' | 'trending' | 'rising' | 'new' | 'recent' | 'rating' | 'popular'>('recommendation');
+  const [userState, setUserState] = useState<UserStateType>('NEW');
   const [showMyOnly, setShowMyOnly] = useState(false);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [savingServerId, setSavingServerId] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [carouselConfig, setCarouselConfig] = useState<{
@@ -629,16 +743,21 @@ export default function DiscordServersPage() {
   const [isEditLinkOpen, setIsEditLinkOpen] = useState(false);
   const [isUpdatingLink, setIsUpdatingLink] = useState(false);
 
+  // ── Delete Server state (Owner only) ──────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<DiscordServer | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const userId = user?.discord_id || null;
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [catRes, serverRes, ratingRes, settingRes] = await Promise.all([
+      const [catRes, serverRes, ratingRes, saveRes, settingRes] = await Promise.all([
         (supabase.from('discord_server_categories' as any).select('*').order('sort_order', { ascending: true })) as any,
         (supabase.from('discord_servers' as any).select('*').eq('status', 'approved').order('bumped_at', { ascending: false })) as any,
         (supabase.from('server_ratings' as any).select('server_id, rating, user_id')) as any,
+        (supabase.from('server_saves' as any).select('server_id, user_id')) as any,
         (supabase.from('site_settings' as any).select('value').eq('key', 'discord_carousel_settings').maybeSingle()) as any,
       ]);
 
@@ -656,6 +775,7 @@ export default function DiscordServersPage() {
 
       const rawServers = (serverRes.data || []) as DiscordServer[];
       const ratings = (ratingRes.data || []) as { server_id: string; rating: number; user_id: string }[];
+      const saves = (saveRes.data || []) as { server_id: string; user_id: string }[];
 
       // Aggregate ratings per server
       const ratingMap = new Map<string, { sum: number; count: number; mine: number }>();
@@ -667,13 +787,124 @@ export default function DiscordServersPage() {
         ratingMap.set(server_id, cur);
       });
 
+      // Aggregate saves per server & identify user saves
+      const saveCountMap = new Map<string, number>();
+      const userSavedSet = new Set<string>();
+      saves.forEach(({ server_id, user_id: suid }) => {
+        saveCountMap.set(server_id, (saveCountMap.get(server_id) || 0) + 1);
+        if (userId && suid === userId) {
+          userSavedSet.add(server_id);
+        }
+      });
+
+      // Fetch discovery trending scores & real growth rate from RPC (Rule 6, 7)
+      const trendingScoreMap = new Map<
+        string,
+        {
+          discovery_score: number;
+          recent_clicks: number;
+          recent_saves: number;
+          previous_clicks: number;
+          previous_saves: number;
+          growth_rate: number | null;
+          is_new_breakout: boolean;
+          is_rising: boolean;
+        }
+      >();
+
+      try {
+        const { data: scoreData } = await (supabase.rpc('get_discovery_trending_scores' as any)) as any;
+        if (scoreData && Array.isArray(scoreData)) {
+          scoreData.forEach((row: any) => {
+            trendingScoreMap.set(row.server_id, {
+              discovery_score: Number(row.discovery_score) || 0,
+              recent_clicks: Number(row.recent_clicks) || 0,
+              recent_saves: Number(row.recent_saves) || 0,
+              previous_clicks: Number(row.previous_clicks) || 0,
+              previous_saves: Number(row.previous_saves) || 0,
+              growth_rate: row.growth_rate != null ? Number(row.growth_rate) : null,
+              is_new_breakout: !!row.is_new_breakout,
+              is_rising: !!row.is_rising,
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('Discovery trending score RPC unavailable, using local calculation:', err);
+      }
+
+      // Fetch personalized recommendations from RPC (Plan 2)
+      const recMap = new Map<
+        string,
+        {
+          recommendation_score: number;
+          recommendation_reason: string;
+          is_exploration: boolean;
+          user_state: UserStateType;
+        }
+      >();
+      let determinedUserState: UserStateType = 'NEW';
+
+      try {
+        const { data: recData } = await (supabase.rpc('get_personalized_recommendations' as any, { p_limit: 50 })) as any;
+        if (recData && Array.isArray(recData)) {
+          recData.forEach((row: any) => {
+            recMap.set(row.server_id, {
+              recommendation_score: Number(row.recommendation_score) || 0,
+              recommendation_reason: row.recommendation_reason || '',
+              is_exploration: !!row.is_exploration,
+              user_state: (row.user_state as UserStateType) || 'NEW',
+            });
+            if (row.user_state) determinedUserState = row.user_state as UserStateType;
+          });
+        }
+      } catch (err) {
+        console.warn('Personalized recommendation RPC unavailable, using local fallback:', err);
+      }
+      setUserState(determinedUserState);
+
+      const now = Date.now();
       const enriched = rawServers.map((s) => {
         const r = ratingMap.get(s.id);
+        const t = trendingScoreMap.get(s.id);
+        const rec = recMap.get(s.id);
+        const saveCount = saveCountMap.get(s.id) || 0;
+        const isNew = s.created_at
+          ? now - new Date(s.created_at).getTime() <= DISCOVERY_CONSTANTS.NEW_SERVER_DAYS * 24 * 60 * 60 * 1000
+          : false;
+        const hoursSinceBump = s.bumped_at ? (now - new Date(s.bumped_at).getTime()) / (1000 * 60 * 60) : 100;
+        const fallbackDiscoveryScore = Math.round(
+          ((s.click_count || 0) * 3.0 + saveCount * 5.0 + (s.bump_count || 0) * 4.0) /
+            Math.pow(hoursSinceBump + 2, 0.5)
+        );
+
+        // Client-side fallback using identical growth calculation function (Rule 7 & Rule 9)
+        const fallbackGrowth = calculateRisingGrowth(s.click_count || 0, saveCount, 0, 0);
+
+        // Fallback recommendation score
+        const fallbackListingFreshness = calculateListingFreshness(s.created_at);
+        const fallbackDiscQuality = normalizeDiscoveryQuality(t ? t.discovery_score : fallbackDiscoveryScore);
+        const fallbackRecScore = Math.round(((fallbackDiscQuality * 0.70) + (fallbackListingFreshness * 0.30)) * 10000) / 10000;
+
         return {
           ...s,
           avg_rating: r ? r.sum / r.count : 0,
           rating_count: r?.count ?? 0,
           my_rating: r?.mine ?? 0,
+          save_count: saveCount,
+          is_saved: userSavedSet.has(s.id),
+          discovery_score: t ? t.discovery_score : fallbackDiscoveryScore,
+          recent_clicks: t ? t.recent_clicks : (s.click_count || 0),
+          recent_saves: t ? t.recent_saves : saveCount,
+          previous_clicks: t ? t.previous_clicks : 0,
+          previous_saves: t ? t.previous_saves : 0,
+          growth_rate: t ? t.growth_rate : fallbackGrowth.growth_rate,
+          is_new_breakout: t ? t.is_new_breakout : fallbackGrowth.is_new_breakout,
+          is_rising: t ? t.is_rising : fallbackGrowth.is_rising,
+          is_new: isNew,
+          recommendation_score: rec ? rec.recommendation_score : fallbackRecScore,
+          recommendation_reason: rec?.recommendation_reason || (isNew ? '🆕 เซิร์ฟเวอร์ใหม่น่าสนใจ' : '🔥 กำลังได้รับความสนใจในขณะนี้'),
+          is_exploration: rec ? rec.is_exploration : false,
+          user_state: rec ? rec.user_state : determinedUserState,
         };
       });
 
@@ -714,6 +945,80 @@ export default function DiscordServersPage() {
     );
   };
 
+  // ── Toggle Save callback (Micro-interaction) ──────────────────────────────
+  const handleToggleSave = async (serverId: string) => {
+    if (!isAuthenticated || !userId) {
+      toast({
+        title: 'กรุณาเข้าสู่ระบบก่อน',
+        description: 'เข้าสู่ระบบด้วย Discord เพื่อบันทึกเซิร์ฟเวอร์ที่คุณสนใจ',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const currentServer = servers.find((s) => s.id === serverId);
+    if (!currentServer) return;
+
+    const willSave = !currentServer.is_saved;
+
+    // Optimistic UI update
+    setServers((prev) =>
+      prev.map((s) =>
+        s.id === serverId
+          ? {
+              ...s,
+              is_saved: willSave,
+              save_count: Math.max(0, (s.save_count || 0) + (willSave ? 1 : -1)),
+            }
+          : s
+      )
+    );
+
+    setSavingServerId(serverId);
+
+    try {
+      const { data, error } = await (supabase.rpc('toggle_server_save' as any, {
+        _server_id: serverId,
+        _user_id: userId,
+      })) as any;
+
+      if (error) throw error;
+
+      if (data?.saved) {
+        toast({
+          title: '✓ บันทึกไว้แล้ว',
+          description: `บันทึก "${currentServer.name}" ไว้ในรายการของคุณแล้ว`,
+          className: 'bg-rose-500 text-white border-none',
+        });
+      } else {
+        toast({
+          title: 'ยกเลิกการบันทึกแล้ว',
+          description: `นำ "${currentServer.name}" ออกจากรายการที่บันทึกไว้แล้ว`,
+        });
+      }
+    } catch (err: any) {
+      // Revert optimistic update on error
+      setServers((prev) =>
+        prev.map((s) =>
+          s.id === serverId
+            ? {
+                ...s,
+                is_saved: currentServer.is_saved,
+                save_count: currentServer.save_count,
+              }
+            : s
+        )
+      );
+      toast({
+        title: 'ไม่สามารถบันทึกได้',
+        description: err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingServerId(null);
+    }
+  };
+
   // ── Auth guard ───────────────────────────────────────────────────────────────
   const requireLogin = (action: () => void) => {
     if (!isAuthenticated) {
@@ -747,38 +1052,30 @@ export default function DiscordServersPage() {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+            Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ invite_url: inviteUrl, category_id: categoryId }),
+          body: JSON.stringify({
+            invite_url: inviteUrl,
+            category_id: categoryId,
+          }),
         }
       );
 
       const result = await response.json();
 
-      // Handle specific error cases
-      if (response.status === 403) {
-        toast({
-          title: '⚠️ ไม่สามารถเพิ่มเซิร์ฟเวอร์ได้',
-          description: result.error || 'คุณไม่ใช่เจ้าของเซิร์ฟเวอร์นี้',
-          variant: 'destructive',
-        });
-        return;
+      if (!response.ok) {
+        throw new Error(result.error || 'เกิดข้อผิดพลาดในการตรวจสอบลิงก์เชิญ');
       }
-      if (response.status === 409) {
-        toast({
-          title: 'เซิร์ฟเวอร์นี้มีอยู่แล้ว',
-          description: result.error || 'เซิร์ฟเวอร์นี้ถูกเพิ่มในระบบแล้ว',
-          variant: 'destructive',
-        });
-        return;
-      }
-      if (!response.ok || !result.success) throw new Error(result.error || `HTTP ${response.status}`);
 
-      toast({ title: 'ส่งคำขอเรียบร้อยแล้ว!', description: `เซิร์ฟเวอร์ "${result.server?.name}" จะแสดงผลหลังจากได้รับการตรวจสอบ`, className: 'bg-green-500 text-white' });
+      toast({
+        title: 'ส่งเซิร์ฟเวอร์เรียบร้อย!',
+        description: 'เซิร์ฟเวอร์ของคุณถูกส่งให้ทีมงานตรวจสอบแล้ว (สถานะ: รออนุมัติ)',
+        className: 'bg-green-500 text-white',
+      });
       setIsAddOpen(false);
       resetForm();
+      fetchData();
     } catch (error: any) {
       toast({ title: 'เกิดข้อผิดพลาด', description: error.message || 'ไม่สามารถเพิ่มเซิร์ฟเวอร์ได้', variant: 'destructive' });
     } finally {
@@ -861,6 +1158,14 @@ export default function DiscordServersPage() {
         console.warn('Could not record bump log', logErr);
       }
 
+      // Track bump in discovery events
+      trackDiscoveryEvent({
+        event_type: 'bump',
+        server_id: serverId,
+        user_id: user.discord_id,
+        metadata: { bump_count: currentBumpCount },
+      });
+
       toast({
         title: '🔥 ดันเซิร์ฟเวอร์สำเร็จ!',
         description: `บันทึกการดันครั้งที่ ${currentBumpCount} แล้ว${freshData.member_count ? ` • อัปเดต: ${freshData.member_count.toLocaleString()} สมาชิก` : ''}`,
@@ -916,6 +1221,15 @@ export default function DiscordServersPage() {
     // Open the invite immediately — don't block on tracking
     window.open(server.invite_url, '_blank', 'noopener,noreferrer');
 
+    // Discovery Funnel Event (click with source attribution)
+    trackDiscoveryEvent({
+      event_type: 'click',
+      server_id: server.id,
+      user_id: user?.discord_id || null,
+      source: sortMode,
+      metadata: { server_name: server.name, invite_url: server.invite_url },
+    });
+
     if (!user) return;
 
     // Run all tracking + notification in background (fire-and-forget)
@@ -962,6 +1276,38 @@ export default function DiscordServersPage() {
         console.error('Click tracking failed:', err);
       }
     })();
+  };
+
+  // ── Delete Server Handler (Owner only) ───────────────────────────────────────
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await (supabase
+        .from('discord_servers' as any)
+        .delete()
+        .eq('id', deleteTarget.id)) as any;
+
+      if (error) throw error;
+
+      toast({
+        title: 'ลบเซิร์ฟเวอร์สำเร็จ',
+        description: `เซิร์ฟเวอร์ "${deleteTarget.name}" ถูกลบออกจากระบบแล้ว`,
+      });
+
+      // Remove from local states
+      setServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err: any) {
+      toast({
+        title: 'เกิดข้อผิดพลาดในการลบ',
+        description: err.message || 'ไม่สามารถลบเซิร์ฟเวอร์ได้ (กรุณาตรวจสอบสิทธิ์เจ้าของ)',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1011,19 +1357,59 @@ export default function DiscordServersPage() {
 
   const filteredServers = servers
     .filter((server) => {
-      const q = searchQuery.toLowerCase();
-      const matchSearch = !q || server.name.toLowerCase().includes(q) || (server.description ?? '').toLowerCase().includes(q);
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        server.name.toLowerCase().includes(q) ||
+        (server.description ?? '').toLowerCase().includes(q) ||
+        (server.discord_id ?? '').toLowerCase().includes(q) ||
+        (server.owner_id ?? '').toLowerCase().includes(q);
       const matchCat = selectedCategory === 'all' || server.category_id === selectedCategory;
       const matchMine = !showMyOnly || (user && server.owner_id === user.discord_id);
-      return matchSearch && matchCat && matchMine;
+      const matchSaved = !showSavedOnly || server.is_saved === true;
+      return matchSearch && matchCat && matchMine && matchSaved;
     })
     .sort((a, b) => {
       // Partners always float to top
       if (a.is_partner !== b.is_partner) return a.is_partner ? -1 : 1;
-      if (sortMode === 'popular') return (b.impression_count || 0) - (a.impression_count || 0);
-      if (sortMode === 'rating') return (b.avg_rating || 0) - (a.avg_rating || 0);
+
+      if (sortMode === 'recommendation') {
+        const recDiff = (b.recommendation_score || 0) - (a.recommendation_score || 0);
+        if (recDiff !== 0) return recDiff;
+        return (b.discovery_score || 0) - (a.discovery_score || 0);
+      }
+      if (sortMode === 'trending') {
+        const scoreDiff = (b.discovery_score || 0) - (a.discovery_score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return new Date(b.bumped_at ?? b.created_at ?? 0).getTime() - new Date(a.bumped_at ?? a.created_at ?? 0).getTime();
+      }
+      if (sortMode === 'rising') {
+        if (a.is_rising !== b.is_rising) return a.is_rising ? -1 : 1;
+        const rateB = b.growth_rate ?? (b.is_new_breakout ? 1.0 : 0);
+        const rateA = a.growth_rate ?? (a.is_new_breakout ? 1.0 : 0);
+        if (rateB !== rateA) return rateB - rateA;
+        return (b.discovery_score || 0) - (a.discovery_score || 0);
+      }
+      if (sortMode === 'new') {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      if (sortMode === 'rating') {
+        const ratingDiff = (b.avg_rating || 0) - (a.avg_rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        return (b.rating_count || 0) - (a.rating_count || 0);
+      }
+      if (sortMode === 'popular') {
+        return (b.impression_count || 0) - (a.impression_count || 0);
+      }
       return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
     });
+
+  // ── Track Search Intent (Debounced via discovery tracker) ───────────────────
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      trackSearchIntent(searchQuery, selectedCategory, filteredServers.length, userId);
+    }
+  }, [searchQuery, selectedCategory, userId, filteredServers.length]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -1072,36 +1458,121 @@ export default function DiscordServersPage() {
 
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-8">
-              <div className="flex gap-2 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="ค้นหาเซิร์ฟเวอร์..." className="pl-10 rounded-xl bg-white/50 dark:bg-card/50 border-latte/30 dark:border-coffee/30 h-9 sm:h-10 text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
-                <div className="flex gap-1.5 items-center">
-                  <Button variant={sortMode === 'recent' ? 'default' : 'outline'} onClick={() => setSortMode('recent')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                    <Clock className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ล่าสุด</span>
+                <div className="flex gap-1 sm:gap-1.5 items-center overflow-x-auto pb-0.5 no-scrollbar">
+                  <Button
+                    variant={sortMode === 'recommendation' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('recommendation')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm gap-1.5 shrink-0 shadow-sm"
+                    size="sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                    <span className="font-semibold">
+                      {userState === 'ESTABLISHED' || userState === 'EARLY'
+                        ? 'แนะนำสำหรับคุณ'
+                        : 'น่าสนใจตอนนี้'}
+                    </span>
                   </Button>
-                  <Button variant={sortMode === 'popular' ? 'default' : 'outline'} onClick={() => setSortMode('popular')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                    <MousePointerClick className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">ยอดนิยม</span>
+                  <Button
+                    variant={sortMode === 'trending' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('trending')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                    size="sm"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span>กำลังมาแรง</span>
                   </Button>
-                  <Button variant={sortMode === 'rating' ? 'default' : 'outline'} onClick={() => setSortMode('rating')} className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3" size="sm">
-                    <Star className="w-3.5 h-3.5 sm:mr-1" /><span className="hidden sm:inline">คะแนน</span>
+                  <Button
+                    variant={sortMode === 'rising' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('rising')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                    size="sm"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-purple-500" />
+                    <span>โตเร็ว</span>
+                  </Button>
+                  <Button
+                    variant={sortMode === 'new' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('new')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                    size="sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>ใหม่</span>
+                  </Button>
+                  <Button
+                    variant={sortMode === 'recent' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('recent')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                    size="sm"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>ล่าสุด</span>
+                  </Button>
+                  <Button
+                    variant={sortMode === 'rating' ? 'default' : 'outline'}
+                    onClick={() => setSortMode('rating')}
+                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                    size="sm"
+                  >
+                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                    <span>คะแนน</span>
                   </Button>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
-                  <Button variant={selectedCategory === 'all' ? 'default' : 'outline'} onClick={() => setSelectedCategory('all')} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">ทั้งหมด</Button>
+                  <Button
+                    variant={selectedCategory === 'all' && !showSavedOnly ? 'default' : 'outline'}
+                    onClick={() => { setSelectedCategory('all'); setShowSavedOnly(false); }}
+                    className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3"
+                    size="sm"
+                  >
+                    ทั้งหมด
+                  </Button>
+                  <Button
+                    variant={showSavedOnly ? 'default' : 'outline'}
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        toast({
+                          title: 'กรุณาเข้าสู่ระบบก่อน',
+                          description: 'เข้าสู่ระบบด้วย Discord เพื่อดูเซิร์ฟเวอร์ที่คุณบันทึกไว้',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      setShowSavedOnly(!showSavedOnly);
+                      if (!showSavedOnly) setSelectedCategory('all');
+                    }}
+                    className={cn(
+                      'rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-medium',
+                      showSavedOnly && 'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
+                    )}
+                    size="sm"
+                  >
+                    <Heart className={cn('w-3.5 h-3.5', showSavedOnly ? 'fill-white text-white' : 'text-rose-500')} />
+                    <span>ที่บันทึกไว้</span>
+                  </Button>
                   {categories.map((cat) => (
-                    <Button key={cat.id} variant={selectedCategory === cat.id ? 'default' : 'outline'} onClick={() => setSelectedCategory(cat.id)} className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3" size="sm">
+                    <Button
+                      key={cat.id}
+                      variant={selectedCategory === cat.id && !showSavedOnly ? 'default' : 'outline'}
+                      onClick={() => { setSelectedCategory(cat.id); setShowSavedOnly(false); }}
+                      className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3"
+                      size="sm"
+                    >
                       {cat.icon} {cat.name}
                     </Button>
                   ))}
                 </div>
                 {user && (
                   <div className="flex items-center gap-1.5 shrink-0 bg-white/50 dark:bg-card/50 rounded-full px-2.5 py-1.5 border border-border/40">
-                    <Switch checked={showMyOnly} onCheckedChange={setShowMyOnly} className="scale-75" />
+                    <Switch checked={showMyOnly} onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }} className="scale-75" />
                     <span className="text-[10px] sm:text-xs text-muted-foreground font-medium whitespace-nowrap">ของฉัน</span>
                   </div>
                 )}
@@ -1115,12 +1586,33 @@ export default function DiscordServersPage() {
                 <p className="text-muted-foreground animate-pulse text-sm">กำลังโหลดเซิร์ฟเวอร์น่าสนใจ...</p>
               </div>
             ) : filteredServers.length === 0 ? (
-              <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30">
-                <Search className="w-10 h-10 text-muted-foreground opacity-30 mx-auto mb-3" />
-                <h3 className="text-lg sm:text-xl font-bold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
-                <p className="text-muted-foreground text-sm mb-4">ลองเปลี่ยนคำค้นหา หรือหมวดหมู่ดูนะคะ</p>
-                <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
-              </div>
+              showSavedOnly ? (
+                <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30 space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-500">
+                    <Heart className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-bold text-foreground">❤️ เซิร์ฟเวอร์ที่บันทึกไว้</h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm max-w-sm mx-auto">
+                      ยังไม่มีเซิร์ฟเวอร์ที่บันทึกไว้ ลองค้นหาเซิร์ฟเวอร์ที่น่าสนใจดูสิคะ
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setShowSavedOnly(false)}
+                    className="rounded-full px-4 text-xs sm:text-sm bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    ค้นหาเซิร์ฟเวอร์
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30">
+                  <Search className="w-10 h-10 text-muted-foreground opacity-30 mx-auto mb-3" />
+                  <h3 className="text-lg sm:text-xl font-bold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
+                  <p className="text-muted-foreground text-sm mb-4">ลองเปลี่ยนคำค้นหา หรือหมวดหมู่ดูนะคะ</p>
+                  <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); setShowSavedOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
+                </div>
+              )
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
                 {filteredServers.map((server, index) => (
@@ -1141,6 +1633,8 @@ export default function DiscordServersPage() {
                         setEditLinkServer(s);
                         setIsEditLinkOpen(true);
                       }}
+                      onDelete={(s) => setDeleteTarget(s)}
+                      onToggleSave={handleToggleSave}
                     />
                   </motion.div>
                 ))}
@@ -1165,6 +1659,7 @@ export default function DiscordServersPage() {
                     setEditLinkServer(s);
                     setIsEditLinkOpen(true);
                   }}
+                  onDelete={(s) => setDeleteTarget(s)}
                 />
               ))}
             </div>
@@ -1193,19 +1688,62 @@ export default function DiscordServersPage() {
           setIsEditLinkOpen(open);
           if (!open) setEditLinkServer(null);
         }}
-        onSuccess={(serverId) => {
-          // Move server from expired section to public listing
-          const updated = ownerExpiredServers.find((s) => s.id === serverId);
-          if (updated) {
-            setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== serverId));
-            setServers((prev) => [
-              { ...updated, invite_status: 'valid' as const },
-              ...prev,
-            ]);
-          }
+        onSuccess={(serverId, updatedData) => {
+          // Update the server in public listing and clear from expired section
+          setServers((prev) =>
+            prev.map((s) =>
+              s.id === serverId
+                ? {
+                    ...s,
+                    invite_status: 'valid' as const,
+                    ...(updatedData || {}),
+                  }
+                : s
+            )
+          );
+          setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== serverId));
           setEditLinkServer(null);
         }}
       />
+
+      {/* Delete Confirmation Dialog (Owner only) */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!isDeleting && !open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md rounded-3xl mx-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              ยืนยันการลบเซิร์ฟเวอร์
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2 text-left">
+              <p className="text-sm">
+                คุณแน่ใจหรือไม่ว่าต้องการลบเซิร์ฟเวอร์ <span className="font-semibold text-foreground">"{deleteTarget?.name}"</span> ออกจากระบบ?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                การกระทำนี้จะลบข้อมูลเซิร์ฟเวอร์ คะแนนรีวิว และสถิติทั้งหมดอย่างถาวร และไม่สามารถกู้คืนได้
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              variant="outline"
+              className="rounded-full"
+              disabled={isDeleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-full gap-1.5"
+              disabled={isDeleting}
+              onClick={handleConfirmDelete}
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <span>{isDeleting ? 'กำลังลบ...' : 'ยืนยันลบเซิร์ฟเวอร์'}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Server Dialog */}
       <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>

@@ -18,14 +18,14 @@ interface DiscordServer {
 interface ExpiredServerCardProps {
   server: DiscordServer;
   onEditLink: (server: DiscordServer) => void;
+  onDelete?: (server: DiscordServer) => void;
 }
 
 /**
  * ExpiredServerCard — shown only to the server owner in the owner-specific
- * expired section. Displays a warning badge and an "แก้ไขลิงก์" button.
- * Requirements: 4.3, 5.1, 5.2
+ * expired section. Displays a warning badge, an "แก้ไขลิงก์" button, and a delete button.
  */
-export function ExpiredServerCard({ server, onEditLink }: ExpiredServerCardProps) {
+export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServerCardProps) {
   return (
     <Card className="relative overflow-hidden rounded-2xl border border-orange-300/60 dark:border-orange-700/40 bg-white/60 dark:bg-card/60 backdrop-blur-xl shadow-sm opacity-80">
       {/* Banner (dimmed) */}
@@ -49,7 +49,7 @@ export function ExpiredServerCard({ server, onEditLink }: ExpiredServerCardProps
             className="text-[10px] bg-orange-500/90 text-white border-none backdrop-blur-md shadow-sm px-2 flex items-center gap-1"
             aria-label="ลิงก์หมดอายุ"
           >
-            <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+            <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
             ลิงก์หมดอายุ
           </Badge>
         </div>
@@ -81,16 +81,32 @@ export function ExpiredServerCard({ server, onEditLink }: ExpiredServerCardProps
           {server.description || 'ไม่มีคำอธิบาย'}
         </p>
 
-        {/* Action */}
-        <Button
-          size="sm"
-          className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md text-xs"
-          onClick={() => onEditLink(server)}
-          aria-label={`แก้ไขลิงก์สำหรับ ${server.name}`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
-          แก้ไขลิงก์
-        </Button>
+        {/* Actions */}
+        <div className="flex gap-2 items-center">
+          <Button
+            size="sm"
+            className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md text-xs h-8"
+            onClick={() => onEditLink(server)}
+            aria-label={`แก้ไขลิงก์สำหรับ ${server.name}`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
+            แก้ไขลิงก์
+          </Button>
+
+          {onDelete && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full h-8 w-8 p-0 border-destructive/30 text-destructive hover:bg-destructive/10 shrink-0"
+              onClick={() => onDelete(server)}
+              title="ลบเซิร์ฟเวอร์ออกจากระบบ"
+              aria-label={`ลบเซิร์ฟเวอร์ ${server.name}`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 hidden" />
+              <span className="text-xs">🗑️</span>
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

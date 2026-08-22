@@ -267,3 +267,93 @@ export async function batchScanDiscordServers(
     expiredServers,
   };
 }
+
+/**
+ * Update server invite link with Guild ID matching validation.
+ * Verifies that the new invite belongs to the exact same Discord server (guild.id === discord_id).
+ */
+export async function updateServerInviteLink(
+  serverId: string,
+  newInviteUrl: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  isMismatchedGuild?: boolean;
+  updatedData?: Record<string, any>;
+}> {
+  // 1. Fetch current server discord_id and owner_id from DB
+  const { data: server, error: fetchErr } = await (supabase
+    .from('discord_servers' as any)
+    .select('id, discord_id, name, owner_id')
+    .eq('id', serverId)
+    .single()) as any;
+
+  if (fetchErr || !server) {
+    return { success: false, error: 'ไม่พบข้อมูลเซิร์ฟเวอร์ในระบบ' };
+  }
+
+  // 2. Validate invite URL format and check via Discord API
+  const code = extractInviteCode(newInviteUrl);
+  if (!code) {
+    return { success: false, error: 'รูปแบบลิงก์เชิญไม่ถูกต้อง กรุณาใช้ลิงก์เช่น discord.gg/xxx' };
+  }
+
+  const check = await checkDiscordInvite(newInviteUrl);
+
+  if (check.status === 429) {
+    return { success: false, error: 'Discord กำลังติด Rate limit กรุณาลองใหม่อีกครั้งใน 1-2 นาที' };
+  }
+
+  if (!check.valid || !check.guild) {
+    return { success: false, error: check.error || 'ลิงก์เชิญใหม่ไม่ถูกต้อง หมดอายุแล้ว หรือเซิร์ฟเวอร์ไม่เปิดให้เข้า' };
+  }
+
+  // 3. CRITICAL VALIDATION: Guild ID Matching!
+  // The new invite's guild.id MUST match the original server's discord_id
+  if (server.discord_id && check.guild.id !== server.discord_id) {
+    return {
+      success: false,
+      isMismatchedGuild: true,
+      error: `ลิงก์นี้ไม่ใช่ของเซิร์ฟเวอร์เดิม! (ตรวจพบว่าเป็นของ "${check.guild.name}" แทนที่จะเป็น "${server.name}") กรุณาใช้ลิงก์เชิญของเซิร์ฟเวอร์เดิมเท่านั้น`,
+    };
+  }
+
+  // 4. Update discord_servers in DB
+  const now = new Date().toISOString();
+  const canonicalInviteUrl = `https://discord.gg/${code}`;
+
+  const updatePayload: Record<string, any> = {
+    invite_url: canonicalInviteUrl,
+    invite_status: 'valid',
+    invite_last_checked_at: now,
+    name: check.guild.name,
+  };
+
+  if (check.guild.description !== undefined) {
+    updatePayload.description = check.guild.description;
+  }
+  if (check.approximate_member_count != null) {
+    updatePayload.member_count = check.approximate_member_count;
+  }
+  const icon = buildIconUrl(check.guild.id, check.guild.icon);
+  if (icon) updatePayload.icon_url = icon;
+  const banner =
+    buildBannerUrl(check.guild.id, check.guild.banner) ||
+    buildSplashUrl(check.guild.id, check.guild.splash);
+  if (banner) updatePayload.banner_url = banner;
+
+  const { error: updateErr } = await (supabase
+    .from('discord_servers' as any)
+    .update(updatePayload as any)
+    .eq('id', serverId)) as any;
+
+  if (updateErr) {
+    return { success: false, error: updateErr.message || 'ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้ (กรุณาตรวจสอบสิทธิ์เจ้าของ)' };
+  }
+
+  return {
+    success: true,
+    updatedData: updatePayload,
+  };
+}
+

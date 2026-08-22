@@ -477,7 +477,7 @@ export function TradingHistoryManagement() {
   }, [fetchProfiles, fetchSalmonPoints, fetchPurchaseItems]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { const t = setInterval(fetchData, 30000); return () => clearInterval(t); }, [fetchData]);
+  useEffect(() => { const t = setInterval(fetchData, 120000); return () => clearInterval(t); }, [fetchData]);
 
   // ── QR scan ──
   const scanQRCode = async (file: File): Promise<string | null> => {

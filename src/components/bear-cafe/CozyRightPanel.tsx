@@ -90,7 +90,7 @@ function PointsWidget() {
 
   useEffect(() => {
     if (!user?.discord_id) return;
-    const id = setInterval(() => fetchPoints(), 30_000);
+    const id = setInterval(() => fetchPoints(), 120_000);
     return () => clearInterval(id);
   }, [fetchPoints, user?.discord_id]);
 

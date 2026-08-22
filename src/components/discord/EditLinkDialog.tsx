@@ -13,12 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { updateServerInviteLink } from '@/lib/discord-invite-checker';
 
 // DiscordServer shape (subset needed by this component)
 interface DiscordServer {
   id: string;
   name: string;
   invite_status: 'valid' | 'expired' | 'unknown';
+  discord_id?: string;
   [key: string]: unknown;
 }
 
@@ -27,7 +29,7 @@ interface EditLinkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called with the server ID after a successful link update */
-  onSuccess: (serverId: string) => void;
+  onSuccess: (serverId: string, updatedData?: Record<string, any>) => void;
 }
 
 /**
@@ -39,10 +41,8 @@ interface EditLinkDialogProps {
  *    - Not expired → close + toast "ลิงก์ใช้งานได้แล้ว"
  *    - Network error → close + toast error
  *    - Still expired → show input
- * 2. Submit → call validate-invite-link action "update-link"
- * 3. Success → call onSuccess(serverId)
- *
- * Requirements: 5.3, 5.4, 5.5, 6.1–6.6
+ * 2. Submit → call updateServerInviteLink with strict Guild ID matching
+ * 3. Success → call onSuccess(serverId, updatedData)
  */
 export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLinkDialogProps) {
   const { toast } = useToast();
@@ -73,7 +73,7 @@ export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLi
         const currentStatus = data?.invite_status as string | undefined;
 
         if (currentStatus !== 'expired') {
-          // Link is no longer expired — close dialog and inform user (Req 5.4)
+          // Link is no longer expired — close dialog and inform user
           onOpenChange(false);
           toast({
             title: 'ลิงก์ใช้งานได้แล้ว',
@@ -86,7 +86,7 @@ export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLi
         // Still expired — show the input field
         setShowInput(true);
       } catch {
-        // Network / DB error — close dialog and show error (Req 5.5)
+        // Network / DB error — close dialog and show error
         onOpenChange(false);
         toast({
           title: 'ไม่สามารถตรวจสอบสถานะได้',
@@ -112,36 +112,34 @@ export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLi
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('validate-invite-link', {
-        body: {
-          action: 'update-link',
-          server_id: server.id,
-          new_invite_url: newInviteUrl.trim(),
-        },
-      });
+      // Execute update with Guild ID matching
+      const result = await updateServerInviteLink(server.id, newInviteUrl.trim());
 
-      if (error) {
-        // Supabase functions.invoke wraps HTTP errors — parse the status
-        const status = (error as any)?.context?.status ?? 0;
-        handleErrorResponse(status, (error as any)?.message ?? '');
-        return;
-      }
-
-      // Check for error in response body (some edge function errors come through data)
-      if (data && !data.success) {
-        const status = data.status ?? 0;
-        handleErrorResponse(status, data.error ?? '');
+      if (!result.success) {
+        if (result.isMismatchedGuild) {
+          toast({
+            title: '⚠️ ลิงก์นี้ไม่ใช่ของเซิร์ฟเวอร์เดิม',
+            description: result.error,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'เกิดข้อผิดพลาดในการอัปเดต',
+            description: result.error || 'ไม่สามารถอัปเดตลิงก์ได้',
+            variant: 'destructive',
+          });
+        }
         return;
       }
 
       // Success
       toast({
-        title: 'อัปเดตลิงก์สำเร็จ',
-        description: `ลิงก์ของ "${server.name}" ได้รับการอัปเดตแล้ว`,
+        title: '✅ อัปเดตลิงก์สำเร็จ',
+        description: `ลิงก์ของ "${result.updatedData?.name || server.name}" ได้รับการอัปเดตและใช้งานได้แล้ว`,
         className: 'bg-green-500 text-white',
       });
       onOpenChange(false);
-      onSuccess(server.id);
+      onSuccess(server.id, result.updatedData);
     } catch (err: any) {
       toast({
         title: 'เกิดข้อผิดพลาด',
@@ -150,41 +148,6 @@ export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLi
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  /** Map HTTP error status codes to Thai user-facing messages (Req 6.3–6.6) */
-  const handleErrorResponse = (status: number, fallbackMessage: string) => {
-    if (status === 422) {
-      toast({
-        title: 'ลิงก์นี้ไม่ใช่ของเซิร์ฟเวอร์เดิม',
-        description: 'กรุณาใช้ลิงก์เชิญของเซิร์ฟเวอร์เดิมเท่านั้น',
-        variant: 'destructive',
-      });
-    } else if (status === 400) {
-      toast({
-        title: 'ลิงก์ไม่ถูกต้องหรือหมดอายุ',
-        description: 'กรุณาตรวจสอบลิงก์เชิญและลองใหม่อีกครั้ง',
-        variant: 'destructive',
-      });
-    } else if (status === 429) {
-      toast({
-        title: 'Discord ถูก rate limit',
-        description: 'กรุณาลองใหม่ภายหลัง',
-        variant: 'destructive',
-      });
-    } else if (status === 503) {
-      toast({
-        title: 'Discord ไม่ตอบสนอง',
-        description: 'กรุณาลองใหม่อีกครั้ง',
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'เกิดข้อผิดพลาด',
-        description: fallbackMessage || 'ไม่สามารถอัปเดตลิงก์ได้',
-        variant: 'destructive',
-      });
     }
   };
 
