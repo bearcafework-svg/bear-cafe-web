@@ -224,16 +224,29 @@ export function formatSelectedDayRewardSubtitle(
 
 export type CheckinDayState = 'completed' | 'today' | 'missed' | 'future' | 'makeup';
 
+/** Rolling makeup window size (days back from today). */
+export const MAKEUP_WINDOW_DAYS = 10;
+
+/**
+ * Whether the rolling makeup window applies for this cycle.
+ * Unlimited same-month makeup until Aug 2026; limited from Sep 2026 onward.
+ */
+export function isMakeupWindowLimited(year: number, month: number): boolean {
+  return year > 2026 || (year === 2026 && month >= 9);
+}
+
 export function getCheckinDayState(
   day: number,
   completedDays: Set<number>,
   todayDay: number,
   makeupWindowOpen: boolean,
+  windowLimited = false,
 ): CheckinDayState {
   if (completedDays.has(day)) return 'completed';
   if (day === todayDay && todayDay <= 28) return 'today';
   if (day < todayDay || (todayDay > 28 && day <= 28)) {
-    return makeupWindowOpen ? 'makeup' : 'missed';
+    const inWindow = !windowLimited || todayDay - day <= MAKEUP_WINDOW_DAYS;
+    return makeupWindowOpen && inWindow ? 'makeup' : 'missed';
   }
   return 'future';
 }
@@ -265,6 +278,7 @@ export const CHECKIN_ERROR_MESSAGES: Record<string, string> = {
   insufficient_points: 'แต้มไม่พอสำหรับเติมเช็กอิน',
   makeup_window_not_open: 'ยังไม่ถึงช่วงเติมเช็กอิน',
   makeup_day_not_past: 'ยังเติมเช็กอินวันนี้ไม่ได้',
+  makeup_day_too_old: 'เกินช่วงเติมย้อนหลังแล้ว (ย้อนหลังได้ไม่เกิน 10 วัน)',
   makeup_window_expired: 'หมดเวลาเติมเช็กอินแล้ว',
   day_already_filled: 'วันนี้เช็กอินแล้ว',
   cycle_not_found: 'ไม่พบข้อมูลรอบเช็กอิน',

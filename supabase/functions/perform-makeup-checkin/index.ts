@@ -60,6 +60,13 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "makeup_day_not_past" }, 400);
     }
 
+    // Rolling 10-day makeup window; effective from the September 2026 cycle onward
+    const MAKEUP_WINDOW_DAYS = 10;
+    const windowActive = year > 2026 || (year === 2026 && month >= 9);
+    if (windowActive && nowDay - day_number > MAKEUP_WINDOW_DAYS) {
+      return json({ ok: false, error: "makeup_day_too_old" }, 400);
+    }
+
     await ensureUserPoints(sb, discord_id);
 
     // Load or create cycle (users who never daily-checked-in still need a row for makeup)

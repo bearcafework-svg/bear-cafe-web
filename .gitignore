@@ -27,6 +27,7 @@ dist-ssr
 .env
 *.prod
 supabase/functions/.env
+supabase/.temp/
 
 CLAUDE.md
 docs/*.md

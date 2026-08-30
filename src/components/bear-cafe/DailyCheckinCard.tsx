@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/lib/auth-context';
-import { useCheckinFlow } from '@/hooks/useCheckinFlow';
-import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
-import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
-import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
-import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth-context";
+import { useCheckinFlow } from "@/hooks/useCheckinFlow";
+import { CheckinRewardModal } from "@/components/bear-cafe/CheckinRewardModal";
+import { CheckinBigRewardPreview } from "@/components/bear-cafe/CheckinBigRewardPreview";
+import { CheckinMakeupConfirmModal } from "@/components/bear-cafe/CheckinMakeupConfirmModal";
+import { CheckinMakeupSuccessModal } from "@/components/bear-cafe/CheckinMakeupSuccessModal";
 import {
   CheckInDayCard,
   CheckInDayCardSkeleton,
-} from '@/components/bear-cafe/CheckInDayCard';
+} from "@/components/bear-cafe/CheckInDayCard";
 import {
   computeCheckinStreak,
   getCheckinClaimButtonLabel,
@@ -19,11 +19,12 @@ import {
   getCheckinWeekDays,
   getCheckinWeekIndex,
   getCheckinToday,
-} from '@/lib/checkin';
-import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { CaffeLatteArtIcon } from '@/icon/outline';
-import { MaskingTape } from '@/components/bear-cafe/FeatureCardFrame';
+  isMakeupWindowLimited,
+} from "@/lib/checkin";
+import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { CaffeLatteArtIcon } from "@/icon/outline";
+import { MaskingTape } from "@/components/bear-cafe/FeatureCardFrame";
 
 function BigRewardPreviewSkeleton() {
   return (
@@ -69,9 +70,15 @@ export function DailyCheckInCard() {
 
   const showSkeleton = loading;
 
-  const [selectedDay, setSelectedDay] = useState(() => Math.min(getCheckinToday().day, 28));
-  const [weekIndex, setWeekIndex] = useState(() => getCheckinWeekIndex(todayDay));
-  const [mobilePageIndex, setMobilePageIndex] = useState(() => getCheckinMobilePageIndex(todayDay));
+  const [selectedDay, setSelectedDay] = useState(() =>
+    Math.min(getCheckinToday().day, 28),
+  );
+  const [weekIndex, setWeekIndex] = useState(() =>
+    getCheckinWeekIndex(todayDay),
+  );
+  const [mobilePageIndex, setMobilePageIndex] = useState(() =>
+    getCheckinMobilePageIndex(todayDay),
+  );
 
   useEffect(() => {
     setWeekIndex(getCheckinWeekIndex(todayDay));
@@ -82,11 +89,14 @@ export function DailyCheckInCard() {
   const visibleWeekDays = getCheckinWeekDays(weekIndex);
   const visibleMobileDays = getCheckinMobilePageDays(mobilePageIndex);
   const selectedReward = rewardsByDay.get(selectedDay);
+  const { year, month } = getCheckinToday();
+  const windowLimited = isMakeupWindowLimited(year, month);
   const selectedState = getCheckinDayState(
     selectedDay,
     completedDays,
     todayDay,
     status?.makeup_window_open ?? false,
+    windowLimited,
   );
   const selectedCheckedIn = selectedDay <= 28 && completedDays.has(selectedDay);
   const canClaimSelected =
@@ -94,7 +104,7 @@ export function DailyCheckInCard() {
     selectedDay <= 28 &&
     !selectedCheckedIn &&
     selectedReward?.is_active &&
-    (selectedState === 'today' || selectedState === 'makeup');
+    (selectedState === "today" || selectedState === "makeup");
   const claimButtonLabel = getCheckinClaimButtonLabel(
     acting,
     selectedCheckedIn,
@@ -115,6 +125,7 @@ export function DailyCheckInCard() {
         completedDays,
         todayDay,
         status?.makeup_window_open ?? false,
+        windowLimited,
       );
       const reward = rewardsByDay.get(day);
       return (
@@ -123,7 +134,9 @@ export function DailyCheckInCard() {
           day={day}
           state={state}
           reward={reward}
-          roleIcon={reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined}
+          roleIcon={
+            reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined
+          }
           isSelected={day === selectedDay}
           disabled={acting}
           onClick={() => setSelectedDay(day)}
@@ -133,12 +146,12 @@ export function DailyCheckInCard() {
   };
 
   const navButtonClass =
-    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:bg-[hsl(var(--latte)/0.5)] disabled:opacity-30 dark:text-[#6B6B6B] dark:hover:bg-[#1A1A1A]';
+    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[hsl(var(--bear-brown)/0.45)] transition-colors hover:bg-[hsl(var(--latte)/0.5)] disabled:opacity-30 dark:text-[#6B6B6B] dark:hover:bg-[#1A1A1A]";
 
   const claimButton = !isAuthenticated ? (
     <button
       type="button"
-      onClick={() => navigate('/login')}
+      onClick={() => navigate("/login")}
       className="shrink-0 rounded-full border border-[#2D5C48] bg-[#1E3A2F] px-4 py-1.5 bear-body-small-medium text-[#E9E6E2] transition-colors hover:bg-[#2D5C48] sm:px-6 sm:py-2 sm:bear-body-regular-medium"
     >
       เข้าสู่ระบบ
@@ -147,16 +160,22 @@ export function DailyCheckInCard() {
     <button
       type="button"
       disabled={!canClaimSelected || acting || selectedDay > 28}
-      onClick={() => handleClaimSelected(selectedDay, selectedState, selectedReward)}
+      onClick={() =>
+        handleClaimSelected(selectedDay, selectedState, selectedReward)
+      }
       className={cn(
-        'shrink-0 rounded-full border-2 px-4 py-1.5 bear-body-small-medium transition-colors sm:px-6 sm:py-1 sm:bear-body-regular-medium',
-        'bg-[#C7EEC8] border-[#9CCC9E] text-[#89654A] hover:bg-[#b5e0b6]',
-        'dark:bg-[#1E3A2F] dark:border-[#2D5C48] dark:text-[#E9E6E2] dark:hover:bg-[#2D5C48]',
-        'disabled:bg-[#bedebf] disabled:border-[#88ae89] disabled:text-[#a3c0a4]',
-        'dark:disabled:border-[#1E3A2F] dark:disabled:bg-[#0C1511] dark:disabled:text-[#214738]',
+        "shrink-0 rounded-full border-2 px-4 py-1.5 bear-body-small-medium transition-colors sm:px-6 sm:py-1 sm:bear-body-regular-medium",
+        "bg-[#C7EEC8] border-[#9CCC9E] text-[#89654A] hover:bg-[#b5e0b6]",
+        "dark:bg-[#1E3A2F] dark:border-[#2D5C48] dark:text-[#E9E6E2] dark:hover:bg-[#2D5C48]",
+        "disabled:bg-[#bedebf] disabled:border-[#88ae89] disabled:text-[#a3c0a4]",
+        "dark:disabled:border-[#1E3A2F] dark:disabled:bg-[#0C1511] dark:disabled:text-[#214738]",
       )}
     >
-      {acting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : claimButtonLabel}
+      {acting ? (
+        <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+      ) : (
+        claimButtonLabel
+      )}
     </button>
   );
 
@@ -164,9 +183,9 @@ export function DailyCheckInCard() {
     <>
       <div
         className={cn(
-          'relative w-full min-w-0 rounded-3xl border p-4 pt-6 sm:p-5 sm:pt-7',
-          'bg-[#FDFAF7] border-2 border-[#F4EEE5]',
-          'dark:bg-[#0A0A0A] dark:border-[#242424] dark:shadow-md dark:shadow-black/20',
+          "relative w-full min-w-0 rounded-3xl border p-4 pt-6 sm:p-5 sm:pt-7",
+          "bg-[#FDFAF7] border-2 border-[#F4EEE5]",
+          "dark:bg-[#0A0A0A] dark:border-[#242424] dark:shadow-md dark:shadow-black/20",
         )}
       >
         <div className="sm:hidden dark:hidden">
@@ -187,8 +206,11 @@ export function DailyCheckInCard() {
             <div className="flex items-center gap-3">
               <CaffeLatteArtIcon size={{ mobile: 30, desktop: 38 }} />
               <h3 className="truncate bear-h3-bold text-[hsl(var(--mocha))] dark:text-[#E9E6E2] md:bear-h1-bold">
-                เช็กอิน {showSkeleton ? '—' : computeCheckinStreak(completedDays, todayDay)} วัน
-                ติดต่อกัน!
+                เช็กอิน{" "}
+                {showSkeleton
+                  ? "—"
+                  : computeCheckinStreak(completedDays, todayDay)}{" "}
+                วัน ติดต่อกัน!
               </h3>
             </div>
             <p className="bear-body-small-medium text-[hsl(var(--bear-brown)/0.55)] dark:text-[#6B6B6B] md:bear-body-small-medium">
@@ -198,7 +220,9 @@ export function DailyCheckInCard() {
           <div className="hidden sm:block">{claimButton}</div>
         </div>
 
-        <div className="mb-3 sm:hidden w-full flex justify-center">{claimButton}</div>
+        <div className="mb-3 sm:hidden w-full flex justify-center">
+          {claimButton}
+        </div>
 
         <div className="mb-3 flex items-center gap-1 sm:hidden">
           <button
@@ -262,9 +286,13 @@ export function DailyCheckInCard() {
             bigReward={bigReward}
             completedDays={completedDays.size}
             claimed={bigRewardClaimed}
-            roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
-            roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
-            onCalendarClick={() => navigate('/full-checkin-calendar')}
+            roleIcon={
+              bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined
+            }
+            roleName={
+              bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined
+            }
+            onCalendarClick={() => navigate("/full-checkin-calendar")}
           />
         )}
       </div>
@@ -275,7 +303,10 @@ export function DailyCheckInCard() {
         onConfirm={handleMakeupConfirm}
         onClose={closeMakeupModal}
       />
-      <CheckinMakeupSuccessModal data={makeupSuccessModal} onClose={closeMakeupSuccessModal} />
+      <CheckinMakeupSuccessModal
+        data={makeupSuccessModal}
+        onClose={closeMakeupSuccessModal}
+      />
       <CheckinRewardModal reward={rewardModal} onClose={closeRewardModal} />
     </>
   );

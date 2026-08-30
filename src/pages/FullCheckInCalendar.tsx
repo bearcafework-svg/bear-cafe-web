@@ -1,27 +1,32 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/lib/auth-context';
-import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
-import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
-import { CheckInDayCard, CheckInDayCardSkeleton } from '@/components/bear-cafe/CheckInDayCard';
-import { CheckinSelectedDayReward } from '@/components/bear-cafe/CheckinSelectedDayReward';
-import { CheckinBigRewardPreview } from '@/components/bear-cafe/CheckinBigRewardPreview';
-import { CheckinRewardModal } from '@/components/bear-cafe/CheckinRewardModal';
-import { CheckinMakeupConfirmModal } from '@/components/bear-cafe/CheckinMakeupConfirmModal';
-import { CheckinMakeupSuccessModal } from '@/components/bear-cafe/CheckinMakeupSuccessModal';
-import { useCheckinFlow } from '@/hooks/useCheckinFlow';
-import { useUserBalances } from '@/hooks/useUserBalances';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth-context";
+import { GreenTeaWarningPopup } from "@/components/bear-cafe/GreenTeaWarningPopup";
+import { CozyPageFooter } from "@/components/bear-cafe/CozyPageFooter";
+import {
+  CheckInDayCard,
+  CheckInDayCardSkeleton,
+} from "@/components/bear-cafe/CheckInDayCard";
+import { CheckinSelectedDayReward } from "@/components/bear-cafe/CheckinSelectedDayReward";
+import { CheckinBigRewardPreview } from "@/components/bear-cafe/CheckinBigRewardPreview";
+import { CheckinRewardModal } from "@/components/bear-cafe/CheckinRewardModal";
+import { CheckinMakeupConfirmModal } from "@/components/bear-cafe/CheckinMakeupConfirmModal";
+import { CheckinMakeupSuccessModal } from "@/components/bear-cafe/CheckinMakeupSuccessModal";
+import { useCheckinFlow } from "@/hooks/useCheckinFlow";
+import { useUserBalances } from "@/hooks/useUserBalances";
 import {
   computeCheckinStreak,
   computeMissedCheckinDays,
   formatSelectedDayRewardSubtitle,
   getCheckinClaimButtonLabel,
   getCheckinDayState,
-} from '@/lib/checkin';
-import { ChevronLeft, Loader2 } from 'lucide-react';
-import { cn, formatNumber } from '@/lib/utils';
-import { CaffeLatteIcon } from '@/icon/outline';
-import { BrokenHeartIcon, Calendar2Icon, FireIcon } from '@/icon/inline';
+  getCheckinToday,
+  isMakeupWindowLimited,
+} from "@/lib/checkin";
+import { ChevronLeft, Loader2 } from "lucide-react";
+import { cn, formatNumber } from "@/lib/utils";
+import { CaffeLatteIcon } from "@/icon/outline";
+import { BrokenHeartIcon, Calendar2Icon, FireIcon } from "@/icon/inline";
 
 const ALL_CHECKIN_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
@@ -63,11 +68,14 @@ export default function FullCheckInCalendar() {
   const totalCheckins = completedDays.size;
   const missedThisMonth = computeMissedCheckinDays(completedDays, todayDay);
   const selectedReward = rewardsByDay.get(selectedDay);
+  const { year, month } = getCheckinToday();
+  const windowLimited = isMakeupWindowLimited(year, month);
   const selectedState = getCheckinDayState(
     selectedDay,
     completedDays,
     todayDay,
     status?.makeup_window_open ?? false,
+    windowLimited,
   );
   const selectedCheckedIn = selectedDay <= 28 && completedDays.has(selectedDay);
   const canClaimSelected =
@@ -75,8 +83,12 @@ export default function FullCheckInCalendar() {
     selectedDay <= 28 &&
     !selectedCheckedIn &&
     selectedReward?.is_active &&
-    (selectedState === 'today' || selectedState === 'makeup');
-  const rewardSubtitle = formatSelectedDayRewardSubtitle(selectedState, selectedDay, todayDay);
+    (selectedState === "today" || selectedState === "makeup");
+  const rewardSubtitle = formatSelectedDayRewardSubtitle(
+    selectedState,
+    selectedDay,
+    todayDay,
+  );
   const claimButtonLabel = getCheckinClaimButtonLabel(
     acting,
     selectedCheckedIn,
@@ -94,18 +106,27 @@ export default function FullCheckInCalendar() {
         <div>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate("/")}
             className="text-[#D7A042] dark:text-[#9A7331] bear-body-regular-medium sm:bear-h2-bold flex items-center gap-1.5 sm:gap-2"
           >
-            <ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" color="#D7A042" />
-            <span className="text-[#9A7331] dark:text-[#D7A042]">กลับไปหน้าคาเฟ่</span>
+            <ChevronLeft
+              size={18}
+              className="sm:w-5 sm:h-5 shrink-0"
+              color="#D7A042"
+            />
+            <span className="text-[#9A7331] dark:text-[#D7A042]">
+              กลับไปหน้าคาเฟ่
+            </span>
           </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 sm:gap-5 lg:gap-6 flex-1 w-full min-w-0">
           <div className="bg-[#FDFAF7] dark:bg-[#101010] border-2 border-[#F4EEE5] dark:border-[#101010] rounded-lg p-3 sm:p-4 md:p-6 lg:p-8 space-y-3 sm:space-y-4 min-w-0">
             <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-              <CaffeLatteIcon size={{ mobile: 24, desktop: 36 }} className="shrink-0" />
+              <CaffeLatteIcon
+                size={{ mobile: 24, desktop: 36 }}
+                className="shrink-0"
+              />
               <p className="bear-h3-bold md:bear-h1-bold text-[#89654A] dark:text-[#E9E6E2] leading-tight min-w-0">
                 เช็กอินรายวันเพื่อรับรางวัลพิเศษ!
               </p>
@@ -118,29 +139,34 @@ export default function FullCheckInCalendar() {
               <div className="grid grid-cols-4 md:grid-cols-7 gap-0.5 min-[375px]:gap-1 sm:gap-2 md:gap-3 min-w-[18.5rem] sm:min-w-0 w-full [&_button]:min-w-0">
                 {loading
                   ? Array.from({ length: 28 }).map((_, i) => (
-                    <CheckInDayCardSkeleton key={i} />
-                  ))
+                      <CheckInDayCardSkeleton key={i} />
+                    ))
                   : ALL_CHECKIN_DAYS.map((day) => {
-                    const state = getCheckinDayState(
-                      day,
-                      completedDays,
-                      todayDay,
-                      status?.makeup_window_open ?? false,
-                    );
-                    const reward = rewardsByDay.get(day);
-                    return (
-                      <CheckInDayCard
-                        key={day}
-                        day={day}
-                        state={state}
-                        reward={reward}
-                        roleIcon={reward?.role_id ? roleMeta[reward.role_id]?.icon : undefined}
-                        isSelected={day === selectedDay}
-                        disabled={acting}
-                        onClick={() => setOverrideDay(day)}
-                      />
-                    );
-                  })}
+                      const state = getCheckinDayState(
+                        day,
+                        completedDays,
+                        todayDay,
+                        status?.makeup_window_open ?? false,
+                        windowLimited,
+                      );
+                      const reward = rewardsByDay.get(day);
+                      return (
+                        <CheckInDayCard
+                          key={day}
+                          day={day}
+                          state={state}
+                          reward={reward}
+                          roleIcon={
+                            reward?.role_id
+                              ? roleMeta[reward.role_id]?.icon
+                              : undefined
+                          }
+                          isSelected={day === selectedDay}
+                          disabled={acting}
+                          onClick={() => setOverrideDay(day)}
+                        />
+                      );
+                    })}
               </div>
             </div>
 
@@ -152,7 +178,8 @@ export default function FullCheckInCalendar() {
             )}
 
             <p className="text-[#94735C] dark:text-[#9D8F7B] bear-body-small-regular md:bear-body-regular">
-              เช็กอินทุกวันเพื่อรับรางวัลสุดพิเศษ ถ้าพลาดวันไหนก็สามารถรับรางวัลย้อนหลังได้น้า
+              เช็กอินทุกวันเพื่อรับรางวัลสุดพิเศษ
+              ถ้าพลาดวันไหนก็สามารถรับรางวัลย้อนหลังได้น้า
             </p>
           </div>
 
@@ -172,11 +199,14 @@ export default function FullCheckInCalendar() {
                   <CheckinSelectedDayReward
                     reward={selectedReward}
                     roleIcon={
-                      selectedReward.role_id ? roleMeta[selectedReward.role_id]?.icon : undefined
+                      selectedReward.role_id
+                        ? roleMeta[selectedReward.role_id]?.icon
+                        : undefined
                     }
                     roleName={
                       selectedReward.role_id
-                        ? roleMeta[selectedReward.role_id]?.name ?? selectedReward.role_name
+                        ? (roleMeta[selectedReward.role_id]?.name ??
+                          selectedReward.role_name)
                         : undefined
                     }
                   />
@@ -194,7 +224,7 @@ export default function FullCheckInCalendar() {
               {!isAuthenticated ? (
                 <button
                   type="button"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate("/login")}
                   className="bg-[#1E3A2F] border-[#2D5C48] text-[#E9E6E2] bear-body-regular-medium rounded-full px-6 sm:px-8 py-2.5 sm:py-2 w-full"
                 >
                   เข้าสู่ระบบ
@@ -203,10 +233,16 @@ export default function FullCheckInCalendar() {
                 <button
                   type="button"
                   disabled={!canClaimSelected || acting || selectedDay > 28}
-                  onClick={() => handleClaimSelected(selectedDay, selectedState, selectedReward)}
+                  onClick={() =>
+                    handleClaimSelected(
+                      selectedDay,
+                      selectedState,
+                      selectedReward,
+                    )
+                  }
                   className={cn(
-                    'bear-body-regular-medium rounded-full px-6 sm:px-8 py-2.5 sm:py-2 cursor-pointer border-2 w-full',
-                    'bg-[#C7EEC8] dark:bg-[#1E3A2F] border-[#9CCC9E] dark:border-[#2D5C48] text-[#89654A] dark:text-[#E9E6E2] disabled:bg-[#bedebf] dark:disabled:bg-[#0C1511] disabled:border-[#88ae89] dark:disabled:border-[#1E3A2F] disabled:text-[#a3c0a4] dark:disabled:text-[#1E3A2F]',
+                    "bear-body-regular-medium rounded-full px-6 sm:px-8 py-2.5 sm:py-2 cursor-pointer border-2 w-full",
+                    "bg-[#C7EEC8] dark:bg-[#1E3A2F] border-[#9CCC9E] dark:border-[#2D5C48] text-[#89654A] dark:text-[#E9E6E2] disabled:bg-[#bedebf] dark:disabled:bg-[#0C1511] disabled:border-[#88ae89] dark:disabled:border-[#1E3A2F] disabled:text-[#a3c0a4] dark:disabled:text-[#1E3A2F]",
                   )}
                 >
                   {acting ? (
@@ -224,8 +260,16 @@ export default function FullCheckInCalendar() {
                 bigReward={bigReward}
                 completedDays={totalCheckins}
                 claimed={bigRewardClaimed}
-                roleIcon={bigReward?.role_id ? roleMeta[bigReward.role_id]?.icon : undefined}
-                roleName={bigReward?.role_id ? roleMeta[bigReward.role_id]?.name : undefined}
+                roleIcon={
+                  bigReward?.role_id
+                    ? roleMeta[bigReward.role_id]?.icon
+                    : undefined
+                }
+                roleName={
+                  bigReward?.role_id
+                    ? roleMeta[bigReward.role_id]?.name
+                    : undefined
+                }
               />
             </div>
 
@@ -247,7 +291,11 @@ export default function FullCheckInCalendar() {
               </div>
               <div className="flex items-center justify-between gap-2 bg-[#FAF2E4] border border-[#F4EEE5] dark:bg-[#121212] dark:border-[#242424] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                  <Calendar2Icon size={16} color="#2D5C48" className="shrink-0" />
+                  <Calendar2Icon
+                    size={16}
+                    color="#2D5C48"
+                    className="shrink-0"
+                  />
                   <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
                     เช็กอินสะสม
                   </span>
@@ -258,7 +306,11 @@ export default function FullCheckInCalendar() {
               </div>
               <div className="flex items-center justify-between gap-2 bg-[#FAF2E4] border border-[#F4EEE5] dark:bg-[#121212] dark:border-[#242424] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                  <BrokenHeartIcon size={16} color="#622F37" className="shrink-0" />
+                  <BrokenHeartIcon
+                    size={16}
+                    color="#622F37"
+                    className="shrink-0"
+                  />
                   <span className="text-[#89654A] dark:text-[#E9E6E2] bear-body-small-medium sm:bear-body-regular-medium truncate">
                     พลาดในเดือนนี้
                   </span>
@@ -280,7 +332,10 @@ export default function FullCheckInCalendar() {
         onConfirm={handleMakeupConfirm}
         onClose={closeMakeupModal}
       />
-      <CheckinMakeupSuccessModal data={makeupSuccessModal} onClose={closeMakeupSuccessModal} />
+      <CheckinMakeupSuccessModal
+        data={makeupSuccessModal}
+        onClose={closeMakeupSuccessModal}
+      />
       <CheckinRewardModal reward={rewardModal} onClose={closeRewardModal} />
     </>
   );
