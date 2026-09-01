@@ -46,11 +46,29 @@ export default function LeaderboardPage() {
         return;
       }
 
-      // 2. Fallback query with extended range limit
+      // 2. Fallback query using minigame_leaderboard_summary view
+      const { data: summaryData, error: summaryErr } = await (supabase as any)
+        .from('minigame_leaderboard_summary')
+        .select('discord_id, wins, points, last_win')
+        .limit(100);
+
+      if (!summaryErr && summaryData && summaryData.length > 0) {
+        const sorted: LeaderboardItem[] = summaryData.map((row: any) => ({
+          discord_id: row.discord_id,
+          total_wins: Number(row.wins || 0),
+          total_points: Number(row.points || 0),
+          last_win: row.last_win || new Date().toISOString()
+        }));
+        setLeaderboard(sorted);
+        return;
+      }
+
+      // 3. Last-resort fallback with strict limit (max 500 rows)
       let query = supabase
         .from('minigame_wins')
         .select('discord_id, game_id, points_earned, created_at')
-        .range(0, 49999);
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (timeFilter === '30d') {
         const thirtyDaysAgo = new Date();

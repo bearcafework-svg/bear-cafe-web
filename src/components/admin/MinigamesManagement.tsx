@@ -132,14 +132,15 @@ export function MinigamesManagement() {
   };
 
   // Fetch Questions
+  // Fetch Questions (Pruned Columns + Capped Limit 200)
   const fetchQuestions = async () => {
     setLoadingQuestions(true);
     try {
       let query = (supabase as any)
         .from('minigame_questions')
-        .select('*')
+        .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, is_active')
         .order('id', { ascending: false })
-        .range(0, 9999);
+        .limit(200);
 
       if (selectedGameFilter !== 'all') {
         query = query.eq('game_id', Number(selectedGameFilter));
@@ -179,11 +180,29 @@ export function MinigamesManagement() {
         return;
       }
 
-      // 2. Fallback query with extended range
+      // 2. Try View minigame_leaderboard_summary
+      const { data: summaryData, error: summaryErr } = await (supabase as any)
+        .from('minigame_leaderboard_summary')
+        .select('discord_id, wins, points, last_win')
+        .limit(100);
+
+      if (!summaryErr && summaryData && summaryData.length > 0) {
+        const sorted: LeaderboardItem[] = summaryData.map((row: any) => ({
+          discord_id: row.discord_id,
+          total_wins: Number(row.wins || 0),
+          total_points: Number(row.points || 0),
+          last_win: row.last_win || new Date().toISOString()
+        }));
+        setLeaderboard(sorted);
+        return;
+      }
+
+      // 3. Fallback query with strict limit (500 rows max)
       let query = (supabase as any)
         .from('minigame_wins')
         .select('discord_id, game_id, points_earned, created_at')
-        .range(0, 49999);
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (lbTimeFilter === '30d') {
         const thirtyDaysAgo = new Date();
@@ -293,7 +312,15 @@ export function MinigamesManagement() {
     const gId = Number(formGameId);
     if (gId === 3) return; // Game 3 is dynamically generated in code
 
-    if (!formQuestion.trim() || !formAnswer.trim()) {
+    const finalQuestion = formQuestion.trim();
+    let finalAnswer = formAnswer.trim();
+
+    // Auto-fill answer for typing games (Game 7 & 8) if left blank
+    if ((gId === 7 || gId === 8) && !finalAnswer) {
+      finalAnswer = finalQuestion;
+    }
+
+    if (!finalQuestion || !finalAnswer) {
       toast({ title: 'กรุณากรอกข้อมูลให้ครบถ้วน', variant: 'destructive' });
       return;
     }
@@ -311,8 +338,8 @@ export function MinigamesManagement() {
         .from('minigame_questions')
         .insert({
           game_id: gId,
-          word_or_question: formQuestion.trim(),
-          answer: formAnswer.trim(),
+          word_or_question: finalQuestion,
+          answer: finalAnswer,
           category: formCategory.trim() || 'คำทั่วไป',
           hints: hintsArray,
           options: [],
@@ -347,7 +374,14 @@ export function MinigamesManagement() {
     if (!editingQuestion) return;
     const gId = editingQuestion.game_id;
 
-    if (!editQuestion.trim() || !editAnswer.trim()) {
+    const finalQuestion = editQuestion.trim();
+    let finalAnswer = editAnswer.trim();
+
+    if ((gId === 7 || gId === 8) && !finalAnswer) {
+      finalAnswer = finalQuestion;
+    }
+
+    if (!finalQuestion || !finalAnswer) {
       toast({ title: 'กรุณากรอกข้อมูลโจทย์และเฉลย', variant: 'destructive' });
       return;
     }
@@ -363,8 +397,8 @@ export function MinigamesManagement() {
       const { error } = await (supabase as any)
         .from('minigame_questions')
         .update({
-          word_or_question: editQuestion.trim(),
-          answer: editAnswer.trim(),
+          word_or_question: finalQuestion,
+          answer: finalAnswer,
           category: editCategory.trim() || 'คำทั่วไป',
           hints: hintsArray,
           options: [],
@@ -613,6 +647,8 @@ export function MinigamesManagement() {
                             ? 'คำตอบ / ตัวเลือกที่ถูกต้อง'
                             : selectedGId === 13
                             ? 'คำตอบที่ถูกต้อง (จริง หรือ เท็จ)'
+                            : selectedGId === 7 || selectedGId === 8
+                            ? 'ข้อความคำตอบที่ต้องพิมพ์ (เว้นว่างไว้จะใช้ประโยคเดียวกับโจทย์)'
                             : 'คำตอบที่ถูกต้อง (เฉลย)'}
                         </label>
                         {selectedGId === 13 ? (
@@ -646,6 +682,8 @@ export function MinigamesManagement() {
                                 ? 'เช่น แข็ง, ฟ้า'
                                 : selectedGId === 12
                                 ? 'เช่น 🐶'
+                                : selectedGId === 7 || selectedGId === 8
+                                ? 'เว้นว่างไว้หากต้องการใช้ประโยคเดียวกับโจทย์'
                                 : 'คำตอบที่ต้องพิมพ์ตอบ'
                             }
                             value={formAnswer}

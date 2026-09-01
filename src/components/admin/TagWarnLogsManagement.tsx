@@ -476,9 +476,12 @@ export function TagWarnLogsManagement() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // auto-refresh every 2m (120s) to save egress
+  // auto-refresh every 2m (120s) when active to save egress
   useEffect(() => {
-    const id = setInterval(fetchData, 120_000);
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData();
+    }, 120_000);
     return () => clearInterval(id);
   }, [fetchData]);
 
