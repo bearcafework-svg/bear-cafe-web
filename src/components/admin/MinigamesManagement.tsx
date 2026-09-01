@@ -17,19 +17,18 @@ import {
 } from 'lucide-react';
 
 export const MINIGAME_CONFIGS: Record<number, { id: number; name: string; icon: string; tag: string; type: string; desc: string }> = {
-  1: { id: 1, name: 'เติมคำศัพท์ (ไทย)', icon: '🇹🇭', tag: 'คำศัพท์ไทย', type: 'single_thai', desc: 'เติมพยัญชนะ/สระในช่องว่าง (แชร์คลังคำศัพท์ไทยกับเกม 5)' },
-  2: { id: 2, name: 'เติมคำศัพท์ (อังกฤษ)', icon: '🇬🇧', tag: 'คำศัพท์อังกฤษ', type: 'single_eng', desc: 'เติมตัวอักษรภาษาอังกฤษ (แชร์คลังคำศัพท์อังกฤษกับเกม 6)' },
+  1: { id: 1, name: 'เติมคำศัพท์ (ไทย)', icon: '🇹🇭', tag: 'คำศัพท์ไทย', type: 'single_thai', desc: 'เติมพยัญชนะ/สระในช่องว่าง' },
+  2: { id: 2, name: 'เติมคำศัพท์ (อังกฤษ)', icon: '🇬🇧', tag: 'คำศัพท์อังกฤษ', type: 'single_eng', desc: 'เติมตัวอักษรภาษาอังกฤษในช่องว่าง' },
   3: { id: 3, name: 'สุ่มโจทย์คณิตฯ', icon: '🔢', tag: 'คณิตศาสตร์', type: 'math', desc: 'สร้างสมการบวก ลบ คูณ อัตโนมัติจากโค้ดบอท' },
   4: { id: 4, name: 'ทายคำจากคำใบ้', icon: '💡', tag: 'คำใบ้', type: 'hints', desc: 'ทายคำจากคำใบ้ 3 ข้อ + เลือกระดับความยาก' },
-  5: { id: 5, name: 'เรียงคำศัพท์ (ไทย)', icon: '🔤', tag: 'คำศัพท์ไทย', type: 'single_thai', desc: 'เรียงตัวอักษรไทยที่สลับตำแหน่ง (แชร์กับเกม 1)' },
-  6: { id: 6, name: 'เรียงคำศัพท์ (อังกฤษ)', icon: '🔡', tag: 'คำศัพท์อังกฤษ', type: 'single_eng', desc: 'เรียงตัวอักษรอังกฤษที่สลับตำแหน่ง (แชร์กับเกม 2)' },
-  7: { id: 7, name: 'พิมพ์คำต่อไปนี้ (ไทย)', icon: '⌨️', tag: 'พิมพ์เร็วไทย', type: 'typing_th', desc: 'พิมพ์ข้อความหรือประโยคภาษาไทยให้ถูกต้องรวดเร็ว' },
-  8: { id: 8, name: 'พิมพ์คำต่อไปนี้ (อังกฤษ)', icon: '💻', tag: 'พิมพ์เร็วอังกฤษ', type: 'typing_en', desc: 'พิมพ์ข้อความหรือประโยคภาษาอังกฤษให้ถูกต้องรวดเร็ว' },
-  9: { id: 9, name: 'ทายคำแปลภาษาอังกฤษ', icon: '🌐', tag: 'คู่คำแปล (EN ➔ TH)', type: 'translation', desc: 'โจทย์ภาษาอังกฤษ ➔ ตัวเลือกคำแปลไทย (แชร์ได้ 4 เกม)' },
-  10: { id: 10, name: 'ทายคำแปลภาษาไทย', icon: '🇹🇭', tag: 'คู่คำแปล (TH ➔ EN)', type: 'translation', desc: 'โจทย์ภาษาไทย ➔ ตัวเลือกคำแปลอังกฤษ (แชร์ได้ 4 เกม)' },
-  11: { id: 11, name: 'เกมต่อคำ', icon: '🔗', tag: 'ต่อคำ', type: 'word_chain', desc: 'ต่อคำศัพท์คำหน้าและคำหลัง เช่น น้ำ ➔ แข็ง' },
-  12: { id: 12, name: 'ข้อไหนไม่เข้าพวก', icon: '🧩', tag: 'ไม่เข้าพวก', type: 'odd_one', desc: 'สุ่มคำศัพท์ตามหมวดหมู่เพื่อหาคำที่ไม่เข้าพวก' },
-  13: { id: 13, name: 'จริงหรือเท็จ', icon: '❓', tag: 'จริง/เท็จ', type: 'true_false', desc: 'ทายว่าข้อความหรือข้อเท็จจริงนั้น จริง หรือ เท็จ' },
+  5: { id: 5, name: 'ฟังเสียงแล้วพิมพ์ตอบ (อังกฤษ)', icon: '🎧', tag: 'ฟังเสียงอังกฤษ', type: 'audio_en', desc: 'ฟังไฟล์เสียงภาษาอังกฤษแล้วพิมพ์คำตอบให้ถูกต้อง (ใช้คลังโจทย์เฉพาะเกม 5)' },
+  6: { id: 6, name: 'พิมพ์คำต่อไปนี้ (ไทย)', icon: '⌨️', tag: 'พิมพ์เร็วไทย', type: 'typing_th', desc: 'พิมพ์ข้อความหรือประโยคภาษาไทยให้ถูกต้องรวดเร็ว' },
+  7: { id: 7, name: 'พิมพ์คำต่อไปนี้ (อังกฤษ)', icon: '💻', tag: 'พิมพ์เร็วอังกฤษ', type: 'typing_en', desc: 'พิมพ์ข้อความหรือประโยคภาษาอังกฤษให้ถูกต้องรวดเร็ว' },
+  8: { id: 8, name: 'ทายคำแปลภาษาอังกฤษ', icon: '🌐', tag: 'คู่คำแปล (EN ➔ TH)', type: 'translation', desc: 'โจทย์ภาษาอังกฤษ ➔ ตัวเลือกคำแปลไทย' },
+  9: { id: 9, name: 'ทายคำแปลภาษาไทย', icon: '🇹🇭', tag: 'คู่คำแปล (TH ➔ EN)', type: 'translation', desc: 'โจทย์ภาษาไทย ➔ ตัวเลือกคำแปลอังกฤษ' },
+  10: { id: 10, name: 'เกมต่อคำ', icon: '🔗', tag: 'ต่อคำ', type: 'word_chain', desc: 'ต่อคำศัพท์คำหน้าและคำหลัง เช่น น้ำ ➔ แข็ง' },
+  11: { id: 11, name: 'ฟังเสียงแล้วพิมพ์ตอบ (ไทย)', icon: '🔊', tag: 'ฟังเสียงไทย', type: 'audio_th', desc: 'ฟังไฟล์เสียงภาษาไทยแล้วพิมพ์คำตอบให้ถูกต้อง (ใช้คลังโจทย์เฉพาะเกม 11)' },
+  12: { id: 12, name: 'จริงหรือเท็จ', icon: '❓', tag: 'จริง/เท็จ', type: 'true_false', desc: 'ทายว่าข้อความหรือข้อเท็จจริงนั้น จริง หรือ เท็จ' },
 };
 
 interface MinigameSetting {
@@ -315,8 +314,8 @@ export function MinigamesManagement() {
     const finalQuestion = formQuestion.trim();
     let finalAnswer = formAnswer.trim();
 
-    // Auto-fill answer for typing games (Game 7 & 8) if left blank
-    if ((gId === 7 || gId === 8) && !finalAnswer) {
+    // Auto-fill answer for typing games (Game 6 & 7) if left blank
+    if ((gId === 6 || gId === 7) && !finalAnswer) {
       finalAnswer = finalQuestion;
     }
 
@@ -377,7 +376,7 @@ export function MinigamesManagement() {
     const finalQuestion = editQuestion.trim();
     let finalAnswer = editAnswer.trim();
 
-    if ((gId === 7 || gId === 8) && !finalAnswer) {
+    if ((gId === 6 || gId === 7) && !finalAnswer) {
       finalAnswer = finalQuestion;
     }
 
