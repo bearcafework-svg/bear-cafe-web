@@ -11,7 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TAG_WARN_CHANNEL_ID = "1168874550889566228";
+const TAG_WARN_CHANNEL_ID = "1524123469011357705";
 const GUIDE_CHANNEL_URL = "https://discord.com/channels/1144251788493602848/1231153445944168518";
 
 Deno.serve(async (req): Promise<Response> => {
