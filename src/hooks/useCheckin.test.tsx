@@ -42,6 +42,7 @@ const authStatus: CheckinStatus = {
   ],
   big_reward: null,
   makeup_window_open: true,
+  makeup_max: 3,
 };
 
 function createWrapper() {
@@ -78,6 +79,12 @@ function mockPublicTables() {
         ],
         error: null,
       });
+    } else if (table === 'site_settings') {
+      chain.eq.mockReturnValue(chain);
+      chain.maybeSingle.mockResolvedValue({
+        data: { value: { days: 3 } },
+        error: null,
+      });
     } else {
       chain.maybeSingle.mockResolvedValue({
         data: {
@@ -111,7 +118,8 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
         daily_rewards: authStatus.daily_rewards,
         big_reward: null,
         makeup_window_open: true,
-      },
+        makeup_max: 3,
+        },
       error: null,
     });
 
@@ -172,7 +180,8 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
         daily_rewards: authStatus.daily_rewards,
         big_reward: null,
         makeup_window_open: true,
-      },
+        makeup_max: 3,
+        },
       error: null,
     });
 
@@ -203,7 +212,8 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
         daily_rewards: authStatus.daily_rewards,
         big_reward: null,
         makeup_window_open: true,
-      },
+        makeup_max: 3,
+        },
       error: null,
     });
 
@@ -222,7 +232,8 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
         daily_rewards: authStatus.daily_rewards,
         big_reward: null,
         makeup_window_open: true,
-      },
+        makeup_max: 3,
+        },
       error: null,
     });
 
@@ -251,7 +262,8 @@ describe('useCheckin shared RQ status load (T1.2)', () => {
         daily_rewards: authStatus.daily_rewards,
         big_reward: null,
         makeup_window_open: true,
-      },
+        makeup_max: 3,
+        },
       error: null,
     });
 
@@ -297,6 +309,7 @@ function authStatusInvokeResult(overrides?: Record<string, unknown>) {
         description: 'Big',
       },
       makeup_window_open: true,
+      makeup_max: 3,
       ...overrides,
     },
     error: null,

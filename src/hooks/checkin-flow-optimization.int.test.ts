@@ -338,6 +338,7 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
       daily_rewards: preCache!.daily_rewards,
       big_reward: preCache!.big_reward,
       makeup_window_open: preCache!.makeup_window_open,
+      makeup_max: preCache!.makeup_max,
     };
     // Output Comparison baseline: prior post-refresh would have carried these siblings + empty completed set
     expect(preCache!.cycle.completed_days).toEqual([]);
@@ -385,6 +386,7 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
     expect(cached?.daily_rewards).toEqual(preSiblings.daily_rewards);
     expect(cached?.big_reward).toEqual(preSiblings.big_reward);
     expect(cached?.makeup_window_open).toBe(preSiblings.makeup_window_open);
+    expect(cached?.makeup_max).toBe(preSiblings.makeup_max);
 
     // Day UI completed set reflects patch
     expect(result.current.completedDays.has(claimDay)).toBe(true);
@@ -431,6 +433,7 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
       daily_rewards: preCache!.daily_rewards,
       big_reward: preCache!.big_reward,
       makeup_window_open: preCache!.makeup_window_open,
+      makeup_max: preCache!.makeup_max,
     };
     expect(result.current.completedDays.has(makeupDay)).toBe(false);
 
@@ -476,6 +479,7 @@ describe('INT-1 Happy-path claim hybrid patch — 0 get-checkin-status', () => {
     expect(cached?.daily_rewards).toEqual(preSiblings.daily_rewards);
     expect(cached?.big_reward).toEqual(preSiblings.big_reward);
     expect(cached?.makeup_window_open).toBe(preSiblings.makeup_window_open);
+    expect(cached?.makeup_max).toBe(preSiblings.makeup_max);
 
     expect(result.current.completedDays.has(makeupDay)).toBe(true);
     expect(result.current.makeupSuccessModal).not.toBeNull();

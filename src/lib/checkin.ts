@@ -32,6 +32,30 @@ export interface CheckinStatus {
   daily_rewards: CheckinDailyReward[];
   big_reward: CheckinBigReward | null;
   makeup_window_open: boolean;
+  /** Max makeup (re-checkin) uses per month; from site_settings. */
+  makeup_max: number;
+}
+
+/** site_settings key for monthly makeup quota. */
+export const CHECKIN_MAX_MAKEUP_DAYS_KEY = 'checkin_max_makeup_days';
+
+/** Default when setting is missing or invalid. */
+export const DEFAULT_CHECKIN_MAKEUP_MAX = 3;
+
+/**
+ * Parse site_settings value for checkin_max_makeup_days.
+ * Accepts `{ "days": N }` or a bare number. Clamps to 0–28; falls back to 3.
+ */
+export function parseCheckinMakeupMax(value: unknown): number {
+  if (value == null) return DEFAULT_CHECKIN_MAKEUP_MAX;
+  let raw: unknown = value;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    raw = (value as Record<string, unknown>).days;
+    if (raw == null) return DEFAULT_CHECKIN_MAKEUP_MAX;
+  }
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_CHECKIN_MAKEUP_MAX;
+  return Math.min(28, Math.max(0, Math.floor(n)));
 }
 
 export const CHECKIN_MONTH_NAMES = [
@@ -241,12 +265,14 @@ export function getCheckinDayState(
   todayDay: number,
   makeupWindowOpen: boolean,
   windowLimited = false,
+  /** When false, past days that would be makeup become missed (quota exhausted). */
+  quotaAvailable = true,
 ): CheckinDayState {
   if (completedDays.has(day)) return 'completed';
   if (day === todayDay && todayDay <= 28) return 'today';
   if (day < todayDay || (todayDay > 28 && day <= 28)) {
     const inWindow = !windowLimited || todayDay - day <= MAKEUP_WINDOW_DAYS;
-    return makeupWindowOpen && inWindow ? 'makeup' : 'missed';
+    return makeupWindowOpen && inWindow && quotaAvailable ? 'makeup' : 'missed';
   }
   return 'future';
 }
@@ -279,6 +305,7 @@ export const CHECKIN_ERROR_MESSAGES: Record<string, string> = {
   makeup_window_not_open: 'ยังไม่ถึงช่วงเติมเช็กอิน',
   makeup_day_not_past: 'ยังเติมเช็กอินวันนี้ไม่ได้',
   makeup_day_too_old: 'เกินช่วงเติมย้อนหลังแล้ว (ย้อนหลังได้ไม่เกิน 10 วัน)',
+  makeup_quota_exceeded: 'เติมเช็กอินครบจำนวนครั้งแล้ว',
   makeup_window_expired: 'หมดเวลาเติมเช็กอินแล้ว',
   day_already_filled: 'วันนี้เช็กอินแล้ว',
   cycle_not_found: 'ไม่พบข้อมูลรอบเช็กอิน',

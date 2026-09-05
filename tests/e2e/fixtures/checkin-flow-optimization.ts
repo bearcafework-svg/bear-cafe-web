@@ -44,6 +44,7 @@ export type CheckinStatusOkPayload = {
   daily_rewards: CheckinDailyReward[];
   big_reward: CheckinBigReward | null;
   makeup_window_open: boolean;
+  makeup_max: number;
 };
 
 /** Minimal auth-context / getSession shape for FE2E auth present Arrange. */
@@ -131,6 +132,7 @@ export function buildCheckinStatus(
     daily_rewards: buildDailyRewards(),
     big_reward: buildBigReward(),
     makeup_window_open: true,
+    makeup_max: 3,
     ...overrides,
   };
 }

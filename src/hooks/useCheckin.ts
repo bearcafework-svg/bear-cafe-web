@@ -3,7 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { readFunctionsErrorPayload } from '@/lib/function-error';
 import {
+  CHECKIN_MAX_MAKEUP_DAYS_KEY,
+  DEFAULT_CHECKIN_MAKEUP_MAX,
   getCheckinToday,
+  parseCheckinMakeupMax,
   type CheckinCycle,
   type CheckinDailyReward,
   type CheckinStatus,
@@ -44,9 +47,22 @@ async function fetchPublicBigReward(): Promise<CheckinStatus['big_reward']> {
   return (data ?? null) as CheckinStatus['big_reward'];
 }
 
+async function fetchPublicMakeupMax(): Promise<number> {
+  const { data, error } = await supabase
+    .from('site_settings' as never)
+    .select('value')
+    .eq('key', CHECKIN_MAX_MAKEUP_DAYS_KEY)
+    .maybeSingle();
+
+  if (error) return DEFAULT_CHECKIN_MAKEUP_MAX;
+  const row = data as { value?: unknown } | null;
+  return parseCheckinMakeupMax(row?.value ?? DEFAULT_CHECKIN_MAKEUP_MAX);
+}
+
 function publicCheckinStatus(
   daily_rewards: CheckinDailyReward[],
   big_reward: CheckinStatus['big_reward'],
+  makeup_max: number,
 ): CheckinStatus {
   const { year, month, day: currentDay } = getCheckinToday();
   return {
@@ -60,15 +76,17 @@ function publicCheckinStatus(
     daily_rewards,
     big_reward,
     makeup_window_open: currentDay > 1,
+    makeup_max,
   };
 }
 
 async function fetchPublicCheckinStatus(): Promise<CheckinStatus> {
-  const [daily_rewards, big_reward] = await Promise.all([
+  const [daily_rewards, big_reward, makeup_max] = await Promise.all([
     fetchPublicDailyRewards(),
     fetchPublicBigReward(),
+    fetchPublicMakeupMax(),
   ]);
-  return publicCheckinStatus(daily_rewards, big_reward);
+  return publicCheckinStatus(daily_rewards, big_reward, makeup_max);
 }
 
 export type CheckinActionResult =

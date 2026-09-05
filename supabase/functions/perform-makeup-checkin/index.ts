@@ -3,6 +3,10 @@ import { discordFetch } from "../_shared/discord-fetch.ts";
 import { ensureUserPoints } from "../_shared/ensure-user-points.ts";
 import { getCheckinToday } from "../_shared/checkin-date.ts";
 import { grantBigReward } from "../_shared/checkin-big-reward.ts";
+import {
+  CHECKIN_MAX_MAKEUP_DAYS_KEY,
+  parseCheckinMakeupMax,
+} from "../_shared/checkin-makeup-max.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,6 +96,17 @@ Deno.serve(async (req): Promise<Response> => {
       return json({ ok: false, error: "day_already_filled" }, 409);
     }
 
+    const { data: makeupMaxSetting } = await sb
+      .from("site_settings")
+      .select("value")
+      .eq("key", CHECKIN_MAX_MAKEUP_DAYS_KEY)
+      .maybeSingle();
+    const makeupMax = parseCheckinMakeupMax(makeupMaxSetting?.value);
+
+    if ((cycle.makeup_days?.length ?? 0) >= makeupMax) {
+      return json({ ok: false, error: "makeup_quota_exceeded" }, 400);
+    }
+
     // Load daily reward for this day to get makeup cost
     const { data: reward } = await sb
       .from("checkin_daily_rewards")
@@ -129,6 +144,46 @@ Deno.serve(async (req): Promise<Response> => {
     if (deductErr) {
       return json({ ok: false, error: "points_deduction_conflict" }, 409);
     }
+
+    // Re-read cycle before append so concurrent makeups cannot exceed quota
+    const { data: freshCycle } = await sb
+      .from("checkin_cycles")
+      .select("makeup_days, completed_days, big_reward_claimed")
+      .eq("id", cycle.id)
+      .maybeSingle();
+
+    const freshMakeup: number[] = freshCycle?.makeup_days ?? cycle.makeup_days ?? [];
+    if (freshMakeup.length >= makeupMax || freshMakeup.includes(day_number)) {
+      await sb
+        .from("user_points")
+        .update({ points: currentPoints })
+        .eq("discord_id", discord_id);
+      return json({
+        ok: false,
+        error: freshMakeup.includes(day_number) ? "day_already_filled" : "makeup_quota_exceeded",
+      }, freshMakeup.includes(day_number) ? 409 : 400);
+    }
+
+    const updatedMakeup = [...freshMakeup, day_number];
+    const { error: cycleUpdateErr } = await sb
+      .from("checkin_cycles")
+      .update({ makeup_days: updatedMakeup })
+      .eq("id", cycle.id);
+
+    if (cycleUpdateErr) {
+      await sb
+        .from("user_points")
+        .update({ points: currentPoints })
+        .eq("discord_id", discord_id);
+      return json({ ok: false, error: "cycle_update_failed" }, 500);
+    }
+
+    cycle = {
+      ...cycle,
+      makeup_days: freshMakeup,
+      completed_days: freshCycle?.completed_days ?? cycle.completed_days,
+      big_reward_claimed: freshCycle?.big_reward_claimed ?? cycle.big_reward_claimed,
+    };
 
     // Grant the daily reward
     const rewardSnapshot: Record<string, unknown> = {};
@@ -179,13 +234,6 @@ Deno.serve(async (req): Promise<Response> => {
         }
       }
     }
-
-    // Append day to makeup_days
-    const updatedMakeup = [...cycle.makeup_days, day_number];
-    await sb
-      .from("checkin_cycles")
-      .update({ makeup_days: updatedMakeup })
-      .eq("id", cycle.id);
 
     await sb.from("checkin_logs").insert({
       discord_id,

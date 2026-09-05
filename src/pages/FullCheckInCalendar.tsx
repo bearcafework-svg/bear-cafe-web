@@ -22,6 +22,7 @@ import {
   getCheckinDayState,
   getCheckinToday,
   isMakeupWindowLimited,
+  DEFAULT_CHECKIN_MAKEUP_MAX,
 } from "@/lib/checkin";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
@@ -70,12 +71,16 @@ export default function FullCheckInCalendar() {
   const selectedReward = rewardsByDay.get(selectedDay);
   const { year, month } = getCheckinToday();
   const windowLimited = isMakeupWindowLimited(year, month);
+  const makeupUsed = status?.cycle.makeup_days?.length ?? 0;
+  const makeupMax = status?.makeup_max ?? DEFAULT_CHECKIN_MAKEUP_MAX;
+  const quotaAvailable = makeupUsed < makeupMax;
   const selectedState = getCheckinDayState(
     selectedDay,
     completedDays,
     todayDay,
     status?.makeup_window_open ?? false,
     windowLimited,
+    quotaAvailable,
   );
   const selectedCheckedIn = selectedDay <= 28 && completedDays.has(selectedDay);
   const canClaimSelected =
@@ -148,6 +153,7 @@ export default function FullCheckInCalendar() {
                         todayDay,
                         status?.makeup_window_open ?? false,
                         windowLimited,
+                        quotaAvailable,
                       );
                       const reward = rewardsByDay.get(day);
                       return (
@@ -173,7 +179,10 @@ export default function FullCheckInCalendar() {
             {/* Shown only during the post-month makeup window */}
             {status?.makeup_window_open && isAuthenticated && (
               <p className="text-center bear-body-small-regular text-[#D7A042] dark:text-[#D7A042] px-1">
-                ช่วงเติมเช็กอินเปิดแล้ว — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม
+                เติมเช็กอิน {makeupUsed}/{makeupMax}
+                {quotaAvailable
+                  ? " — คลิกวันที่พลาดเพื่อเติมด้วยแต้ม"
+                  : " — ครบจำนวนครั้งแล้ว"}
               </p>
             )}
 

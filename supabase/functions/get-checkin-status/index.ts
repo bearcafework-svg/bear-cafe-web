@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { getCheckinToday } from "../_shared/checkin-date.ts";
+import {
+  CHECKIN_MAX_MAKEUP_DAYS_KEY,
+  parseCheckinMakeupMax,
+} from "../_shared/checkin-makeup-max.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,6 +47,7 @@ Deno.serve(async (req): Promise<Response> => {
       { data: cycle },
       { data: dailyRewards },
       { data: bigReward },
+      { data: makeupMaxSetting },
     ] = await Promise.all([
       sb
         .from("checkin_cycles")
@@ -63,9 +68,15 @@ Deno.serve(async (req): Promise<Response> => {
         .eq("year", year)
         .eq("month", month)
         .maybeSingle(),
+      sb
+        .from("site_settings")
+        .select("value")
+        .eq("key", CHECKIN_MAX_MAKEUP_DAYS_KEY)
+        .maybeSingle(),
     ]);
 
     const makeupWindowOpen = currentDay > 1;
+    const makeup_max = parseCheckinMakeupMax(makeupMaxSetting?.value);
 
     return json({
       ok: true,
@@ -79,6 +90,7 @@ Deno.serve(async (req): Promise<Response> => {
       daily_rewards: dailyRewards ?? [],
       big_reward: bigReward ?? null,
       makeup_window_open: makeupWindowOpen,
+      makeup_max,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "internal_error";

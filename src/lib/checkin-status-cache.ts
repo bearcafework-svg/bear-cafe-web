@@ -1,5 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { CheckinCycle, CheckinStatus } from '@/lib/checkin';
+import {
+  DEFAULT_CHECKIN_MAKEUP_MAX,
+  parseCheckinMakeupMax,
+} from '@/lib/checkin';
 
 /** Mirror useUserBalances — shared RQ identity for Home + Full Calendar. */
 export function checkinStatusQueryKey(discordId: string) {
@@ -26,6 +30,7 @@ export function patchCheckinStatusCycle(
     daily_rewards: prev.daily_rewards,
     big_reward: prev.big_reward,
     makeup_window_open: prev.makeup_window_open,
+    makeup_max: prev.makeup_max,
     cycle: {
       year: cycle.year,
       month: cycle.month,
@@ -55,6 +60,7 @@ type CheckinStatusEdgePayload = {
   daily_rewards?: CheckinStatus['daily_rewards'];
   big_reward?: CheckinStatus['big_reward'];
   makeup_window_open?: boolean;
+  makeup_max?: number;
 };
 
 /** Auth status queryFn — Bearer + discord_id → CheckinStatus. */
@@ -80,5 +86,6 @@ export async function fetchCheckinStatus(discordId: string): Promise<CheckinStat
     daily_rewards: payload.daily_rewards ?? [],
     big_reward: payload.big_reward ?? null,
     makeup_window_open: Boolean(payload.makeup_window_open),
+    makeup_max: parseCheckinMakeupMax(payload.makeup_max ?? DEFAULT_CHECKIN_MAKEUP_MAX),
   };
 }

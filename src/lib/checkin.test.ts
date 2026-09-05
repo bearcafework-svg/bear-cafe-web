@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHECKIN_ERROR_MESSAGES,
+  DEFAULT_CHECKIN_MAKEUP_MAX,
   getCheckinDayState,
   isMakeupWindowLimited,
   MAKEUP_WINDOW_DAYS,
+  parseCheckinMakeupMax,
 } from './checkin';
 
 describe('isMakeupWindowLimited', () => {
@@ -55,10 +57,43 @@ describe('getCheckinDayState makeup window', () => {
     expect(getCheckinDayState(20, new Set([20]), 20, true, true)).toBe('completed');
     expect(getCheckinDayState(21, empty, 20, true, true)).toBe('future');
   });
+
+  it('marks in-window day as missed when quota is exhausted', () => {
+    expect(
+      getCheckinDayState(todayDay - 3, empty, todayDay, true, true, false),
+    ).toBe('missed');
+  });
+
+  it('keeps in-window day as makeup when quota remains', () => {
+    expect(
+      getCheckinDayState(todayDay - 3, empty, todayDay, true, true, true),
+    ).toBe('makeup');
+  });
+});
+
+describe('parseCheckinMakeupMax', () => {
+  it('parses { days: N } and clamps to 0–28', () => {
+    expect(parseCheckinMakeupMax({ days: 3 })).toBe(3);
+    expect(parseCheckinMakeupMax({ days: 0 })).toBe(0);
+    expect(parseCheckinMakeupMax({ days: 28 })).toBe(28);
+    expect(parseCheckinMakeupMax({ days: 99 })).toBe(28);
+    expect(parseCheckinMakeupMax({ days: -1 })).toBe(0);
+  });
+
+  it('falls back to 3 for invalid values', () => {
+    expect(parseCheckinMakeupMax(undefined)).toBe(DEFAULT_CHECKIN_MAKEUP_MAX);
+    expect(parseCheckinMakeupMax(null)).toBe(DEFAULT_CHECKIN_MAKEUP_MAX);
+    expect(parseCheckinMakeupMax({})).toBe(DEFAULT_CHECKIN_MAKEUP_MAX);
+    expect(parseCheckinMakeupMax('x')).toBe(DEFAULT_CHECKIN_MAKEUP_MAX);
+  });
 });
 
 describe('CHECKIN_ERROR_MESSAGES', () => {
   it('includes makeup_day_too_old', () => {
     expect(CHECKIN_ERROR_MESSAGES.makeup_day_too_old).toMatch(/10/);
+  });
+
+  it('includes makeup_quota_exceeded', () => {
+    expect(CHECKIN_ERROR_MESSAGES.makeup_quota_exceeded).toMatch(/ครบ/);
   });
 });

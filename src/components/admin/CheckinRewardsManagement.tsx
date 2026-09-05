@@ -14,6 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarCheck, Gift, Coins, Edit, Save, X, ChevronLeft, ChevronRight, Calendar, Sparkles, AlertTriangle } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
+import {
+  CHECKIN_MAX_MAKEUP_DAYS_KEY,
+  DEFAULT_CHECKIN_MAKEUP_MAX,
+  parseCheckinMakeupMax,
+} from '@/lib/checkin';
 
 interface DailyReward {
   id: string;
@@ -97,6 +102,55 @@ export function CheckinRewardsManagement() {
 
   const [saving, setSaving] = useState(false);
 
+  // Global monthly makeup quota (site_settings)
+  const [makeupMax, setMakeupMax] = useState(DEFAULT_CHECKIN_MAKEUP_MAX);
+  const [makeupMaxDraft, setMakeupMaxDraft] = useState(String(DEFAULT_CHECKIN_MAKEUP_MAX));
+  const [savingMakeupMax, setSavingMakeupMax] = useState(false);
+
+  const fetchMakeupMax = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings' as never)
+        .select('value')
+        .eq('key', CHECKIN_MAX_MAKEUP_DAYS_KEY)
+        .maybeSingle();
+      if (error) throw error;
+      const parsed = parseCheckinMakeupMax((data as { value?: unknown } | null)?.value);
+      setMakeupMax(parsed);
+      setMakeupMaxDraft(String(parsed));
+    } catch (error) {
+      console.error('Error fetching makeup max:', error);
+      setMakeupMax(DEFAULT_CHECKIN_MAKEUP_MAX);
+      setMakeupMaxDraft(String(DEFAULT_CHECKIN_MAKEUP_MAX));
+    }
+  }, []);
+
+  const saveMakeupMax = async () => {
+    const parsed = parseCheckinMakeupMax({ days: Number(makeupMaxDraft) });
+    setSavingMakeupMax(true);
+    try {
+      const { error } = await supabase
+        .from('site_settings' as never)
+        .upsert({
+          key: CHECKIN_MAX_MAKEUP_DAYS_KEY,
+          value: { days: parsed },
+          updated_at: new Date().toISOString(),
+        } as never);
+      if (error) throw error;
+      setMakeupMax(parsed);
+      setMakeupMaxDraft(String(parsed));
+      toast({
+        title: 'บันทึกสำเร็จ',
+        description: `จำกัดเติมเช็กอินได้สูงสุด ${parsed} ครั้งต่อเดือน`,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้';
+      toast({ title: 'เกิดข้อผิดพลาด', description: message, variant: 'destructive' });
+    } finally {
+      setSavingMakeupMax(false);
+    }
+  };
+
   const fetchRewards = useCallback(async () => {
     setLoading(true);
     try {
@@ -131,6 +185,10 @@ export function CheckinRewardsManagement() {
   useEffect(() => {
     fetchRewards();
   }, [fetchRewards]);
+
+  useEffect(() => {
+    fetchMakeupMax();
+  }, [fetchMakeupMax]);
 
   const openEditDayDialog = (dayNum: number) => {
     const reward = dailyRewards.find(r => r.day_number === dayNum);
@@ -462,6 +520,46 @@ export function CheckinRewardsManagement() {
           ) : (
             <p className="text-sm text-muted-foreground">ยังไม่มีการตั้งค่ารางวัลใหญ่</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Makeup monthly quota */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base font-semibold">
+              จำนวนครั้งสูงสุดที่เติมเช็กอินได้ต่อเดือน
+            </CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            ไม่รวมหน้าต่าง 10 วัน — จำกัดจำนวนครั้งต่อเดือนเท่านั้น (ค่าเริ่มต้น {DEFAULT_CHECKIN_MAKEUP_MAX})
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 max-w-md">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="makeup-max-days">จำนวนครั้งสูงสุด</Label>
+              <Input
+                id="makeup-max-days"
+                type="number"
+                min={0}
+                max={28}
+                value={makeupMaxDraft}
+                onChange={(e) => setMakeupMaxDraft(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={saveMakeupMax}
+              disabled={savingMakeupMax || Number(makeupMaxDraft) === makeupMax}
+            >
+              <Save className="w-4 h-4 mr-1" />
+              {savingMakeupMax ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            ค่าปัจจุบัน: {makeupMax} ครั้ง/เดือน
+          </p>
         </CardContent>
       </Card>
 

@@ -49,6 +49,7 @@ function makePrevStatus(overrides?: Partial<CheckinStatus>): CheckinStatus {
       makeup_days: [],
       big_reward_claimed: false,
     },
+    makeup_max: 3,
     ...overrides,
   };
 }
@@ -74,6 +75,7 @@ describe('patchCheckinStatusCycle', () => {
     expect(next!.daily_rewards).toEqual(prev.daily_rewards);
     expect(next!.big_reward).toEqual(prev.big_reward);
     expect(next!.makeup_window_open).toBe(prev.makeup_window_open);
+    expect(next!.makeup_max).toBe(prev.makeup_max);
     expect(next!.cycle).toEqual({
       year: patchedCycle.year,
       month: patchedCycle.month,
