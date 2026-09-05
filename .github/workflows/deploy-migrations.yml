@@ -29,7 +29,41 @@ jobs:
           supabase db query --linked \
             "DELETE FROM supabase_migrations.schema_migrations WHERE version ~ '^[0-9]{14}_';"
 
-      - name: Show migration status
+      - name: Show migration status (before repair)
+        run: supabase migration list
+
+      # Remote history stops at 20260717201000, but later schema was applied outside
+      # migration tracking (db push failed with "policy already exists"). Mark that
+      # backlog as applied so only truly new migrations (e.g. checkin makeup seed) run.
+      - name: Repair drifted migration history
+        run: |
+          supabase migration repair --status applied \
+            20260717202000 \
+            20260718001000 \
+            20260718020000 \
+            20260719140000 \
+            20260719150000 \
+            20260724000000 \
+            20260724010000 \
+            20260727000000 \
+            20260730000000 \
+            20260804000000 \
+            20260804010000 \
+            20260804020000 \
+            20260804030000 \
+            20260808000000 \
+            20260808010000 \
+            20260808020000 \
+            20260814231500 \
+            20260814233000 \
+            20260818180000 \
+            20260818190000 \
+            20260820000000 \
+            20260820000001 \
+            20260820000002 \
+            20260826000000
+
+      - name: Show migration status (after repair)
         run: supabase migration list
 
       - name: Push migrations to production

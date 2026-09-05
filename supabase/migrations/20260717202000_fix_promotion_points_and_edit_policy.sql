@@ -97,7 +97,9 @@ END;
 $$;
 
 -- 2. Drop old policy and create new one allowing users to edit approved submissions
+-- Idempotent: policy may already exist if this SQL was applied outside migration history.
 DROP POLICY IF EXISTS "Allow update own pending or admin/owner" ON public.promotion_submissions;
+DROP POLICY IF EXISTS "Allow update own pending/approved or admin/owner" ON public.promotion_submissions;
 
 CREATE POLICY "Allow update own pending/approved or admin/owner" ON public.promotion_submissions FOR UPDATE TO authenticated
 USING (
