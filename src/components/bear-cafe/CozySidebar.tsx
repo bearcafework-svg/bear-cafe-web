@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
-import { useTheme } from 'next-themes';
-import { FileTextIcon, LogIn, Settings } from 'lucide-react';
+import { FileTextIcon, LogIn, Settings, Sun, Moon } from 'lucide-react';
+import { useAnimatedThemeToggle } from '@/components/ui/animated-theme-toggler';
 import { BearLogo } from './BearLogo';
 import { useUserBalances } from '@/hooks/useUserBalances';
 import {
@@ -29,7 +29,7 @@ interface NavItemConfig {
   label: string;
   href?: string;
   external?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   matchPath?: string;
   requireAuth?: boolean;
   icon?: React.ReactNode;
@@ -38,9 +38,10 @@ interface NavItemConfig {
 interface NavItemProps extends NavItemConfig {
   isActive?: boolean;
   icon?: React.ReactNode;
+  rightElement?: React.ReactNode;
 }
 
-function NavItem({ label, href, external, onClick, isActive, icon }: NavItemProps) {
+function NavItem({ label, href, external, onClick, isActive, icon, rightElement }: NavItemProps) {
   const base = cn(
     'group flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
     isActive
@@ -76,6 +77,7 @@ function NavItem({ label, href, external, onClick, isActive, icon }: NavItemProp
     <button type="button" onClick={onClick} className={base}>
       {iconEl}
       <span>{label}</span>
+      {rightElement}
     </button>
   );
 }
@@ -182,7 +184,7 @@ function SidebarBalances() {
 
 export function CozySidebar() {
   const { user, logout, isAuthenticated } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { isDark, toggleTheme } = useAnimatedThemeToggle({ variant: 'circle' });
   const location = useLocation();
 
   const hasAdminAccess =
@@ -248,8 +250,19 @@ export function CozySidebar() {
           ))}
           <NavItem
             label="สลับธีม"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            icon={<SugarCubesColorIcon size={20} />}
+            onClick={(e) => toggleTheme(e.currentTarget)}
+            icon={
+              isDark ? (
+                <Sun className="w-5 h-5 text-amber-400 transition-transform duration-300 hover:rotate-45" />
+              ) : (
+                <Moon className="w-5 h-5 text-slate-600 dark:text-slate-300 transition-transform duration-300 hover:-rotate-12" />
+              )
+            }
+            rightElement={
+              <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground/80 font-normal">
+                {isDark ? 'มืด' : 'สว่าง'}
+              </span>
+            }
           />
         </NavSection>
       </nav>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
@@ -17,13 +17,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,12 +47,13 @@ import {
   X,
   Bell,
   BellOff,
+  ImagePlus,
+  Trash2,
   List,
   LayoutGrid,
   Menu,
   History,
   PieChart,
-  Trash2,
   Pencil,
   Mail,
   Tag,
@@ -94,6 +89,27 @@ import { computeSalmonPreview, computeSalmonDelta } from '@/lib/salmonPoint';
 import fishIcon from '@/assets/fish-icon.png';
 
 const ITEMS_PER_PAGE = 12;
+
+const BILL_TYPE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'bill-bank',
+    label: 'ธนาคารทั่วไป',
+    value: 'ธนาคารทั่วไป',
+    description: 'โอนผ่านบัญชีธนาคาร (รองรับระบบตรวจสอบ QR Code บนสลิปอัตโนมัติ)',
+    icon: '🏦',
+    badge: 'Mobile Banking',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'bill-truemoney',
+    label: 'ทรูมันนี่วอลเล็ท',
+    value: 'ทรูมันนี่',
+    description: 'ชำระผ่านแอปพลิเคชัน TrueMoney Wallet หรือสแกนจ่ายวอลเล็ท',
+    icon: '🧡',
+    badge: 'TrueMoney',
+    badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
+  },
+];
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1410538470253793331/O1fVU-YMsPrHJNZao3NjbHlkxoutDbh29YA26A2Fb-t6fRZOCrjTjLlESZ4lQKP5cTMA';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -162,6 +178,12 @@ interface SelectedItem {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatCurrency(val: number): string {
   return (val || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -293,8 +315,16 @@ export function TradingHistoryManagement() {
     if (!isAddDialogOpen) setCatalogSearch('');
   }, [isAddDialogOpen]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrls = useMemo(() => selectedFiles.map(f => URL.createObjectURL(f)), [selectedFiles]);
-  useEffect(() => () => { previewUrls.forEach(URL.revokeObjectURL); }, [previewUrls]);
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [previewUrls]);
 
   // ── Filters ──
   const [serviceQuery, setServiceQuery] = useState('');
@@ -507,17 +537,21 @@ export function TradingHistoryManagement() {
     });
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
-    if (files.length + selectedFiles.length > 2) {
-      toast({ title: 'อัปโหลดได้สูงสุด 2 รูป', variant: 'destructive' }); return;
+  const handleFilesAdded = async (incomingFiles: File[]) => {
+    const validImages = incomingFiles.filter(f => f.type.startsWith('image/'));
+    if (validImages.length === 0) return;
+    if (validImages.length + selectedFiles.length > 2) {
+      toast({ title: 'อัปโหลดได้สูงสุด 2 รูป', variant: 'destructive' });
     }
-    const newFiles = [...selectedFiles, ...files].slice(0, 2);
+    const remaining = 2 - selectedFiles.length;
+    if (remaining <= 0) return;
+    const toAdd = validImages.slice(0, remaining);
+    const newFiles = [...selectedFiles, ...toAdd];
     setSelectedFiles(newFiles);
-    if (files.length > 0) {
+
+    if (toAdd.length > 0) {
       try {
-        const qr = await scanQRCode(files[0]);
+        const qr = await scanQRCode(toAdd[0]);
         if (qr) {
           const isTrueMoney = qr.includes('140') || qr.toLowerCase().includes('truemoney');
           setNewBill(p => ({ ...p, billType: isTrueMoney ? 'ทรูมันนี่' : 'ธนาคารทั่วไป' }));
@@ -525,6 +559,38 @@ export function TradingHistoryManagement() {
         }
       } catch { /* ignore */ }
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    handleFilesAdded(files);
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    handleFilesAdded(files);
   };
 
   // ── Class item select ──
@@ -1294,13 +1360,13 @@ export function TradingHistoryManagement() {
                       <Label className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
                         <CreditCard className="w-3.5 h-3.5 text-primary" /> ประเภทบิล
                       </Label>
-                      <Select value={newBill.billType} onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}>
-                        <SelectTrigger className="h-9 text-xs rounded-xl bg-background border-border/50"><SelectValue /></SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
-                          <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <RichSelect
+                        data={BILL_TYPE_RICH_OPTIONS}
+                        value={newBill.billType}
+                        onValueChange={v => setNewBill(p => ({ ...p, billType: v }))}
+                        placeholder="เลือกประเภทบิล..."
+                        triggerClassName="h-9 text-xs rounded-xl bg-background border-border/50"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1512,18 +1578,145 @@ export function TradingHistoryManagement() {
                   </div>
                 </div>
 
-                {/* Slip upload */}
-                <div className="space-y-1.5 bg-muted/40 p-4 rounded-2xl border border-border/40">
-                  <Label className="text-xs font-semibold">หลักฐานการโอน (สลิป 1-2 รูป) *</Label>
-                  <Input type="file" multiple accept="image/*" onChange={handleFileChange} className="cursor-pointer h-9 text-xs rounded-xl" />
-                  {selectedFiles.length > 0 && (
-                    <div className="flex gap-2 mt-2">
-                      {selectedFiles.map((f, i) => (
-                        <div key={i} className="relative group">
-                          <img src={previewUrls[i]} alt={f.name} className="w-16 h-16 object-cover rounded-xl border" />
-                          <button onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full p-0.5 shadow-md"><X className="h-3 w-3" /></button>
-                        </div>
-                      ))}
+                {/* Slip upload (Dropzone & Cards) */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-foreground">
+                        หลักฐานการโอน (สลิป) *
+                      </Label>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          'text-[10px] px-2 py-0.5 rounded-full font-normal',
+                          selectedFiles.length > 0
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {selectedFiles.length}/2 รูป
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {/* Empty state: Cozy Drag & Drop Zone */}
+                  {selectedFiles.length === 0 ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={cn(
+                        'group relative flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
+                        'border-border/60 bg-muted/20 hover:border-amber-500/50 hover:bg-amber-500/[0.04]',
+                        isDragging && 'border-amber-500 bg-amber-500/10 scale-[0.99]'
+                      )}
+                    >
+                      <div className="rounded-full bg-background p-3.5 shadow-sm border border-border/50 transition-transform duration-200 group-hover:scale-110">
+                        <ImagePlus className="h-6 w-6 text-amber-500" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                          คลิกเพื่อเลือกรูปสลิป หรือลากไฟล์สลิปมาวางที่นี่
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          รองรับ JPG, PNG, WEBP (อย่างน้อย 1 รูป, สูงสุด 2 รูป พร้อมสแกน QR อัตโนมัติ)
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Grid of preview cards */}
+                      <div className={cn(
+                        'grid gap-3',
+                        selectedFiles.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'
+                      )}>
+                        {selectedFiles.map((file, i) => (
+                          <div
+                            key={i}
+                            className="group relative flex flex-col rounded-2xl border border-border/60 bg-card/60 p-2 shadow-sm transition-all hover:border-border"
+                          >
+                            {/* Image Container with Hover Overlay */}
+                            <div className="relative h-36 w-full overflow-hidden rounded-xl bg-muted/40">
+                              <img
+                                src={previewUrls[i]}
+                                alt={file.name}
+                                className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105"
+                              />
+
+                              {/* Dark Overlay with Action Buttons */}
+                              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 group-hover:opacity-100">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))}
+                                  className="h-8 gap-1 rounded-xl bg-rose-600 px-3 text-xs font-medium text-white shadow-md hover:bg-rose-700 active:scale-95"
+                                  title="ลบสลิปนี้"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>ลบสลิป</span>
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* File Info */}
+                            <div className="mt-2 flex items-center justify-between gap-2 px-1 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-medium text-foreground" title={file.name}>
+                                  {file.name}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))}
+                                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* If 1 file selected, show an 'Add 2nd slip' button slot */}
+                        {selectedFiles.length === 1 && (
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={cn(
+                              'group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-4 transition-all duration-200',
+                              'border-border/60 bg-muted/10 hover:border-amber-500/50 hover:bg-amber-500/[0.03]',
+                              isDragging && 'border-amber-500 bg-amber-500/10'
+                            )}
+                          >
+                            <div className="rounded-full bg-background p-2.5 shadow-sm border border-border/50 group-hover:scale-105 transition-transform">
+                              <Plus className="h-4 w-4 text-amber-500" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs font-medium text-foreground group-hover:text-amber-500 transition-colors">
+                                เพิ่มสลิปอีก 1 รูปภาพ
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">หรือลากไฟล์มาวางที่นี่</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2522,13 +2715,13 @@ export function TradingHistoryManagement() {
               </div>
               <div className="space-y-2">
                 <Label>ประเภทบิล</Label>
-                <Select value={editForm.type_bill} onValueChange={v => setEditForm(p => ({ ...p, type_bill: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ทรูมันนี่">ทรูมันนี่</SelectItem>
-                    <SelectItem value="ธนาคารทั่วไป">ธนาคารทั่วไป</SelectItem>
-                  </SelectContent>
-                </Select>
+                <RichSelect
+                  data={BILL_TYPE_RICH_OPTIONS}
+                  value={editForm.type_bill}
+                  onValueChange={v => setEditForm(p => ({ ...p, type_bill: v }))}
+                  placeholder="เลือกประเภทบิล..."
+                  triggerClassName="h-9 text-xs rounded-xl bg-background border-border/50"
+                />
               </div>
             </div>
           </div>

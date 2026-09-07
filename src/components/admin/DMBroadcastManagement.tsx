@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ProgressIndicator } from '@/components/ui/progress-indicator';
+import { TaskSteps, type TaskStepItem } from '@/components/ui/task-steps';
+import { OrderTrackingParallaxCard } from '@/components/ui/order-tracking-parallax-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +22,8 @@ import {
   Send, Users, Mail, AlertCircle, Play, Square, RefreshCw, XCircle, 
   CheckCircle, Shield, FileText, ChevronDown, ChevronUp,
   Search, Eye, Trash2, ChevronLeft, ChevronRight, Activity, Database, Sparkles,
-  Code, Copy, Clock, Timer
+  Code, Copy, Clock, Timer, Radio, Zap, Terminal, Check, Pause, CheckCircle2,
+  Info, Filter, ArrowRight, ExternalLink
 } from 'lucide-react';
 
 interface CampaignQueue {
@@ -68,6 +72,129 @@ interface DiscordPreviewProps {
   jsonContent: string;
 }
 
+const TARGET_TYPE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'target-option',
+    label: 'แยกตามหมวดหมู่ข่าวสาร',
+    value: 'option',
+    description: 'ส่ง DM ถึงเฉพาะสมาชิกที่เลือกกดรับข่าวสารในหมวดหมู่นี้',
+    icon: '🏷️',
+    badge: 'ตามหมวดหมู่',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'target-all',
+    label: 'สมาชิกทุกคนในเซิร์ฟเวอร์',
+    value: 'all',
+    description: 'บรอดแคสต์ส่ง DM กระจายไปยังสมาชิกทุกคนในเซิร์ฟเวอร์ Discord',
+    icon: '👥',
+    badge: 'ทุกคน',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'target-test',
+    label: 'ทดสอบเฉพาะบุคคล (ป้อน ID)',
+    value: 'test',
+    description: 'ทดสอบส่งเฉพาะ Discord User ID ที่ระบุ สำหรับตรวจสอบความเรียบร้อย',
+    icon: '🧪',
+    badge: 'ทดสอบระบบ',
+    badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25',
+  },
+];
+
+const TARGET_OPTION_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'opt-events',
+    label: 'กิจกรรม (Events)',
+    value: '49B40A9yBS',
+    description: 'สมาชิกที่กดรับแจ้งเตือนเกี่ยวกับกิจกรรม คอนเทสต์ และอีเวนต์ของคาเฟ่',
+    icon: '🎉',
+    badge: 'กิจกรรม',
+    badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25',
+  },
+  {
+    id: 'opt-announce',
+    label: 'ประกาศสำคัญ (Announcements)',
+    value: 'JNySCX80ja',
+    description: 'ประกาศสำคัญจากทีมงาน การปรับปรุงระบบ และกฎระเบียบเซิร์ฟเวอร์',
+    icon: '📢',
+    badge: 'ประกาศ',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'opt-general',
+    label: 'ข่าวสารทั่วไป (General News)',
+    value: 'DsMHlVrjze',
+    description: 'ข่าวสาร พูดคุย อัปเดตทั่วไป และสาระน่ารู้ประจำวัน',
+    icon: '📑',
+    badge: 'ทั่วไป',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'opt-promo',
+    label: 'โปรโมชันและโฆษณา (Promotions)',
+    value: '6io1xnaMWJ',
+    description: 'สิทธิพิเศษ ดีลส่วนลด บริการ และโปรโมชันร้านค้า',
+    icon: '🎁',
+    badge: 'โปรโมชัน',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+];
+
+const TOKEN_TYPE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'token-1',
+    label: 'Token 1 (บอทหลัก)',
+    value: 'token1',
+    description: 'Discord Bot ตัวหลักของ Bear Cafe สำหรับส่งข้อความทั่วไป',
+    icon: '🤖',
+    badge: 'บอทหลัก',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'token-2',
+    label: 'Token 2 (บอทสำรอง)',
+    value: 'token2',
+    description: 'Discord Bot ตัวสำรอง ช่วยกระจายโควตาและลดอัตรา Rate Limit',
+    icon: '🧸',
+    badge: 'บอทสำรอง',
+    badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+  },
+];
+
+const SAFETY_MODE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'mode-safe',
+    label: 'Safe Mode (ปลอดภัยสูงสุด)',
+    value: 'safe',
+    description: 'สุ่มหน่วง 15-35 วิ/ข้อความ • ปลอดภัยสูงสุด ป้องกันข้อความถูกระงับ โควตา 50 ข้อความ/ชม.',
+    icon: '🛡️',
+    badge: 'ปลอดภัยสูงสุด',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+  {
+    id: 'mode-balanced',
+    label: 'Balanced Mode (สมดุลความเร็ว)',
+    value: 'balanced',
+    description: 'สุ่มหน่วง 5-15 วิ/ข้อความ • ทำงานรวดเร็วปานกลาง โควตา 100 ข้อความ/ชม.',
+    icon: '⚡',
+    badge: 'สมดุลความเร็ว',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+];
+
+const FILTER_OPTION_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'filter-all',
+    label: 'ทั้งหมด',
+    value: 'all',
+    description: 'แสดงสมาชิกทุกคนที่รับการบรอดแคสต์',
+    icon: '📋',
+    badge: 'ทั้งหมด',
+  },
+  ...TARGET_OPTION_RICH_OPTIONS,
+];
+
 function getFormattedJson(payload: any): string {
   if (!payload) return '{}';
   try {
@@ -84,13 +211,27 @@ function getFormattedJson(payload: any): string {
   }
 }
 
-function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewProps) {
+interface DiscordPreviewProps {
+  inputMode: 'text' | 'json';
+  textContent: string;
+  jsonContent: string;
+  targetType?: string;
+  safetyMode?: string;
+  estimatedTargets?: number;
+}
+
+function DiscordPreview({ inputMode, textContent, jsonContent, targetType, safetyMode, estimatedTargets = 0 }: DiscordPreviewProps) {
   let content = '';
   let mediaUrl: string | null = null;
   let textBlocks: string[] = [];
   let selectMenuOptions: any[] = [];
   let selectPlaceholder = '🐻︲เลือกการแจ้งเตือนที่ต้องการ';
   let parseError: string | null = null;
+
+  const payloadSize = useMemo(() => {
+    const raw = inputMode === 'text' ? textContent : jsonContent;
+    return new Blob([raw || '']).size;
+  }, [inputMode, textContent, jsonContent]);
 
   if (inputMode === 'text') {
     content = textContent;
@@ -156,57 +297,97 @@ function DiscordPreview({ inputMode, textContent, jsonContent }: DiscordPreviewP
   };
 
   return (
-    <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden h-full flex flex-col">
-      <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
-        <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
-          <Eye className="w-4 h-4 text-indigo-500 shrink-0" />
-          หน้าต่างแสดงตัวอย่าง (Discord Live Preview)
-        </CardTitle>
-        <CardDescription className="text-xs">แสดงตัวอย่างรูปแบบข้อความเสมือนบนแอปพลิเคชัน Discord</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col justify-start p-4">
-        {parseError ? (
-          <div className="flex-1 min-h-[250px] border border-dashed border-red-300 bg-red-50/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-            <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-            <p className="text-sm font-semibold text-red-500">รูปแบบ JSON ไม่ถูกต้อง</p>
-            <p className="text-xs text-red-400 mt-1 font-mono">{parseError}</p>
+    <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden h-full flex flex-col justify-between">
+      <div>
+        <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+              <Eye className="w-4 h-4 text-indigo-500 shrink-0" />
+              ตัวอย่างบน Discord (Live Preview)
+            </CardTitle>
+            <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-mono">
+              Live Mockup
+            </Badge>
           </div>
-        ) : (
-          <div className="bg-[#313338] rounded-2xl p-4 text-[#dbdee1] flex items-start gap-3 shadow-inner border border-zinc-700/50">
-            <div className="w-10 h-10 rounded-full bg-[#5865f2] shrink-0 flex items-center justify-center font-bold text-white text-base shadow">
-              🐻
+          <CardDescription className="text-xs">แสดงผลแบบเรียลไทม์เหมือนที่ผู้ใช้งานจะได้เห็นบนแอปพลิเคชัน Discord</CardDescription>
+        </CardHeader>
+        <CardContent className="p-4">
+          {parseError ? (
+            <div className="min-h-[220px] border border-dashed border-red-300 dark:border-red-900/50 bg-red-50/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+              <AlertCircle className="w-7 h-7 text-red-500 mb-2" />
+              <p className="text-sm font-semibold text-red-500">รูปแบบ JSON ไม่ถูกต้อง</p>
+              <p className="text-xs text-red-400 mt-1 font-mono max-w-xs truncate">{parseError}</p>
             </div>
-            <div className="flex-1 space-y-2 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-white">Bear Cafe Bot</span>
-                <Badge className="bg-[#5865f2] hover:bg-[#5865f2] text-[10px] h-4 px-1 rounded font-normal text-white">BOT</Badge>
-                <span className="text-[11px] text-zinc-400">วันนี้ เวลา 00:00</span>
+          ) : (
+            <div className="bg-[#313338] rounded-2xl p-4 text-[#dbdee1] flex items-start gap-3 shadow-inner border border-zinc-700/50">
+              <div className="w-10 h-10 rounded-full bg-[#5865f2] shrink-0 flex items-center justify-center font-bold text-white text-base shadow">
+                🐻
               </div>
-
-              {content && formatMarkdown(content)}
-
-              {mediaUrl && (
-                <div className="rounded-xl overflow-hidden max-w-sm border border-zinc-700 mt-2">
-                  <img src={mediaUrl} alt="Discord Attachment" className="w-full object-cover max-h-60" />
+              <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-white">Bear Cafe Bot</span>
+                  <Badge className="bg-[#5865f2] hover:bg-[#5865f2] text-[10px] h-4 px-1 rounded font-normal text-white">BOT</Badge>
+                  <span className="text-[11px] text-zinc-400">วันนี้ เวลา {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
                 </div>
-              )}
 
-              {textBlocks.length > 0 && textBlocks.map((txt, idx) => (
-                <div key={idx} className="mt-2 text-sm">{formatMarkdown(txt)}</div>
-              ))}
+                {content && formatMarkdown(content)}
 
-              {selectMenuOptions.length > 0 && (
-                <div className="mt-3 bg-[#2b2d31] border border-zinc-700 rounded-xl p-2.5 space-y-1 max-w-md">
-                  <div className="text-xs text-zinc-400 flex items-center justify-between font-medium">
-                    <span>{selectPlaceholder}</span>
-                    <ChevronDown className="w-4 h-4" />
+                {mediaUrl && (
+                  <div className="rounded-xl overflow-hidden max-w-sm border border-zinc-700 mt-2">
+                    <img src={mediaUrl} alt="Discord Attachment" className="w-full object-cover max-h-60" />
                   </div>
-                </div>
-              )}
+                )}
+
+                {textBlocks.length > 0 && textBlocks.map((txt, idx) => (
+                  <div key={idx} className="mt-2 text-sm">{formatMarkdown(txt)}</div>
+                ))}
+
+                {selectMenuOptions.length > 0 && (
+                  <div className="mt-3 bg-[#2b2d31] border border-zinc-700 rounded-xl p-2.5 space-y-1 max-w-md">
+                    <div className="text-xs text-zinc-400 flex items-center justify-between font-medium">
+                      <span>{selectPlaceholder}</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </div>
+
+      {/* Pre-Flight Telemetry Inspector */}
+      <div className="p-4 pt-0">
+        <div className="p-3.5 rounded-2xl bg-[#FAF6F0] dark:bg-[#1A1614] border border-[#EAD8C8] dark:border-[#2D2420] space-y-2.5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">
+            <span className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-primary" /> มาตรวัดก่อนออกอากาศ (Pre-Flight Telemetry)
+            </span>
+            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+              สถานะ: {content ? 'พร้อมเข้าคิว' : 'รอกรอกเนื้อหา'}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div className="p-2 rounded-xl bg-white dark:bg-[#14110F] border border-[#EAD8C8]/60 dark:border-[#2A221E] space-y-0.5">
+              <span className="text-muted-foreground block text-[10px]">ขนาดข้อมูล</span>
+              <span className="font-mono font-bold text-foreground">{payloadSize.toLocaleString()} ไบต์</span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-[#14110F] border border-[#EAD8C8]/60 dark:border-[#2A221E] space-y-0.5">
+              <span className="text-muted-foreground block text-[10px]">เป้าหมายโดยประมาณ</span>
+              <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                {targetType === 'all' ? 'สมาชิกทั้งหมด' : targetType === 'test' ? '1 คน (ทดสอบ)' : `~${estimatedTargets || 0} คน`}
+              </span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-[#14110F] border border-[#EAD8C8]/60 dark:border-[#2A221E] space-y-0.5">
+              <span className="text-muted-foreground block text-[10px]">ความเร็ว & นโยบาย</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {safetyMode === 'safe' ? 'Safe (15-35s)' : 'Balanced (5-15s)'}
+              </span>
             </div>
           </div>
-        )}
-      </CardContent>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -318,6 +499,36 @@ export function DMBroadcastManagement() {
       avgDelay
     };
   };
+
+  const getCampaignPipelineSteps = (c: CampaignQueue): { steps: TaskStepItem[]; current: number } => {
+    const steps: TaskStepItem[] = [
+      { id: 'validate', label: '1. ตรวจสอบข้อมูล', meta: 'ผ่าน' },
+      { id: 'queue', label: '2. กรองผู้รับ', meta: `${c.total_targets} คน` },
+      { 
+        id: 'dispatch', 
+        label: '3. กำลังส่ง DM', 
+        meta: c.status === 'processing' 
+          ? `${c.sent_count}/${c.total_targets}` 
+          : c.status === 'completed' 
+          ? 'ครบแล้ว' 
+          : 'รอส่ง' 
+      },
+      { id: 'finalized', label: '4. สรุปผล & Log', meta: c.status === 'completed' ? '100%' : 'ปลายทาง' },
+    ];
+
+    let current = 0;
+    if (c.status === 'pending') {
+      current = 1;
+    } else if (c.status === 'processing' || c.status === 'paused') {
+      current = 2;
+    } else if (c.status === 'completed') {
+      current = 4;
+    } else if (c.status === 'cancelled') {
+      current = 1;
+    }
+
+    return { steps, current };
+  };
   
   // Paginated Campaign Logs
   const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([]);
@@ -378,6 +589,27 @@ export function DMBroadcastManagement() {
     ]
   }
 }`);
+
+  // Cyber Console Terminal States
+  const [logLevelFilter, setLogLevelFilter] = useState<'all' | 'info' | 'success' | 'warn' | 'error'>('all');
+  const [logAutoScroll, setLogAutoScroll] = useState(true);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+
+  // Estimated Target Count for Inspector
+  const estimatedTargetsCount = useMemo(() => {
+    if (targetType === 'all') return subStats.totalSubs;
+    if (targetType === 'option') return subStats.options[targetOption as keyof typeof subStats.options] || 0;
+    if (targetType === 'test') return testUserId.split(',').map(s => s.trim()).filter(Boolean).length || 1;
+    return 0;
+  }, [targetType, targetOption, subStats, testUserId]);
+
+  // Auto-scroll terminal when new systemLogs arrive
+  useEffect(() => {
+    if (logAutoScroll && terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [systemLogs, logAutoScroll]);
 
   // Fetch Subscribers List
   const fetchMemberSubscriptions = useCallback(async () => {
@@ -618,10 +850,42 @@ export function DMBroadcastManagement() {
         .eq('id', campaignId);
 
       if (error) throw error;
-      toast({ title: 'ยกเลิกบรอดแคสต์แล้วค่ะ' });
+      toast({ title: 'ยกเลิกบรอดแคสต์แล้ว' });
       fetchDashboardData(true);
     } catch (e) {
       toast({ title: 'ผิดพลาด', description: 'ไม่สามารถยกเลิกได้', variant: 'destructive' });
+    }
+  };
+
+  // Pause Campaign
+  const handlePauseCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('dm_broadcast_queues' as any)
+        .update({ status: 'paused', updated_at: new Date().toISOString() })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+      toast({ title: 'พักการส่งชั่วคราวแล้ว', description: 'บอทจะหยุดส่งชั่วคราว สามารถกดดำเนินการต่อได้ทุกเมื่อ' });
+      fetchDashboardData(true);
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  // Resume Campaign
+  const handleResumeCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('dm_broadcast_queues' as any)
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+      toast({ title: 'ดำเนินการส่งต่อแล้ว', description: 'ระบบนำคิวกลับมาส่งต่อทันที' });
+      fetchDashboardData(true);
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
     }
   };
 
@@ -797,57 +1061,128 @@ export function DMBroadcastManagement() {
 
       {/* 1. Statistics Cards Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl">
+        {/* Card 1: Audience */}
+        <Card className="border-[#EAD8C8] dark:border-[#2D2420] shadow-xs bg-[#FDFBF7] dark:bg-[#181412] rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" /> สมาชิกที่สมัครรับข่าวสาร
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-stone-700 dark:text-stone-300">
+                <Users className="w-4 h-4 text-amber-500" /> ผู้รับข่าวสารทั้งหมด
+              </span>
+              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold">
+                พร้อมรับข่าว
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.totalSubs} คน</div>
-            <p className="text-[11px] text-muted-foreground mt-1">ยอดผู้ใช้ที่เลือกช่องทางรับข่าวสาร</p>
+            <div className="text-2xl font-black text-[#4E3F30] dark:text-[#F3EDE6]">
+              {subStats.totalSubs.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">คน</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">ผู้ใช้ที่เลือกหัวข้อรับการแจ้งเตือนจากบอท</p>
           </CardContent>
         </Card>
 
-        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl col-span-1 md:col-span-2">
+        {/* Card 2: Category Distribution */}
+        <Card className="border-[#EAD8C8] dark:border-[#2D2420] shadow-xs bg-[#FDFBF7] dark:bg-[#181412] rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground">สัดส่วนตามหมวดหมู่ข่าวสาร</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">🎉 กิจกรรม</span>
-              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['49B40A9yBS']} คน</div>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">📢 ประกาศสำคัญ</span>
-              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['JNySCX80ja']} คน</div>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">📑 ข่าวสารทั่วไป</span>
-              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['DsMHlVrjze']} คน</div>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">🎁 โปรโมชัน</span>
-              <div className="text-base font-bold text-[#4E3F30] dark:text-[#E8E1D9]">{subStats.options['6io1xnaMWJ']} คน</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-[#EAD8C8] dark:border-[#2D2520] shadow-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] rounded-2xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-              <Mail className="w-4 h-4 text-emerald-500" /> สถานะช่องทาง DM
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-stone-700 dark:text-stone-300">
+                <Radio className="w-4 h-4 text-primary" /> หมวดหมู่ที่ติดตาม
+              </span>
+              <span className="text-[10px] text-muted-foreground">4 หมวดหมู่</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">เปิดรับ DM:</span>
-              <span className="font-bold">{dmStatusStats.open}</span>
+          <CardContent className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-[#FAF6F0] dark:bg-[#201A17] p-2 rounded-xl border border-[#EAD8C8]/60 dark:border-[#2D2420]/70">
+              <span className="text-[10px] text-muted-foreground block">🎉 กิจกรรม</span>
+              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9] text-sm">{subStats.options['49B40A9yBS']}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-rose-600 dark:text-rose-400 font-medium">ปิดรับ DM:</span>
-              <span className="font-bold">{dmStatusStats.closed}</span>
+            <div className="bg-[#FAF6F0] dark:bg-[#201A17] p-2 rounded-xl border border-[#EAD8C8]/60 dark:border-[#2D2420]/70">
+              <span className="text-[10px] text-muted-foreground block">📢 ประกาศสำคัญ</span>
+              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9] text-sm">{subStats.options['JNySCX80ja']}</span>
             </div>
+            <div className="bg-[#FAF6F0] dark:bg-[#201A17] p-2 rounded-xl border border-[#EAD8C8]/60 dark:border-[#2D2420]/70">
+              <span className="text-[10px] text-muted-foreground block">📑 ข่าวสารทั่วไป</span>
+              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9] text-sm">{subStats.options['DsMHlVrjze']}</span>
+            </div>
+            <div className="bg-[#FAF6F0] dark:bg-[#201A17] p-2 rounded-xl border border-[#EAD8C8]/60 dark:border-[#2D2420]/70">
+              <span className="text-[10px] text-muted-foreground block">🎁 โปรโมชัน</span>
+              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9] text-sm">{subStats.options['6io1xnaMWJ']}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: DM Delivery Health */}
+        <Card className="border-[#EAD8C8] dark:border-[#2D2420] shadow-xs bg-[#FDFBF7] dark:bg-[#181412] rounded-2xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-stone-700 dark:text-stone-300">
+                <Mail className="w-4 h-4 text-emerald-500" /> อัตราความพร้อมส่ง DM
+              </span>
+              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-semibold">
+                {dmStatusStats.open + dmStatusStats.closed > 0 
+                  ? `${Math.round((dmStatusStats.open / (dmStatusStats.open + dmStatusStats.closed)) * 100)}% เข้าถึงได้`
+                  : 'พร้อมส่ง'}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> เปิดรับ: {dmStatusStats.open}
+                </span>
+                <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> ปิดรับ: {dmStatusStats.closed}
+                </span>
+              </div>
+            </div>
+            <div className="p-1.5 bg-[#FAF6F0] dark:bg-[#201A17] rounded-xl border border-[#EAD8C8]/60 dark:border-[#2D2420]/70 text-[10px] text-muted-foreground flex items-center gap-1.5">
+              <Shield className="w-3 h-3 text-amber-500 shrink-0" />
+              <span>บันทึกประวัติ DM 50007 อัตโนมัติ เพื่อกันบอทติด Quarantine</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Engine Status */}
+        <Card className="border-[#EAD8C8] dark:border-[#2D2420] shadow-xs bg-[#FDFBF7] dark:bg-[#181412] rounded-2xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-stone-700 dark:text-stone-300">
+                <Zap className="w-4 h-4 text-amber-500" /> สถานะเครื่องยนต์บอท
+              </span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(() => {
+              const runningCount = campaigns.filter(c => c.status === 'processing').length;
+              const pendingCount = campaigns.filter(c => c.status === 'pending').length;
+              return (
+                <div>
+                  <div className="text-base font-bold text-[#4E3F30] dark:text-[#F3EDE6] flex items-center gap-2">
+                    {runningCount > 0 ? (
+                      <span className="text-blue-500 flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 animate-spin" /> กำลังส่ง ({runningCount} งาน)
+                      </span>
+                    ) : pendingCount > 0 ? (
+                      <span className="text-amber-500 flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 animate-pulse" /> รอคิว ({pendingCount} งาน)
+                      </span>
+                    ) : (
+                      <span className="text-emerald-500 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> พร้อมทำงาน (Idle)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    รองรับ Token 1 และ 2 พร้อมระบบเฉลี่ยคิวอัตโนมัติ
+                  </p>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -876,168 +1211,210 @@ export function DMBroadcastManagement() {
             
             {/* Left Col: Composer Form */}
             <div className="lg:col-span-7 flex flex-col">
-              <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl flex-1 flex flex-col">
-                <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
-                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" /> กรอกข้อมูลบรอดแคสต์
-                  </CardTitle>
-                  <CardDescription className="text-xs">ตั้งชื่อ เลือกกลุ่มเป้าหมาย ข้อความข่าวสาร และกำหนดระดับความปลอดภัย</CardDescription>
-                </CardHeader>
-                <CardContent className="p-5 flex-1 flex flex-col justify-between">
-                  <form onSubmit={handleSubmitCampaign} className="space-y-4">
-                    
-                    {/* Campaign Title */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="title" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ชื่อรายการบรอดแคสต์ (อ้างอิงภายใน)</Label>
-                      <Input 
-                        id="title"
-                        placeholder="เช่น ประกาศกิจกรรมกิลด์ 15 เม.ย."
-                        value={composerTitle}
-                        onChange={(e) => setComposerTitle(e.target.value)}
-                        required
-                        className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"
-                      />
+              <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[#181412] dark:border-[#2D2420] shadow-sm rounded-3xl flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="pb-4 border-b border-[#EAD8C8]/60 dark:border-[#2D2420] bg-[#FAF6F0]/50 dark:bg-[#15110E]/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" /> สร้างงานบรอดแคสต์ใหม่ (Broadcast Studio)
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        กำหนดชื่อรายการ กลุ่มเป้าหมาย เนื้อหา และตั้งค่านโยบายความปลอดภัยของระบบคิว
+                      </CardDescription>
                     </div>
+                    <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold px-2.5 py-1">
+                      สตูดิโอ 3 ขั้นตอน
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-6">
+                  <form onSubmit={handleSubmitCampaign} className="space-y-6">
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Target Audience */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">กลุ่มเป้าหมายผู้รับสาร</Label>
-                        <Select value={targetType} onValueChange={(val: 'all' | 'option' | 'test') => setTargetType(val)}>
-                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="option">🏷️ แยกตามหมวดหมู่ข่าวสาร</SelectItem>
-                            <SelectItem value="all">👥 สมาชิกทุกคนในเซิร์ฟเวอร์</SelectItem>
-                            <SelectItem value="test">🧪 ทดสอบเฉพาะบุคคล (ป้อน ID)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    {/* Step 1: Target & Basic Settings */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-[#FAF6F0]/60 dark:bg-[#201A17]/60 border border-[#EAD8C8]/70 dark:border-[#2D2420]">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                        <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center text-[11px] font-bold">1</span>
+                        กลุ่มเป้าหมายและบอทผู้ส่ง (Audience & Sender)
                       </div>
 
-                      {/* Option Category */}
-                      {targetType === 'option' && (
-                        <div className="space-y-1.5">
-                          <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">หมวดหมู่ข่าวสาร</Label>
-                          <Select value={targetOption} onValueChange={setTargetOption}>
-                            <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
-                              <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
-                              <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
-                              <SelectItem value="6io1xnaMWJ">🎁 โปรโมชันและโฆษณา</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="title" className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">
+                          ชื่อรายการบรอดแคสต์ <span className="text-rose-500">*</span>
+                        </Label>
+                        <Input 
+                          id="title"
+                          placeholder="เช่น แจ้งเตือนกิจกรรมกิลด์ 15 ก.ย. หรือ ข่าวสารอัปเดตร้าน"
+                          value={composerTitle}
+                          onChange={(e) => setComposerTitle(e.target.value)}
+                          required
+                          className="border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E] text-sm rounded-xl h-10"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <RichSelect
+                            label="กลุ่มเป้าหมายผู้รับสาร"
+                            value={targetType}
+                            onValueChange={(val: any) => setTargetType(val)}
+                            data={TARGET_TYPE_RICH_OPTIONS}
+                            placeholder="เลือกกลุ่มเป้าหมาย..."
+                          />
+                        </div>
+
+                        {targetType === 'option' && (
+                          <div className="space-y-1">
+                            <RichSelect
+                              label="หมวดหมู่ข่าวสาร"
+                              value={targetOption}
+                              onValueChange={setTargetOption}
+                              data={TARGET_OPTION_RICH_OPTIONS}
+                              placeholder="เลือกหมวดหมู่..."
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <RichSelect
+                            label="บอทที่ใช้ส่งข้อความ"
+                            value={tokenType}
+                            onValueChange={(val: any) => setTokenType(val)}
+                            data={TOKEN_TYPE_RICH_OPTIONS}
+                            placeholder="เลือกบอทส่งข้อความ..."
+                          />
+                        </div>
+                      </div>
+
+                      {targetType === 'test' && (
+                        <div className="space-y-1 pt-1">
+                          <Label htmlFor="testUserId" className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">
+                            Discord User ID สำหรับทดสอบ (คั่นด้วยจุลภาคได้)
+                          </Label>
+                          <Input 
+                            id="testUserId"
+                            placeholder="ป้อน Discord User ID เช่น 944920660759707658"
+                            value={testUserId}
+                            onChange={(e) => setTestUserId(e.target.value)}
+                            required
+                            className="border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E] text-xs font-mono rounded-xl h-9"
+                          />
                         </div>
                       )}
-
-                      {/* Bot Credentials */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">บอทที่ใช้ส่ง (Credentials)</Label>
-                        <Select value={tokenType} onValueChange={(val: 'token1' | 'token2') => setTokenType(val)}>
-                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl h-10"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="token1">Token 1 (บอทหลัก)</SelectItem>
-                            <SelectItem value="token2">Token 2 (บอทสำรอง)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
 
-                    {/* Test User ID Input */}
-                    {targetType === 'test' && (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="testUserId" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">Discord User ID สำหรับทดสอบ</Label>
-                        <Input 
-                          id="testUserId"
-                          placeholder="ป้อน Discord User ID (เช่น 944920660759707658)"
-                          value={testUserId}
-                          onChange={(e) => setTestUserId(e.target.value)}
-                          required
-                          className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-xs rounded-xl h-9"
-                        />
-                      </div>
-                    )}
-
-                    {/* Safety & Deduplication Options Box */}
-                    <div className="p-4 bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] space-y-3">
+                    {/* Step 2: Content Studio */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-[#FAF6F0]/60 dark:bg-[#201A17]/60 border border-[#EAD8C8]/70 dark:border-[#2D2420]">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="dedup" className="text-xs sm:text-sm font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2 cursor-pointer">
-                          <Shield className="w-4 h-4 text-emerald-500" /> ข้ามคนที่เคยส่งสำเร็จแล้ว (กันส่งซ้ำ 100%)
-                        </Label>
-                        <input 
-                          id="dedup"
-                          type="checkbox"
-                          checked={excludePreviousSuccess}
-                          onChange={(e) => setExcludePreviousSuccess(e.target.checked)}
-                          className="w-4 h-4 accent-[#8C6239] rounded cursor-pointer"
-                        />
+                        <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                          <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center text-[11px] font-bold">2</span>
+                          เนื้อหาข้อความ (Message Payload)
+                        </div>
+
+                        <div className="flex gap-1 bg-[#F0E6D8] dark:bg-[#14100E] p-0.5 rounded-xl border border-[#EAD8C8] dark:border-[#2D2420]">
+                          <button 
+                            type="button"
+                            className={cn("px-2.5 py-1 text-xs rounded-lg font-semibold transition-all flex items-center gap-1", inputMode === 'text' ? "bg-white dark:bg-[#221B17] text-stone-900 dark:text-stone-100 shadow-xs" : "text-muted-foreground hover:text-stone-800 dark:hover:text-stone-200")}
+                            onClick={() => setInputMode('text')}
+                          >
+                            <FileText className="w-3 h-3 text-amber-500" /> ข้อความธรรมดา
+                          </button>
+                          <button 
+                            type="button"
+                            className={cn("px-2.5 py-1 text-xs rounded-lg font-semibold transition-all flex items-center gap-1", inputMode === 'json' ? "bg-white dark:bg-[#221B17] text-stone-900 dark:text-stone-100 shadow-xs" : "text-muted-foreground hover:text-stone-800 dark:hover:text-stone-200")}
+                            onClick={() => setInputMode('json')}
+                          >
+                            <Shield className="w-3 h-3 text-blue-500" /> Discohook JSON
+                          </button>
+                        </div>
                       </div>
-                      
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold text-[#827160]">ระดับความเร็วส่งและระยะหน่วง (Safety Velocity)</Label>
-                        <Select value={safetyMode} onValueChange={(val: 'safe' | 'balanced') => setSafetyMode(val)}>
-                          <SelectTrigger className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-xs rounded-xl h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="safe">🛡️ Safe Mode (สุ่มหน่วง 15-35 วิ | โควตา 50 ข้อความ/ชม.)</SelectItem>
-                            <SelectItem value="balanced">⚡ Balanced Mode (สุ่มหน่วง 5-15 วิ | โควตา 100 ข้อความ/ชม.)</SelectItem>
-                          </SelectContent>
-                        </Select>
+
+                      {inputMode === 'text' ? (
+                        <div className="space-y-1.5">
+                          <Textarea 
+                            id="textContent"
+                            placeholder="พิมพ์ข้อความข่าวสาร รองรับ Markdown เช่น **ตัวหนา**, *ตัวเอียง*, <#channel_id>..."
+                            className="h-36 border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E] text-sm rounded-xl resize-y"
+                            value={textContent}
+                            onChange={(e) => setTextContent(e.target.value)}
+                          />
+                          <div className="flex justify-between text-[11px] text-muted-foreground px-1">
+                            <span>รองรับ Discord Markdown</span>
+                            <span>{textContent.length} ตัวอักษร</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <Textarea 
+                            id="jsonContent"
+                            placeholder="วาง JSON รูปแบบ Component v2 หรือ Embed ที่นี่..."
+                            className="h-36 font-mono text-xs border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E] text-emerald-600 dark:text-emerald-400 rounded-xl resize-y"
+                            value={jsonContent}
+                            onChange={(e) => setJsonContent(e.target.value)}
+                          />
+                          <div className="flex justify-between text-[11px] text-muted-foreground px-1">
+                            <span>Discohook / Discord Component v2 JSON format</span>
+                            <span>{jsonContent.length} ไบต์</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 3: Safety & Policy */}
+                    <div className="space-y-3 p-4 rounded-2xl bg-[#FAF6F0]/60 dark:bg-[#201A17]/60 border border-[#EAD8C8]/70 dark:border-[#2D2420]">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                        <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center text-[11px] font-bold">3</span>
+                        การควบคุมความเร็วและความปลอดภัย (Anti-Spam & Quarantine Protection)
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-[#14100E] border border-[#EAD8C8]/60 dark:border-[#2D2420]">
+                          <Label htmlFor="dedup" className="text-xs font-semibold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2 cursor-pointer">
+                            <Shield className="w-4 h-4 text-emerald-500" /> ข้ามคนที่เคยส่งสำเร็จแล้ว (ป้องกันส่งซ้ำ 100%)
+                          </Label>
+                          <input 
+                            id="dedup"
+                            type="checkbox"
+                            checked={excludePreviousSuccess}
+                            onChange={(e) => setExcludePreviousSuccess(e.target.checked)}
+                            className="w-4 h-4 accent-[#8C6239] rounded cursor-pointer"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <RichSelect
+                            label="ระดับความเร็วและระยะหน่วงเวลาระหว่างส่ง"
+                            value={safetyMode}
+                            onValueChange={(val: any) => setSafetyMode(val)}
+                            data={SAFETY_MODE_RICH_OPTIONS}
+                            placeholder="เลือกระดับความปลอดภัย..."
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Format Selector */}
-                    <div className="space-y-1.5">
-                      <Label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">รูปแบบเนื้อหาข้อความ</Label>
-                      <div className="flex gap-2">
-                        <Button 
-                          type="button"
-                          variant={inputMode === 'text' ? 'default' : 'outline'}
-                          size="sm"
-                          className="flex-1 rounded-xl text-xs font-semibold"
-                          onClick={() => setInputMode('text')}
-                        >
-                          <FileText className="w-3.5 h-3.5 mr-1" /> ข้อความธรรมดา (Markdown)
-                        </Button>
-                        <Button 
-                          type="button"
-                          variant={inputMode === 'json' ? 'default' : 'outline'}
-                          size="sm"
-                          className="flex-1 rounded-xl text-xs font-semibold"
-                          onClick={() => setInputMode('json')}
-                        >
-                          <Shield className="w-3.5 h-3.5 mr-1" /> Component JSON (Discohook)
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Content Textarea */}
-                    {inputMode === 'text' ? (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="textContent" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">ข้อความข่าวสาร</Label>
-                        <Textarea 
-                          id="textContent"
-                          placeholder="พิมพ์ข่าวสารที่คุณต้องการส่งที่นี่..."
-                          className="h-36 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-sm rounded-xl"
-                          value={textContent}
-                          onChange={(e) => setTextContent(e.target.value)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="jsonContent" className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8]">JSON Payload (Discord Component format)</Label>
-                        <Textarea 
-                          id="jsonContent"
-                          placeholder="วาง JSON รูปแบบ Component v2 ที่นี่..."
-                          className="h-36 font-mono text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] rounded-xl"
-                          value={jsonContent}
-                          onChange={(e) => setJsonContent(e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    <Button type="submit" className="w-full rounded-2xl h-11 gap-2 bg-[#8C6239] hover:bg-[#74502D] text-white font-bold text-sm shadow-sm" disabled={submitting}>
-                      {submitting ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <Play className="w-4 h-4 text-white" />}
-                      นำส่งเข้าคิวออกอากาศ
+                    {/* Submit Action */}
+                    <Button 
+                      type="submit" 
+                      className="w-full rounded-2xl h-12 gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold text-sm shadow-md shadow-amber-500/20 hover:shadow-amber-500/30 active:scale-[0.99] transition-all cursor-pointer border-0" 
+                      disabled={submitting}
+                    >
+                      {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-stone-950" />}
+                      {submitting ? 'กำลังนำเข้าคิวออกอากาศ...' : 'นำส่งเข้าคิวออกอากาศ (Queue Broadcast)'}
                     </Button>
+
+                    {/* Pipeline Stage Preview */}
+                    <div className="pt-2">
+                      <TaskSteps
+                        steps={[
+                          { id: 'step-1', label: '1. ตรวจสอบข้อมูล', meta: composerTitle ? 'พร้อม' : 'รอกรอก' },
+                          { id: 'step-2', label: '2. จัดคิว & คัดกรอง', meta: targetType === 'all' ? 'ทุกคน' : `${estimatedTargetsCount} คน` },
+                          { id: 'step-3', label: '3. ป้องกัน Spam', meta: safetyMode === 'safe' ? 'Safe Mode' : 'Balanced' },
+                          { id: 'step-4', label: '4. ออกอากาศ DM', meta: tokenType === 'token2' ? 'บอท 2' : 'บอท 1' },
+                        ]}
+                        current={submitting ? 1 : 0}
+                        label="ขั้นตอนการประมวลผล (Broadcast Pipeline Preview)"
+                      />
+                    </div>
 
                   </form>
                 </CardContent>
@@ -1046,7 +1423,14 @@ export function DMBroadcastManagement() {
 
             {/* Right Col: Live Preview */}
             <div className="lg:col-span-5 flex flex-col">
-              <DiscordPreview inputMode={inputMode} textContent={textContent} jsonContent={jsonContent} />
+              <DiscordPreview 
+                inputMode={inputMode} 
+                textContent={textContent} 
+                jsonContent={jsonContent}
+                targetType={targetType}
+                safetyMode={safetyMode}
+                estimatedTargets={estimatedTargetsCount}
+              />
             </div>
 
           </div>
@@ -1054,6 +1438,74 @@ export function DMBroadcastManagement() {
 
         {/* TAB 2: Campaigns History & Paginated Logs */}
         <TabsContent value="campaigns" className="space-y-6">
+
+          {/* 1. Featured Active / Latest Campaign Parallax Tracker */}
+          {(() => {
+            const activeCampaign = campaigns.find(c => c.status === 'processing' || c.status === 'pending' || c.status === 'paused') || (campaigns.length > 0 ? campaigns[0] : null);
+            if (!activeCampaign) return null;
+
+            const activeEta = calculateETA(activeCampaign);
+            const pipeline = getCampaignPipelineSteps(activeCampaign);
+
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    {activeCampaign.status === 'processing' 
+                      ? 'ระบบติดตามงานบรอดแคสต์สด (Live Active Tracking)' 
+                      : 'ระบบติดตามงานบรอดแคสต์ล่าสุด (Recent Broadcast Tracking)'}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold">
+                    Interactive 3D Parallax
+                  </Badge>
+                </div>
+
+                <OrderTrackingParallaxCard
+                  campaignId={activeCampaign.id}
+                  title={activeCampaign.title}
+                  subTitle={`เป้าหมาย: ${
+                    activeCampaign.target_type === 'all' 
+                      ? 'สมาชิกทุกคน' 
+                      : activeCampaign.target_type === 'test' 
+                      ? 'ทดสอบเฉพาะบุคคล' 
+                      : 'แยกตามหมวดหมู่'
+                  } • สร้างเมื่อ ${new Date(activeCampaign.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`}
+                  status={
+                    activeCampaign.status === 'processing' ? 'กำลังกระจายส่งข้อความ DM...' :
+                    activeCampaign.status === 'pending' ? 'รอคิวออกอากาศ' :
+                    activeCampaign.status === 'completed' ? 'จัดส่งเสร็จสิ้นสมบูรณ์' :
+                    activeCampaign.status === 'paused' ? 'พักส่งชั่วคราว' : 'ยกเลิกการส่งแล้ว'
+                  }
+                  statusType={activeCampaign.status}
+                  eta={
+                    (activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused')
+                      ? activeEta.text.replace('⏱️ ประเมินเวลาเสร็จสิ้น: ~ ', '')
+                      : undefined
+                  }
+                  totalTargets={activeCampaign.total_targets}
+                  sentCount={activeCampaign.sent_count}
+                  failedCount={activeCampaign.failed_count}
+                  tokenType={activeCampaign.token_type}
+                  safetyMode={activeCampaign.message_payload?.options?.min_delay_sec >= 15 ? 'safe' : 'balanced'}
+                  onViewLogs={() => handleToggleExpand(activeCampaign.id)}
+                  onPause={activeCampaign.status === 'processing' ? () => handlePauseCampaign(activeCampaign.id) : undefined}
+                  onResume={activeCampaign.status === 'paused' ? () => handleResumeCampaign(activeCampaign.id) : undefined}
+                  onCancel={(activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused') ? () => handleCancelCampaign(activeCampaign.id) : undefined}
+                  onRetry={activeCampaign.failed_count > 0 && activeCampaign.status !== 'processing' ? () => handleRetryFailedCampaign(activeCampaign.id) : undefined}
+                  onViewJson={() => setJsonViewCampaign(activeCampaign)}
+                >
+                  <TaskSteps
+                    steps={pipeline.steps}
+                    current={pipeline.current}
+                    label="ขั้นตอนกระบวนการจัดส่ง (Broadcast Pipeline)"
+                  />
+                </OrderTrackingParallaxCard>
+              </div>
+            );
+          })()}
+
+          {/* 2. All Campaigns List */}
           <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
             <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
               <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการงานบรอดแคสต์ทั้งหมด ({campaigns.length})</CardTitle>
@@ -1100,6 +1552,18 @@ export function DMBroadcastManagement() {
                                     <Code className="w-3.5 h-3.5 text-blue-500" /> ดู JSON
                                   </Button>
 
+                                  {c.status === 'processing' && (
+                                    <Button size="sm" variant="outline" className="h-7 text-xs font-bold gap-1 border-amber-500/40 text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 cursor-pointer" onClick={() => handlePauseCampaign(c.id)}>
+                                      <Pause className="w-3 h-3" /> พักส่ง
+                                    </Button>
+                                  )}
+
+                                  {c.status === 'paused' && (
+                                    <Button size="sm" variant="outline" className="h-7 text-xs font-bold gap-1 border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 cursor-pointer" onClick={() => handleResumeCampaign(c.id)}>
+                                      <Play className="w-3 h-3 fill-emerald-600" /> ส่งต่อ
+                                    </Button>
+                                  )}
+
                                   {c.failed_count > 0 && c.status !== 'processing' && (
                                     <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 font-bold cursor-pointer" onClick={() => handleRetryFailedCampaign(c.id)}>
                                       <RefreshCw className="w-3 h-3" /> ส่งซ่อม ({c.failed_count})
@@ -1132,21 +1596,34 @@ export function DMBroadcastManagement() {
                                 </div>
                               )}
 
-                              {/* Progress Bar */}
-                              <div className="space-y-1.5 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
+                              {/* Progress Indicator Component */}
+                              <div className="space-y-2 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3.5 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
                                 <div className="flex justify-between items-center text-xs text-[#8C6239] dark:text-[#EAD8C8]">
-                                  <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
+                                  <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong></span>
                                   <div className="flex gap-3 font-semibold text-xs">
                                     <span className="text-emerald-600 dark:text-emerald-400">สำเร็จ: {c.sent_count}</span>
-                                    <span className="text-rose-600 dark:text-rose-400">ล้มเหลว: {c.failed_count}</span>
+                                    {c.failed_count > 0 && (
+                                      <span className="text-rose-600 dark:text-rose-400">ล้มเหลว: {c.failed_count}</span>
+                                    )}
                                   </div>
                                 </div>
-                                <Progress value={percent} className="h-2 bg-muted [&>div]:bg-emerald-500" />
+                                <ProgressIndicator
+                                  value={percent}
+                                  showLabel={true}
+                                  size="sm"
+                                  variant={c.status === 'completed' ? 'emerald' : c.status === 'processing' ? 'amber' : 'default'}
+                                />
                               </div>
 
                               {/* Paginated Logs Area (Expanded) */}
                               {isExpanded && (
                                 <div className="pt-3 border-t border-border/40 space-y-3">
+                                  {/* Embedded TaskSteps for this campaign */}
+                                  <TaskSteps
+                                    steps={getCampaignPipelineSteps(c).steps}
+                                    current={getCampaignPipelineSteps(c).current}
+                                    label={`ขั้นตอนกระบวนการของรายการนี้ (${c.status})`}
+                                  />
                                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                                     <h4 className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
                                       <AlertCircle className="w-4 h-4 text-muted-foreground" /> ผลการจัดส่งรายคน (หน้า {logsPage} / {totalLogPages})
@@ -1247,64 +1724,117 @@ export function DMBroadcastManagement() {
 
         {/* TAB 3: Subscribers List (Paginated) */}
         <TabsContent value="subscribers" className="space-y-6">
-          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
-            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายชื่อสมาชิกผู้รับข่าวสาร ({filteredMemberSubs.length} คน)</CardTitle>
-                <CardDescription className="text-xs">แสดงรายชื่อผู้ใช้งานที่เลือกสมัครรับแจ้งเตือนแยกตามหมวดหมู่</CardDescription>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-56">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[#181412] dark:border-[#2D2420] shadow-sm rounded-3xl overflow-hidden">
+            <CardHeader className="pb-4 border-b border-[#EAD8C8]/60 dark:border-[#2D2420] space-y-3 bg-[#FAF6F0]/40 dark:bg-[#15110E]/40">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                    <Users className="w-5 h-5 text-amber-500" /> ทำเนียบสมาชิกผู้รับข่าวสาร ({filteredMemberSubs.length} คน)
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    รายชื่อผู้ใช้ที่ลงทะเบียนรับข่าวสาร DM แยกตามหมวดหมู่ความสนใจ
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
-                    className="pl-9 h-9 text-xs rounded-xl"
-                    placeholder="ค้นหาชื่อ หรือ User ID..."
+                    className="pl-9 h-9 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E]"
+                    placeholder="ค้นหาชื่อ หรือ Discord ID..."
                     value={memberSearchQuery}
                     onChange={(e) => { setMemberSearchQuery(e.target.value); setMemberPage(1); }}
                   />
                 </div>
-                <Select value={filterOption} onValueChange={(val) => { setFilterOption(val); setMemberPage(1); }}>
-                  <SelectTrigger className="w-36 h-9 text-xs rounded-xl"><SelectValue placeholder="หมวดหมู่" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="49B40A9yBS">🎉 กิจกรรม</SelectItem>
-                    <SelectItem value="JNySCX80ja">📢 ประกาศสำคัญ</SelectItem>
-                    <SelectItem value="DsMHlVrjze">📑 ข่าวสารทั่วไป</SelectItem>
-                    <SelectItem value="6io1xnaMWJ">🎁 โปรโมชัน</SelectItem>
-                  </SelectContent>
-                </Select>
+              </div>
+
+              {/* Quick Filter Category Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {[
+                  { id: 'all', label: 'ทั้งหมด', count: memberSubs.length },
+                  { id: '49B40A9yBS', label: '🎉 กิจกรรม', count: subStats.options['49B40A9yBS'] },
+                  { id: 'JNySCX80ja', label: '📢 ประกาศสำคัญ', count: subStats.options['JNySCX80ja'] },
+                  { id: 'DsMHlVrjze', label: '📑 ข่าวสารทั่วไป', count: subStats.options['DsMHlVrjze'] },
+                  { id: '6io1xnaMWJ', label: '🎁 โปรโมชัน', count: subStats.options['6io1xnaMWJ'] },
+                ].map((chip) => {
+                  const isActive = filterOption === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      onClick={() => { setFilterOption(chip.id); setMemberPage(1); }}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border",
+                        isActive
+                          ? "bg-amber-500 text-stone-950 border-amber-500 shadow-xs font-bold"
+                          : "bg-white/80 dark:bg-[#201A17] text-stone-700 dark:text-stone-300 border-[#EAD8C8] dark:border-[#2D2420] hover:border-amber-500/40 hover:bg-amber-500/5"
+                      )}
+                    >
+                      <span>{chip.label}</span>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded-md text-[10px]",
+                        isActive ? "bg-stone-950/20 text-stone-950 font-bold" : "bg-stone-200 dark:bg-[#2A221E] text-stone-600 dark:text-stone-400"
+                      )}>
+                        {chip.count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </CardHeader>
+
             <CardContent className="p-4 space-y-4">
               {loadingMembers ? (
                 <div className="text-center py-12 text-muted-foreground animate-pulse text-xs">กำลังโหลดรายชื่อสมาชิก...</div>
               ) : paginatedMembers.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-xs border border-dashed rounded-2xl">ไม่พบรายชื่อสมาชิกที่ค้นหา</div>
+                <div className="text-center py-12 text-muted-foreground text-xs border border-dashed border-[#EAD8C8] dark:border-[#2D2420] rounded-2xl">
+                  ไม่พบสมาชิกตามเงื่อนไขที่ค้นหา
+                </div>
               ) : (
-                <div className="border border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl overflow-hidden bg-white dark:bg-[#1E1B18]">
+                <div className="border border-[#EAD8C8] dark:border-[#2D2420] rounded-2xl overflow-hidden bg-white dark:bg-[#14100E]">
                   <Table>
-                    <TableHeader className="bg-[#FAF6F0]/50 dark:bg-[#25201C]/50">
-                      <TableRow>
-                        <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">สมาชิก</TableHead>
+                    <TableHeader className="bg-[#FAF6F0]/60 dark:bg-[#1E1815]">
+                      <TableRow className="border-b border-[#EAD8C8] dark:border-[#2D2420]">
+                        <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">สมาชิก (Member)</TableHead>
                         <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">หมวดหมู่ที่ติดตาม</TableHead>
                         <TableHead className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8]">ลงทะเบียนเมื่อ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedMembers.map((sub) => (
-                        <TableRow key={sub.userId} className="text-xs">
+                        <TableRow key={sub.userId} className="text-xs border-b border-[#EAD8C8]/60 dark:border-[#2D2420]/60 hover:bg-amber-500/5 transition-colors">
                           <TableCell className="py-3 px-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-[#4E3F30] dark:text-[#E8E1D9]">
-                                {sub.username ? `@${sub.username}` : (sub.discordUsername ? `@${sub.discordUsername}` : 'Unknown Member')}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-mono">{sub.userId}</span>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                                {(sub.username || sub.discordUsername || 'U').slice(0, 2)}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-[#4E3F30] dark:text-[#F3EDE6] text-xs">
+                                  {sub.username ? `@${sub.username}` : (sub.discordUsername ? `@${sub.discordUsername}` : 'สมาชิก Discord')}
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[11px] text-muted-foreground font-mono">{sub.userId}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(sub.userId);
+                                      setCopiedUserId(sub.userId);
+                                      setTimeout(() => setCopiedUserId(null), 2000);
+                                      toast({ title: 'คัดลอก Discord ID แล้ว' });
+                                    }}
+                                    className="text-stone-400 hover:text-amber-500 transition-colors p-0.5 cursor-pointer"
+                                    title="คัดลอก Discord ID"
+                                  >
+                                    {copiedUserId === sub.userId ? (
+                                      <Check className="w-3 h-3 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="py-3 px-4">
                             <div className="flex flex-wrap gap-1">
                               {sub.options.map((opt) => (
-                                <Badge key={opt} variant="outline" className="text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                                <Badge key={opt} variant="outline" className="text-[10px] px-2 py-0.5 rounded-lg font-semibold bg-[#FAF6F0] dark:bg-[#201A17] border-[#EAD8C8] dark:border-[#2D2420]">
                                   {opt === '49B40A9yBS' && '🎉 กิจกรรม'}
                                   {opt === 'JNySCX80ja' && '📢 ประกาศสำคัญ'}
                                   {opt === 'DsMHlVrjze' && '📑 ข่าวสารทั่วไป'}
@@ -1325,12 +1855,14 @@ export function DMBroadcastManagement() {
 
               {/* Pagination Controls */}
               <div className="flex justify-between items-center pt-2">
-                <span className="text-xs text-muted-foreground">หน้า {memberPage} จาก {totalMemberPages} (รวม {filteredMemberSubs.length} รายการ)</span>
+                <span className="text-xs text-muted-foreground">
+                  หน้า {memberPage} จาก {totalMemberPages} (รวม {filteredMemberSubs.length} รายการ)
+                </span>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl" disabled={memberPage <= 1} onClick={() => setMemberPage(m => m - 1)}>
+                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl cursor-pointer" disabled={memberPage <= 1} onClick={() => setMemberPage(m => m - 1)}>
                     <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl" disabled={memberPage >= totalMemberPages} onClick={() => setMemberPage(m => m + 1)}>
+                  <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl cursor-pointer" disabled={memberPage >= totalMemberPages} onClick={() => setMemberPage(m => m + 1)}>
                     ถัดไป <ChevronRight className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -1339,83 +1871,175 @@ export function DMBroadcastManagement() {
           </Card>
         </TabsContent>
 
-        {/* TAB 4: Live Bot Logs & DB Cleanup Tool */}
+        {/* TAB 4: Cyber Console Terminal & DB Cleaner */}
         <TabsContent value="logs" className="space-y-6">
           <div className="grid grid-cols-1 gap-6">
             
             {/* DB Log Cleanup Tool */}
-            <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
-              <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
+            <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[#181412] dark:border-[#2D2420] shadow-xs rounded-3xl">
+              <CardHeader className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-1">
                   <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
                     <Database className="w-5 h-5 text-amber-500" /> เครื่องมือจัดการพื้นที่ฐานข้อมูล (Database Log Cleaner)
                   </CardTitle>
-                  <CardDescription className="text-xs">
-                    ล้างซาก Log บรอดแคสต์เก่าที่ส่งเสร็จสิ้นแล้วเพื่อคืนสปีดและความเบาให้ฐานข้อมูล Supabase
+                  <CardDescription className="text-xs text-muted-foreground">
+                    ล้างประวัติการส่งบรอดแคสต์เก่าที่สำเร็จแล้วเกิน 14 วัน เพื่อรักษาความเร็วของฐานข้อมูล Supabase
                   </CardDescription>
                 </div>
                 <Button
                   size="sm"
                   variant="destructive"
-                  className="rounded-xl text-xs gap-1.5 font-bold"
+                  className="rounded-xl text-xs gap-1.5 font-bold cursor-pointer shrink-0"
                   onClick={handleCleanOldLogs}
                   disabled={cleaningLogs}
                 >
                   {cleaningLogs ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  🗑️ ล้าง Log บรอดแคสต์เก่า (เก่ากว่า 14 วัน)
+                  🗑️ ล้าง Log ซากบรอดแคสต์เก่า (&gt; 14 วัน)
                 </Button>
               </CardHeader>
             </Card>
 
-            {/* Thai Live Console Logs */}
-            <Card className="border-[#EAD8C8] bg-[#1E1B18] text-[#EAD8C8] shadow-md rounded-3xl overflow-hidden">
-              <CardHeader className="pb-3 border-b border-[#2D2520] flex flex-row items-center justify-between flex-wrap gap-2">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2 text-emerald-400">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            {/* Cyber Console Terminal */}
+            <div className="rounded-3xl border border-[#2D2420] bg-[#12100E] text-stone-300 shadow-2xl overflow-hidden font-mono text-xs">
+              
+              {/* Window Header with macOS Dots & Status */}
+              <div className="px-5 py-3.5 bg-[#181412] border-b border-[#2D2420] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-[#FF5F56] inline-block shadow-xs" />
+                    <span className="w-3 h-3 rounded-full bg-[#FFBD2E] inline-block shadow-xs" />
+                    <span className="w-3 h-3 rounded-full bg-[#27C93F] inline-block shadow-xs" />
+                  </div>
+                  <div className="h-4 w-px bg-[#2D2420]" />
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-stone-200 tracking-wider">
+                      BEAR-CAFE TELEMETRY CONSOLE :: LIVE STREAM
                     </span>
-                    📟 บันทึกการทำงานระบบบอทภาษาไทย (Live Bot Status Logs)
-                  </CardTitle>
-                  <CardDescription className="text-xs text-zinc-400">
-                    แสดงสถานะการทำงานสดจากบอทเป็นภาษาไทยแบบ Real-time (เก็บบันทึกล่าสุดไม่เกิน 500 แถว)
-                  </CardDescription>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" className="h-7 text-xs border-[#2D2520] bg-[#25201C] text-zinc-300" onClick={fetchSystemLogs}>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    ONLINE
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-[#2D2420] bg-[#1E1815] text-stone-300 hover:bg-[#2A221E] cursor-pointer"
+                    onClick={() => {
+                      const allText = systemLogs.map(l => `[${new Date(l.created_at).toLocaleTimeString('th-TH')}] [${l.level?.toUpperCase() || 'INFO'}] ${l.message_th}`).join('\n');
+                      navigator.clipboard.writeText(allText);
+                      toast({ title: 'คัดลอกบันทึกทั้งหมดแล้ว' });
+                    }}
+                  >
+                    <Copy className="w-3 h-3 mr-1" /> คัดลอกทั้งหมด
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs border-[#2D2420] bg-[#1E1815] text-stone-300 hover:bg-[#2A221E] cursor-pointer" onClick={fetchSystemLogs}>
                     <RefreshCw className="w-3 h-3 mr-1" /> รีเฟรช
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-rose-400 hover:bg-rose-950/30" onClick={handleClearSystemLogs}>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-rose-400 hover:bg-rose-950/40 cursor-pointer" onClick={handleClearSystemLogs}>
                     ล้างหน้าจอ
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="p-4 font-mono text-xs max-h-80 overflow-y-auto space-y-1.5 scrollbar-thin">
-                {systemLogs.length === 0 ? (
-                  <div className="text-center py-8 text-zinc-500 text-xs italic">
-                    ยังไม่มีบันทึกสถานะจากบอท (บอทจะส่งรายงานสถานะภาษาไทยมาที่นี่เมื่อเริ่มทำงาน)
-                  </div>
-                ) : (
-                  systemLogs.map((log) => {
-                    const colorClass =
-                      log.level === 'error' ? 'text-rose-400 bg-rose-950/20 p-1 rounded border border-rose-900/30 font-bold' :
-                      log.level === 'warn' ? 'text-amber-300' :
-                      log.level === 'success' ? 'text-emerald-400 font-bold' :
-                      'text-zinc-300';
+              </div>
 
+              {/* Subheader: Filter Chips & Auto-Scroll Toggle */}
+              <div className="px-5 py-2.5 bg-[#14100E] border-b border-[#2D2420]/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-stone-500 text-[10px] uppercase font-bold mr-1">ระดับ:</span>
+                  {[
+                    { id: 'all', label: 'ทั้งหมด' },
+                    { id: 'info', label: 'ℹ️ ข้อมูล' },
+                    { id: 'success', label: '✅ สำเร็จ' },
+                    { id: 'warn', label: '⚠️ เตือน' },
+                    { id: 'error', label: '❌ ผิดพลาด' },
+                  ].map((lvl) => (
+                    <button
+                      key={lvl.id}
+                      onClick={() => setLogLevelFilter(lvl.id as any)}
+                      className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer border",
+                        logLevelFilter === lvl.id
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                          : "bg-transparent text-stone-400 border-transparent hover:text-stone-200"
+                      )}
+                    >
+                      {lvl.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-stone-400 text-[11px] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={logAutoScroll}
+                      onChange={(e) => setLogAutoScroll(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-amber-500 rounded"
+                    />
+                    <span>เลื่อนตามอัตโนมัติ (Auto-scroll)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Terminal Logs Stream Screen */}
+              <div className="p-5 max-h-96 overflow-y-auto space-y-1.5 [scrollbar-width:thin] bg-[#12100E]">
+                {(() => {
+                  const filteredLogs = systemLogs.filter(log => {
+                    if (logLevelFilter === 'all') return true;
+                    return log.level === logLevelFilter;
+                  });
+
+                  if (filteredLogs.length === 0) {
                     return (
-                      <div key={log.id} className={cn("leading-relaxed flex items-start gap-2", colorClass)}>
-                        <span className="select-none text-zinc-500 shrink-0 text-[10px]">
-                          {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </span>
-                        <span>{log.message_th}</span>
+                      <div className="text-center py-12 text-stone-500 text-xs italic">
+                        {systemLogs.length === 0 
+                          ? 'ยังไม่มีบันทึกสถานะจากบอท (บอทจะส่งรายงานสถานะภาษาไทยมาที่นี่เมื่อเริ่มทำงาน)'
+                          : 'ไม่พบบันทึกในระดับที่เลือก'}
                       </div>
                     );
-                  })
-                )}
-              </CardContent>
-            </Card>
+                  }
+
+                  return (
+                    <>
+                      {filteredLogs.map((log) => {
+                        const levelConfig =
+                          log.level === 'error' ? { badge: 'ERR', color: 'text-rose-400 bg-rose-950/40 border-rose-900/50' } :
+                          log.level === 'warn' ? { badge: 'WRN', color: 'text-amber-300 bg-amber-950/40 border-amber-900/50' } :
+                          log.level === 'success' ? { badge: 'OK ', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-900/50' } :
+                          { badge: 'INF', color: 'text-sky-300 bg-sky-950/30 border-sky-900/40' };
+
+                        return (
+                          <div 
+                            key={log.id} 
+                            className="flex items-start gap-2.5 leading-relaxed py-1 px-2 rounded-lg hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.05]"
+                          >
+                            <span className="text-stone-500 text-[10px] shrink-0 select-none">
+                              {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                            <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-bold border shrink-0", levelConfig.color)}>
+                              {levelConfig.badge}
+                            </span>
+                            <span className="text-stone-200 flex-1 break-words font-sans text-xs">
+                              {log.message_th}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div ref={terminalEndRef} />
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Terminal Footer Info */}
+              <div className="px-5 py-2 bg-[#181412] border-t border-[#2D2420] text-[10px] text-stone-500 flex justify-between items-center">
+                <span>เก็บบันทึก {systemLogs.length} รายการล่าสุด</span>
+                <span className="text-amber-500/80">Bear Cafe Bot Telemetry v2.4</span>
+              </div>
+            </div>
 
           </div>
         </TabsContent>

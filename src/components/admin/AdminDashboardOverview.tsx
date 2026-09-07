@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { AdminPageDef } from '@/lib/admin-pages';
 import { cn } from '@/lib/utils';
+import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
 
 interface AdminDashboardOverviewProps {
   onNavigate: (tabId: string) => void;
@@ -46,6 +47,7 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export function AdminDashboardOverview({ onNavigate, visibleItems, username }: AdminDashboardOverviewProps) {
+  const { notify } = useAdminNotification();
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeReports: 0,
@@ -90,7 +92,9 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchStats();
+    fetchStats().then(() => {
+      notify.info('อัปเดตข้อมูลสถิติแล้ว', 'ดึงข้อมูลสถิติล่าสุดจากฐานข้อมูลสำเร็จ');
+    });
   };
 
   // Group pages by category (excluding overview itself)

@@ -29,13 +29,11 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
   Plus, Home, User, Clock, Bell, Edit2, Search, RefreshCw,
   Loader2, CheckCircle2, X, Upload, Star, Link, Hash, Users, Calendar,
-  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone, Rocket
+  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone, Rocket, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
@@ -52,11 +50,13 @@ interface Contract {
   role_name: string | null;
   discord_role_id: string | null;
   package_name?: string | null;
+  channel_id?: string | null;
+  channel_deleted_at?: string | null;
   operator_id: string | null;
   operator_name: string | null;
   created_at: string;
   updated_at: string | null;
-  edit_log: Array<{ editor: string; avatar: string | null; timestamp: string }> | null;
+  edit_log: Array<{ editor: string; avatar: string | null; timestamp: string; action?: string; tag?: string; note?: string }> | null;
 }
 
 interface TypeIcons {
@@ -198,33 +198,33 @@ function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 bg-[#FAF6F0] dark:bg-[#2C241E] px-3 py-1 rounded-xl border border-[#F0E8DC] dark:border-[#42352B]">
-      <span className="text-[11px] font-medium text-[#827160] dark:text-[#A89889]">ไอคอน:</span>
+    <div className="flex items-center gap-2.5 bg-[#FAF6F0] dark:bg-[#231C17] px-3.5 py-1.5 rounded-2xl border border-[#F0E8DC] dark:border-[#382B22] shadow-sm">
+      <span className="text-xs font-medium text-[#827160] dark:text-[#BAA796]">ไอคอนสัญญา:</span>
       {(['house', 'personal_role', 'boost_role', 'ad'] as ContractType[]).map(type => (
         <div key={type} className="relative group">
           <button
             onClick={() => handleClick(type)}
             title={`อัปโหลดไอคอน ${typeLabel[type]}`}
-            className="relative w-8 h-8 rounded-lg border border-dashed border-[#DFD5C0] hover:border-[#8C6239] bg-white dark:bg-[#1E1B18] transition-colors flex items-center justify-center overflow-hidden"
+            className="relative w-9 h-9 rounded-xl border-2 border-dashed border-[#DFD5C0] dark:border-[#42342A] hover:border-amber-500 hover:bg-amber-500/10 bg-white dark:bg-[#1A1512] transition-all flex items-center justify-center overflow-hidden shadow-xs active:scale-95"
           >
             {uploading === type ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
             ) : typeIcons[type] ? (
-              <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover rounded-lg" />
+              <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
             ) : (
-              React.createElement(typeIconsMap[type], { className: "w-3.5 h-3.5 text-[#827160]" })
+              React.createElement(typeIconsMap[type], { className: "w-4 h-4 text-[#827160] dark:text-[#A89889] group-hover:text-amber-500 transition-colors" })
             )}
-            <span className="absolute bottom-0 right-0 bg-background/80 rounded-tl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Upload className="w-2 h-2 text-muted-foreground" />
+            <span className="absolute bottom-0 right-0 bg-black/60 backdrop-blur-xs rounded-tl px-0.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Upload className="w-2.5 h-2.5 text-white" />
             </span>
           </button>
           {typeIcons[type] && (
             <button
               onClick={() => handleDelete(type)}
               title={`ลบไอคอน ${typeLabel[type]}`}
-              className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md z-10 hover:scale-110"
             >
-              <X className="w-2 h-2" />
+              <X className="w-2.5 h-2.5" />
             </button>
           )}
         </div>
@@ -262,10 +262,33 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [endAt, setEndAt] = useState('');
   const [roomLink, setRoomLink] = useState('');
   const [packageName, setPackageName] = useState('');
+  const [channelId, setChannelId] = useState('');
 
   // Promo Packages catalog
   const [promoPackages, setPromoPackages] = useState<string[]>([]);
   const [isCustomPackage, setIsCustomPackage] = useState(false);
+
+  const promoPackageOptions = React.useMemo<RichSelectItem[]>(() => {
+    const options: RichSelectItem[] = promoPackages.map((pkg) => ({
+      id: `pkg-${pkg}`,
+      label: pkg,
+      value: pkg,
+      description: `แพ็กเกจโฆษณาสำเร็จรูปจากคลังสินค้า (${pkg})`,
+      icon: '📢',
+      badge: 'แพ็กเกจโฆษณา',
+      badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+    }));
+    options.push({
+      id: 'pkg-custom',
+      label: 'กรอกชื่อแพ็กเกจด้วยตัวเอง',
+      value: '__custom__',
+      description: 'ระบุชื่อแพ็กเกจหรือรายละเอียดแคมเปญแบบกำหนดเอง',
+      icon: '✏️',
+      badge: 'กำหนดเอง',
+      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+    });
+    return options;
+  }, [promoPackages]);
 
   // End Date Dual Mode ('picker' | 'days')
   const [endMode, setEndMode] = useState<'picker' | 'days'>('picker');
@@ -339,7 +362,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
 
   function reset() {
     setType('house'); setMemberId(''); setStartAt(''); setEndAt('');
-    setRoomLink(''); setRoleSearch(''); setPackageName('');
+    setRoomLink(''); setRoleSearch(''); setPackageName(''); setChannelId('');
     setEndMode('picker'); setDaysInput(''); setIsCustomPackage(false);
     setSelectedDiscordRole(null);
   }
@@ -397,6 +420,8 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       role_name: isRoleType ? selectedDiscordRole?.name ?? null : null,
       discord_role_id: isRoleType ? selectedDiscordRole?.id ?? null : null,
       package_name: type === 'ad' ? packageName.trim() : null,
+      channel_id: type === 'ad' ? (channelId.trim() || null) : null,
+      channel_deleted_at: null,
       operator_id: operatorId,
       operator_name: operatorName,
       edit_log: [],
@@ -581,50 +606,67 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
 
             {/* Fields for Ad */}
             {type === 'ad' && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
-                {promoPackages.length > 0 && !isCustomPackage ? (
-                  <div className="space-y-1.5">
-                    <Select value={packageName} onValueChange={(val) => {
-                      if (val === '__custom__') {
-                        setIsCustomPackage(true);
-                        setPackageName('');
-                      } else {
-                        setPackageName(val);
-                      }
-                    }}>
-                      <SelectTrigger className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-10 font-bold">
-                        <SelectValue placeholder="เลือกแพ็กเกจจาก Catalog..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {promoPackages.map((pkg) => (
-                          <SelectItem key={pkg} value={pkg} className="text-sm font-semibold">{pkg}</SelectItem>
-                        ))}
-                        <SelectItem value="__custom__" className="text-sm font-semibold">✏️ กรอกชื่อแพ็กเกจด้วยตัวเอง...</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="space-y-3 bg-[#6366F1]/5 dark:bg-[#6366F1]/10 p-3.5 rounded-2xl border border-[#6366F1]/20">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
+                  {promoPackages.length > 0 && !isCustomPackage ? (
+                    <div className="space-y-1.5">
+                      <RichSelect
+                        data={promoPackageOptions}
+                        value={packageName}
+                        onValueChange={(val) => {
+                          if (val === '__custom__') {
+                            setIsCustomPackage(true);
+                            setPackageName('');
+                          } else {
+                            setPackageName(val);
+                          }
+                        }}
+                        placeholder="เลือกแพ็กเกจจาก Catalog..."
+                        triggerClassName="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm h-10 font-bold"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {promoPackages.length > 0 && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomPackage(false)}
+                            className="text-xs text-blue-500 hover:underline font-bold"
+                          >
+                            ← เลือกแพ็กเกจจาก Catalog
+                          </button>
+                        </div>
+                      )}
+                      <Input
+                        value={packageName}
+                        onChange={e => setPackageName(e.target.value)}
+                        placeholder="เช่น แพ็ก Banner A"
+                        className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl h-10 text-sm font-medium focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-1.5">
+                      <Hash className="w-4 h-4 text-[#6366F1]" />
+                      Discord Channel ID (ห้องโฆษณา)
+                    </Label>
+                    <span className="text-[11px] text-muted-foreground font-medium">ไม่บังคับ</span>
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {promoPackages.length > 0 && (
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomPackage(false)}
-                          className="text-xs text-blue-500 hover:underline font-bold"
-                        >
-                          ← เลือกแพ็กเกจจาก Catalog
-                        </button>
-                      </div>
-                    )}
-                    <Input
-                      value={packageName}
-                      onChange={e => setPackageName(e.target.value)}
-                      placeholder="เช่น แพ็ก Banner A"
-                      className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl h-10 text-sm font-medium focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
-                    />
-                  </div>
-                )}
+                  <Input
+                    value={channelId}
+                    onChange={e => setChannelId(e.target.value)}
+                    placeholder="เช่น 123456789012345678"
+                    className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-mono h-10 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0"
+                  />
+                  <p className="text-[11px] text-[#827160] dark:text-[#A89889]">
+                    💡 เมื่อถึงเวลาสิ้นสุดสัญญา ระบบจะทำการลบห้อง Discord นี้ทิ้งโดยอัตโนมัติทันที
+                  </p>
+                </div>
               </div>
             )}
 
@@ -743,6 +785,7 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
   const [endAt, setEndAt] = useState(contract.end_at ? toLocalDatetimeValue(contract.end_at) : '');
   const [roomLink, setRoomLink] = useState(contract.room_link ?? '');
   const [packageName, setPackageName] = useState(contract.package_name ?? '');
+  const [channelId, setChannelId] = useState(contract.channel_id ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -760,6 +803,7 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
       updatePayload.room_link = roomLink.trim() || null;
     } else if (contract.type === 'ad') {
       updatePayload.package_name = packageName.trim() || null;
+      updatePayload.channel_id = channelId.trim() || null;
     }
 
     const { error } = await (supabase as any).from('contracts').update(updatePayload).eq('id', contract.id);
@@ -806,14 +850,45 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
               />
             </div>
           ) : (
-            <div className="space-y-1.5">
-              <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
-              <Input
-                value={packageName}
-                onChange={e => setPackageName(e.target.value)}
-                placeholder="เช่น แพ็ก Banner A"
-                className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-medium h-10 focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
-              />
+            <div className="space-y-3 bg-[#6366F1]/5 dark:bg-[#6366F1]/10 p-3.5 rounded-2xl border border-[#6366F1]/20">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9]">ชื่อแพ็กเกจโฆษณา</Label>
+                <Input
+                  value={packageName}
+                  onChange={e => setPackageName(e.target.value)}
+                  placeholder="เช่น แพ็ก Banner A"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-medium h-10 focus-visible:ring-[#8C6239] focus-visible:ring-offset-0"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-bold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-1.5">
+                    <Hash className="w-4 h-4 text-[#6366F1]" />
+                    Discord Channel ID (ห้องโฆษณา)
+                  </Label>
+                  {contract.channel_deleted_at && (
+                    <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/25 text-[10px] font-bold">
+                      ลบห้องแล้ว
+                    </Badge>
+                  )}
+                </div>
+                <Input
+                  value={channelId}
+                  onChange={e => setChannelId(e.target.value)}
+                  placeholder="เช่น 123456789012345678"
+                  className="bg-white dark:bg-[#221F1D] border-[#EFE7DC] dark:border-[#382F28] rounded-xl text-sm font-mono h-10 focus-visible:ring-[#6366F1] focus-visible:ring-offset-0"
+                />
+                {contract.channel_deleted_at ? (
+                  <p className="text-[11px] text-rose-500 font-medium">
+                    🗑️ ห้องนี้ถูกลบเรียบร้อยแล้วเมื่อ {formatDateThai(contract.channel_deleted_at, true)}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-[#827160] dark:text-[#A89889]">
+                    💡 จะถูกลบอัตโนมัติเมื่อสิ้นสุดสัญญา
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -911,6 +986,25 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deletingChannel, setDeletingChannel] = useState(false);
+
+  async function handleDeleteChannelNow() {
+    if (!contract.channel_id) return;
+    if (!window.confirm(`คุณต้องการลบห้อง Discord (ID: ${contract.channel_id}) ทันทีหรือไม่?`)) return;
+    setDeletingChannel(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-expired-ad-channels', {
+        body: { contract_id: contract.id },
+      });
+      if (error) throw error;
+      toast({ title: 'ลบห้องโฆษณาสำเร็จ', description: data?.message || 'ห้องถูกลบเรียบร้อยแล้ว' });
+      onRefresh();
+    } catch (e: any) {
+      toast({ title: 'ลบห้องไม่สำเร็จ', description: e.message, variant: 'destructive' });
+    } finally {
+      setDeletingChannel(false);
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -1158,11 +1252,44 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
           {/* Details based on contract type */}
           <div className="space-y-2 text-xs pt-1">
-            {contract.type === 'ad' && contract.package_name && (
-              <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm w-fit">
-                <Megaphone className="w-3.5 h-3.5 text-[#6366F1]" />
-                {contract.package_name}
-              </Badge>
+            {contract.type === 'ad' && (
+              <div className="space-y-1.5">
+                {contract.package_name && (
+                  <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20 text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm w-fit">
+                    <Megaphone className="w-3.5 h-3.5 text-[#6366F1]" />
+                    {contract.package_name}
+                  </Badge>
+                )}
+                {contract.channel_id && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {contract.channel_deleted_at ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                        <Trash2 className="w-3 h-3 text-rose-500" />
+                        ลบห้องแล้ว ({contract.channel_id})
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-[#6366F1]/10 text-[#6366F1] dark:text-[#A5B4FC] border border-[#6366F1]/20">
+                          <Hash className="w-3 h-3" />
+                          {contract.channel_id}
+                        </span>
+                        {isExpired && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleDeleteChannelNow}
+                            disabled={deletingChannel}
+                            className="h-6 px-2 text-[10px] font-bold rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                          >
+                            {deletingChannel ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                            ลบห้องทันที
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {(contract.type === 'personal_role' || contract.type === 'boost_role') && (
@@ -1342,6 +1469,7 @@ export function ContractsManagement() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
   const [selectedLogContract, setSelectedLogContract] = useState<Contract | null>(null);
+  const [cleaningChannels, setCleaningChannels] = useState(false);
 
   const [typeIcons, setTypeIcons] = useState<TypeIcons>({ house: null, personal_role: null, boost_role: null, ad: null });
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { username: string; discord_username: string | null }>>({});
@@ -1407,6 +1535,23 @@ export function ContractsManagement() {
     const memberIds = [...new Set(list.map(c => c.member_id))];
     fetchMemberProfiles(memberIds);
   }, [toast]);
+
+  async function handleCleanupExpiredAdChannels() {
+    setCleaningChannels(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-expired-ad-channels', {});
+      if (error) throw error;
+      toast({
+        title: 'ตรวจสอบห้องโฆษณาสำเร็จ',
+        description: data?.message || `ลบห้องที่หมดอายุเรียบร้อยแล้ว (${data?.deletedCount ?? 0} ห้อง)`,
+      });
+      fetchContracts();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการตรวจสอบห้อง', description: e.message, variant: 'destructive' });
+    } finally {
+      setCleaningChannels(false);
+    }
+  }
 
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
 
@@ -1491,6 +1636,17 @@ export function ContractsManagement() {
             {user?.is_owner && (
               <IconUpload typeIcons={typeIcons} onUploaded={handleIconUploaded} />
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCleanupExpiredAdChannels}
+              disabled={cleaningChannels}
+              className="gap-1.5 h-9 rounded-xl border-[#6366F1]/30 hover:bg-[#6366F1]/10 text-[#6366F1] dark:text-[#A5B4FC] font-bold cursor-pointer"
+              title="ตรวจและลบห้อง Discord โฆษณาที่ครบกำหนดเวลาแล้ว"
+            >
+              <Trash2 className={cn('w-3.5 h-3.5', cleaningChannels && 'animate-spin')} />
+              ลบห้องโฆษณาหมดอายุ
+            </Button>
             <Button
               variant="outline"
               size="sm"

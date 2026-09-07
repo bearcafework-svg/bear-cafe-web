@@ -181,7 +181,7 @@ async function handleNotification(
         type: 1,
         components: [{
           type: 2, style: 5,
-          label: "︲เช็คแต้มของคุณ",
+          label: "︲เช็กแต้มของคุณ",
           emoji: { id: "1212856675053346897", name: "bearcafe_star", animated: false },
           url: "https://discord.com/channels/1144251788493602848/1145305334806741122",
         }],

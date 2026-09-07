@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
-import { ShieldBan, Shield, Plus, Trash2, Search, AlertTriangle, Loader2, Pencil, Check } from 'lucide-react';
+import { ShieldBan, Shield, Plus, Trash2, Search, AlertTriangle, Loader2, Pencil, Check, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { BulkDeleteToolbar } from '@/components/admin/BulkDeleteToolbar';
@@ -58,6 +58,43 @@ export function NonTransferableRolesManagement() {
   const [formReason, setFormReason] = useState('');
   // Edit form
   const [editFormData, setEditFormData] = useState({ role_name: '', reason: '' });
+
+  // Discord Server Role Verification State & Rate Limit Cooldown
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyCooldown, setVerifyCooldown] = useState(0);
+  const [missingRoles, setMissingRoles] = useState<NonTransferableRole[]>([]);
+  const [missingRolesDialogOpen, setMissingRolesDialogOpen] = useState(false);
+  const [isCleaningMissing, setIsCleaningMissing] = useState(false);
+
+  // Initialize and tick cooldown timer
+  useEffect(() => {
+    const savedExpiry = localStorage.getItem('bear_cafe_verify_roles_cooldown');
+    if (savedExpiry) {
+      const remaining = Math.ceil((Number(savedExpiry) - Date.now()) / 1000);
+      if (remaining > 0) setVerifyCooldown(remaining);
+      else localStorage.removeItem('bear_cafe_verify_roles_cooldown');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (verifyCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setVerifyCooldown((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem('bear_cafe_verify_roles_cooldown');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [verifyCooldown]);
+
+  const startCooldown = (seconds = 30) => {
+    const expiry = Date.now() + seconds * 1000;
+    localStorage.setItem('bear_cafe_verify_roles_cooldown', expiry.toString());
+    setVerifyCooldown(seconds);
+  };
 
   const filteredRoles = roles.filter(
     r => r.role_name.toLowerCase().includes(searchQuery.toLowerCase()) || r.discord_role_id.includes(searchQuery)
@@ -104,6 +141,113 @@ export function NonTransferableRolesManagement() {
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถดึง Roles จาก Discord ได้', variant: 'destructive' });
     } finally {
       setLoadingDiscordRoles(false);
+    }
+  }
+
+  // ── Verify Roles In Discord & Rate Limit Guard ────────────────────────────
+  async function handleVerifyRolesInDiscord() {
+    if (isVerifying || verifyCooldown > 0) return;
+    if (roles.length === 0) {
+      toast({
+        title: 'ไม่มีข้อมูล Role ให้ตรวจสอบ',
+        description: 'ยังไม่มี Role ใดถูกบันทึกในตารางบทบาทห้ามย้ายค่ะ',
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'กรุณาเข้าสู่ระบบ', variant: 'destructive' });
+        return;
+      }
+
+      // Single API request to get all guild roles from Discord (protects against per-role rate limit)
+      const { data, error } = await supabase.functions.invoke('discord-roles', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { refresh: true },
+      });
+
+      if (error) {
+        const roleBanPayload = await readRoleBanPayload(error);
+        if (roleBanPayload) { navigate('/banned-role', { replace: true }); return; }
+
+        const msg = error.message || '';
+        if (msg.includes('429') || msg.toLowerCase().includes('rate')) {
+          toast({
+            title: 'ติด Rate Limit ของ Discord',
+            description: 'ระบบ Discord กำลังจำกัดอัตราการเรียก API กรุณารอสักครู่แล้วลองใหม่นะคะ',
+            variant: 'destructive',
+          });
+          startCooldown(60);
+          return;
+        }
+        throw error;
+      }
+
+      const allServerRoleIds: string[] = data?.all_role_ids || (data?.roles ? data.roles.map((r: any) => r.id) : []);
+      const serverRoleIdSet = new Set<string>(allServerRoleIds);
+
+      // Identify roles in non_transferable_roles that do NOT exist in the Discord server
+      const missing = roles.filter((r) => !serverRoleIdSet.has(r.discord_role_id));
+
+      startCooldown(30);
+
+      if (missing.length === 0) {
+        toast({
+          title: '✅ ตรวจสอบเรียบร้อยแล้ว',
+          description: `ตรวจสอบ ${roles.length} Role พบว่าทุก Role ยังคงอยู่ใน Discord Server ครบถ้วนค่ะ`,
+          className: 'bg-emerald-600 text-white',
+        });
+      } else {
+        setMissingRoles(missing);
+        setMissingRolesDialogOpen(true);
+      }
+    } catch (error: any) {
+      console.error('Error verifying roles in Discord:', error);
+      toast({
+        title: 'เกิดข้อผิดพลาดในการตรวจสอบ',
+        description: error.message || 'ไม่สามารถเชื่อมต่อกับ Discord API ได้',
+        variant: 'destructive',
+      });
+      startCooldown(15);
+    } finally {
+      setIsVerifying(false);
+    }
+  }
+
+  // ── Delete Missing Roles In Batch ──────────────────────────────────────────
+  async function handleCleanMissingRoles() {
+    if (missingRoles.length === 0) return;
+    setIsCleaningMissing(true);
+    try {
+      const missingIds = missingRoles.map((r) => r.id);
+      const { error } = await supabase
+        .from('non_transferable_roles' as any)
+        .delete()
+        .in('id', missingIds);
+
+      if (error) throw error;
+
+      setRoles((prev) => prev.filter((r) => !missingIds.includes(r.id)));
+      setMissingRolesDialogOpen(false);
+      setMissingRoles([]);
+
+      toast({
+        title: '✨ ลบ Role ที่ไม่มีในเซิร์ฟเวอร์สำเร็จ',
+        description: `นำ Role ที่ถูกลบออกจาก Discord ออกจากตารางแล้ว ${missingIds.length} รายการค่ะ`,
+        className: 'bg-emerald-600 text-white',
+      });
+    } catch (error: any) {
+      console.error('Error cleaning missing roles:', error);
+      toast({
+        title: 'เกิดข้อผิดพลาดในการลบ',
+        description: error.message || 'ไม่สามารถลบข้อมูลออกจากตารางได้',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCleaningMissing(false);
     }
   }
 
@@ -236,9 +380,31 @@ export function NonTransferableRolesManagement() {
               <ShieldBan className="w-4 h-4 text-honey" />
               บทบาทห้ามย้าย
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหา Role..." className="w-64" />
-              <Button onClick={openCreateDialog} className="gap-2">
+              <Button
+                variant="outline"
+                onClick={handleVerifyRolesInDiscord}
+                disabled={isVerifying || verifyCooldown > 0 || roles.length === 0}
+                className="gap-2 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-medium transition-all"
+                title={
+                  verifyCooldown > 0
+                    ? `กรุณารออีก ${verifyCooldown} วินาทีก่อนตรวจสอบซ้ำ (ป้องกัน Rate Limit)`
+                    : 'ยิง API ตรวจสอบว่า RoleID ทั้งหมดยังคงมีอยู่ใน Discord Server หรือไม่'
+                }
+              >
+                {isVerifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                ) : (
+                  <RefreshCw className={`w-4 h-4 text-amber-400 ${verifyCooldown > 0 ? 'opacity-50' : ''}`} />
+                )}
+                {isVerifying
+                  ? 'กำลังตรวจสอบ...'
+                  : verifyCooldown > 0
+                  ? `รอ ${verifyCooldown}s`
+                  : 'ตรวจสอบ Role ในเซิร์ฟเวอร์'}
+              </Button>
+              <Button onClick={openCreateDialog} className="gap-2 shrink-0">
                 <Plus className="w-4 h-4" />
                 เพิ่ม Role
               </Button>
@@ -453,6 +619,82 @@ export function NonTransferableRolesManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Missing Roles from Discord Confirmation Dialog */}
+      <Dialog open={missingRolesDialogOpen} onOpenChange={setMissingRolesDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl bg-[#14100E] border-[#2D231C] text-stone-100 shadow-2xl p-6">
+          <DialogHeader className="pb-3 border-b border-[#2A221E]">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-rose-400">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              พบ Role ที่ไม่มีอยู่ใน Discord Server ({missingRoles.length} รายการ)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-stone-400">
+              Role เหล่านี้ถูกลบออกจากเซิร์ฟเวอร์ Discord ไปแล้ว ต้องการลบออกจากตารางบทบาทห้ามย้ายโดยอัตโนมัติหรือไม่?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3">
+            <div className="text-xs text-stone-300 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-start gap-2.5">
+              <ShieldBan className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>
+                รายการด้านล่างไม่พบ ID ในเซิร์ฟเวอร์ Discord ปัจจุบัน การลบออกจะช่วยให้ตารางข้อมูลสะอาดและไม่ค้าง ID ที่ไม่มีอยู่จริงค่ะ
+              </span>
+            </div>
+
+            <ScrollArea className="max-h-64 rounded-2xl border border-[#2A221E] bg-[#181412] p-2">
+              <div className="space-y-1.5">
+                {missingRoles.map((role) => (
+                  <div
+                    key={role.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl border border-rose-500/20 bg-rose-950/20"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className="border-rose-500/40 text-rose-300 text-xs font-semibold gap-1 bg-rose-500/10"
+                        >
+                          <ShieldBan className="w-3 h-3" />
+                          {role.role_name}
+                        </Badge>
+                        <span className="font-mono text-[11px] text-stone-400">{role.discord_role_id}</span>
+                      </div>
+                      {role.reason && (
+                        <p className="text-[11px] text-stone-400 truncate mt-1">เหตุผล: {role.reason}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-[#2A221E] flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMissingRolesDialogOpen(false)}
+              disabled={isCleaningMissing}
+              className="rounded-xl border-[#3A2C23] bg-[#1F1916] text-stone-300"
+            >
+              ยกเลิก / ละเว้นไว้ก่อน
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCleanMissingRoles}
+              disabled={isCleaningMissing}
+              className="rounded-xl font-bold gap-1.5 bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20"
+            >
+              {isCleaningMissing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              ลบออกจากตาราง ({missingRoles.length} รายการ)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

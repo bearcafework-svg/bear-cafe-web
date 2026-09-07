@@ -16,23 +16,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert } from '@/integrations/supabase/types';
 import {
   RefreshCw, Ban, AlertTriangle, Clock, User, Shield, Hash,
   MessageSquare, Gavel, X, ChevronLeft, ChevronRight,
-  EyeOff, Eye, Loader2, Plus, UploadCloud, Trash2,
+  EyeOff, Eye, Loader2, Plus, UploadCloud, Upload, Trash2,
   Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send, Search,
   LayoutGrid, List, Menu, History,
 } from 'lucide-react';
@@ -44,14 +40,85 @@ import { DatePicker } from '@/components/ui/date-picker';
 
 const ITEMS_PER_PAGE = 12;
 
-const PUNISH_OPTIONS = [
-  { value: 'ชื่อ/รูปไม่เหมาะสม', label: 'ชื่อ/รูปไม่เหมาะสม' },
-  { value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵', label: 'ชาเขียวเตือนใจ' },
-  { value: 'ミ ถ้วยกาแฟ 𓂃 ☕', label: 'ถ้วยกาแฟ' },
-  { value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕', label: 'กาแฟดับเบิ้ลช็อต' },
-  { value: 'เตะ', label: 'เตะ' },
-  { value: 'แบนถาวร', label: 'แบนถาวร' },
+const PUNISH_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'punish-profile',
+    label: 'ชื่อ/รูปไม่เหมาะสม',
+    value: 'ชื่อ/รูปไม่เหมาะสม',
+    description: 'แจ้งเตือนให้สมาชิกปรับเปลี่ยนชื่อ Display Name หรือรูปโปรไฟล์ให้ถูกต้องตามระเบียบ',
+    icon: '🏷️',
+    badge: 'แก้ไขโปรไฟล์',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'punish-greentea',
+    label: 'ชาเขียวเตือนใจ',
+    value: 'ミ ชาเขียวเตือนใจ 𓂃 🍵',
+    description: 'ตักเตือนสำหรับความผิดเล็กน้อยหรือทำผิดกฎกติกาคาเฟ่ครั้งแรก',
+    icon: (
+      <img
+        src="/icons/warn-green-tea.png"
+        alt="ชาเขียวเตือนใจ"
+        className="h-6 w-6 object-contain"
+        style={{ imageRendering: 'pixelated' }}
+      />
+    ),
+    badge: 'ยศตักเตือน',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+  {
+    id: 'punish-coffee',
+    label: 'ถ้วยกาแฟ',
+    value: 'ミ ถ้วยกาแฟ 𓂃 ☕',
+    description: 'ตักเตือนครั้งที่ 1 สำหรับการกระทำผิดซ้ำ ระงับสิทธิ์ร่วมกิจกรรมชั่วคราว',
+    icon: (
+      <img
+        src="/icons/warn-coffee.png"
+        alt="ถ้วยกาแฟ"
+        className="h-6 w-6 object-contain"
+        style={{ imageRendering: 'pixelated' }}
+      />
+    ),
+    badge: 'เตือนครั้งที่ 1',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'punish-doubleshot',
+    label: 'กาแฟดับเบิ้ลช็อต',
+    value: 'ミ กาแฟดับเบิ้ลช็อต 𓂃 ☕☕',
+    description: 'ตักเตือนครั้งที่ 2 ขั้นร้ายแรง โทษขั้นสูงสุดก่อนพิจารณาเตะหรือแบนถาวร',
+    icon: (
+      <img
+        src="/icons/warn-double-shot.png"
+        alt="กาแฟดับเบิ้ลช็อต"
+        className="h-6 w-6 object-contain"
+        style={{ imageRendering: 'pixelated' }}
+      />
+    ),
+    badge: 'เตือนครั้งที่ 2',
+    badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
+  },
+  {
+    id: 'punish-kick',
+    label: 'เตะออกจากเซิร์ฟเวอร์',
+    value: 'เตะ',
+    description: 'นำสมาชิกออกจากเซิร์ฟเวอร์ทันที สามารถเข้าร่วมใหม่ได้หากได้รับคำเชิญ',
+    icon: '👢',
+    badge: 'ลงโทษทันที',
+    badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25',
+  },
+  {
+    id: 'punish-ban',
+    label: 'แบนถาวร',
+    value: 'แบนถาวร',
+    description: 'ระงับสิทธิ์การเข้าเซิร์ฟเวอร์ถาวร และบันทึกประวัติการกระทำผิดในระบบ',
+    icon: '🔨',
+    badge: 'ขั้นเด็ดขาด',
+    badgeColor: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25',
+  },
 ];
+
+const PUNISH_OPTIONS = PUNISH_RICH_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +151,12 @@ interface DiscordProfile {
 type TagWarnCancelRequestInsert = TablesInsert<'tag_warn_cancel_requests'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatTimestamp(raw: string | null | undefined): string {
   if (!raw) return '-';
@@ -132,6 +205,7 @@ function getPunishBadgeStyle(punish: string | null): string {
 
 export function TagWarnLogsManagement() {
   const { toast } = useToast();
+  const { notify } = useAdminNotification();
   const { user } = useAuth();
 
   // core data
@@ -169,6 +243,8 @@ export function TagWarnLogsManagement() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [spoilerFlags, setSpoilerFlags] = useState<boolean[]>([false, false]);
   const [spoilerAll, setSpoilerAll] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // send to discord
   const [sendTarget, setSendTarget] = useState<WarnRecord | null>(null);
@@ -222,6 +298,18 @@ export function TagWarnLogsManagement() {
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  const templateRichOptions = useMemo<RichSelectItem[]>(() => {
+    return templates.map((tpl) => ({
+      id: tpl.id,
+      label: tpl.title,
+      value: tpl.message,
+      description: tpl.message,
+      icon: '📋',
+      badge: 'เทมเพลต',
+      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    }));
+  }, [templates]);
 
   // template select helper
   const handleSelectTemplate = (templateMsg: string, target: 'add' | 'edit') => {
@@ -404,13 +492,47 @@ export function TagWarnLogsManagement() {
     setSpoilerFlags((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleFilesAdded = useCallback((incomingFiles: File[]) => {
+    const validImages = incomingFiles.filter((f) => f.type.startsWith('image/'));
+    if (validImages.length === 0) return;
+    setSelectedFiles((prev) => {
+      const remaining = 2 - prev.length;
+      if (remaining <= 0) return prev;
+      const toAdd = validImages.slice(0, remaining);
+      setSpoilerFlags((s) => [...s, ...Array(toAdd.length).fill(false)]);
+      return [...prev, ...toAdd];
+    });
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    const remaining = 2 - selectedFiles.length;
-    if (remaining <= 0) return;
-    setSelectedFiles((prev) => [...prev, ...files.slice(0, remaining)]);
-    setSpoilerFlags((prev) => [...prev, ...Array(Math.min(files.length, remaining)).fill(false)]);
+    handleFilesAdded(files);
     e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    handleFilesAdded(files);
   };
 
   // ── Fetch profiles ────────────────────────────────────────────────────────
@@ -612,9 +734,11 @@ export function TagWarnLogsManagement() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      notify.success('ส่งแจ้งเตือน Discord สำเร็จ', `แจ้งเตือนเคสเตือนถูกส่งไปยัง Discord เรียบร้อยแล้ว`);
       toast({ title: 'ส่งแจ้งเตือน Discord สำเร็จ' });
       setSendTarget(null);
     } catch (e: any) {
+      notify.error('ส่งแจ้งเตือน Discord ไม่สำเร็จ', e?.message || 'Discord API Error');
       toast({ title: 'ส่งแจ้งเตือนไม่สำเร็จ', description: e?.message, variant: 'destructive' });
     } finally {
       setIsSending(false);
@@ -826,7 +950,12 @@ export function TagWarnLogsManagement() {
             open={isAddDialogOpen}
             onOpenChange={(o) => {
               setIsAddDialogOpen(o);
-              if (!o) { setSelectedFiles([]); setSpoilerFlags([false, false]); setSpoilerAll(false); }
+              if (!o) {
+                setSelectedFiles([]);
+                setSpoilerFlags([false, false]);
+                setSpoilerAll(false);
+                setIsDragging(false);
+              }
             }}
           >
             <DialogTrigger asChild>
@@ -834,7 +963,7 @@ export function TagWarnLogsManagement() {
                 <Plus className="h-4 w-4" /> เพิ่มแท็กเตือน
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
               <DialogHeader>
                 <DialogTitle>เพิ่มประวัติแท็กเตือน</DialogTitle>
                 <DialogDescription>กรอกข้อมูลให้ครบถ้วน — กดปุ่ม 📬 บน card เพื่อส่งแจ้งเตือน Discord ภายหลัง</DialogDescription>
@@ -845,67 +974,230 @@ export function TagWarnLogsManagement() {
                   <Input id="memberId" value={newWarn.memberId} onChange={(e) => setNewWarn({ ...newWarn, memberId: e.target.value })} placeholder="ไอดีสมาชิกที่ถูกเตือน" />
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <Label htmlFor="warnMsg">ข้อความเตือน</Label>
                     {templates.length > 0 && (
-                      <Select onValueChange={(v) => handleSelectTemplate(v, 'add')}>
-                        <SelectTrigger className="h-7 text-xs w-[180px] bg-primary/5 border-primary/20 text-primary rounded-lg font-semibold">
-                          <SelectValue placeholder="เลือกจากเทมเพลต" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {templates.map(tpl => (
-                            <SelectItem key={tpl.id} value={tpl.message} className="text-xs font-medium">
-                              {tpl.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="w-[190px]">
+                        <RichSelect
+                          data={templateRichOptions}
+                          value=""
+                          onValueChange={(v) => handleSelectTemplate(v, 'add')}
+                          placeholder="เลือกจากเทมเพลต"
+                          triggerClassName="h-7 text-xs rounded-lg bg-primary/5 border-primary/20 text-primary font-semibold"
+                          contentClassName="w-[340px]"
+                          align="end"
+                        />
+                      </div>
                     )}
                   </div>
                   <Textarea id="warnMsg" value={newWarn.message} onChange={(e) => setNewWarn({ ...newWarn, message: e.target.value })} placeholder="ระบุรายละเอียดการเตือน..." className="min-h-[80px]" />
                 </div>
                 <div className="space-y-2">
                   <Label>บทลงโทษ</Label>
-                  <Select value={newWarn.punish} onValueChange={(v) => setNewWarn({ ...newWarn, punish: v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือกบทลงโทษ" /></SelectTrigger>
-                    <SelectContent>
-                      {PUNISH_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <RichSelect
+                    data={PUNISH_RICH_OPTIONS}
+                    value={newWarn.punish}
+                    onValueChange={(v) => setNewWarn({ ...newWarn, punish: v })}
+                    placeholder="เลือกบทลงโทษ..."
+                    triggerClassName="h-10 rounded-xl"
+                  />
                 </div>
-                <div className="space-y-2">
+
+                {/* ── Evidence Images (Dropzone & Cards) ── */}
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <Label>รูปภาพหลักฐาน (อย่างน้อย 1 รูป, สูงสุด 2 รูป)</Label>
-                    {selectedFiles.length === 2 && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-foreground">
+                        รูปภาพหลักฐาน
+                      </Label>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          'text-[10px] px-2 py-0.5 rounded-full font-normal',
+                          selectedFiles.length > 0
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {selectedFiles.length}/2 รูป
+                      </Badge>
+                    </div>
+
+                    {selectedFiles.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <Checkbox id="spoiler-all" checked={spoilerAll} onCheckedChange={(v) => { const b = !!v; setSpoilerAll(b); setSpoilerFlags([b, b]); }} />
-                        <Label htmlFor="spoiler-all" className="text-xs cursor-pointer">ซ่อนภาพทั้งหมด</Label>
+                        <Checkbox
+                          id="spoiler-all"
+                          checked={spoilerAll}
+                          onCheckedChange={(v) => {
+                            const b = !!v;
+                            setSpoilerAll(b);
+                            setSpoilerFlags(selectedFiles.map(() => b));
+                          }}
+                          className="h-3.5 w-3.5 rounded"
+                        />
+                        <Label htmlFor="spoiler-all" className="text-xs cursor-pointer text-muted-foreground hover:text-foreground">
+                          ซ่อนภาพทั้งหมด (Spoiler)
+                        </Label>
                       </div>
                     )}
                   </div>
-                  {selectedFiles.length < 2 && (
-                    <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-border rounded-lg p-3 hover:border-primary/50 transition-colors">
-                      <ImagePlus className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">คลิกเพื่ออัปโหลดรูปภาพ</span>
-                      <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" />
-                    </label>
-                  )}
-                  {selectedFiles.length > 0 && (
-                    <div className="flex gap-3 mt-2 flex-wrap">
-                      {selectedFiles.map((f, i) => (
-                        <div key={i} className="relative">
-                          <img src={previewUrls[i]} alt={f.name} className={cn('w-24 h-24 object-cover rounded-lg border border-border', spoilerFlags[i] && 'blur-sm')} />
-                          <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-md z-10">
-                            <X className="h-3 w-3" />
-                          </button>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Checkbox id={`spoiler-${i}`} checked={spoilerFlags[i]} onCheckedChange={() => toggleSpoilerFlag(i)} />
-                            <Label htmlFor={`spoiler-${i}`} className="text-[10px] cursor-pointer">ซ่อนภาพ</Label>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {/* Empty state: Cozy Drag & Drop Zone */}
+                  {selectedFiles.length === 0 ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={cn(
+                        'group relative flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
+                        'border-border/60 bg-muted/20 hover:border-amber-500/50 hover:bg-amber-500/[0.04]',
+                        isDragging && 'border-amber-500 bg-amber-500/10 scale-[0.99]'
+                      )}
+                    >
+                      <div className="rounded-full bg-background p-3.5 shadow-sm border border-border/50 transition-transform duration-200 group-hover:scale-110">
+                        <ImagePlus className="h-6 w-6 text-amber-500" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                          คลิกเพื่อเลือกรูปภาพ หรือลากไฟล์ภาพมาวางที่นี่
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          รองรับ JPG, PNG, WEBP (อย่างน้อย 1 รูป, สูงสุด 2 รูป)
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Grid of preview cards */}
+                      <div className={cn(
+                        'grid gap-3',
+                        selectedFiles.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'
+                      )}>
+                        {selectedFiles.map((file, i) => (
+                          <div
+                            key={i}
+                            className="group relative flex flex-col rounded-2xl border border-border/60 bg-card/60 p-2 shadow-sm transition-all hover:border-border"
+                          >
+                            {/* Image Container with Hover Overlay */}
+                            <div className="relative h-36 w-full overflow-hidden rounded-xl bg-muted/40">
+                              <img
+                                src={previewUrls[i]}
+                                alt={file.name}
+                                className={cn(
+                                  'h-full w-full object-cover transition-all duration-300 group-hover:scale-105',
+                                  spoilerFlags[i] && 'blur-md'
+                                )}
+                              />
+
+                              {/* Spoiler Active Indicator Tag */}
+                              {spoilerFlags[i] && (
+                                <div className="absolute top-2 left-2 flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-medium text-amber-300 backdrop-blur-sm">
+                                  <EyeOff className="h-3 w-3" />
+                                  <span>ซ่อนภาพ</span>
+                                </div>
+                              )}
+
+                              {/* Dark Overlay with Action Buttons */}
+                              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 group-hover:opacity-100">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => toggleSpoilerFlag(i)}
+                                  className="h-8 gap-1.5 rounded-xl bg-white/95 px-3 text-xs font-medium text-stone-900 shadow-md hover:bg-white active:scale-95"
+                                  title={spoilerFlags[i] ? 'ยกเลิกการซ่อนภาพ' : 'ซ่อนภาพนี้ (Spoiler)'}
+                                >
+                                  {spoilerFlags[i] ? (
+                                    <>
+                                      <Eye className="h-3.5 w-3.5" />
+                                      <span>แสดงภาพ</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                      <span>ซ่อนภาพ</span>
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => removeFile(i)}
+                                  className="h-8 gap-1 rounded-xl bg-rose-600 px-3 text-xs font-medium text-white shadow-md hover:bg-rose-700 active:scale-95"
+                                  title="ลบรูปนี้"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>ลบ</span>
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* File Info & Bottom Actions */}
+                            <div className="mt-2 flex items-center justify-between gap-2 px-1 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-medium text-foreground" title={file.name}>
+                                  {file.name}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Checkbox
+                                  id={`spoiler-file-${i}`}
+                                  checked={spoilerFlags[i]}
+                                  onCheckedChange={() => toggleSpoilerFlag(i)}
+                                  className="h-3.5 w-3.5 rounded"
+                                />
+                                <Label
+                                  htmlFor={`spoiler-file-${i}`}
+                                  className="text-[11px] cursor-pointer text-muted-foreground"
+                                >
+                                  ซ่อนภาพ
+                                </Label>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+
+                        {/* If 1 file selected, show an 'Add 2nd photo' button slot */}
+                        {selectedFiles.length === 1 && (
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={cn(
+                              'group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-4 transition-all duration-200',
+                              'border-border/60 bg-muted/10 hover:border-amber-500/50 hover:bg-amber-500/[0.03]',
+                              isDragging && 'border-amber-500 bg-amber-500/10'
+                            )}
+                          >
+                            <div className="rounded-full bg-background p-2.5 shadow-sm border border-border/50 group-hover:scale-105 transition-transform">
+                              <Plus className="h-4 w-4 text-amber-500" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs font-medium text-foreground group-hover:text-amber-500 transition-colors">
+                                เพิ่มอีก 1 รูปภาพ
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">หรือลากไฟล์มาวางที่นี่</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1042,22 +1334,40 @@ export function TagWarnLogsManagement() {
                                 <Mail className="h-3.5 w-3.5" />
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
-                              <History className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            {(cancelled || pendingApproval) && !showBlur && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleBlur(r.id)} title="ซ่อน">
-                                <EyeOff className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {user?.is_owner && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(r)} title="ลบข้อมูลถาวร">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                            <DropdownMenu
+                              options={[
+                                {
+                                  label: 'ประวัติการแก้ไข',
+                                  icon: <History className="h-4 w-4" />,
+                                  onClick: () => handleOpenCaseLogs(r),
+                                },
+                                {
+                                  label: 'แก้ไขข้อมูล',
+                                  icon: <Pencil className="h-4 w-4" />,
+                                  onClick: () => {
+                                    setEditTarget(r);
+                                    setEditForm({ message: r.message ?? '', punish: r.punish ?? '' });
+                                  },
+                                },
+                                ...(((cancelled || pendingApproval) && !showBlur) ? [{
+                                  label: 'ซ่อนการแสดงผล',
+                                  icon: <EyeOff className="h-4 w-4" />,
+                                  onClick: () => toggleBlur(r.id),
+                                }] : []),
+                                ...(!cancelled && !pendingApproval ? [{
+                                  label: 'ยกเลิกเคส',
+                                  icon: <Ban className="h-4 w-4" />,
+                                  onClick: () => setCancelTarget(r),
+                                  destructive: true,
+                                }] : []),
+                                ...(user?.is_owner ? [{
+                                  label: 'ลบข้อมูลถาวร',
+                                  icon: <Trash2 className="h-4 w-4" />,
+                                  onClick: () => setDeleteTarget(r),
+                                  destructive: true,
+                                }] : []),
+                              ]}
+                            />
                           </div>
                         </div>
 
@@ -1152,7 +1462,7 @@ export function TagWarnLogsManagement() {
                 return (
                   <Card key={r.id} className="overflow-hidden transition-all relative">
                     <div className={cn('h-1', cancelled ? 'bg-muted-foreground/30' : pendingApproval ? 'bg-amber-500/60' : 'bg-destructive/80')} />
-                    
+
                     {/* Blur Overlays */}
                     {pendingApproval && showBlur && (
                       <div className="absolute inset-0 z-10 flex items-center justify-between bg-background/80 backdrop-blur-sm px-6 py-3">
@@ -1183,7 +1493,7 @@ export function TagWarnLogsManagement() {
                         <Badge variant={cancelled ? 'outline' : 'secondary'} className="font-mono text-xs h-7 w-12 flex items-center justify-center shrink-0">
                           #{r.sequence ?? idx + 1}
                         </Badge>
-                        
+
                         {/* Barista & Member Stack */}
                         <div className="flex items-center -space-x-2 shrink-0">
                           <Avatar className="h-8 w-8 border-2 border-background ring-1 ring-primary/20 shrink-0" title={`Barista: ${barista.name}`}>
@@ -1246,22 +1556,35 @@ export function TagWarnLogsManagement() {
                               <Mail className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleOpenCaseLogs(r)} title="ประวัติการแก้ไข">
-                            <History className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => { setEditTarget(r); setEditForm({ message: r.message ?? '', punish: r.punish ?? '' }); }} title="แก้ไขข้อมูล">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          {user?.is_owner && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(r)} title="ลบเคส">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {!cancelled && !pendingApproval && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5" onClick={() => setCancelTarget(r)} title="ยกเลิกเคส">
-                              <Ban className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <DropdownMenu
+                            options={[
+                              {
+                                label: 'ประวัติการแก้ไข',
+                                icon: <History className="h-4 w-4" />,
+                                onClick: () => handleOpenCaseLogs(r),
+                              },
+                              {
+                                label: 'แก้ไขข้อมูล',
+                                icon: <Pencil className="h-4 w-4" />,
+                                onClick: () => {
+                                  setEditTarget(r);
+                                  setEditForm({ message: r.message ?? '', punish: r.punish ?? '' });
+                                },
+                              },
+                              ...(!cancelled && !pendingApproval ? [{
+                                label: 'ยกเลิกเคส',
+                                icon: <Ban className="h-4 w-4" />,
+                                onClick: () => setCancelTarget(r),
+                                destructive: true,
+                              }] : []),
+                              ...(user?.is_owner ? [{
+                                label: 'ลบเคสถาวร',
+                                icon: <Trash2 className="h-4 w-4" />,
+                                onClick: () => setDeleteTarget(r),
+                                destructive: true,
+                              }] : []),
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1448,35 +1771,33 @@ export function TagWarnLogsManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <Label>ข้อความเตือน</Label>
                 {templates.length > 0 && (
-                  <Select onValueChange={(v) => handleSelectTemplate(v, 'edit')}>
-                    <SelectTrigger className="h-7 text-xs w-[180px] bg-primary/5 border-primary/20 text-primary rounded-lg font-semibold">
-                      <SelectValue placeholder="เลือกจากเทมเพลต" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map(tpl => (
-                        <SelectItem key={tpl.id} value={tpl.message} className="text-xs font-medium">
-                          {tpl.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="w-[190px]">
+                    <RichSelect
+                      data={templateRichOptions}
+                      value=""
+                      onValueChange={(v) => handleSelectTemplate(v, 'edit')}
+                      placeholder="เลือกจากเทมเพลต"
+                      triggerClassName="h-7 text-xs rounded-lg bg-primary/5 border-primary/20 text-primary font-semibold"
+                      contentClassName="w-[340px]"
+                      align="end"
+                    />
+                  </div>
                 )}
               </div>
               <Textarea value={editForm.message} onChange={(e) => setEditForm({ ...editForm, message: e.target.value })} className="min-h-[80px]" />
             </div>
             <div className="space-y-2">
               <Label>บทลงโทษ</Label>
-              <Select value={editForm.punish} onValueChange={(v) => setEditForm({ ...editForm, punish: v })}>
-                <SelectTrigger><SelectValue placeholder="เลือกบทลงโทษ" /></SelectTrigger>
-                <SelectContent>
-                  {PUNISH_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <RichSelect
+                data={PUNISH_RICH_OPTIONS}
+                value={editForm.punish}
+                onValueChange={(v) => setEditForm({ ...editForm, punish: v })}
+                placeholder="เลือกบทลงโทษ..."
+                triggerClassName="h-10 rounded-xl"
+              />
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1642,7 +1963,7 @@ export function TagWarnLogsManagement() {
                     <div className="text-xs text-foreground bg-muted/30 p-2 rounded-lg font-semibold">
                       รายละเอียด: {log.details}
                     </div>
-                    
+
                     {log.before_data && log.after_data && (
                       <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40 text-[11px]">
                         <div className="space-y-1">

@@ -692,3 +692,36 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* View Transitions API (Magic UI Animated Theme Toggler) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  height: 100%;
+  overflow: clip;
+}
+
+::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-group(root) {
+  animation-duration: var(--magicui-theme-toggle-vt-duration);
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
+  will-change: clip-path;
+}
+
+/* Disable competing CSS transitions while View Transition is running for max 60fps smoothness */
+html[data-magicui-theme-vt="active"],
+html[data-magicui-theme-vt="active"] *,
+html[data-magicui-theme-vt="active"] *::before,
+html[data-magicui-theme-vt="active"] *::after {
+  transition: none !important;
+}
+
+
+

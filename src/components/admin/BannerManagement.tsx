@@ -35,11 +35,15 @@ import {
   EyeOff,
   ArrowUp,
   ArrowDown,
+  ImagePlus,
+  X,
 } from 'lucide-react';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { BulkDeleteToolbar } from './BulkDeleteToolbar';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import type { Tables } from '@/integrations/supabase/types';
 import { compressImage } from '@/lib/image-compress';
+import { cn } from '@/lib/utils';
 
 type Banner = Tables<'banners'>;
 
@@ -50,6 +54,7 @@ export function BannerManagement() {
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -155,10 +160,7 @@ export function BannerManagement() {
     setDialogOpen(true);
   }
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  async function processAndSetFile(file: File) {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
@@ -209,6 +211,48 @@ export function BannerManagement() {
     objectUrlRef.current = newUrl;
     setPreviewUrl(newUrl);
   }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      processAndSetFile(file);
+      e.target.value = '';
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processAndSetFile(file);
+  };
+
+  const handleRemoveImage = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  };
 
   async function uploadImage(file: File): Promise<string> {
     const fileExt = file.name.split('.').pop();
@@ -603,33 +647,27 @@ export function BannerManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleActive(banner)}
-                      >
-                        {banner.is_active ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(banner)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(banner)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="flex justify-end">
+                      <DropdownMenu
+                        options={[
+                          {
+                            label: banner.is_active ? "ซ่อนแบนเนอร์" : "แสดงแบนเนอร์",
+                            onClick: () => toggleActive(banner),
+                            Icon: banner.is_active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />,
+                          },
+                          {
+                            label: "แก้ไข",
+                            onClick: () => openEditDialog(banner),
+                            Icon: <Edit className="h-3.5 w-3.5" />,
+                          },
+                          {
+                            label: "ลบแบนเนอร์",
+                            onClick: () => handleDelete(banner),
+                            Icon: <Trash2 className="h-3.5 w-3.5" />,
+                            variant: "destructive",
+                          },
+                        ]}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -663,46 +701,90 @@ export function BannerManagement() {
           <div className="space-y-4">
             {/* Image Upload */}
             <div className="space-y-2">
-              <Label>รูปภาพ Banner *</Label>
+              <div className="flex items-center justify-between text-xs">
+                <Label className="font-semibold text-foreground">รูปภาพ Banner *</Label>
+                <span className="text-[11px] text-muted-foreground">แนะนำ 909 × 304 px (3:1)</span>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp,image/gif"
                 onChange={handleFileSelect}
                 className="hidden"
               />
               {previewUrl ? (
-                <div className="relative group">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="w-full aspect-[3/1] object-cover rounded-xl border border-border/50"
-                  />
-                  <div className="absolute inset-0 bg-mocha/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                    <Button
-                      variant="secondary"
-                      className="bg-cream/90 text-mocha hover:bg-cream border-0"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      เปลี่ยนรูป
-                    </Button>
+                <div className="space-y-1.5">
+                  <div className="group relative w-full aspect-[3/1] overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-sm">
+                    <img
+                      src={previewUrl}
+                      alt="ตัวอย่าง Banner"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-[2px] transition-opacity duration-200 flex items-center justify-center gap-2.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-9 gap-1.5 rounded-xl bg-white/95 px-3.5 text-xs font-medium text-stone-900 shadow-lg hover:bg-white active:scale-95 transition-all"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        เปลี่ยนรูป
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        className="h-9 gap-1.5 rounded-xl bg-rose-600 px-3.5 text-xs font-medium text-white shadow-lg hover:bg-rose-700 active:scale-95 transition-all"
+                        onClick={handleRemoveImage}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        ลบรูป
+                      </Button>
+                    </div>
                   </div>
+                  {selectedFile && (
+                    <div className="flex items-center justify-between rounded-xl bg-muted/40 border border-border/40 px-3 py-1.5 text-xs text-muted-foreground">
+                      <span className="truncate max-w-[80%] font-medium text-foreground">{selectedFile.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px]">{(selectedFile.size / 1024).toFixed(0)} KB</span>
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="rounded-full p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title="นำออก"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <button
-                  type="button"
+                <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full aspect-[3/1] border-2 border-dashed border-bear-brown/25 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-honey/50 hover:bg-honey/5 transition-colors"
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={cn(
+                    'group relative flex w-full aspect-[3/1] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
+                    'border-border/60 bg-muted/20 hover:border-amber-500/50 hover:bg-amber-500/[0.04]',
+                    isDragging && 'border-amber-500 bg-amber-500/10 scale-[0.99]'
+                  )}
                 >
-                  <Upload className="w-8 h-8 text-muted-foreground/50" />
-                  <span className="text-sm text-muted-foreground">
-                    คลิกเพื่ออัพโหลดรูปภาพ
-                  </span>
-                  <span className="text-xs text-muted-foreground/60">
-                    แนะนำ 909 × 304 px
-                  </span>
-                </button>
+                  <div className="rounded-full bg-background p-3.5 shadow-sm border border-border/50 transition-transform duration-200 group-hover:scale-110">
+                    <ImagePlus className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                      คลิกเพื่อเลือกรูปภาพ หรือลากไฟล์ภาพมาวางที่นี่
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      แนะนำขนาด 909 × 304 px (สัดส่วน 3:1)
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 

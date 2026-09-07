@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -59,6 +57,45 @@ const REWARD_TYPE_COLORS: Record<string, string> = {
 const MONTH_NAMES = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
+
+const CHECKIN_REWARD_TYPE_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'reward-points',
+    label: 'แต้มสะสม',
+    value: 'points',
+    description: 'แต้มร้านค้าสำหรับใช้ซื้อไอเทมหรือแลกของรางวัลในคาเฟ่',
+    icon: '🪙',
+    badge: 'แต้มคาเฟ่',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'reward-ticket-point',
+    label: 'แต้มตั๋ว',
+    value: 'ticket_point',
+    description: 'แต้มตั๋วพิเศษสำหรับใช้สุ่มรางวัลกาชาปองและกิจกรรมพิเศษ',
+    icon: '🎟️',
+    badge: 'ตั๋วกาชา',
+    badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+  },
+  {
+    id: 'reward-ticket-piece',
+    label: 'ชิ้นส่วนตั๋ว',
+    value: 'ticket_piece_point',
+    description: 'เศษชิ้นส่วนตั๋ว สามารถสะสมเพื่อรวมเป็นตั๋วกาชาปองใบเต็มได้',
+    icon: '🧩',
+    badge: 'ชิ้นส่วนตั๋ว',
+    badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25',
+  },
+  {
+    id: 'reward-role',
+    label: 'ยศ Discord',
+    value: 'role',
+    description: 'มอบยศหรือ Role พิเศษใน Discord Server ให้สมาชิกอัตโนมัติ',
+    icon: '🛡️',
+    badge: 'บทบาทดิสคอร์ด',
+    badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25',
+  },
 ];
 
 export function CheckinRewardsManagement() {
@@ -661,23 +698,16 @@ export function CheckinRewardsManagement() {
 
           <div className="space-y-4">
             <div>
-              <Label>ประเภทรางวัล</Label>
-              <Select
+              <Label className="text-xs font-semibold">ประเภทรางวัล</Label>
+              <RichSelect
+                data={CHECKIN_REWARD_TYPE_OPTIONS}
                 value={editForm.reward_type}
                 onValueChange={(value) =>
                   setEditForm({ ...editForm, reward_type: value as DailyReward['reward_type'] })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="points">แต้ม</SelectItem>
-                  <SelectItem value="ticket_point">แต้มตั๋ว</SelectItem>
-                  <SelectItem value="ticket_piece_point">แต้มชิ้นตั๋ว</SelectItem>
-                  <SelectItem value="role">Discord Role</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="เลือกประเภทรางวัล..."
+                triggerClassName="h-10 rounded-xl mt-1.5"
+              />
             </div>
 
             {editForm.reward_type === 'role' ? (
@@ -787,23 +817,16 @@ export function CheckinRewardsManagement() {
             </div>
 
             <div>
-              <Label>ประเภทรางวัล</Label>
-              <Select
+              <Label className="text-xs font-semibold">ประเภทรางวัล</Label>
+              <RichSelect
+                data={CHECKIN_REWARD_TYPE_OPTIONS}
                 value={bulkForm.reward_type}
                 onValueChange={(value) =>
                   setBulkForm({ ...bulkForm, reward_type: value as DailyReward['reward_type'] })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="points">แต้ม</SelectItem>
-                  <SelectItem value="ticket_point">แต้มตั๋ว</SelectItem>
-                  <SelectItem value="ticket_piece_point">แต้มชิ้นตั๋ว</SelectItem>
-                  <SelectItem value="role">Discord Role</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="เลือกประเภทรางวัล..."
+                triggerClassName="h-10 rounded-xl mt-1.5"
+              />
             </div>
 
             {bulkForm.reward_type === 'role' ? (
@@ -870,23 +893,16 @@ export function CheckinRewardsManagement() {
 
           <div className="space-y-4">
             <div>
-              <Label>ประเภทรางวัล</Label>
-              <Select
+              <Label className="text-xs font-semibold">ประเภทรางวัล</Label>
+              <RichSelect
+                data={CHECKIN_REWARD_TYPE_OPTIONS}
                 value={bigRewardForm.reward_type}
                 onValueChange={(value) =>
                   setBigRewardForm({ ...bigRewardForm, reward_type: value as BigReward['reward_type'] })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="points">แต้ม</SelectItem>
-                  <SelectItem value="ticket_point">แต้มตั๋ว</SelectItem>
-                  <SelectItem value="ticket_piece_point">แต้มชิ้นตั๋ว</SelectItem>
-                  <SelectItem value="role">Discord Role</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="เลือกประเภทรางวัล..."
+                triggerClassName="h-10 rounded-xl mt-1.5"
+              />
             </div>
 
             {bigRewardForm.reward_type === 'role' ? (

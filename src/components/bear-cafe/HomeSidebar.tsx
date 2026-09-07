@@ -93,7 +93,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
         </button>
 
 
-        {/* เช็คแต้มของคุณ */}
+        {/* เช็กแต้มของคุณ */}
         {user && (
           <Link
             to="/points"
@@ -104,7 +104,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
               alt="Point Icon" 
               className="w-6 h-6 shrink-0 object-contain drop-shadow-sm transition-all duration-300 group-hover:scale-125 group-hover:-translate-y-1 [@media(max-height:820px)]:w-5 [@media(max-height:820px)]:h-5" 
             />
-            <span className="font-medium">เช็คแต้มของคุณ</span>
+            <span className="font-medium">เช็กแต้มของคุณ</span>
           </Link>
         )}
 

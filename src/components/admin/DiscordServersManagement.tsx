@@ -14,12 +14,14 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
   Loader2, Check, X, ExternalLink, Users, Trash2, Pencil, Plus,
   MousePointerClick, FolderOpen, Star, ShieldCheck, Handshake,
   GripVertical, LayoutList, Clock, CheckCircle2, XCircle, RefreshCw,
   Flame, Trophy, Zap, AlertTriangle, Info, Sparkles, SlidersHorizontal, Search,
 } from 'lucide-react';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -97,6 +99,31 @@ export function DiscordServersManagement() {
     highlight_color: '', carousel_order: '',
   });
   const [editLoading, setEditLoading] = useState(false);
+
+  const categoryFilterOptions = React.useMemo<RichSelectItem[]>(() => [
+    { id: 'all', label: 'หมวดหมู่ทั้งหมด', value: 'all', icon: '📁', description: 'แสดงเซิร์ฟเวอร์ทุกหมวดหมู่' },
+    ...categories.map(c => ({
+      id: c.id,
+      label: c.name,
+      value: c.id,
+      icon: c.icon || '📁',
+      description: `เซิร์ฟเวอร์ในหมวดหมู่ ${c.name}`,
+      badge: 'หมวดหมู่',
+      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    }))
+  ], [categories]);
+
+  const categoryFormOptions = React.useMemo<RichSelectItem[]>(() => [
+    ...categories.map(c => ({
+      id: c.id,
+      label: c.name,
+      value: c.id,
+      icon: c.icon || '📁',
+      description: `จัดอยู่ในหมวดหมู่ ${c.name}`,
+      badge: 'หมวดหมู่',
+      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    }))
+  ], [categories]);
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<DiscordServer | null>(null);
@@ -646,19 +673,14 @@ export function DiscordServersManagement() {
               )}
             </div>
 
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[170px] h-9 rounded-xl text-xs">
-                <SelectValue placeholder="หมวดหมู่ทั้งหมด" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">📁 หมวดหมู่ทั้งหมด</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-full sm:w-52">
+              <RichSelect
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+                data={categoryFilterOptions}
+                placeholder="หมวดหมู่ทั้งหมด"
+              />
+            </div>
 
             {(searchQuery || selectedCategory !== 'all') && (
               <Button
@@ -819,20 +841,32 @@ export function DiscordServersManagement() {
                         <Check className="w-3 h-3 mr-1" />อนุมัติใหม่
                       </Button>
                     )}
-                    <Button
-                      size="sm" variant="outline"
-                      className="h-7 w-7 p-0"
-                      title="รีโหลดข้อมูลจาก Discord"
-                      onClick={() => handleRefreshServer(server)}
-                      disabled={refreshingId === server.id}
-                    >
-                      <RefreshCw className={cn('w-3 h-3', refreshingId === server.id && 'animate-spin')} />
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleEdit(server)}><Pencil className="w-3 h-3" /></Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(server)}><Trash2 className="w-3 h-3" /></Button>
-                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" asChild>
-                      <a href={server.invite_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-3 h-3" /></a>
-                    </Button>
+                    <DropdownMenu
+                      options={[
+                        {
+                          label: "ซิงค์ข้อมูล Discord",
+                          onClick: () => handleRefreshServer(server),
+                          Icon: <RefreshCw className={cn('h-3.5 w-3.5', refreshingId === server.id && 'animate-spin')} />,
+                          disabled: refreshingId === server.id,
+                        },
+                        {
+                          label: "แก้ไขข้อมูล",
+                          onClick: () => handleEdit(server),
+                          Icon: <Pencil className="h-3.5 w-3.5" />,
+                        },
+                        {
+                          label: "เปิดลิงก์เชิญ",
+                          onClick: () => window.open(server.invite_url, '_blank', 'noopener,noreferrer'),
+                          Icon: <ExternalLink className="h-3.5 w-3.5" />,
+                        },
+                        {
+                          label: "ลบเซิร์ฟเวอร์",
+                          onClick: () => setDeleteTarget(server),
+                          Icon: <Trash2 className="h-3.5 w-3.5" />,
+                          variant: "destructive",
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -864,15 +898,13 @@ export function DiscordServersManagement() {
 
             {/* Category */}
             <div className="space-y-1.5">
-              <Label>หมวดหมู่</Label>
-              <Select value={editForm.category_id} onValueChange={(v) => setEditForm((p) => ({ ...p, category_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="เลือกหมวดหมู่..." /></SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <RichSelect
+                label="หมวดหมู่"
+                value={editForm.category_id}
+                onValueChange={(v) => setEditForm((p) => ({ ...p, category_id: v }))}
+                data={categoryFormOptions}
+                placeholder="เลือกหมวดหมู่..."
+              />
             </div>
 
             {/* Highlight color */}

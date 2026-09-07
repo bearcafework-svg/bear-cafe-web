@@ -19,10 +19,12 @@ export interface GuildRole {
 interface CachedGuildRoles {
   roles: GuildRole[];
   expiresAt: number;
+  lastFetchedAt: number;
 }
 
 const cache = new Map<string, CachedGuildRoles>();
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MIN_REFRESH_INTERVAL_MS = 10 * 1000; // 10 seconds rate limit guard
 
 /**
  * Fetch guild roles with automatic in-memory caching.
@@ -56,16 +58,28 @@ export async function getGuildRoles(
   }
 
   const roles: GuildRole[] = await response.json();
-  cache.set(guildId, { roles, expiresAt: Date.now() + ttlMs });
+  const now = Date.now();
+  cache.set(guildId, { roles, expiresAt: now + ttlMs, lastFetchedAt: now });
   console.log(`[guild-roles-cache] Cached ${roles.length} roles for guild ${guildId}`);
   return roles;
 }
 
-/** Clear the cache (useful for admin refresh actions) */
-export function clearGuildRolesCache(guildId?: string) {
+/** 
+ * Clear the cache (useful for admin refresh actions).
+ * Includes safety throttle to avoid spamming Discord API if called repeatedly.
+ */
+export function clearGuildRolesCache(guildId?: string, force = false): boolean {
   if (guildId) {
+    const existing = cache.get(guildId);
+    // If fetched less than MIN_REFRESH_INTERVAL_MS ago and not forced, keep cache to prevent rate limit
+    if (!force && existing && Date.now() - existing.lastFetchedAt < MIN_REFRESH_INTERVAL_MS) {
+      console.warn(`[guild-roles-cache] Skipped clearing cache for guild ${guildId} (rate-limit throttle active)`);
+      return false;
+    }
     cache.delete(guildId);
+    return true;
   } else {
     cache.clear();
+    return true;
   }
 }

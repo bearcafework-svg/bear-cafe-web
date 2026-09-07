@@ -19,6 +19,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
@@ -153,6 +154,71 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
     prev_level_id: null as string | null,
     is_active: true
   });
+
+  const ACTIVE_STATUS_RICH_OPTIONS: RichSelectItem[] = useMemo(() => [
+    {
+      id: 'status-yes',
+      label: 'เปิดใช้งาน',
+      value: 'yes',
+      description: 'เปิดสถานะการทำงานในระบบ สามารถจัดสรรงานได้',
+      icon: '🟢',
+      badge: 'เปิดใช้งาน',
+      badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    },
+    {
+      id: 'status-no',
+      label: 'ปิดใช้งาน',
+      value: 'no',
+      description: 'ปิดการใช้งานหรือระงับสถานะชั่วคราว',
+      icon: '🔴',
+      badge: 'ปิดใช้งาน',
+      badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    },
+  ], []);
+
+  const positionRichOptions = useMemo<RichSelectItem[]>(() => {
+    return positions.map(p => ({
+      id: p.id,
+      label: p.name,
+      value: p.id,
+      icon: '💼',
+      badge: 'ตำแหน่ง',
+      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    }));
+  }, [positions]);
+
+  const levelRichOptions = useMemo<RichSelectItem[]>(() => {
+    return levels.map(l => ({
+      id: l.id,
+      label: l.name,
+      value: l.id,
+      icon: '⭐',
+      badge: 'ระดับ',
+      badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+    }));
+  }, [levels]);
+
+  const nextLevelOptions = useMemo<RichSelectItem[]>(() => [
+    { id: 'none', label: 'ไม่มี', value: 'none', description: 'ไม่มีการเลื่อนขั้นอัตโนมัติ', icon: '➖' },
+    ...levels.filter(l => l.id !== levelForm.id).map(l => ({
+      id: l.id,
+      label: l.name,
+      value: l.id,
+      icon: '🔺',
+      badge: 'เลื่อนขั้น',
+    }))
+  ], [levels, levelForm.id]);
+
+  const prevLevelOptions = useMemo<RichSelectItem[]>(() => [
+    { id: 'none', label: 'ไม่มี', value: 'none', description: 'ไม่มีการลดขั้นอัตโนมัติ', icon: '➖' },
+    ...levels.filter(l => l.id !== levelForm.id).map(l => ({
+      id: l.id,
+      label: l.name,
+      value: l.id,
+      icon: '🔻',
+      badge: 'ลดขั้น',
+    }))
+  ], [levels, levelForm.id]);
 
   // Discord Members Search State (Combobox matching /role-transfer behavior)
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -1270,38 +1336,24 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">ตำแหน่งงาน</Label>
-                <Select
+                <RichSelect
+                  label="ตำแหน่งงาน"
                   value={memberForm.position_id}
                   onValueChange={v => setMemberForm(prev => ({ ...prev, position_id: v }))}
-                >
-                  <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                    <SelectValue placeholder="เลือกตำแหน่ง" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {positions.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  data={positionRichOptions}
+                  placeholder="เลือกตำแหน่ง..."
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">ระดับทีมงาน</Label>
-                <Select
+                <RichSelect
+                  label="ระดับทีมงาน"
                   value={memberForm.level_id}
                   onValueChange={v => setMemberForm(prev => ({ ...prev, level_id: v }))}
-                >
-                  <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                    <SelectValue placeholder="เลือกระดับ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {levels.map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  data={levelRichOptions}
+                  placeholder="เลือกระดับ..."
+                />
               </div>
             </div>
 
@@ -1540,19 +1592,13 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">การเปิดใช้งาน</Label>
-                <Select
+                <RichSelect
+                  label="การเปิดใช้งาน"
                   value={posForm.is_active ? 'yes' : 'no'}
                   onValueChange={v => setPosForm(prev => ({ ...prev, is_active: v === 'yes' }))}
-                >
-                  <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="yes">เปิดใช้งาน</SelectItem>
-                    <SelectItem value="no">ปิดใช้งาน</SelectItem>
-                  </SelectContent>
-                </Select>
+                  data={ACTIVE_STATUS_RICH_OPTIONS}
+                  placeholder="เลือกสถานะ..."
+                />
               </div>
             </div>
           </div>
@@ -1585,40 +1631,24 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
                 className="h-9 border-latte/40 rounded-xl"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">ระดับเมื่อเลื่อนขั้น</Label>
-                <Select
+                <RichSelect
+                  label="ระดับเมื่อเลื่อนขั้น"
                   value={levelForm.next_level_id || 'none'}
                   onValueChange={v => setLevelForm(prev => ({ ...prev, next_level_id: v === 'none' ? null : v }))}
-                >
-                  <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                    <SelectValue placeholder="ไม่มี" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">ไม่มี</SelectItem>
-                    {levels.filter(l => l.id !== levelForm.id).map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  data={nextLevelOptions}
+                  placeholder="ไม่มี"
+                />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">ระดับเมื่อลดขั้น</Label>
-                <Select
+                <RichSelect
+                  label="ระดับเมื่อลดขั้น"
                   value={levelForm.prev_level_id || 'none'}
                   onValueChange={v => setLevelForm(prev => ({ ...prev, prev_level_id: v === 'none' ? null : v }))}
-                >
-                  <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                    <SelectValue placeholder="ไม่มี" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">ไม่มี</SelectItem>
-                    {levels.filter(l => l.id !== levelForm.id).map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  data={prevLevelOptions}
+                  placeholder="ไม่มี"
+                />
               </div>
             </div>
             <div className="space-y-1">
@@ -1631,19 +1661,13 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">การเปิดใช้งาน</Label>
-              <Select
+              <RichSelect
+                label="การเปิดใช้งาน"
                 value={levelForm.is_active ? 'yes' : 'no'}
                 onValueChange={v => setLevelForm(prev => ({ ...prev, is_active: v === 'yes' }))}
-              >
-                <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yes">เปิดใช้งาน</SelectItem>
-                  <SelectItem value="no">ปิดใช้งาน</SelectItem>
-                </SelectContent>
-              </Select>
+                data={ACTIVE_STATUS_RICH_OPTIONS}
+                placeholder="เลือกสถานะ..."
+              />
             </div>
           </div>
           <DialogFooter>

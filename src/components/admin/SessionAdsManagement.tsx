@@ -39,6 +39,8 @@ import {
   GripVertical,
   RefreshCw,
   CheckCircle2,
+  ImagePlus,
+  X,
 } from 'lucide-react';
 import { compressImage } from '@/lib/image-compress';
 import { cn } from '@/lib/utils';
@@ -283,6 +285,7 @@ export function SessionAdsManagement() {
   const [cropFile, setCropFile] = useState<File | null>(null);       // triggers crop modal
   const [pendingImageUrl, setPendingImageUrl] = useState<string>(''); // url after crop+upload
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // bucket picker
@@ -343,6 +346,7 @@ export function SessionAdsManagement() {
     setDialogOpen(false);
     setCropFile(null);
     setPendingImageUrl('');
+    setIsDragging(false);
   };
 
   // ── File select → open crop modal ───────────────────────────────────────────
@@ -355,6 +359,37 @@ export function SessionAdsManagement() {
       return;
     }
     setCropFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'รองรับเฉพาะไฟล์รูปภาพ', variant: 'destructive' });
+        return;
+      }
+      setCropFile(file);
+    }
   };
 
   // ── After crop confirmed: compress → upload ─────────────────────────────────
@@ -849,35 +884,94 @@ export function SessionAdsManagement() {
 
             {/* Image upload area */}
             <div className="space-y-2">
-              <Label>ภาพโฆษณา * <span className="text-muted-foreground font-normal">(1200 × 480 px)</span></Label>
+              <div className="flex items-center justify-between text-xs">
+                <Label className="font-semibold text-foreground">ภาพโฆษณา *</Label>
+                <span className="text-[11px] text-muted-foreground">ขนาด 1200 × 480 px (2.5:1)</span>
+              </div>
               {pendingImageUrl ? (
-                <div className="relative group">
-                  <img src={pendingImageUrl} alt="preview"
-                    className="w-full aspect-[2.5/1] object-cover rounded-xl border border-border/50" />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2">
-                    <Button variant="secondary" size="sm"
-                      className="bg-white/90 text-foreground hover:bg-white border-0"
-                      onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-4 h-4 mr-1" />เปลี่ยนรูป
-                    </Button>
-                    <Button variant="secondary" size="sm"
-                      className="bg-white/90 text-foreground hover:bg-white border-0"
-                      onClick={openPicker}>
-                      <Images className="w-4 h-4 mr-1" />เลือกจาก Bucket
-                    </Button>
+                <div className="space-y-2">
+                  <div className="group relative w-full aspect-[2.5/1] overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-sm">
+                    <img
+                      src={pendingImageUrl}
+                      alt="preview"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-[2px] transition-opacity duration-200 flex items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-xl bg-white/95 px-3 text-xs font-medium text-stone-900 shadow-md hover:bg-white active:scale-95 transition-all"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        เปลี่ยนรูป
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-xl bg-white/95 px-3 text-xs font-medium text-stone-900 shadow-md hover:bg-white active:scale-95 transition-all"
+                        onClick={openPicker}
+                      >
+                        <Images className="w-3.5 h-3.5" />
+                        เลือกจาก Bucket
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="h-8 gap-1 rounded-xl bg-rose-600 px-3 text-xs font-medium text-white shadow-md hover:bg-rose-700 active:scale-95 transition-all"
+                        onClick={() => setPendingImageUrl('')}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        ลบ
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
-                  <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="w-full aspect-[2.5/1] border-2 border-dashed border-border/40 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-honey/50 hover:bg-honey/5 transition-colors">
-                    {uploading
-                      ? <><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /><span className="text-sm text-muted-foreground">กำลังอัปโหลด...</span></>
-                      : <><Upload className="w-7 h-7 text-muted-foreground/50" /><span className="text-sm text-muted-foreground">คลิกเพื่ออัปโหลดและครอป</span><span className="text-xs text-muted-foreground/60">ผลลัพธ์ 1200 × 480 px · บีบให้ ≤300 KB อัตโนมัติ</span></>}
-                  </button>
-                  <Button variant="outline" size="sm" className="self-end gap-1 text-xs" onClick={openPicker}>
-                    <Images className="w-3 h-3" />เลือกจาก Bucket
-                  </Button>
+                <div className="space-y-2">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={cn(
+                      'group relative flex w-full aspect-[2.5/1] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
+                      'border-border/60 bg-muted/20 hover:border-amber-500/50 hover:bg-amber-500/[0.04]',
+                      isDragging && 'border-amber-500 bg-amber-500/10 scale-[0.99]'
+                    )}
+                  >
+                    <div className="rounded-full bg-background p-3.5 shadow-sm border border-border/50 transition-transform duration-200 group-hover:scale-110">
+                      {uploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                      ) : (
+                        <ImagePlus className="h-6 w-6 text-amber-500" />
+                      )}
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                        {uploading ? 'กำลังอัปโหลดและประมวลผลภาพ...' : 'คลิกเพื่ออัปโหลดและครอปภาพ หรือลากไฟล์ภาพมาวางที่นี่'}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        ผลลัพธ์ 1200 × 480 px · บีบอัดภาพให้อัตโนมัติ (≤ 300 KB)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 rounded-xl text-xs h-8 hover:bg-muted/60"
+                      onClick={openPicker}
+                    >
+                      <Images className="w-3.5 h-3.5 text-amber-500" />
+                      เลือกจาก Bucket ที่มีอยู่
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

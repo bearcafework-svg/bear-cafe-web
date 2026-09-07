@@ -5,6 +5,7 @@ import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { GlowCard } from '@/components/ui/spotlight-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -487,7 +488,7 @@ function ServerCard({
       onMouseEnter={handleCardMouseEnter}
       onMouseLeave={handleCardMouseLeave}
     >
-      <Card
+      <GlowCard
         className={[
           'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
           isExpired ? 'opacity-90 border-red-500/30' : isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
@@ -703,7 +704,7 @@ function ServerCard({
             )}
           </div>
         </CardContent>
-      </Card>
+      </GlowCard>
     </div>
   );
 }

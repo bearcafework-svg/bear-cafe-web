@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { withRetry } from '@/lib/retry';
 import { useToast } from '@/hooks/use-toast';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -18,8 +18,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Plus, Pencil, Trash2, UserPlus, UserMinus, Key, Shield, Users, User, ChevronDown, ChevronUp,
+  Search, Check, Copy, Sparkles,
 } from 'lucide-react';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { SearchBar } from '@/components/admin/SearchBar';
+import { StackedList, type StackedMemberItem } from '@/components/ui/stacked-list';
 import { cn } from '@/lib/utils';
 
 import { ASSIGNABLE_PAGES, getPermissionGroups } from '@/lib/admin-pages';
@@ -78,9 +81,29 @@ export function PermissionsManagement() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [assignTab, setAssignTab] = useState<'current' | 'add'>('current');
 
+  // View mode
+  const [viewMode, setViewMode] = useState<'stacked' | 'cards'>('stacked');
+
   // All assigned users (for cards + grouped view)
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Array<{
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    discord_username: string | null;
+    discord_id: string | null;
+  }>>([]);
   const [expandedPermId, setExpandedPermId] = useState<string | null>(null);
+
+  // Quick user perm assignment dialog (from drawer)
+  const [userQuickDialogUser, setUserQuickDialogUser] = useState<{ id: string; username: string } | null>(null);
+  const [userQuickPermIds, setUserQuickPermIds] = useState<string[]>([]);
+  const [savingUserQuick, setSavingUserQuick] = useState(false);
+
+  // New Search & Assign Member Modal
+  const [assignMemberModalOpen, setAssignMemberModalOpen] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   const fetchPermissions = useCallback(async () => {
     try {
@@ -108,17 +131,22 @@ export function PermissionsManagement() {
 
   const fetchAssignedUsers = useCallback(async () => {
     try {
-      const { data: assignments, error: aErr } = await supabase
-        .from('user_custom_permissions')
-        .select('user_id, permission_id');
+      const [{ data: assignments, error: aErr }, { data: profiles, error: pErr }] = await Promise.all([
+        supabase.from('user_custom_permissions').select('user_id, permission_id'),
+        supabase.from('profiles').select('id, username, avatar_url, discord_username, discord_id').order('username'),
+      ]);
       if (aErr) throw aErr;
-      if (!assignments || assignments.length === 0) { setAssignedUsers([]); return; }
-      const userIds = [...new Set(assignments.map(a => a.user_id))];
-      const { data: profiles, error: pErr } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', userIds);
       if (pErr) throw pErr;
+
+      if (profiles) {
+        setAllProfiles(profiles as any);
+      }
+
+      if (!assignments || assignments.length === 0) {
+        setAssignedUsers([]);
+        return;
+      }
+
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
       setAssignedUsers(assignments.map(a => {
         const p = profileMap.get(a.user_id);
@@ -135,6 +163,36 @@ export function PermissionsManagement() {
   }, []);
 
   useEffect(() => { fetchAssignedUsers(); }, [fetchAssignedUsers]);
+
+  function openUserQuickPermDialog(u: { id: string; username: string }, currentPermIds: string[]) {
+    setUserQuickDialogUser(u);
+    setUserQuickPermIds(currentPermIds);
+  }
+
+  async function handleSaveUserQuickPerms() {
+    if (!userQuickDialogUser) return;
+    setSavingUserQuick(true);
+    try {
+      await supabase.from('user_custom_permissions').delete().eq('user_id', userQuickDialogUser.id);
+      if (userQuickPermIds.length > 0) {
+        const { error } = await supabase.from('user_custom_permissions').insert(
+          userQuickPermIds.map(pid => ({
+            user_id: userQuickDialogUser.id,
+            permission_id: pid,
+            assigned_by: user?.id,
+          }))
+        );
+        if (error) throw error;
+      }
+      toast({ title: 'อัปเดตสิทธิ์สมาชิกเรียบร้อยแล้ว' });
+      setUserQuickDialogUser(null);
+      fetchAssignedUsers();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingUserQuick(false);
+    }
+  }
 
   function openCreateDialog() {
     setEditingPermission(null);
@@ -292,26 +350,195 @@ export function PermissionsManagement() {
 
   const groups = [...new Set(PAGE_OPTIONS.map(p => p.group))];
 
+  // Map to StackedMemberItem for StackedList (Grouped by user so users with multiple permissions don't duplicate!)
+  const activeStackedMembers = useMemo<StackedMemberItem[]>(() => {
+    const userMap = new Map<string, {
+      userId: string;
+      username: string;
+      avatar_url: string | null;
+      perms: CustomPermission[];
+    }>();
+
+    assignedUsers.forEach(a => {
+      const perm = permissions.find(p => p.id === a.permission_id);
+      if (!userMap.has(a.user_id)) {
+        userMap.set(a.user_id, {
+          userId: a.user_id,
+          username: a.username,
+          avatar_url: a.avatar_url,
+          perms: perm ? [perm] : [],
+        });
+      } else if (perm) {
+        userMap.get(a.user_id)!.perms.push(perm);
+      }
+    });
+
+    return Array.from(userMap.values()).map(item => {
+      const profile = allProfiles.find(p => p.id === item.userId);
+      const primaryPerm = item.perms[0];
+      return {
+        id: item.userId,
+        name: item.username,
+        avatar: item.avatar_url,
+        roleName: item.perms.map(p => p.name).join(', '),
+        roleColor: primaryPerm?.color || '#f59e0b',
+        discordUsername: profile?.discord_username || undefined,
+        subtext: item.perms.length === 1
+          ? (primaryPerm?.description || `${primaryPerm?.allowed_pages.length || 0} หน้าที่ได้รับอนุญาต`)
+          : `ได้รับสิทธิ์กำหนดเองทั้งหมด ${item.perms.length} สิทธิ์`,
+        online: true,
+        badgeContent: (
+          <div className="flex flex-wrap gap-1 max-w-[220px] justify-end">
+            {item.perms.map(p => {
+              const color = p.color || '#f59e0b';
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border shrink-0 transition-colors shadow-xs"
+                  style={{
+                    backgroundColor: `${color}18`,
+                    color: color,
+                    borderColor: `${color}40`,
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="truncate max-w-[90px]">{p.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        ),
+        data: { user: profile || { id: item.userId, username: item.username }, perms: item.perms },
+        onAction: () => {
+          openUserQuickPermDialog({ id: item.userId, username: item.username }, item.perms.map(p => p.id));
+        },
+      };
+    });
+  }, [assignedUsers, permissions, allProfiles]);
+
+  const allStackedMembers = useMemo<StackedMemberItem[]>(() => {
+    return allProfiles.map(p => {
+      const userAssignments = assignedUsers.filter(a => a.user_id === p.id);
+      const userPerms = userAssignments
+        .map(a => permissions.find(perm => perm.id === a.permission_id))
+        .filter(Boolean) as CustomPermission[];
+
+      const hasPerms = userPerms.length > 0;
+      const primaryPerm = userPerms[0];
+
+      return {
+        id: p.id,
+        name: p.username || 'ไม่ระบุชื่อ',
+        avatar: p.avatar_url,
+        discordUsername: p.discord_username || undefined,
+        roleName: hasPerms ? userPerms.map(up => up.name).join(', ') : 'ผู้ใช้ทั่วไป',
+        roleColor: hasPerms ? (primaryPerm?.color || '#f59e0b') : '#78716c',
+        subtext: p.discord_id ? `Discord ID: ${p.discord_id}` : (hasPerms ? 'มีสิทธิ์กำหนดเอง' : 'ยังไม่มีสิทธิ์พิเศษ'),
+        online: hasPerms,
+        data: { user: p, userPerms },
+        onAction: () => {
+          openUserQuickPermDialog(p, userPerms.map(up => up.id));
+        },
+      };
+    });
+  }, [allProfiles, assignedUsers, permissions]);
+
+  // Filtered members for Assign Member Modal
+  const searchedMembersForAssignment = useMemo(() => {
+    const q = memberSearchTerm.toLowerCase().trim();
+    if (!q) {
+      const activeIds = new Set(assignedUsers.map(a => a.user_id));
+      const withPerms = allProfiles.filter(p => activeIds.has(p.id));
+      const withoutPerms = allProfiles.filter(p => !activeIds.has(p.id)).slice(0, 15 - Math.min(15, withPerms.length));
+      return [...withPerms, ...withoutPerms];
+    }
+    return allProfiles
+      .filter(p =>
+        (p.username ?? '').toLowerCase().includes(q) ||
+        (p.discord_id ?? '').includes(q) ||
+        ((p as any).discord_username ?? '').toLowerCase().includes(q)
+      )
+      .slice(0, 25);
+  }, [allProfiles, assignedUsers, memberSearchTerm]);
+
   return (
     <div className="space-y-6">
       {/* ─── Custom Permissions Section ─── */}
       <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
+        {/* Header with View Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-2">
             <Key className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold">สิทธิ์กำหนดเอง</h2>
             <Badge variant="secondary">{permissions.length}</Badge>
           </div>
-          <Button onClick={openCreateDialog} size="sm" className="gap-1.5">
-            <Plus className="w-4 h-4" />
-            สร้างสิทธิ์ใหม่
-          </Button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-muted/60 p-1 rounded-2xl border border-border/60">
+              <button
+                type="button"
+                onClick={() => setViewMode('stacked')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer',
+                  viewMode === 'stacked'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Users className="w-3.5 h-3.5" />
+                ทำเนียบสมาชิก (Stacked List)
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer',
+                  viewMode === 'cards'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                การ์ดบทบาทสิทธิ์ ({permissions.length})
+              </button>
+            </div>
+
+            <Button
+              onClick={() => { setAssignMemberModalOpen(true); setMemberSearchTerm(''); }}
+              size="sm"
+              variant="outline"
+              className="gap-1.5 rounded-xl border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 font-semibold cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-amber-500" />
+              มอบหมายสิทธิ์ให้สมาชิก
+            </Button>
+
+            <Button onClick={openCreateDialog} size="sm" className="gap-1.5 rounded-xl cursor-pointer">
+              <Plus className="w-4 h-4" />
+              สร้างสิทธิ์ใหม่
+            </Button>
+          </div>
         </div>
 
-        {/* Permissions list */}
+        {/* Content based on view mode */}
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">กำลังโหลด...</div>
+          <div className="text-center py-12 text-muted-foreground text-sm">กำลังโหลด...</div>
+        ) : viewMode === 'stacked' ? (
+          <StackedList
+            title="สมาชิกที่ได้รับสิทธิ์พิเศษ"
+            subtitle="สมาชิกที่มีบทบาทและสิทธิ์กำหนดเองในระบบ"
+            drawerTitle="รายชื่อสมาชิกทั้งหมด"
+            drawerSubtitle="คลิกที่สมาชิกเพื่อจัดการหรือมอบหมายสิทธิ์"
+            activeMembers={activeStackedMembers}
+            allMembers={allStackedMembers}
+            onAddClick={() => { setAssignMemberModalOpen(true); setMemberSearchTerm(''); }}
+            onMemberClick={member => {
+              if (member.onAction) member.onAction();
+            }}
+            emptyActiveText="ยังไม่มีสมาชิกที่ได้รับสิทธิ์พิเศษในระบบ"
+            emptyDrawerText="ไม่พบข้อมูลสมาชิกในระบบ"
+          />
         ) : permissions.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -341,6 +568,26 @@ export function PermissionsManagement() {
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{perm.description}</p>
                         )}
                       </div>
+                      <DropdownMenu
+                        options={[
+                          {
+                            label: "จัดการผู้ใช้",
+                            onClick: () => openAssignDialog(perm),
+                            Icon: <UserPlus className="h-3.5 w-3.5" />,
+                          },
+                          {
+                            label: "แก้ไขสิทธิ์",
+                            onClick: () => openEditDialog(perm),
+                            Icon: <Pencil className="h-3.5 w-3.5" />,
+                          },
+                          {
+                            label: "ลบสิทธิ์",
+                            onClick: () => setDeleteTarget(perm),
+                            Icon: <Trash2 className="h-3.5 w-3.5" />,
+                            variant: "destructive",
+                          },
+                        ]}
+                      />
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-3 pt-0">
@@ -399,23 +646,8 @@ export function PermissionsManagement() {
                       </div>
                     )}
                     {members.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground mb-3">ยังไม่มีสมาชิก</p>
+                      <p className="text-[10px] text-muted-foreground">ยังไม่มีสมาชิก</p>
                     )}
-
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => openAssignDialog(perm)}>
-                        <UserPlus className="w-3.5 h-3.5" />
-                        จัดการผู้ใช้
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => openEditDialog(perm)}>
-                        <Pencil className="w-3.5 h-3.5" />
-                        แก้ไข
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(perm)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                        ลบ
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );
@@ -619,6 +851,187 @@ export function PermissionsManagement() {
               })()}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Quick Member Permissions Dialog */}
+      <Dialog open={!!userQuickDialogUser} onOpenChange={open => { if (!open) setUserQuickDialogUser(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-primary" />
+              จัดการสิทธิ์ — {userQuickDialogUser?.username}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            {permissions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">ยังไม่มีสิทธิ์กำหนดเองในระบบ</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {permissions.map(perm => {
+                  const checked = userQuickPermIds.includes(perm.id);
+                  return (
+                    <label
+                      key={perm.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-border/50 hover:bg-muted/40 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: perm.color || '#f59e0b' }} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{perm.name}</p>
+                          {perm.description && (
+                            <p className="text-[10px] text-muted-foreground truncate">{perm.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => {
+                          setUserQuickPermIds(prev =>
+                            prev.includes(perm.id) ? prev.filter(id => id !== perm.id) : [...prev, perm.id]
+                          );
+                        }}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setUserQuickDialogUser(null)}>
+              ยกเลิก
+            </Button>
+            <Button size="sm" onClick={handleSaveUserQuickPerms} disabled={savingUserQuick}>
+              {savingUserQuick ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Search & Assign Member Modal ─── */}
+      <Dialog open={assignMemberModalOpen} onOpenChange={setAssignMemberModalOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-3xl p-6 bg-[#FAF6F0] dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] shadow-2xl">
+          <DialogHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2420]">
+            <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-amber-500" /> มอบหมายสิทธิ์ให้สมาชิก
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              ค้นหาสมาชิกจากชื่อ หรือ Discord ID เพื่อเลือกมอบหมายหรือปรับเปลี่ยนสิทธิ์
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Search Bar */}
+          <div className="relative my-3">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="ค้นหาด้วยชื่อผู้ใช้, @discord หรือ Discord ID..."
+              value={memberSearchTerm}
+              onChange={e => setMemberSearchTerm(e.target.value)}
+              className="h-10 pl-10 pr-4 rounded-xl border-[#EAD8C8] dark:border-[#2D2420] bg-white dark:bg-[#14100E] text-xs"
+              autoFocus
+            />
+          </div>
+
+          {/* Members Results List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[50vh] [scrollbar-width:thin]">
+            {searchedMembersForAssignment.length === 0 ? (
+              <div className="py-12 text-center text-xs text-muted-foreground border border-dashed border-[#EAD8C8] dark:border-[#2D2420] rounded-2xl">
+                ไม่พบสมาชิกที่ตรงกับ "{memberSearchTerm}"
+              </div>
+            ) : (
+              searchedMembersForAssignment.map(p => {
+                const userAssignments = assignedUsers.filter(a => a.user_id === p.id);
+                const userPerms = userAssignments
+                  .map(a => permissions.find(perm => perm.id === a.permission_id))
+                  .filter(Boolean) as CustomPermission[];
+
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#EAD8C8]/80 dark:border-[#2D2420] bg-white dark:bg-[#15110E] hover:border-amber-500/40 hover:bg-amber-500/5 transition-all cursor-pointer"
+                    onClick={() => {
+                      setAssignMemberModalOpen(false);
+                      openUserQuickPermDialog(p, userPerms.map(up => up.id));
+                    }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="relative shrink-0">
+                        {p.avatar_url ? (
+                          <img src={p.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover ring-1 ring-border" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+                            {(p.username || 'U').slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        {userPerms.length > 0 && (
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-foreground truncate">{p.username}</span>
+                          {p.discord_username && (
+                            <span className="text-[10px] text-muted-foreground truncate">@{p.discord_username}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground font-mono truncate">{p.discord_id || p.id}</span>
+                        </div>
+
+                        {/* Current Permissions Tags */}
+                        {userPerms.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {userPerms.map(up => (
+                              <Badge
+                                key={up.id}
+                                variant="outline"
+                                className="text-[9px] px-1.5 py-0 rounded-md font-semibold"
+                                style={{
+                                  backgroundColor: `${up.color || '#f59e0b'}15`,
+                                  color: up.color || '#f59e0b',
+                                  borderColor: `${up.color || '#f59e0b'}35`,
+                                }}
+                              >
+                                {up.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">ยังไม่มีสิทธิ์พิเศษ</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3 rounded-xl text-xs font-semibold gap-1 shrink-0 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAssignMemberModalOpen(false);
+                        openUserQuickPermDialog(p, userPerms.map(up => up.id));
+                      }}
+                    >
+                      <Key className="w-3.5 h-3.5 text-amber-500" />
+                      {userPerms.length > 0 ? 'ปรับสิทธิ์' : 'มอบสิทธิ์'}
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-[#EAD8C8]/60 dark:border-[#2D2420]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAssignMemberModalOpen(false)}
+              className="rounded-xl text-xs cursor-pointer"
+            >
+              ปิดหน้าต่าง
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -23,9 +23,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Badge } from '@/components/ui/badge';
 import {
   Plus, Trash2, Edit, Loader2, ArrowUp, ArrowDown, ExternalLink,
@@ -96,6 +94,27 @@ const DELIVERY_MODE_META: Record<DeliveryMode, { label: string; desc: string; co
   random_one: { label: 'สุ่ม 1 ชิ้น',  desc: 'สุ่มแสดง 1 ชิ้นจาก session_ads ทั้งหมดที่ active', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
   ordered:    { label: 'เรียงลำดับ',   desc: 'แสดงชิ้นแรกจากรายการที่ assign ไว้ตาม sort_order',  color: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400' },
 };
+
+const DELIVERY_MODE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'mode-random-one',
+    label: 'สุ่ม 1 ชิ้น (Random One)',
+    value: 'random_one',
+    description: 'สุ่มแสดง 1 ชิ้นจากโฆษณาทั้งหมดที่เปิดใช้งานอยู่ เหมาะสำหรับกระจายยอดการมองเห็น',
+    icon: '🎲',
+    badge: 'สุ่มแสดงผล',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'mode-ordered',
+    label: 'เรียงตามลำดับ (Ordered)',
+    value: 'ordered',
+    description: 'แสดงชิ้นแรกจากรายการที่มอบหมายไว้ตามลำดับการจัดเรียง (Priority / Sort Order)',
+    icon: '🔢',
+    badge: 'ตามลำดับ',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+];
 
 // ── DeliveryModeBadge ──────────────────────────────────────────────────────────
 function DeliveryModeBadge({ mode }: { mode: DeliveryMode }) {
@@ -707,24 +726,14 @@ export function AdPlacementsManagement() {
             </div>
 
             {/* delivery_mode */}
-            <div className="space-y-2">
-              <Label>โหมดการแสดงผล</Label>
-              <Select value={form.delivery_mode}
-                onValueChange={v => setForm(prev => ({ ...prev, delivery_mode: v as DeliveryMode }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(DELIVERY_MODE_META) as [DeliveryMode, typeof DELIVERY_MODE_META['all']][]).map(([mode, meta]) => (
-                    <SelectItem key={mode} value={mode}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{meta.label}</span>
-                        <span className="text-xs text-muted-foreground">{meta.desc}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-1.5">
+              <RichSelect
+                label="โหมดการแสดงผล (Delivery Mode)"
+                value={form.delivery_mode}
+                onValueChange={v => setForm(prev => ({ ...prev, delivery_mode: v as DeliveryMode }))}
+                data={DELIVERY_MODE_RICH_OPTIONS}
+                placeholder="เลือกโหมดการแสดงผล..."
+              />
             </div>
 
             {/* is_active */}

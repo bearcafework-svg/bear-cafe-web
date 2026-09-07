@@ -15,13 +15,15 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Package, RefreshCw, Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShoppingBag,
-  ArrowUp, ArrowDown, Search, ChevronLeft, ChevronRight
+  ArrowUp, ArrowDown, Search, ChevronLeft, ChevronRight, Copy
 } from 'lucide-react';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 
@@ -61,6 +63,54 @@ const ALL_PRODUCT_TYPES: ProductType[] = [
   'rental',
   'promo_package',
   'other',
+];
+
+const PRODUCT_TYPE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'pt-class-role',
+    label: 'ยศคลาส',
+    value: 'class_role',
+    description: 'ยศประจำสายอาชีพและระดับสมาชิกในคาเฟ่',
+    icon: '🛡️',
+    badge: 'สายอาชีพ',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'pt-decoration-role',
+    label: 'ยศตกแต่ง',
+    value: 'decoration_role',
+    description: 'ยศเสริมความสวยงาม สีสัน หรือสัญลักษณ์พิเศษบนโปรไฟล์',
+    icon: '✨',
+    badge: 'ความสวยงาม',
+    badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25',
+  },
+  {
+    id: 'pt-rental',
+    label: 'เช่าห้อง / บ้าน',
+    value: 'rental',
+    description: 'สัญญาเช่าห้องแชทส่วนตัว บ้านพัก หรือพื้นที่เฉพาะกลุ่ม',
+    icon: '🏠',
+    badge: 'สัญญาเช่า',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'pt-promo-package',
+    label: 'แพ็กเกจโปรโมท',
+    value: 'promo_package',
+    description: 'บริการลงโฆษณา แบนเนอร์ หรือประชาสัมพันธ์ในเซิร์ฟเวอร์',
+    icon: '📢',
+    badge: 'การตลาด',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+  {
+    id: 'pt-other',
+    label: 'อื่นๆ',
+    value: 'other',
+    description: 'สินค้าหรือบริการพิเศษอื่นๆ ที่ไม่ได้จัดอยู่ในหมวดข้างต้น',
+    icon: '📦',
+    badge: 'ทั่วไป',
+    badgeColor: 'bg-stone-500/10 text-stone-600 dark:text-stone-400 border-stone-500/25',
+  },
 ];
 
 // ─── Blank form state ───────────────────────────────────────────────────────
@@ -168,6 +218,19 @@ export function ProductCatalogManagement() {
     setEditTarget(product);
     setForm({
       display_name: product.display_name,
+      role_id: product.role_id ?? '',
+      product_type: product.product_type,
+      current_price: product.current_price != null ? String(product.current_price) : '',
+      is_purchasable: product.is_purchasable,
+      is_active: product.is_active,
+    });
+    setDialogOpen(true);
+  }
+
+  function openDuplicate(product: ProductCatalogRow) {
+    setEditTarget(null);
+    setForm({
+      display_name: `${product.display_name} (สำเนา)`,
       role_id: product.role_id ?? '',
       product_type: product.product_type,
       current_price: product.current_price != null ? String(product.current_price) : '',
@@ -537,23 +600,27 @@ export function ProductCatalogManagement() {
                           </TableCell>
 
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEdit(product)}
-                                aria-label="แก้ไข"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeleteTarget(product)}
-                                aria-label="ลบ"
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
+                            <div className="flex justify-end">
+                              <DropdownMenu
+                                options={[
+                                  {
+                                    label: "แก้ไข",
+                                    onClick: () => openEdit(product),
+                                    Icon: <Pencil className="h-3.5 w-3.5" />,
+                                  },
+                                  {
+                                    label: "ทำซ้ำ (Duplicate)",
+                                    onClick: () => openDuplicate(product),
+                                    Icon: <Copy className="h-3.5 w-3.5" />,
+                                  },
+                                  {
+                                    label: "ลบสินค้า",
+                                    onClick: () => setDeleteTarget(product),
+                                    Icon: <Trash2 className="h-3.5 w-3.5" />,
+                                    variant: "destructive",
+                                  },
+                                ]}
+                              />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -622,20 +689,14 @@ export function ProductCatalogManagement() {
 
             {/* product_type */}
             <div className="space-y-1.5">
-              <Label>ประเภทสินค้า</Label>
-              <Select
+              <Label className="text-xs font-semibold">ประเภทสินค้า</Label>
+              <RichSelect
+                data={PRODUCT_TYPE_RICH_OPTIONS}
                 value={form.product_type}
                 onValueChange={(v) => setForm({ ...form, product_type: v as ProductType })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_PRODUCT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{PRODUCT_TYPE_LABELS[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="เลือกประเภทสินค้า..."
+                triggerClassName="h-10 rounded-xl"
+              />
             </div>
 
             {/* role_id */}

@@ -102,7 +102,7 @@ Deno.serve(async (req): Promise<Response> => {
                 {
                   type: 2, // Button
                   style: 5, // Link
-                  label: "︲เช็คยอดโดเนทของคุณ",
+                  label: "︲เช็กยอดโดเนทของคุณ",
                   emoji: { id: "1256669436350562355", name: "bee20000", animated: false },
                   url: "https://discord.com/channels/1144251788493602848/1508608796967305216",
                 },

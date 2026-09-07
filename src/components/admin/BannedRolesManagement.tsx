@@ -32,14 +32,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { readRoleBanPayload } from '@/lib/role-ban';
@@ -323,6 +317,27 @@ export function BannedRolesManagement() {
     (dr) => !bannedRoles.some((br) => br.discord_role_id === dr.id)
   );
 
+  const roleRichOptions = React.useMemo<RichSelectItem[]>(() => {
+    return availableRoles.map((role) => ({
+      id: role.id,
+      label: role.name,
+      value: role.id,
+      icon: role.icon ? (
+        <img src={role.icon} alt="" className="w-5 h-5 rounded-md object-cover shrink-0" />
+      ) : role.color ? (
+        <div
+          className="w-4 h-4 rounded-full shrink-0 border border-border/40 shadow-xs"
+          style={{ backgroundColor: role.color }}
+        />
+      ) : (
+        <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+      ),
+      description: `Discord Role ID: ${role.id}`,
+      badge: 'Discord Role',
+      badgeColor: 'bg-destructive/10 text-destructive border-destructive/20',
+    }));
+  }, [availableRoles]);
+
   return (
     <>
       <Card className="admin-card">
@@ -456,51 +471,23 @@ export function BannedRolesManagement() {
             {/* Discord Role Selector */}
             <div className="space-y-2">
               <Label>เลือก Role จาก Discord</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={formData.discord_role_id}
-                  onValueChange={handleRoleSelect}
-                  disabled={loadingDiscordRoles}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder={loadingDiscordRoles ? 'กำลังโหลด...' : 'เลือก Role'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRoles.length === 0 ? (
-                      <div className="py-6 text-center text-sm text-muted-foreground">
-                        {loadingDiscordRoles ? 'กำลังโหลด...' : 'ไม่มี Role ให้เลือก'}
-                      </div>
-                    ) : (
-                      availableRoles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          <div className="flex items-center gap-2">
-                            {role.icon ? (
-                              <img
-                                src={role.icon}
-                                alt=""
-                                className="w-4 h-4 rounded-sm object-cover shrink-0"
-                              />
-                            ) : role.color ? (
-                              <div
-                                className="w-3 h-3 rounded-full shrink-0 border border-border/40"
-                                style={{ backgroundColor: role.color }}
-                              />
-                            ) : (
-                              <Shield className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            )}
-                            <span>{role.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+              <div className="flex gap-2 items-start">
+                <div className="flex-1 min-w-0">
+                  <RichSelect
+                    value={formData.discord_role_id}
+                    onValueChange={handleRoleSelect}
+                    disabled={loadingDiscordRoles}
+                    data={roleRichOptions}
+                    placeholder={loadingDiscordRoles ? 'กำลังโหลด Roles จาก Discord...' : 'เลือก Role ที่ต้องการแบน...'}
+                  />
+                </div>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={fetchDiscordRoles}
                   disabled={loadingDiscordRoles}
                   title="รีเฟรช Roles"
+                  className="h-10 w-10 shrink-0 rounded-xl"
                 >
                   {loadingDiscordRoles ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

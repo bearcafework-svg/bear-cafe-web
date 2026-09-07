@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireRoleBanGuard } from "../_shared/role-ban.ts";
-import { getGuildRoles } from "../_shared/guild-roles-cache.ts";
+import { getGuildRoles, clearGuildRolesCache } from "../_shared/guild-roles-cache.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,11 +85,10 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     // Check if user has page access
-    // Allow: owner, admin, anyone with 'roles' OR 'contracts' page permission
-    // (contracts admins need discord roles for personal_role contract creation)
+    // Allow: owner, admin, anyone with 'roles', 'contracts', 'non-transferable-roles' OR 'roles-to-delete' page permission
     const { data: hasAccess } = await adminClient.rpc('has_any_page_access', {
       _user_id: profile.id,
-      _pages: ['roles', 'contracts'],
+      _pages: ['roles', 'contracts', 'non-transferable-roles', 'roles-to-delete'],
     });
 
     if (!hasAccess) {
@@ -97,6 +96,16 @@ Deno.serve(async (req): Promise<Response> => {
         JSON.stringify({ error: 'Access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Check optional body for refresh flag
+    let requestBody: any = {};
+    if (req.method === 'POST') {
+      try {
+        requestBody = await req.json();
+      } catch {
+        requestBody = {};
+      }
     }
 
     // Fetch roles from Discord API
@@ -108,6 +117,10 @@ Deno.serve(async (req): Promise<Response> => {
         JSON.stringify({ error: 'Discord configuration missing' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (requestBody?.refresh === true) {
+      clearGuildRolesCache(guildId);
     }
 
     let roles: DiscordRole[];
@@ -142,10 +155,13 @@ Deno.serve(async (req): Promise<Response> => {
         };
       });
 
-    console.log(`Fetched ${filteredRoles.length} roles from Discord`);
+    console.log(`Fetched ${filteredRoles.length} roles (total: ${roles.length}) from Discord`);
 
     return new Response(
-      JSON.stringify({ roles: filteredRoles }),
+      JSON.stringify({
+        roles: filteredRoles,
+        all_role_ids: roles.map(role => role.id),
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

@@ -13,16 +13,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { useToast } from '@/hooks/use-toast';
 import {
   Copy, Edit, Check, ChevronsUpDown, Loader2, Plus, Power, Search, Trash2,
   ChevronLeft, ChevronRight, Pencil, RotateCcw, MinusCircle, PlusCircle,
 } from 'lucide-react';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { supabase } from '@/integrations/supabase/client';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
@@ -79,6 +78,83 @@ const defaultForm: FormState = {
   code: '', rewardType: 'points', points: '0', roleId: '',
   startAt: '', endAt: '', maxUses: '0', enabled: true,
 };
+
+const REWARD_TYPE_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'reward-points',
+    label: 'แต้มสะสม (Points)',
+    value: 'points',
+    description: 'มอบแต้มสะสมสำหรับใช้แลกซื้อไอเทมหรือบริการในคาเฟ่',
+    icon: '🪙',
+    badge: 'แต้มคาเฟ่',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'reward-role',
+    label: 'ยศ Discord (Role)',
+    value: 'role',
+    description: 'มอบบทบาทยศพิเศษในเซิร์ฟเวอร์ Discord ให้ผู้ใช้งานทันที',
+    icon: '🛡️',
+    badge: 'ยศดิสคอร์ด',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'reward-both',
+    label: 'แต้มสะสม + ยศ Discord (Both)',
+    value: 'both',
+    description: 'มอบทั้งแต้มสะสมและยศพิเศษในเซิร์ฟเวอร์พร้อมกันในการแลกครั้งเดียว',
+    icon: '🎁',
+    badge: 'แพ็กเกจรวม',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+];
+
+const STATUS_FILTER_RICH_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'status-all',
+    label: 'สถานะทั้งหมด',
+    value: 'all',
+    description: 'แสดงโค้ดแลกรับทุกสถานะในระบบ',
+    icon: '📋',
+    badge: 'ทั้งหมด',
+  },
+  {
+    id: 'status-enabled',
+    label: 'เปิดใช้งาน',
+    value: 'enabled',
+    description: 'โค้ดที่สามารถใช้งานแลกรับของรางวัลได้ในขณะนี้',
+    icon: '🟢',
+    badge: 'เปิดใช้งาน',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+  {
+    id: 'status-disabled',
+    label: 'ปิดใช้งาน',
+    value: 'disabled',
+    description: 'โค้ดที่ถูกปิดพักการใช้งานชั่วคราว',
+    icon: '🔴',
+    badge: 'ปิดใช้งาน',
+    badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25',
+  },
+  {
+    id: 'status-not-started',
+    label: 'ยังไม่เริ่ม',
+    value: 'not_started',
+    description: 'โค้ดที่มีกำหนดการเริ่มในอนาคต ยังไม่ถึงเวลาใช้งาน',
+    icon: '⏳',
+    badge: 'ยังไม่เริ่ม',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'status-expired',
+    label: 'หมดอายุ',
+    value: 'expired',
+    description: 'โค้ดที่สิ้นสุดช่วงเวลาการใช้งานแล้ว',
+    icon: '⌛',
+    badge: 'หมดอายุ',
+    badgeColor: 'bg-stone-500/10 text-stone-500 dark:text-stone-400 border-stone-500/25',
+  },
+];
 
 const ITEMS_PER_PAGE = 20;
 
@@ -282,17 +358,13 @@ function CodesTab() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="ค้นหาโค้ด" className="w-full lg:max-w-xs" />
-            <div className="w-full lg:w-60">
-              <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-                <SelectTrigger><SelectValue placeholder="กรองสถานะ" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="enabled">เปิดใช้งาน</SelectItem>
-                  <SelectItem value="disabled">ปิดใช้งาน</SelectItem>
-                  <SelectItem value="not_started">ยังไม่เริ่ม</SelectItem>
-                  <SelectItem value="expired">หมดอายุ</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="w-full lg:w-64">
+              <RichSelect
+                value={statusFilter}
+                onValueChange={v => setStatusFilter(v as StatusFilter)}
+                data={STATUS_FILTER_RICH_OPTIONS}
+                placeholder="กรองสถานะ"
+              />
             </div>
           </div>
 
@@ -331,10 +403,40 @@ function CodesTab() {
                       <TableCell>{`${c.used_count ?? 0} / ${c.max_uses === 0 || !c.max_uses ? '∞' : c.max_uses}`}</TableCell>
                       <TableCell><Badge variant={variant} className={badgeClass}>{getStatusLabel(status)}</Badge></TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(c)}><Edit className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleToggle(c)} disabled={actionCode === c.code}><Power className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setPendingDeleteCode(c); setDeleteDialogOpen(true); }} disabled={actionCode === c.code}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        <div className="flex justify-end">
+                          <DropdownMenu
+                            options={[
+                              {
+                                label: "คัดลอกโค้ด",
+                                onClick: () => {
+                                  navigator.clipboard.writeText(c.code);
+                                  toast({ title: 'คัดลอกโค้ดแล้ว' });
+                                },
+                                Icon: <Copy className="h-3.5 w-3.5" />,
+                              },
+                              {
+                                label: "แก้ไข",
+                                onClick: () => handleOpenEdit(c),
+                                Icon: <Edit className="h-3.5 w-3.5" />,
+                              },
+                              {
+                                label: c.is_active ? "พักการใช้งาน" : "เปิดใช้งาน",
+                                onClick: () => handleToggle(c),
+                                Icon: <Power className="h-3.5 w-3.5" />,
+                                disabled: actionCode === c.code,
+                              },
+                              {
+                                label: "ลบโค้ด",
+                                onClick: () => {
+                                  setPendingDeleteCode(c);
+                                  setDeleteDialogOpen(true);
+                                },
+                                Icon: <Trash2 className="h-3.5 w-3.5" />,
+                                variant: "destructive",
+                                disabled: actionCode === c.code,
+                              },
+                            ]}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -358,16 +460,14 @@ function CodesTab() {
               <Label>Code</Label>
               <Input value={formState.code} onChange={e => setFormState(p => ({ ...p, code: e.target.value }))} placeholder="WELCOME2026" disabled={!!editingCode} />
             </div>
-            <div className="space-y-2">
-              <Label>Reward Type</Label>
-              <Select value={formState.rewardType} onValueChange={v => setFormState(p => ({ ...p, rewardType: v as RewardType }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="points">points</SelectItem>
-                  <SelectItem value="role">role</SelectItem>
-                  <SelectItem value="both">both</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-1.5">
+              <RichSelect
+                label="ประเภทของรางวัล (Reward Type)"
+                value={formState.rewardType}
+                onValueChange={v => setFormState(p => ({ ...p, rewardType: v as RewardType }))}
+                data={REWARD_TYPE_RICH_OPTIONS}
+                placeholder="เลือกประเภทรางวัล..."
+              />
             </div>
             {(formState.rewardType === 'points' || formState.rewardType === 'both') && (
               <div className="space-y-2">

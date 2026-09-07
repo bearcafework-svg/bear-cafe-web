@@ -19,6 +19,7 @@ import {
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
+import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
     ClipboardList, Send, Settings, CheckCircle2, XCircle, Clock, AlertTriangle,
     Trash2, Eye, ShieldCheck, RefreshCw, Upload, Image as ImageIcon, Loader2, ArrowLeftRight,
@@ -109,6 +110,27 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
     const activeWeekConfig = useMemo(() => {
         return settings.weeks.find(w => currentDay >= w.start && currentDay <= w.end) || settings.weeks[0];
     }, [settings.weeks, currentDay]);
+
+    const submissionTypeRichOptions = useMemo<RichSelectItem[]>(() => [
+        {
+            id: 'sub-post',
+            label: 'โพสต์ (Post)',
+            value: 'โพสต์',
+            description: `สร้างโพสต์โปรโมทคาเฟ่ • ได้รับ ${settings.post_points} แต้ม/ชิ้น`,
+            icon: '📝',
+            badge: `${settings.post_points} แต้ม`,
+            badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        },
+        {
+            id: 'sub-comment',
+            label: 'คอมเมนต์ (Comment)',
+            value: 'คอมเมนต์',
+            description: `คอมเมนต์สร้างการมีส่วนร่วม • ได้รับ ${settings.comment_points} แต้ม/ชิ้น`,
+            icon: '💬',
+            badge: `${settings.comment_points} แต้ม`,
+            badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        },
+    ], [settings.post_points, settings.comment_points]);
 
     // Submission Form State
     const [submitForm, setSubmitForm] = useState({
@@ -749,20 +771,14 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
                                                 </p>
                                             </div>
                                         )}
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">ประเภทงานโปรโมท</Label>
-                                            <Select
+                                        <div className="space-y-1.5">
+                                            <RichSelect
+                                                label="ประเภทงานโปรโมท"
                                                 value={submitForm.type}
                                                 onValueChange={v => setSubmitForm(prev => ({ ...prev, type: v as Submission['submission_type'] }))}
-                                            >
-                                                <SelectTrigger className="h-9 border-latte/40 rounded-xl">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="โพสต์">โพสต์ (ได้รับ {settings.post_points} แต้ม/ชิ้น)</SelectItem>
-                                                    <SelectItem value="คอมเมนต์">คอมเมนต์ (ได้รับ {settings.comment_points} แต้ม/ชิ้น)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                                data={submissionTypeRichOptions}
+                                                placeholder="เลือกประเภทงาน..."
+                                            />
                                         </div>
 
                                         <div className="space-y-1">

@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BearLogoText } from '@/components/bear-cafe/BearLogo';
+import { DropdownNavigation } from '@/components/ui/dropdown-navigation';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { AdminNotificationProvider, useAdminNotification } from '@/components/admin/AdminNotificationToast';
+import { getAdminNavTree } from '@/lib/admin-navigation';
 import { withRetry } from '@/lib/retry';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -22,8 +30,9 @@ import {
 import {
   ArrowLeft, Users, User, FolderOpen, Flag, Search, Ban, Shield, ShieldCheck,
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
-  ClipboardList, AlertTriangle, ChevronRight, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
-  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin,
+  ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
+  Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
+  Copy,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -92,6 +101,7 @@ interface NavItem {
   icon: React.ElementType;
   ownerOnly?: boolean;
   group: string;
+  groupLabel?: string;
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -126,14 +136,24 @@ const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
   icon: ICON_MAP[p.id] || Settings,
   ownerOnly: p.ownerOnly,
   group: p.group,
+  groupLabel: p.groupLabel,
 }));
 
 const GROUP_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
-  moderation: { label: 'การดูแล', icon: Shield },
-  content: { label: 'เนื้อหา', icon: LayoutDashboard },
-  system: { label: 'ระบบ', icon: Settings },
+  products: { label: 'สินค้าและบริการ', icon: ShoppingCart },
+  community: { label: 'ดูแลชุมชน', icon: Shield },
+  content: { label: 'สื่อและคอนเทนต์', icon: LayoutDashboard },
+  system: { label: 'ระบบและการตั้งค่า', icon: Settings },
 };
 export default function AdminPage() {
+  return (
+    <AdminNotificationProvider>
+      <AdminPageContent />
+    </AdminNotificationProvider>
+  );
+}
+
+function AdminPageContent() {
   const navigate = useNavigate();
   const { section } = useParams<{ section?: string }>();
   const { user } = useAuth();
@@ -161,12 +181,7 @@ export default function AdminPage() {
   }, [section, activeTab]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuerySidebar, setSearchQuerySidebar] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    moderation: true,
-    content: true,
-    system: true,
-  });
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
 
   // Admin role allowed pages from site_settings
   const [adminRolePages, setAdminRolePages] = useState<string[]>([]);
@@ -215,21 +230,27 @@ export default function AdminPage() {
     }
   }, [user, hasAdminAccess, navigate, toast]);
 
-  // Filter nav items based on role + custom permissions (merged, not overridden)
-  const visibleItems = NAV_ITEMS.filter(item => {
-    if (item.id === 'overview') return true; // Always visible
-    if (isOwner) return true; // Owner sees all
-    // Merge admin role pages + custom permission pages
+  // Check permission for a specific page ID (100% compatible with custom permissions)
+  const canAccessPage = useCallback((pageId: string) => {
+    if (pageId === 'overview') return true;
+    if (isOwner) return true;
+    const pageDef = ADMIN_PAGES.find(p => p.id === pageId);
     const fromAdmin = user?.is_admin
-      ? (adminRolePages.length > 0 ? adminRolePages.includes(item.id) : !item.ownerOnly)
+      ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : !pageDef?.ownerOnly)
       : false;
-    const fromCustom = userAllowedPages.includes(item.id);
+    const fromCustom = userAllowedPages.includes(pageId);
     return fromAdmin || fromCustom;
-  });
+  }, [isOwner, user?.is_admin, adminRolePages, userAllowedPages]);
 
-  const groups = ['moderation', 'content', 'system'].filter(g =>
-    visibleItems.some(i => i.group === g && i.id !== 'overview')
-  );
+  // Dropdown Mega-Menu navigation tree with Thai categories
+  const dropdownNavTree = useMemo(() => {
+    return getAdminNavTree(canAccessPage);
+  }, [canAccessPage]);
+
+  // Filter nav items based on role + custom permissions (merged, not overridden)
+  const visibleItems = useMemo(() => {
+    return NAV_ITEMS.filter(item => canAccessPage(item.id));
+  }, [canAccessPage]);
 
   const activeItem = visibleItems.find(i => i.id === activeTab);
 
@@ -237,122 +258,12 @@ export default function AdminPage() {
     setActiveTab(id);
     localStorage.setItem('admin_active_tab', id);
     navigate(`/admin/${id}`, { replace: true });
-    if (isTabletOrMobile) setSidebarOpen(false);
+    setSidebarOpen(false);
   };
 
-  const toggleGroup = (groupKey: string) => {
-    setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
-  };
 
-  /* ─── Sidebar nav content (shared between mobile sheet & desktop) ─── */
-  const renderNav = () => {
-    const filteredNavItems = visibleItems.filter(item => {
-      if (item.id === 'overview') return false; // overview is static at the top
-      if (!searchQuerySidebar.trim()) return true;
-      return item.label.toLowerCase().includes(searchQuerySidebar.toLowerCase()) ||
-             item.id.toLowerCase().includes(searchQuerySidebar.toLowerCase());
-    });
-
-    const groupsToRender = groups.filter(g =>
-      filteredNavItems.some(i => i.group === g)
-    );
-
-    return (
-      <nav className="flex flex-col gap-1 p-2">
-        {/* Sidebar Search */}
-        <div className="px-2 mb-3 relative">
-          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-5 top-2.5" />
-          <Input
-            value={searchQuerySidebar}
-            onChange={(e) => setSearchQuerySidebar(e.target.value)}
-            placeholder="ค้นหาเมนู..."
-            className="h-8 pl-8 pr-3 text-xs bg-background/50 rounded-xl border-border/60 focus-visible:ring-primary/20"
-          />
-        </div>
-
-        {/* Static Overview Page Link */}
-        <div className="px-2 mb-3">
-          <button
-            onClick={() => handleNavClick('overview')}
-            className={cn(
-              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
-              activeTab === 'overview'
-                ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10 font-semibold'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
-            )}
-          >
-            <LayoutDashboard className={cn('w-4 h-4 shrink-0', activeTab === 'overview' && 'text-primary')} />
-            <span>ภาพรวมระบบ</span>
-            {activeTab === 'overview' && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
-          </button>
-        </div>
-
-        {/* Collapsible Groups */}
-        <div className="flex flex-col gap-1 px-1">
-          {groupsToRender.map((groupKey) => {
-            const groupInfo = GROUP_LABELS[groupKey];
-            const GroupIcon = groupInfo.icon;
-            const items = filteredNavItems.filter(i => i.group === groupKey);
-            const isExpanded = !!expandedGroups[groupKey] || !!searchQuerySidebar.trim();
-
-            return (
-              <div key={groupKey} className="mb-3">
-                <button
-                  onClick={() => toggleGroup(groupKey)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <GroupIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{groupInfo.label}</span>
-                  </div>
-                  <span className="text-[9px] text-muted-foreground/60 shrink-0">
-                    {isExpanded ? '▼' : '►'}
-                  </span>
-                </button>
-
-                {isExpanded && (
-                  <div className="mt-1 pl-1 flex flex-col gap-0.5 animate-in fade-in duration-200">
-                    {items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = activeTab === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => handleNavClick(item.id)}
-                          className={cn(
-                            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ease-out',
-                            isActive
-                              ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/20 ring-1 ring-primary/10 font-semibold'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground active:bg-muted/70'
-                          )}
-                        >
-                          <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
-                          <span className="truncate">{item.label}</span>
-                          {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </nav>
-    );
-  };
 
   /* ─── Content area ─── */
-  const canAccessPage = (pageId: string) => {
-    if (pageId === 'overview') return true;
-    if (isOwner) return true;
-    const fromAdmin = user?.is_admin
-      ? (adminRolePages.length > 0 ? adminRolePages.includes(pageId) : true)
-      : false;
-    const fromCustom = userAllowedPages.includes(pageId);
-    return fromAdmin || fromCustom;
-  };
-
   const renderContent = () => {
     try {
       switch (activeTab) {
@@ -425,13 +336,14 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gradient-to-br from-cream via-latte/30 to-peach/20 dark:from-background dark:via-background dark:to-muted/20">
       {/* ─── Header ─── */}
       <header className="border-b border-latte dark:border-border bg-cream/80 dark:bg-card/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 py-2.5 flex items-center justify-between gap-2">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate('/')}
               className="rounded-xl bg-cream/80 dark:bg-muted shadow-sm shrink-0 w-9 h-9"
+              title="กลับหน้าหลัก"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
@@ -441,99 +353,186 @@ export default function AdminPage() {
               Admin Panel
             </Badge>
           </div>
+
+          {/* 🐻☕ Dropdown Mega-Menu Navigation (Desktop) */}
+          <div className="hidden lg:flex items-center mx-2">
+            <DropdownNavigation
+              navItems={dropdownNavTree}
+              activeId={activeTab}
+              onItemClick={handleNavClick}
+            />
+          </div>
+
           <div className="flex items-center gap-2 shrink-0">
-            {/* Mobile menu toggle */}
-            {isTabletOrMobile && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="gap-1.5 text-xs"
-              >
-                {activeItem && <activeItem.icon className="w-3.5 h-3.5" />}
-                <span className="max-w-[80px] truncate">{activeItem?.label}</span>
-                <ChevronRight className={cn('w-3 h-3 transition-transform', sidebarOpen && 'rotate-90')} />
-              </Button>
+            {/* Owner Maintenance Toggle Button (Header Top-Right) */}
+            {isOwner && (
+              <Dialog open={maintenanceOpen} onOpenChange={setMaintenanceOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-9 px-3 rounded-xl gap-2 text-xs font-semibold transition-all shadow-sm border",
+                      isMaintenanceMode
+                        ? "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                        : "bg-background/80 border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                    )}
+                    title="ตั้งค่าโหมดปิดปรับปรุงระบบ"
+                  >
+                    <Wrench className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="hidden sm:inline">ปิดปรับปรุง</span>
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        isMaintenanceMode ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                      )}
+                    />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md rounded-3xl p-6">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                      <Wrench className="w-4 h-4 text-amber-500" />
+                      จัดการโหมดปิดปรับปรุงระบบ
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="pt-2">
+                    <MaintenanceToggle
+                      isEnabled={isMaintenanceMode}
+                      enabledStaff={enabledStaff}
+                      message={maintenanceMessage}
+                      onToggle={toggleMaintenanceMode}
+                      onUpdateMaintenance={updateMaintenanceMode}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-base text-primary">
+
+            {/* Theme Toggler (Dark/Light mode switch) */}
+            <AnimatedThemeToggler
+              className="h-9 w-9 rounded-xl border border-border/60 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs shrink-0"
+              title="สลับธีม (โหมดมืด / สว่าง)"
+            />
+
+            {/* User Profile */}
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-base text-primary shrink-0">
               <User className="w-4 h-4" />
             </div>
-            <span className="font-medium hidden lg:block text-sm">{user?.username}</span>
+            <span className="font-medium hidden xl:block text-sm max-w-[120px] truncate">{user?.username}</span>
+
+            {/* Mobile / Tablet Navigation Sheet */}
+            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="lg:hidden gap-1.5 text-xs h-9 px-2.5 rounded-xl border-border/60"
+                >
+                  <Menu className="w-4 h-4 text-primary" />
+                  <span className="max-w-[70px] truncate font-medium">{activeItem?.label}</span>
+                  <ChevronDown className={cn('w-3 h-3 transition-transform text-muted-foreground', sidebarOpen && 'rotate-180')} />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[85vw] sm:max-w-md p-0 flex flex-col bg-background/95 backdrop-blur-2xl border-r border-border">
+                <SheetHeader className="p-4 pb-3 border-b border-border/60 text-left">
+                  <SheetTitle className="flex items-center gap-2">
+                    <BearLogoText />
+                    <Badge className="text-[10px] bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                      เมนูจัดการ
+                    </Badge>
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                  {dropdownNavTree.map((cat) => (
+                    <div key={cat.id} className="space-y-3">
+                      <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                          {cat.label}
+                        </span>
+                      </div>
+                      {cat.subMenus?.map((sub, sIdx) => (
+                        <div key={sIdx} className="space-y-1.5 pl-1">
+                          <p className="text-[11px] font-semibold text-muted-foreground/80">{sub.title}</p>
+                          <div className="space-y-1">
+                            {sub.items.map((item) => {
+                              const Icon = item.icon;
+                              const isActive = activeTab === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    if (item.id) handleNavClick(item.id);
+                                    setSidebarOpen(false);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center gap-3 p-2.5 rounded-2xl text-left transition-all",
+                                    isActive
+                                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold"
+                                      : "hover:bg-muted/60 text-foreground"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-7 h-7 rounded-xl flex items-center justify-center shrink-0",
+                                    isActive ? "bg-amber-500 text-stone-950 shadow-sm" : "bg-muted text-muted-foreground"
+                                  )}>
+                                    <Icon className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold truncate">{item.label}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{item.description}</p>
+                                  </div>
+                                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Sheet Footer: Theme Switcher */}
+                <div className="p-3.5 border-t border-border/60 flex items-center justify-between bg-muted/20 shrink-0">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-foreground">สลับธีม</span>
+                    <span className="text-[10px] text-muted-foreground">โหมดมืด / สว่าง</span>
+                  </div>
+                  <AnimatedThemeToggler
+                    className="h-9 w-9 rounded-xl border border-border/60 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs"
+                    title="สลับธีม"
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
 
-      {/* ─── Mobile nav dropdown ─── */}
-      {isTabletOrMobile && sidebarOpen && (
-        <div className="border-b border-border bg-card/95 backdrop-blur-md animate-in slide-in-from-top-2 duration-200 z-40 relative">
-          <div className="max-h-[60vh] overflow-y-auto">
-            {renderNav()}
-          </div>
-        </div>
-      )}
-
-      {/* ─── Main layout ─── */}
-      <div className="max-w-[1600px] mx-auto flex">
-        {/* Desktop sidebar */}
-        {!isTabletOrMobile && (
-          <aside className="w-60 lg:w-64 shrink-0 border-r border-latte/60 dark:border-border bg-cream/40 dark:bg-card/40 sticky top-[53px] h-[calc(100vh-53px)] overflow-y-auto">
-            <div className="py-3">
-              {renderNav()}
-              {/* Maintenance toggle at bottom of sidebar */}
-              {isOwner && (
-                <div className="px-3 pt-4 mt-4 border-t border-border">
-                  <MaintenanceToggle
-                    isEnabled={isMaintenanceMode}
-                    enabledStaff={enabledStaff}
-                    message={maintenanceMessage}
-                    onToggle={toggleMaintenanceMode}
-                    onUpdateMaintenance={updateMaintenanceMode}
-                  />
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-
-        {/* Content */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6">
-          <div className="max-w-6xl mx-auto space-y-6">
-          {/* Mobile maintenance toggle */}
-          {isTabletOrMobile && isOwner && (
-            <div className="mb-4">
-              <MaintenanceToggle
-                isEnabled={isMaintenanceMode}
-                enabledStaff={enabledStaff}
-                message={maintenanceMessage}
-                onToggle={toggleMaintenanceMode}
-                onUpdateMaintenance={updateMaintenanceMode}
-              />
-            </div>
+      {/* ─── Main content layout (Full width, No sidebar) ─── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Page title hierarchy */}
+        <div className="flex items-center gap-3 pb-4 border-b border-border/40">
+          {activeItem && (
+            <>
+              <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
+                <activeItem.icon className="w-5 h-5 text-primary admin-icon" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-foreground leading-tight">{activeItem.label}</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {activeItem.groupLabel || GROUP_LABELS[activeItem.group]?.label}
+                </p>
+              </div>
+            </>
           )}
+        </div>
 
-          {/* Page title — improved hierarchy */}
-          <div className="flex items-center gap-3 pb-4 border-b border-border/40">
-            {activeItem && (
-              <>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
-                  <activeItem.icon className="w-5 h-5 text-primary admin-icon" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-foreground leading-tight">{activeItem.label}</h1>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {GROUP_LABELS[activeItem.group]?.label}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="animate-fade-in">
-            {renderContent()}
-          </div>
-          </div>{/* end max-w-6xl */}
-        </main>
-      </div>
+        <div className="animate-fade-in">
+          {renderContent()}
+        </div>
+      </main>
     </div>
   );
 }
@@ -774,20 +773,35 @@ function UsersManagement({ currentUser, isOwner }: UsersManagementProps) {
                         )}
                       </TableCell>
                       <TableCell className="text-right py-2.5 sm:py-3.5 px-2 sm:px-4">
-                        <div className="flex justify-end gap-1.5 sm:gap-2">
-                          {isOwner && (
-                            <>
-                              <Button variant="ghost" size="sm" onClick={() => toggleRole(u.id, 'moderator', !!u.roles?.find(r => r.role === 'moderator'))} title="ให้/ถอดสิทธิ์ Owner" disabled={u.id === currentUser?.id} className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors">
-                                <Shield className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => openPermDialog(u)} title="จัดการสิทธิ์กำหนดเอง" className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors">
-                                <Key className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                          <Button variant={u.is_banned ? 'outline' : 'ghost'} size="sm" onClick={() => toggleBan(u.id, u.is_banned)} title="แบน/ปลดแบน" disabled={u.id === currentUser?.id} className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-colors">
-                            <Ban className="w-4 h-4" />
-                          </Button>
+                        <div className="flex justify-end">
+                          <DropdownMenu
+                            options={[
+                              ...(u.discord_id ? [{
+                                label: 'คัดลอก Discord ID',
+                                icon: <Copy className="h-4 w-4" />,
+                                onClick: () => {
+                                  navigator.clipboard.writeText(u.discord_id);
+                                  toast({ title: 'คัดลอก Discord ID แล้ว' });
+                                },
+                              }] : []),
+                              ...(isOwner ? [{
+                                label: 'จัดการสิทธิ์กำหนดเอง',
+                                icon: <Key className="h-4 w-4" />,
+                                onClick: () => openPermDialog(u),
+                              }] : []),
+                              ...(isOwner && u.id !== currentUser?.id ? [{
+                                label: u.roles?.some(r => r.role === 'moderator') ? 'ถอดสิทธิ์ Owner' : 'มอบสิทธิ์ Owner',
+                                icon: <Shield className="h-4 w-4" />,
+                                onClick: () => toggleRole(u.id, 'moderator', !!u.roles?.some(r => r.role === 'moderator')),
+                              }] : []),
+                              ...(u.id !== currentUser?.id ? [{
+                                label: u.is_banned ? 'ปลดแบนผู้ใช้' : 'แบนผู้ใช้',
+                                icon: <Ban className="h-4 w-4" />,
+                                onClick: () => toggleBan(u.id, u.is_banned),
+                                destructive: !u.is_banned,
+                              }] : []),
+                            ]}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -911,6 +925,7 @@ function ReportsManagement() {
   const [baristaQuery, setBaristaQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
   const { toast } = useToast();
+  const { notify } = useAdminNotification();
   const { user } = useAuth();
 
   const normalizeUserLabel = (value?: string | null) => {
@@ -984,9 +999,14 @@ function ReportsManagement() {
       const { error } = await supabase.from('reports').update({ status, handled_at: status !== 'open' ? new Date().toISOString() : null }).eq('id', reportId);
       if (error) throw error;
       setReports(reports.map(r => r.id === reportId ? { ...r, status } : r));
+      notify.info(
+        'อัปเดตเคสรายงานแล้ว',
+        `เคสรายงานได้รับการเปลี่ยนสถานะเป็น "${statusConfig[status]?.label || status}" เรียบร้อย`
+      );
       toast({ title: 'อัปเดตสถานะแล้ว' });
     } catch (error) {
       console.error('Error updating report:', error);
+      notify.error('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตสถานะรายงานได้');
       toast({ title: 'เกิดข้อผิดพลาด', variant: 'destructive' });
     }
   }
@@ -1050,6 +1070,10 @@ function ReportsManagement() {
         };
 
         if (data?.sync_success === false) {
+          notify.error(
+            'Discord API Sync ล้มเหลว',
+            'สถานะคำขอถูกอัปเดตแล้ว แต่ส่งข้อมูล cancel ไป TagWarn ไม่สำเร็จ กรุณากด Retry'
+          );
           toast({
             title: 'อนุมัติสำเร็จ แต่ sync log หลักไม่สำเร็จ',
             description: 'สถานะคำขอถูกอัปเดตแล้ว แต่ส่งข้อมูล cancel ไป TagWarn ไม่สำเร็จ กรุณากด Retry จากหน้า Admin อีกครั้ง',
@@ -1078,13 +1102,28 @@ function ReportsManagement() {
       );
 
       if (!(status === 'approved' && updatedPayload.external_sync_status === 'failed')) {
+        if (status === 'approved') {
+          notify.success(
+            'อนุมัติคำขอยกเลิกสำเร็จ',
+            `เคส #${req.warn_sequence ?? '-'} ได้รับการอนุมัติยกเลิกประวัติเรียบร้อยแล้ว`
+          );
+        } else {
+          notify.warning(
+            'ปฏิเสธคำขอยกเลิกเคส',
+            `เคส #${req.warn_sequence ?? '-'} คำขอยกเลิกถูกปฏิเสธแล้ว`
+          );
+        }
         toast({
           title: status === 'approved' ? 'อนุมัติคำขอสำเร็จ' : 'ปฏิเสธคำขอสำเร็จ',
           description: `เคส #${req.warn_sequence ?? '-'} ถูก${status === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'}แล้ว`,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating cancel request:', error);
+      notify.error(
+        'Discord API Error',
+        error?.message || 'ไม่สามารถอัปเดตคำขอได้'
+      );
       toast({ title: 'เกิดข้อผิดพลาด', description: 'ไม่สามารถอัปเดตคำขอได้', variant: 'destructive' });
     } finally {
       setApprovingId(null);
