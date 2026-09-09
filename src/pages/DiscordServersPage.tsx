@@ -19,7 +19,7 @@ import {
   ArrowLeft, Plus, Users, Info, Loader2,
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
-  Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles,
+  Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,6 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { TagsSelector, type TagItem } from '@/components/ui/tags-selector';
 import {
   trackDiscoveryEvent,
   trackSearchIntent,
@@ -722,6 +723,8 @@ export default function DiscordServersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const [bumpingId, setBumpingId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'recommendation' | 'trending' | 'rising' | 'new' | 'recent' | 'rating' | 'popular'>('recommendation');
@@ -1356,8 +1359,14 @@ export default function DiscordServersPage() {
       .slice(0, limitCount);
   }
 
+  const activeTagId = selectedTags[0] || (selectedCategory !== 'all' ? selectedCategory : null);
+  const activeCategory = categories.find((c) => c.id === activeTagId);
+
   const filteredServers = servers
     .filter((server) => {
+      // ซ่อนเซิร์ฟเวอร์ที่ลิงก์หมดอายุ ไม่ต้องแสดงจนกว่าเจ้าของจะแก้ไขลิงก์
+      if (server.invite_status === 'expired') return false;
+
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -1365,7 +1374,8 @@ export default function DiscordServersPage() {
         (server.description ?? '').toLowerCase().includes(q) ||
         (server.discord_id ?? '').toLowerCase().includes(q) ||
         (server.owner_id ?? '').toLowerCase().includes(q);
-      const matchCat = selectedCategory === 'all' || server.category_id === selectedCategory;
+
+      const matchCat = !activeTagId || server.category_id === activeTagId;
       const matchMine = !showMyOnly || (user && server.owner_id === user.discord_id);
       const matchSaved = !showSavedOnly || server.is_saved === true;
       return matchSearch && matchCat && matchMine && matchSaved;
@@ -1457,6 +1467,45 @@ export default function DiscordServersPage() {
           carouselConfig={carouselConfig}
         />
 
+        {/* Owner Expired Alert Banner */}
+        {isAuthenticated && ownerExpiredServers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-3xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+          >
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  คุณมี {ownerExpiredServers.length} เซิร์ฟเวอร์ที่ลิงก์เชิญหมดอายุและถูกซ่อนอยู่
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-300/70">
+                  ระบบจะไม่แสดงเซิร์ฟเวอร์เหล่านี้ต่อสาธารณะ จนกว่าคุณจะกดแก้ไขลิงก์เชิญใหม่
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const el = document.getElementById('owner-expired-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                } else if (ownerExpiredServers[0]) {
+                  setEditLinkServer(ownerExpiredServers[0]);
+                  setIsEditLinkOpen(true);
+                }
+              }}
+              className="rounded-full border-amber-500/40 hover:bg-amber-500/15 text-amber-800 dark:text-amber-200 shrink-0 h-8 text-xs font-semibold self-end sm:self-center"
+            >
+              แก้ไขลิงก์ ({ownerExpiredServers.length})
+            </Button>
+          </motion.div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-8">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
@@ -1527,10 +1576,10 @@ export default function DiscordServersPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1">
+                <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1 items-center">
                   <Button
-                    variant={selectedCategory === 'all' && !showSavedOnly ? 'default' : 'outline'}
-                    onClick={() => { setSelectedCategory('all'); setShowSavedOnly(false); }}
+                    variant={!activeCategory && !showSavedOnly ? 'default' : 'outline'}
+                    onClick={() => { setSelectedCategory('all'); setShowSavedOnly(false); setSelectedTags([]); }}
                     className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3"
                     size="sm"
                   >
@@ -1548,7 +1597,10 @@ export default function DiscordServersPage() {
                         return;
                       }
                       setShowSavedOnly(!showSavedOnly);
-                      if (!showSavedOnly) setSelectedCategory('all');
+                      if (!showSavedOnly) {
+                        setSelectedCategory('all');
+                        setSelectedTags([]);
+                      }
                     }}
                     className={cn(
                       'rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-medium',
@@ -1559,17 +1611,48 @@ export default function DiscordServersPage() {
                     <Heart className={cn('w-3.5 h-3.5', showSavedOnly ? 'fill-white text-white' : 'text-rose-500')} />
                     <span>ที่บันทึกไว้</span>
                   </Button>
-                  {categories.map((cat) => (
+
+                  {/* แสดงเฉพาะแท็กล่าสุดที่เลือก (Single Latest Tag) */}
+                  {activeCategory && !showSavedOnly && (
                     <Button
-                      key={cat.id}
-                      variant={selectedCategory === cat.id && !showSavedOnly ? 'default' : 'outline'}
-                      onClick={() => { setSelectedCategory(cat.id); setShowSavedOnly(false); }}
-                      className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3"
+                      variant="default"
+                      onClick={() => setIsTagFilterOpen(true)}
+                      className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-xs group"
                       size="sm"
+                      title="แท็กล่าสุดที่เลือก (คลิกเพื่อเปลี่ยน หรือกด X เพื่อล้าง)"
                     >
-                      {cat.icon} {cat.name}
+                      <Tag className="w-3.5 h-3.5" />
+                      <span>{activeCategory.icon} {activeCategory.name}</span>
+                      <span
+                        role="button"
+                        aria-label="ล้างแท็ก"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCategory('all');
+                          setSelectedTags([]);
+                        }}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-white/20 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </span>
                     </Button>
-                  ))}
+                  )}
+
+                  {/* ปุ่มเปิดกล่องเลือกแท็ก */}
+                  <Button
+                    variant={isTagFilterOpen ? 'secondary' : 'outline'}
+                    onClick={() => setIsTagFilterOpen((prev) => !prev)}
+                    className={cn(
+                      'rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-medium transition-all',
+                      isTagFilterOpen && 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'
+                    )}
+                    size="sm"
+                    title="เลือกแท็กเซิร์ฟเวอร์"
+                  >
+                    <Tag className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{activeCategory ? 'เปลี่ยนแท็ก' : 'เลือกแท็ก...'}</span>
+                    <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isTagFilterOpen && 'rotate-180')} />
+                  </Button>
                 </div>
                 {user && (
                   <div className="flex items-center gap-1.5 shrink-0 bg-white/50 dark:bg-card/50 rounded-full px-2.5 py-1.5 border border-border/40">
@@ -1578,6 +1661,61 @@ export default function DiscordServersPage() {
                   </div>
                 )}
               </div>
+
+              {/* Tag Selector Box (Single Latest Mode) */}
+              {isTagFilterOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="bg-card/80 dark:bg-card/50 backdrop-blur-md p-3.5 sm:p-4 rounded-3xl border border-border/50 shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-amber-500" />
+                        เลือกแท็ก (ระบบจะเลือกเฉพาะอันล่าสุด)
+                      </span>
+                      {activeCategory && (
+                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                          พบ {filteredServers.length} เซิร์ฟเวอร์
+                        </Badge>
+                      )}
+                    </div>
+                    {activeCategory && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTags([]);
+                          setSelectedCategory('all');
+                        }}
+                        className="h-6 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-full"
+                      >
+                        ล้างแท็ก
+                      </Button>
+                    )}
+                  </div>
+                  <TagsSelector
+                    tags={categories.map((c) => ({ id: c.id, label: `${c.icon} ${c.name}` }))}
+                    selectedTags={activeTagId ? [activeTagId] : []}
+                    onTagsChange={(newTags) => {
+                      const latest = newTags.slice(-1);
+                      setSelectedTags(latest);
+                      if (latest.length > 0) {
+                        setSelectedCategory(latest[0]);
+                        setShowSavedOnly(false);
+                      } else {
+                        setSelectedCategory('all');
+                      }
+                    }}
+                    maxSelected={1}
+                    keepLatestOnly={true}
+                    label=""
+                    placeholder="คลิกเลือกแท็กด้านล่าง (ระบบจะสลับเป็นแท็กล่าสุดให้อัตโนมัติ)..."
+                  />
+                </motion.div>
+              )}
             </div>
 
             {/* Server Grid */}
@@ -1644,11 +1782,11 @@ export default function DiscordServersPage() {
 
         {/* Owner expired servers section — visible only to the server owner (Req 2.3, 4.3, 4.4, 5.1, 5.2, 5.6) */}
         {isAuthenticated && ownerExpiredServers.length > 0 && (
-          <div className="mt-8 sm:mt-12">
+          <div id="owner-expired-section" className="mt-8 sm:mt-12 scroll-mt-24">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="w-5 h-5 text-orange-500" aria-hidden="true" />
               <h3 className="text-base sm:text-lg font-bold text-foreground">
-                เซิร์ฟเวอร์ของคุณที่ลิงก์หมดอายุ
+                เซิร์ฟเวอร์ของคุณที่ลิงก์หมดอายุ <span className="text-xs sm:text-sm font-normal text-muted-foreground">(ถูกซ่อนอยู่จนกว่าจะแก้ไขลิงก์)</span>
               </h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
@@ -1763,13 +1901,17 @@ export default function DiscordServersPage() {
               <p className="text-[10px] text-muted-foreground flex items-center gap-1 italic"><Info className="w-3 h-3" /> แนะนำให้ใช้ลิงก์ที่ไม่มีวันหมดอายุ</p>
             </div>
             <div className="space-y-2">
-              <Label className="font-semibold text-sm">หมวดหมู่ <span className="text-destructive">*</span></Label>
-              <Select onValueChange={setCategoryId} value={categoryId}>
-                <SelectTrigger className="rounded-xl text-sm"><SelectValue placeholder="เลือกหมวดหมู่..." /></SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <TagsSelector
+                tags={categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.name}` }))}
+                value={categoryId ? [categoryId] : []}
+                onValueChange={(val) => {
+                  const id = Array.isArray(val) ? (val[0] || '') : (val || '');
+                  setCategoryId(id);
+                }}
+                maxSelected={1}
+                label="หมวดหมู่ *"
+                placeholder="คลิกเลือกหมวดหมู่ที่เหมาะสมที่สุด..."
+              />
             </div>
             <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-3 sm:p-4 text-xs space-y-2 border border-primary/10">
               <p className="font-semibold text-foreground">✨ ระบบจะดึงข้อมูลให้อัตโนมัติ:</p>

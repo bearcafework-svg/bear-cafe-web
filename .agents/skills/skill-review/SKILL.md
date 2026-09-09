@@ -26,6 +26,7 @@ description: ตรวจสอบคุณภาพ ความปลอดภ
 ### 3. UI/UX & Responsive Consistency
 * เช็กความสอดคล้องกับ Bear Cafe Design System (Warm Dark `#12100E`, ขอบโค้งมน, บรรยากาศอบอุ่น)
 * ตรวจสอบการจัดวางบนหน้าจอ Mobile และ Desktop ไม่ให้มีส่วนประกอบใดล้นหน้าจอ (Overflow)
+* **Touch Device Scrolling:** ตรวจสอบคอมโพเนนต์ Dropdown, Select, Popover และ Modal ว่าสามารถใช้นิ้วปัดเลื่อนบนมือถือและ iPad ได้จริง ไม่ถูก `h-[var(--radix-select-trigger-height)]` หรือ `body[data-scroll-locked]` ล็อกค้าง
 * **Thai Natural Language & UX Copy:** ตรวจสอบข้อความภาษาไทย (ปุ่ม, Label, Modal, Notification, Empty State, Error Message) ว่าเป็นภาษาธรรมชาติ กระชับ เข้าใจง่าย ไม่อ่านเหมือนภาษาทางการ/ราชการ และไม่มีคำที่มี "กลิ่น AI" (เช่น ดำเนินการ, ดังกล่าว, ในส่วนของ, ผู้ใช้งาน, ทั้งนี้, เพื่อทำการ)
 
 ### 4. Cross-System Compatibility (Discord Bot)

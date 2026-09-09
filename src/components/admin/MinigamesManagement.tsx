@@ -11,12 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import {
   Gamepad2, Plus, Trash2, Save, RefreshCw, Trophy, Sparkles, Medal, Award, Crown,
   Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, ListFilter,
   CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Eye, Volume2, Headphones,
-  Keyboard, Laptop, Globe, Check, AlertCircle, Radio
+  Keyboard, Laptop, Globe, Check, AlertCircle, Radio, Clock, ShieldCheck, User
 } from 'lucide-react';
 
 export interface MinigameConfig {
@@ -148,7 +149,7 @@ const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
     description: 'คำศัพท์ภาษาไทย • บอทจะสุ่มขีดช่องว่างให้อัตโนมัติ (แชร์ร่วมกับเกม 6)',
     icon: '🇹🇭',
     badge: 'คำศัพท์ไทย',
-    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
   },
   {
     id: 'game-2',
@@ -161,27 +162,27 @@ const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
   },
   {
     id: 'game-3',
-    label: 'เกม 3: สุ่มโจทย์คณิตฯ (อัตโนมัติ)',
+    label: 'เกม 3: สุ่มโจทย์คณิตฯ (Auto)',
     value: '3',
-    description: 'โจทย์คำนวณตัวเลขและสมการ • บอทสร้างอัตโนมัติจากโค้ด (ไม่ต้องเพิ่มโจทย์)',
+    description: 'ระบบสุ่มตัวเลขและสมการบวกลบคูณตามระดับความยากอัตโนมัติจากโค้ดบอท',
     icon: '🔢',
-    badge: 'บอทสร้างอัตโนมัติ',
-    badgeColor: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/25',
+    badge: 'คณิต (บอทสร้าง)',
+    badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25',
   },
   {
     id: 'game-4',
-    label: 'เกม 4: ทายคำจากคำใบ้',
+    label: 'เกม 4: ทายคำจากคำใบ้ 3 ข้อ',
     value: '4',
-    description: 'โจทย์ 3 ข้อความคำใบ้ • เลือกระดับความยาก (ง่าย/ปานกลาง/ยาก)',
+    description: 'ทายคำศัพท์จากคำใบ้ 3 ข้อ • ระบุระดับความยาก (ง่าย/ปานกลาง/ยาก)',
     icon: '💡',
-    badge: '3 คำใบ้',
+    badge: 'คำใบ้ 3 ข้อ',
     badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
   },
   {
     id: 'game-5',
     label: 'เกม 5: ฟังเสียงแล้วพิมพ์ตอบ (อังกฤษ)',
     value: '5',
-    description: 'คำศัพท์ภาษาอังกฤษ • บอทสังเคราะห์เสียง Google TTS อังกฤษให้ฟังใน Discord',
+    description: 'ฟังเสียง Google TTS อังกฤษ • บอทส่งไฟล์เสียง MP3 ในดิสคอร์ด',
     icon: '🎧',
     badge: 'เสียง TTS อังกฤษ',
     badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
@@ -190,10 +191,10 @@ const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
     id: 'game-6',
     label: 'เกม 6: พิมพ์คำต่อไปนี้ (ไทย)',
     value: '6',
-    description: 'ประโยค/ข้อความภาษาไทยสำหรับแข่งพิมพ์เร็ว (แชร์คลังคำศัพท์ไทยกับเกม 1)',
+    description: 'แข่งพิมพ์ประโยค/ข้อความภาษาไทย • แข่งความเร็ว (แชร์ร่วมกับเกม 1)',
     icon: '⌨️',
     badge: 'พิมพ์เร็วไทย',
-    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+    badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25',
   },
   {
     id: 'game-7',
@@ -308,6 +309,16 @@ interface Question {
   difficulty: 'easy' | 'medium' | 'hard' | null;
   category?: string | null;
   is_active: boolean;
+  status?: 'approved' | 'pending_create' | 'pending_update' | 'pending_delete' | 'deleted';
+  created_by?: string | null;
+  created_by_name?: string | null;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
+  deleted_by?: string | null;
+  deleted_by_name?: string | null;
+  pending_request_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface LeaderboardItem {
@@ -327,6 +338,7 @@ export function getBotTargetGameIds(gameId: number): number[] {
 
 export function MinigamesManagement() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Settings & Questions state
   const [settings, setSettings] = useState<MinigameSetting[]>([]);
@@ -441,13 +453,13 @@ export function MinigamesManagement() {
     }
   }, []);
 
-  // Fetch Questions (supports bot shared pools and loads up to 2000 questions)
+  // Fetch Questions (supports bot shared pools, audit fields and loads up to 2000 questions)
   const fetchQuestions = useCallback(async () => {
     setLoadingQuestions(true);
     try {
       let query = (supabase as any)
         .from('minigame_questions')
-        .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, is_active')
+        .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, is_active, status, created_by, created_by_name, updated_by, updated_by_name, deleted_by, deleted_by_name, pending_request_id, created_at, updated_at')
         .order('id', { ascending: false })
         .limit(2000);
 
@@ -460,7 +472,31 @@ export function MinigamesManagement() {
         }
       }
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+
+      // Fallback to base columns if columns not added yet
+      if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+        let baseQuery = (supabase as any)
+          .from('minigame_questions')
+          .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, is_active')
+          .order('id', { ascending: false })
+          .limit(2000);
+
+        if (selectedGameFilter !== 'all') {
+          const targetIds = getBotTargetGameIds(Number(selectedGameFilter));
+          if (targetIds.length === 1) {
+            baseQuery = baseQuery.eq('game_id', targetIds[0]);
+          } else {
+            baseQuery = baseQuery.in('game_id', targetIds);
+          }
+        }
+
+        const fallbackRes = await baseQuery;
+        if (fallbackRes.error) throw fallbackRes.error;
+        data = fallbackRes.data;
+        error = null;
+      }
+
       if (error) throw error;
       setQuestions((data as any) || []);
     } catch (err: any) {
@@ -664,10 +700,39 @@ export function MinigamesManagement() {
       optionsArray = ['จริง', 'เท็จ'];
     }
 
+    const operatorId = user?.discord_id || user?.id || 'admin';
+    const operatorName = user?.username || user?.discord_username || 'Staff';
+
     try {
-      const { error } = await (supabase as any)
-        .from('minigame_questions')
-        .insert({
+      if (!user?.is_owner) {
+        // Staff mode: Submit change request to Reports
+        const reqPayload = {
+          action_type: 'create',
+          game_id: gId,
+          new_data: {
+            word_or_question: finalQuestion,
+            answer: finalAnswer,
+            category: formCategory.trim() || 'คำทั่วไป',
+            hints: hintsArray,
+            options: optionsArray,
+            difficulty: finalDiff,
+            is_active: true,
+          },
+          requested_by: operatorId,
+          requested_by_name: operatorName,
+          status: 'pending',
+        };
+
+        const { error } = await (supabase as any).from('minigame_change_requests').insert(reqPayload);
+        if (error) throw error;
+
+        toast({
+          title: 'ส่งคำขอเพิ่มคำศัพท์สำเร็จ 📨',
+          description: `คำขอเพิ่มคำศัพท์เกม #${gId} ถูกส่งไปยังหน้า Reports เพื่อรอให้ Owner อนุมัติแล้วค่ะ`,
+        });
+      } else {
+        // Owner mode: Insert directly into minigame_questions
+        const insertData: any = {
           game_id: gId,
           word_or_question: finalQuestion,
           answer: finalAnswer,
@@ -675,16 +740,36 @@ export function MinigamesManagement() {
           hints: hintsArray,
           options: optionsArray,
           difficulty: finalDiff,
-          is_active: true
-        });
+          is_active: true,
+          status: 'approved',
+          created_by: operatorId,
+          created_by_name: operatorName,
+          updated_by: operatorId,
+          updated_by_name: operatorName,
+        };
 
-      if (error) throw error;
-      toast({ title: 'เพิ่มคำศัพท์สำเร็จ', description: `เพิ่มข้อมูลเข้าคลังเกม #${gId} เรียบร้อยแล้วค่ะ` });
+        let res = await (supabase as any).from('minigame_questions').insert(insertData);
+        if (res.error && (res.error.code === '42703' || res.error.message?.includes('created_by'))) {
+          delete insertData.status;
+          delete insertData.created_by;
+          delete insertData.created_by_name;
+          delete insertData.updated_by;
+          delete insertData.updated_by_name;
+          res = await (supabase as any).from('minigame_questions').insert(insertData);
+        }
+        if (res.error) throw res.error;
+
+        toast({
+          title: 'เพิ่มคำศัพท์สำเร็จ 🎉',
+          description: `บันทึกข้อมูลเข้าคลังเกม #${gId} เรียบร้อยแล้ว (สิทธิ์ Owner)`,
+        });
+        fetchQuestions();
+        fetchGameCounts();
+      }
+
       setFormQuestion('');
       if (gId !== 12) setFormAnswer('');
       setFormHint1(''); setFormHint2(''); setFormHint3('');
-      fetchQuestions();
-      fetchGameCounts();
     } catch (err: any) {
       toast({ title: 'เกิดข้อผิดพลาดในการบันทึกโจทย์', description: err.message, variant: 'destructive' });
     }
@@ -734,22 +819,100 @@ export function MinigamesManagement() {
       optionsArray = ['จริง', 'เท็จ'];
     }
 
+    const operatorId = user?.discord_id || user?.id || 'admin';
+    const operatorName = user?.username || user?.discord_username || 'Staff';
+
     try {
-      const { error } = await (supabase as any)
-        .from('minigame_questions')
-        .update({
+      if (!user?.is_owner) {
+        // Staff mode: Submit update request to Reports
+        const reqPayload = {
+          question_id: editingQuestion.id,
+          action_type: 'update',
+          game_id: gId,
+          old_data: {
+            word_or_question: editingQuestion.word_or_question,
+            answer: editingQuestion.answer,
+            category: editingQuestion.category || 'คำทั่วไป',
+            hints: editingQuestion.hints || [],
+            options: editingQuestion.options || [],
+            difficulty: editingQuestion.difficulty,
+            is_active: editingQuestion.is_active,
+          },
+          new_data: {
+            word_or_question: finalQuestion,
+            answer: finalAnswer,
+            category: editCategory.trim() || 'คำทั่วไป',
+            hints: hintsArray,
+            options: optionsArray,
+            difficulty: finalDiff,
+            is_active: editingQuestion.is_active,
+          },
+          requested_by: operatorId,
+          requested_by_name: operatorName,
+          status: 'pending',
+        };
+
+        const { data: reqData, error: reqErr } = await (supabase as any)
+          .from('minigame_change_requests')
+          .insert(reqPayload)
+          .select('id')
+          .single();
+
+        if (reqErr) throw reqErr;
+
+        // Mark question as pending_update in DB
+        try {
+          await (supabase as any)
+            .from('minigame_questions')
+            .update({
+              status: 'pending_update',
+              pending_request_id: reqData?.id,
+            })
+            .eq('id', editingQuestion.id);
+        } catch (_) {}
+
+        toast({
+          title: 'ส่งคำขอแก้ไขคำศัพท์สำเร็จ 📨',
+          description: `คำขอแก้ไขข้อ #${editingQuestion.id} ถูกส่งไปยังหน้า Reports เพื่อรอ Owner ตรวจสอบและอนุมัติค่ะ`,
+        });
+      } else {
+        // Owner mode: Direct update on minigame_questions
+        const updateData: any = {
           word_or_question: finalQuestion,
           answer: finalAnswer,
           category: editCategory.trim() || 'คำทั่วไป',
           hints: hintsArray,
           options: optionsArray,
           difficulty: finalDiff,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingQuestion.id);
+          status: 'approved',
+          updated_by: operatorId,
+          updated_by_name: operatorName,
+          updated_at: new Date().toISOString(),
+        };
 
-      if (error) throw error;
-      toast({ title: 'แก้ไขสำเร็จ', description: `แก้ไขข้อมูลข้อ #${editingQuestion.id} เรียบร้อยแล้วค่ะ` });
+        let res = await (supabase as any)
+          .from('minigame_questions')
+          .update(updateData)
+          .eq('id', editingQuestion.id);
+
+        if (res.error && (res.error.code === '42703' || res.error.message?.includes('updated_by'))) {
+          delete updateData.status;
+          delete updateData.updated_by;
+          delete updateData.updated_by_name;
+          res = await (supabase as any)
+            .from('minigame_questions')
+            .update(updateData)
+            .eq('id', editingQuestion.id);
+        }
+
+        if (res.error) throw res.error;
+
+        toast({
+          title: 'แก้ไขสำเร็จ 🎉',
+          description: `แก้ไขข้อมูลข้อ #${editingQuestion.id} เรียบร้อยแล้วค่ะ (สิทธิ์ Owner)`,
+        });
+      }
+
       setEditDialogOpen(false);
       fetchQuestions();
     } catch (err: any) {
@@ -757,16 +920,72 @@ export function MinigamesManagement() {
     }
   };
 
-  const handleDeleteQuestion = async (id: number) => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบคำศัพท์ข้อนี้ออกจากคลัง?')) return;
-    try {
-      const { error } = await (supabase as any).from('minigame_questions').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: 'ลบคำศัพท์เรียบร้อยแล้ว' });
-      fetchQuestions();
-      fetchGameCounts();
-    } catch (err: any) {
-      toast({ title: 'เกิดข้อผิดพลาดในการลบ', description: err.message, variant: 'destructive' });
+  const handleDeleteQuestion = async (q: Question) => {
+    const operatorId = user?.discord_id || user?.id || 'admin';
+    const operatorName = user?.username || user?.discord_username || 'Staff';
+
+    if (!user?.is_owner) {
+      // Staff mode: Confirm sending delete request to Reports
+      if (!confirm(`คุณต้องการส่งคำขอลบข้อ #${q.id} ("${q.word_or_question}") ไปยังหน้า Reports เพื่อรอให้ Owner อนุมัติหรือไม่?`)) return;
+
+      try {
+        const reqPayload = {
+          question_id: q.id,
+          action_type: 'delete',
+          game_id: q.game_id,
+          old_data: {
+            word_or_question: q.word_or_question,
+            answer: q.answer,
+            category: q.category || 'คำทั่วไป',
+            hints: q.hints || [],
+            options: q.options || [],
+            difficulty: q.difficulty,
+            is_active: q.is_active,
+          },
+          new_data: {},
+          requested_by: operatorId,
+          requested_by_name: operatorName,
+          status: 'pending',
+        };
+
+        const { data: reqData, error: reqErr } = await (supabase as any)
+          .from('minigame_change_requests')
+          .insert(reqPayload)
+          .select('id')
+          .single();
+
+        if (reqErr) throw reqErr;
+
+        try {
+          await (supabase as any)
+            .from('minigame_questions')
+            .update({
+              status: 'pending_delete',
+              pending_request_id: reqData?.id,
+            })
+            .eq('id', q.id);
+        } catch (_) {}
+
+        toast({
+          title: 'ส่งคำขอลบคำศัพท์สำเร็จ 📨',
+          description: `คำขอลบข้อ #${q.id} ถูกส่งไปยังหน้า Reports เพื่อรอ Owner ตรวจสอบและอนุมัติค่ะ`,
+        });
+        fetchQuestions();
+      } catch (err: any) {
+        toast({ title: 'เกิดข้อผิดพลาดในการส่งคำขอลบ', description: err.message, variant: 'destructive' });
+      }
+    } else {
+      // Owner mode: Direct delete
+      if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบคำศัพท์ข้อ #${q.id} ("${q.word_or_question}") ออกจากคลัง?`)) return;
+      try {
+        const { error } = await (supabase as any).from('minigame_questions').delete().eq('id', q.id);
+        if (error) throw error;
+        toast({ title: 'ลบคำศัพท์เรียบร้อยแล้ว (สิทธิ์ Owner)' });
+        fetchQuestions();
+        fetchGameCounts();
+      } catch (err: any) {
+        toast({ title: 'เกิดข้อผิดพลาดในการลบ', description: err.message, variant: 'destructive' });
+      }
     }
   };
 
@@ -873,6 +1092,35 @@ export function MinigamesManagement() {
 
         {/* TAB 1: QUESTION BANK MANAGER */}
         <TabsContent value="questions" className="space-y-6">
+
+          {/* Staff vs Owner Permission Mode Banner */}
+          {user?.is_owner ? (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2.5">
+                <Crown className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <strong className="font-bold text-sm block text-amber-800 dark:text-amber-300">โหมดเจ้าของร้าน (Owner Mode)</strong>
+                  <span>ท่านมีสิทธิ์อนุมัติและปรับปรุงคลังคำศัพท์โดยตรง ทุกการดำเนินการจะถูกบันทึกประวัติผู้แก้ไขอัตโนมัติ</span>
+                </div>
+              </div>
+              <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] shrink-0">
+                สิทธิ์ Owner
+              </Badge>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
+                <div>
+                  <strong className="font-bold text-sm block text-blue-800 dark:text-blue-300">โหมดทีมงาน (Staff Mode)</strong>
+                  <span>การเพิ่ม แก้ไข หรือลบคำศัพท์จะถูกส่งเป็นคำขอไปยังหน้า <strong>Admin &gt; Reports</strong> เพื่อรอให้ Owner อนุมัติก่อนขึ้นระบบจริง</span>
+                </div>
+              </div>
+              <Badge className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shrink-0">
+                สิทธิ์ Staff
+              </Badge>
+            </div>
+          )}
 
           {/* Section 1: Quick Interactive Game Selector Grid */}
           <Card className="border-[#EAD8C8] dark:border-[#2D2520] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] shadow-xs rounded-3xl overflow-hidden">
@@ -1503,27 +1751,31 @@ export function MinigamesManagement() {
                   <TableHeader className="bg-[#FAF6F0]/60 dark:bg-[#25201C]/60">
                     <TableRow className="h-9">
                       <TableHead className="w-14 text-xs font-bold">ID</TableHead>
-                      <TableHead className="w-32 text-xs font-bold">มินิเกม</TableHead>
-                      <TableHead className="w-28 text-xs font-bold">หมวดหมู่</TableHead>
+                      <TableHead className="w-28 text-xs font-bold">มินิเกม</TableHead>
+                      <TableHead className="w-24 text-xs font-bold">หมวดหมู่</TableHead>
                       <TableHead className="text-xs font-bold">โจทย์ / คำศัพท์</TableHead>
                       <TableHead className="text-xs font-bold">คำตอบ / เฉลย</TableHead>
-                      <TableHead className="text-xs font-bold">รายละเอียดบน Discord</TableHead>
-                      <TableHead className="w-24 text-xs font-bold">ความยาก</TableHead>
+                      <TableHead className="text-xs font-bold">รายละเอียด</TableHead>
+                      <TableHead className="w-20 text-xs font-bold">ความยาก</TableHead>
+                      <TableHead className="w-28 text-xs font-bold">สถานะ</TableHead>
+                      <TableHead className="w-32 text-xs font-bold">ผู้จัดการ</TableHead>
                       <TableHead className="text-right w-20 text-xs font-bold">จัดการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredQuestions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-12 text-xs">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-12 text-xs">
                           {searchKeyword ? `ไม่พบคำศัพท์ที่ ${searchMatchMode === 'starts_with' ? 'ขึ้นต้นด้วย' : searchMatchMode === 'exact' ? 'ตรงกับ' : 'มีคำว่า'} "${searchKeyword}"` : 'ไม่พบรายการคำศัพท์ในคลังของเกมนี้'}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredQuestions.slice((qPage - 1) * qItemsPerPage, qPage * qItemsPerPage).map((q) => {
                         const gConfig = MINIGAME_CONFIGS[q.game_id];
+                        const isPendingRow = q.status === 'pending_update' || q.status === 'pending_delete';
+
                         return (
-                          <TableRow key={q.id} className="h-9 text-xs hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40 transition-colors">
+                          <TableRow key={q.id} className={cn("h-9 text-xs transition-colors", isPendingRow ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40")}>
                             <TableCell className="font-mono text-xs font-bold text-muted-foreground">#{q.id}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-[10px] font-semibold flex items-center gap-1 w-fit bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
@@ -1536,10 +1788,10 @@ export function MinigamesManagement() {
                                 {q.category || 'คำทั่วไป'}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-semibold text-xs max-w-[200px] truncate" title={q.word_or_question}>
+                            <TableCell className="font-semibold text-xs max-w-[180px] truncate" title={q.word_or_question}>
                               {q.word_or_question}
                             </TableCell>
-                            <TableCell className="font-semibold text-xs text-emerald-600 dark:text-emerald-400 max-w-[200px] truncate" title={q.answer}>
+                            <TableCell className="font-semibold text-xs text-emerald-600 dark:text-emerald-400 max-w-[180px] truncate" title={q.answer}>
                               {q.game_id === 12 ? (
                                 <Badge className={cn("text-[10px] font-bold", q.answer === 'จริง' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white")}>
                                   {q.answer === 'จริง' ? '✅ จริง' : '❌ เท็จ'}
@@ -1582,26 +1834,68 @@ export function MinigamesManagement() {
                                 <span className="text-xs text-muted-foreground">-</span>
                               )}
                             </TableCell>
+
+                            {/* Status Badge Cell */}
+                            <TableCell>
+                              {q.status === 'pending_update' ? (
+                                <Badge className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 gap-1 font-bold whitespace-nowrap">
+                                  <Clock className="w-3 h-3 text-amber-500 inline mr-0.5" /> รออนุมัติแก้
+                                </Badge>
+                              ) : q.status === 'pending_delete' ? (
+                                <Badge className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 gap-1 font-bold whitespace-nowrap">
+                                  <Trash2 className="w-3 h-3 text-rose-500 inline mr-0.5" /> รออนุมัติลบ
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 gap-1 font-medium whitespace-nowrap">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 inline mr-0.5" /> ใช้งานอยู่
+                                </Badge>
+                              )}
+                            </TableCell>
+
+                            {/* Audit Info Cell */}
+                            <TableCell>
+                              <div className="text-[11px] leading-tight space-y-0.5">
+                                <div className="flex items-center gap-1 text-foreground font-medium truncate max-w-[120px]" title={`เพิ่มโดย: ${q.created_by_name || 'ระบบ'}`}>
+                                  <User className="w-3 h-3 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{q.created_by_name || 'ระบบ'}</span>
+                                </div>
+                                {q.updated_by_name && q.updated_by_name !== q.created_by_name && (
+                                  <div className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={`แก้ไขล่าสุดโดย: ${q.updated_by_name}`}>
+                                    แก้: {q.updated_by_name}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* Actions Cell */}
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 rounded-lg cursor-pointer"
-                                  onClick={() => openEditModal(q)}
-                                  title="แก้ไข"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg cursor-pointer"
-                                  onClick={() => handleDeleteQuestion(q.id)}
-                                  title="ลบคำศัพท์"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                {!user?.is_owner && isPendingRow ? (
+                                  <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/30 px-1.5 py-0.5 bg-amber-500/10 whitespace-nowrap" title="คำขอของข้อนี้กำลังรอ Owner อนุมัติในหน้า Reports">
+                                    รออนุมัติ
+                                  </Badge>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 rounded-lg cursor-pointer"
+                                      onClick={() => openEditModal(q)}
+                                      title={user?.is_owner ? "แก้ไขข้อมูล (สิทธิ์ Owner)" : "ส่งคำขอแก้ไขข้อมูล"}
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg cursor-pointer"
+                                      onClick={() => handleDeleteQuestion(q)}
+                                      title={user?.is_owner ? "ลบคำศัพท์ (สิทธิ์ Owner)" : "ส่งคำขอลบคำศัพท์"}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

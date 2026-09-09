@@ -35,7 +35,11 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
 * **Tailwind CSS & Token Usage:** ใช้ Utility classes ที่กระชับ อ่านง่าย และใช้ Token สีตาม `tailwind.config.ts`
 * **Icons:** ใช้ไอคอนจาก `lucide-react` ที่มีความนุ่มนวลและสื่อความหมายชัดเจน
 * **Micro-interactions:** มีเอฟเฟกต์ hover และ active เล็กน้อย เช่น `transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]`
-* **Responsive First:** ออกแบบให้ใช้งานได้ดีทั้งบนหน้าจอมือถือ (Mobile) และหน้าจอคอมพิวเตอร์ (Desktop)
+* **Responsive First:** ออกแบบให้ใช้งานได้ดีทั้งบนหน้าจอมือถือ (Mobile), แท็บเล็ต (iPad/Tablet) และหน้าจอคอมพิวเตอร์ (Desktop)
+* **Touch Device Scrolling Standard (กฎสำคัญสำหรับ Dropdown/Select บน Mobile & iPad):**
+  - **ห้ามใส่ `h-[var(--radix-select-trigger-height)]` บน Viewport:** เด็ดขาด เพราะจะล็อกความสูงกล่องเลื่อนเท่ากับปุ่ม Trigger (~36px-40px) ส่งผลให้ `react-remove-scroll` มองว่าการทัชแถวด้านล่างอยู่นอกขอบเขต และสั่ง `event.preventDefault()` ทำให้หน้าจอค้าง เลื่อนไม่ได้
+  - **ใช้ `max-h-[inherit]` และ `touch-pan-y`:** บน `SelectPrimitive.Viewport`, `PopoverContent` และกล่องเลื่อนของ Dropdown ให้ใส่ `touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]` เสมอ เพื่อให้ WebKit บน iOS/iPadOS ทำงานร่วมกับระบบสัมผัสได้อย่างลื่นไหล
+  - **ซ่อน Scroll Buttons ในโหมด Popper:** ปุ่มเลื่อนหัว-ท้าย (`SelectScrollUpButton`/`SelectScrollDownButton`) ให้แสดงเฉพาะเมื่อ `position !== "popper"` เพื่อไม่ให้แย่งพื้นที่และขัดขวางการปัดเลื่อนด้วยนิ้ว
 * **Glassmorphism & Card Design:** ใช้การ์ดกึ่งโปร่งแสงผสมพื้นหลังเบลอ (เช่น `bg-[#1A1614]/80 backdrop-blur-md border border-[#2D2420]`)
 
 ---
@@ -55,14 +59,40 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
     {/* Button Text */}
   </button>
   ```
+* **Option Dropdown & Select Standard (มาตรฐาน Dropdown สำหรับ Mobile, iPad และ PC):**
+  - รองรับทั้งการหมุน Mouse Wheel บนคอมพิวเตอร์ และการใช้นิ้วปัดลาก (Touch Drag) บนโทรศัพท์มือถือและ iPad
+  - โครงสร้างมาตรฐานสำหรับ Radix Select (`@/components/ui/select`):
+    ```tsx
+    {/* Select Content: ปรับความสูงตามพื้นที่หน้าจอจริง */}
+    <SelectPrimitive.Content
+      className="relative z-50 max-h-[var(--radix-select-content-available-height,24rem)] min-w-[8rem] overflow-hidden rounded-xl border bg-popover shadow-xl"
+      position={position}
+    >
+      {/* ซ่อน Scroll Buttons เมื่อเป็น popper */}
+      {position !== "popper" && <SelectScrollUpButton />}
+      
+      {/* Viewport: ปลดล็อกความสูง + เปิด Touch Pan และ WebKit Touch Scrolling */}
+      <SelectPrimitive.Viewport
+        className={cn(
+          "p-1.5 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]",
+          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)] max-h-[inherit] overflow-y-auto"
+        )}
+      >
+        {children}
+      </SelectPrimitive.Viewport>
+
+      {position !== "popper" && <SelectScrollDownButton />}
+    </SelectPrimitive.Content>
+    ```
 * **Rich Select Option Card (ตัวเลือกแบบการ์ดพรีเมียม + ซ่อน Scrollbar):**
   - ออกแบบสำหรับ Dropdown หรือตัวเลือกสำคัญ โดยมีการ์ดย่อยแสดงไอคอน/สี, ป้ายชื่อ, คำอธิบายย่อย และ Radio/Check indicator
   - **กฎการเลื่อน (Cozy Invisible Scroll):** รายการตัวเลือกที่ยาว ต้องเลื่อน Scroll ได้อย่างลื่นไหลโดยไม่ต้องเห็นแถบ Scrollbar กวนสายตา (ใช้ utility ซ่อน scrollbar เช่น `no-scrollbar` หรือ `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden`)
+  - **รองรับ Mobile Touch:** ต้องมี `touch-pan-y [-webkit-overflow-scrolling:touch] overscroll-contain` ในกล่องเลื่อนเสมอ
   ```tsx
-  {/* Dropdown Container พร้อมซ่อน Scrollbar */}
-  <div className="max-h-72 overflow-y-auto space-y-1.5 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-    {/* Rich Option Card Item */}
-    <div className="flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer bg-[#181412]/80 border-[#2A221E] hover:border-amber-500/40 hover:bg-amber-500/5">
+  {/* Dropdown Container พร้อม Touch-Pan และซ่อน Scrollbar */}
+  <div className="max-h-72 overflow-y-auto space-y-1.5 p-1.5 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    {/* Rich Option Card Item (แตะลากได้ลื่นไหล ไม่แย่ง Gesture) */}
+    <div className="flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer touch-pan-y bg-[#181412]/80 border-[#2A221E] hover:border-amber-500/40 hover:bg-amber-500/5">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
           {/* Icon หรือ Image เช่น ชาเขียว/ถ้วยกาแฟ */}
@@ -116,6 +146,27 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
       allMembers={allMembers}
       onAddClick={openCreateDialog}
       onMemberClick={member => openPermModal(member)}
+    />
+    ```
+* **Tags Selector (กล่องเลือกแท็กแบบแยกกล่องเลือก-กล่องคลัง + Spring Physics Motion):**
+  - ออกแบบสำหรับการเลือกแท็ก หมวดหมู่ หรือตัวกรองหลายตัวพร้อมกันอย่างเป็นระเบียบและน่าใช้งาน (`@/components/ui/tags-selector`)
+  - **โครงสร้าง:**
+    - กล่องบน (Selected Pool): กล่องการ์ดมนแสดงแท็กที่เลือก พร้อมปุ่ม `X` สี Rose เพื่อลบออก เมื่อไม่มีแท็กที่เลือกจะมี Placeholder พร้อมไอคอน Sparkles
+    - กล่องล่าง (Available Pool): คลังแท็กที่เหลือทั้งหมด เมื่อคลิกที่แท็ก ไอเทมจะวิ่งทะลุขึ้นไปจัดเรียงในกล่องบนอย่างนุ่มนวลด้วย Framer Motion (`layoutId` + Spring Animation)
+    - รองรับทั้ง Multi-selection และ Single-selection (`maxSelected={1}`, `keepLatestOnly={true}`) โดยเมื่อผู้ใช้คลิกเลือกแท็กใหม่ ระบบจะสลับมาเลือกเฉพาะแท็กล่าสุดให้อัตโนมัติ (Auto-replace with latest tag) ป้องกันตัวเลือกสะสมเยอะเกินไป
+    - **Single Latest Mode:** ในแถบตัวกรองหลัก จะแสดงเฉพาะชิปแท็กล่าสุดที่เลือก (Single Active Chip พร้อมปุ่ม `✕` เพื่อล้าง) แทนที่จะเรียงปุ่มทุกหมวดหมู่จนล้นจอ
+  - โทนสีและสไตล์: มุมโค้งมน `rounded-2xl`, ขอบอบอุ่น `#EFE7DC` / Dark `#2C221D`, ชิปการ์ดโฮเวอร์สีน้ำผึ้งอำพัน `hover:bg-amber-500/15 active:scale-95`, ป้ายกำกับ "ล่าสุด" สีอำพัน
+  - รูปแบบการเรียกใช้ (Single Latest Mode):
+    ```tsx
+    import { TagsSelector } from "@/components/ui/tags-selector";
+
+    <TagsSelector
+      tags={categories.map(c => ({ id: c.id, label: `${c.icon} ${c.name}` }))}
+      selectedTags={activeTag ? [activeTag] : []}
+      onTagsChange={(newTags) => setActiveTag(newTags.slice(-1)[0] || null)}
+      maxSelected={1}
+      keepLatestOnly={true}
+      placeholder="คลิกเลือกแท็กด้านล่าง (จะสลับเป็นแท็กล่าสุดให้อัตโนมัติ)..."
     />
     ```
 

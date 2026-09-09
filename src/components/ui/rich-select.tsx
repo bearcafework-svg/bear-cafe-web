@@ -111,7 +111,7 @@ export function RichSelect({
           align={align}
           onWheelCapture={(e) => e.stopPropagation()}
           className={cn(
-            'w-[calc(100vw-2.5rem)] sm:w-[420px] max-w-[95vw] p-2 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md shadow-2xl space-y-1 z-[60]',
+            'w-[calc(100vw-2.5rem)] sm:w-[420px] max-w-[95vw] p-2 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md shadow-2xl space-y-1 z-[60] touch-pan-y overscroll-contain',
             contentClassName
           )}
         >
@@ -120,7 +120,7 @@ export function RichSelect({
               e.stopPropagation();
               e.currentTarget.scrollTop += e.deltaY;
             }}
-            className="max-h-[290px] sm:max-h-[310px] overflow-y-auto space-y-1 overscroll-contain scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="max-h-[290px] sm:max-h-[310px] overflow-y-auto space-y-1 overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
             {safeData.map((item) => {
               const isSelected = item.value === currentValue;
@@ -129,7 +129,7 @@ export function RichSelect({
                   key={item.id}
                   onClick={() => handleSelect(item.value)}
                   className={cn(
-                    'group relative flex cursor-pointer items-center justify-between gap-3 rounded-xl p-2.5 transition-all duration-150',
+                    'group relative flex cursor-pointer items-center justify-between gap-3 rounded-xl p-2.5 transition-all duration-150 touch-pan-y',
                     'border border-transparent hover:border-amber-500/40 hover:bg-amber-500/[0.06]',
                     isSelected && 'border-amber-500/50 bg-amber-500/[0.08]'
                   )}

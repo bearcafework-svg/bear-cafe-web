@@ -68,6 +68,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import type { Tables } from '@/integrations/supabase/types';
 import { Gamepad2 } from 'lucide-react';
 import { MinigamesManagement } from '@/components/admin/MinigamesManagement';
+import { MinigameRequestsManagement } from '@/components/admin/MinigameRequestsManagement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
 import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
@@ -924,9 +926,18 @@ function ReportsManagement() {
   const [memberQuery, setMemberQuery] = useState('');
   const [baristaQuery, setBaristaQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
+  const [minigamePendingCount, setMinigamePendingCount] = useState(0);
   const { toast } = useToast();
   const { notify } = useAdminNotification();
   const { user } = useAuth();
+
+  const cancelPendingCount = useMemo(() => {
+    return cancelRequests.filter((r) => r.status === 'pending').length;
+  }, [cancelRequests]);
+
+  const userReportsPendingCount = useMemo(() => {
+    return reports.filter((r) => r.status === 'open' || r.status === 'investigating').length;
+  }, [reports]);
 
   const normalizeUserLabel = (value?: string | null) => {
     if (!value) return 'Unknown';
@@ -1178,176 +1189,277 @@ function ReportsManagement() {
     other: 'อื่นๆ',
   };
 
+  const totalPendingAll = minigamePendingCount + cancelPendingCount + userReportsPendingCount;
+
   return (
-    <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-[#8C6239] dark:text-[#EAD8C8] font-bold">
-              <Flag className="w-5 h-5 text-rose-500" />
-              จัดการรายงาน
-            </CardTitle>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-40 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD]">
-                <SelectValue placeholder="กรองสถานะ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="open">รอดำเนินการ</SelectItem>
-                <SelectItem value="investigating">กำลังตรวจสอบ</SelectItem>
-                <SelectItem value="resolved">แก้ไขแล้ว</SelectItem>
-                <SelectItem value="dismissed">ยกเลิก</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            <Input
-              value={caseQuery}
-              onChange={(e) => setCaseQuery(e.target.value)}
-              placeholder="ค้นหาเลขเคส"
-              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
-            />
-            <Input
-              value={memberQuery}
-              onChange={(e) => setMemberQuery(e.target.value)}
-              placeholder="ค้นหา Member ID"
-              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
-            />
-            <Input
-              value={baristaQuery}
-              onChange={(e) => setBaristaQuery(e.target.value)}
-              placeholder="ค้นหา Barista ID"
-              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
-            />
-            <DatePicker
-              value={dateQuery}
-              onChange={setDateQuery}
-              placeholder="เลือกวันที่"
-              className="border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl"
-            />
-          </div>
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border border-[#EAD8C8] dark:border-[#2D2520] p-5 rounded-3xl shadow-xs">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2.5">
+            <Flag className="w-6 h-6 text-rose-500" />
+            ศูนย์จัดการรายงานและคำขออนุมัติ (Reports & Approvals Hub)
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            ศูนย์รวมคำขอแก้ไขคลังมินิเกมจากทีมงาน, คำขอยกเลิกประวัติเตือน TagWarn, และรายงานพฤติกรรมผู้ใช้จากห้องบาร์
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[#8C6239] dark:text-[#EAD8C8]">คำขอยกเลิก TagWarn (ต้องอนุมัติโดย Owner)</h3>
-            <Badge variant="outline" className="border-[#EAD8C8] dark:border-[#382F28]">{cancelRequests.length} คำขอ</Badge>
-          </div>
-
-          {cancelRequests.length === 0 ? (
-            <div className="text-sm text-muted-foreground border border-[#EAD8C8] dark:border-[#2D2520] bg-[#FAF6F0]/30 dark:bg-muted/10 rounded-xl p-3.5 text-center">
-              ยังไม่มีคำขอยกเลิกในระบบ
-            </div>
+        <div className="flex items-center gap-2">
+          {totalPendingAll > 0 ? (
+            <Badge className="px-3 py-1 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white animate-pulse">
+              {totalPendingAll} รายการรอดำเนินการ
+            </Badge>
           ) : (
-            <div className="space-y-2.5">
-              {cancelRequests.map((req) => (
-                <Card key={req.id} className="bg-[#FAF6F0] dark:bg-[#25201C]/30 border border-[#EAD8C8] dark:border-[#2D2520] border-l-4 border-l-amber-500/80 rounded-2xl shadow-xs overflow-hidden">
-                  <CardContent className="p-4 flex flex-wrap items-center gap-3 justify-between">
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#8C6239] dark:text-[#EAD8C8] border border-[#EFE8DD] dark:border-[#382F28] text-[10px] px-2 rounded-md">เคส #{req.warn_sequence ?? '-'}</Badge>
-                        <Badge variant={req.status === 'pending' ? 'outline' : req.status === 'approved' ? 'default' : 'destructive'} className="text-[10px] rounded-md font-semibold">
-                          {req.status === 'pending' ? 'รออนุมัติ' : req.status === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธ'}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">{new Date(req.created_at).toLocaleString('th-TH')}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        สมาชิก: <strong className="text-foreground">{req.member_id ?? '-'}</strong> • ผู้ส่งคำขอ:{' '}
-                        <strong className="text-foreground">{req.requested_by_name || req.requester?.username || 'Unknown'}</strong>
-                        {req.approved_at && (
-                          <>
-                            {' '}• อนุมัติเมื่อ {new Date(req.approved_at).toLocaleString('th-TH')}
-                          </>
-                        )}
-                      </p>
-                    </div>
-
-                    {req.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="destructive" onClick={() => rejectCancelRequest(req)} disabled={approvingId === req.id} className="gap-1 rounded-xl">
-                          <XCircle className="w-3.5 h-3.5" /> ปฏิเสธ
-                        </Button>
-                        <Button size="sm" onClick={() => approveCancelRequest(req)} disabled={approvingId === req.id} className="gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">
-                          {approvingId === req.id && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                          <CheckCircle className="w-3.5 h-3.5" /> อนุมัติ
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Badge variant="outline" className="px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 border-emerald-500/25">
+              ✅ ไม่มีคำขอค้าง
+            </Badge>
           )}
+          <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => fetchReports()}>
+            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} /> ดึงข้อมูลสด
+          </Button>
         </div>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
-        ) : filteredReports.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground border border-dashed border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl bg-[#FAF6F0]/20 dark:bg-muted/5">
-            ไม่มีรายงานในขณะนี้
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredReports.map((report) => {
-              const config = statusConfig[report.status];
-              const StatusIcon = config.icon;
-              const statusBorderColor =
-                report.status === 'open' ? 'border-l-amber-500' :
-                report.status === 'investigating' ? 'border-l-sky-500 animate-pulse' :
-                report.status === 'resolved' ? 'border-l-emerald-500' :
-                'border-l-slate-400';
+      {/* 3 Main Tabs */}
+      <Tabs defaultValue="minigame_requests" className="w-full space-y-6">
+        <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-1 sm:grid-cols-3 h-auto gap-1">
+          <TabsTrigger value="minigame_requests" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Gamepad2 className="w-4 h-4 text-amber-500" />
+            <span>คำขอมินิเกม</span>
+            {minigamePendingCount > 0 && (
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full font-bold">
+                {minigamePendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
 
-              return (
-                <Card key={report.id} className={cn("bg-white dark:bg-[#1E1B18] border border-[#EAD8C8] dark:border-[#2D2520] border-l-4 rounded-2xl shadow-xs overflow-hidden", statusBorderColor)}>
-                  <CardContent className="p-4.5">
-                    <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                      <div className="flex-1 space-y-3 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={cn("text-[10px] px-2.5 rounded-full font-semibold", config.className)}><StatusIcon className="w-3 h-3 mr-1" />{config.label}</Badge>
-                          <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#8C6239] dark:text-[#EAD8C8] border border-[#EFE8DD] dark:border-[#382F28] text-[10px] px-2.5 rounded-full font-bold">{typeLabels[report.report_type] || report.report_type}</Badge>
-                          <span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+          <TabsTrigger value="tagwarn_cancel" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <AlertTriangle className="w-4 h-4 text-orange-500" />
+            <span>คำขอยกเลิก TagWarn</span>
+            {cancelPendingCount > 0 && (
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full font-bold">
+                {cancelPendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+
+          <TabsTrigger value="user_reports" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Flag className="w-4 h-4 text-rose-500" />
+            <span>รายงานผู้ใช้</span>
+            {userReportsPendingCount > 0 && (
+              <Badge className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full font-bold">
+                {userReportsPendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: MINIGAME CHANGE REQUESTS HUB */}
+        <TabsContent value="minigame_requests" className="space-y-4">
+          <MinigameRequestsManagement onPendingCountChange={setMinigamePendingCount} />
+        </TabsContent>
+
+        {/* TAB 2: TAGWARN CANCEL REQUESTS */}
+        <TabsContent value="tagwarn_cancel" className="space-y-4">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    คำขอยกเลิกประวัติเตือน TagWarn
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    คำขอจากบาริสต้า/ทีมงาน เพื่อขอยกเลิกการเตือนผู้ใช้ (ต้องได้รับอนุมัติโดย Owner)
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="border-[#EAD8C8] dark:border-[#382F28] font-bold">
+                  {cancelRequests.length} คำขอ
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 sm:p-5">
+              {cancelRequests.length === 0 ? (
+                <div className="text-xs text-muted-foreground border border-[#EAD8C8] dark:border-[#2D2520] bg-[#FAF6F0]/30 dark:bg-muted/10 rounded-2xl p-6 text-center">
+                  ยังไม่มีคำขอยกเลิกในระบบค่ะ
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cancelRequests.map((req) => (
+                    <Card key={req.id} className="bg-white dark:bg-[#1E1B18] border border-[#EAD8C8] dark:border-[#2D2520] border-l-4 border-l-amber-500/80 rounded-2xl shadow-xs overflow-hidden">
+                      <CardContent className="p-4 flex flex-wrap items-center gap-3 justify-between">
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#8C6239] dark:text-[#EAD8C8] border border-[#EFE8DD] dark:border-[#382F28] text-[10px] px-2 rounded-md">
+                              เคส #{req.warn_sequence ?? '-'}
+                            </Badge>
+                            <Badge variant={req.status === 'pending' ? 'outline' : req.status === 'approved' ? 'default' : 'destructive'} className="text-[10px] rounded-md font-semibold">
+                              {req.status === 'pending' ? '⏳ รออนุมัติ' : req.status === 'approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธ'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{new Date(req.created_at).toLocaleString('th-TH')}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            สมาชิก: <strong className="text-foreground">{req.member_id ?? '-'}</strong> • ผู้ส่งคำขอ:{' '}
+                            <strong className="text-foreground">{req.requested_by_name || req.requester?.username || 'Unknown'}</strong>
+                            {req.approved_at && (
+                              <> • อนุมัติเมื่อ {new Date(req.approved_at).toLocaleString('th-TH')}</>
+                            )}
+                          </p>
                         </div>
-                        <div className="text-xs sm:text-sm bg-[#FAF6F0] dark:bg-[#25201C]/50 border border-[#F0E8DC] dark:border-[#2D2520] p-3.5 rounded-2xl text-[#4E3F30] dark:text-[#E8E1D9] whitespace-pre-wrap break-words max-h-32 overflow-y-auto pr-2">
-                          {report.description}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3.5 text-xs text-muted-foreground pt-1">
-                          <span className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-[#8C6239] dark:text-[#B8956A]" />
-                            <span>ผู้แจ้ง (Barista ID):</span>
-                            <span className="font-semibold text-foreground bg-[#FAF5EE] dark:bg-[#2A2420] border border-[#EFE7DC] dark:border-[#3E3229] px-2 py-0.5 rounded-lg font-mono">
-                              {normalizeUserLabel(report.reporter?.username)}
-                            </span>
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5 text-[#8C6239] dark:text-[#B8956A]" />
-                            <span>ผู้ถูกแจ้ง (Member ID):</span>
-                            <span className="font-semibold text-foreground bg-[#FAF5EE] dark:bg-[#2A2420] border border-[#EFE7DC] dark:border-[#3E3229] px-2 py-0.5 rounded-lg font-mono">
-                              {normalizeUserLabel(report.reported_user?.username)}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                      <Select value={report.status} onValueChange={(value: ReportStatus) => updateReportStatus(report.id, value)}>
-                        <SelectTrigger className="w-36 border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] self-start sm:self-auto">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="open">รอดำเนินการ</SelectItem>
-                          <SelectItem value="investigating">กำลังตรวจสอบ</SelectItem>
-                          <SelectItem value="resolved">แก้ไขแล้ว</SelectItem>
-                          <SelectItem value="dismissed">ยกเลิก</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                        {req.status === 'pending' && user?.is_owner && (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="destructive" onClick={() => rejectCancelRequest(req)} disabled={approvingId === req.id} className="gap-1 rounded-xl text-xs h-8">
+                              <XCircle className="w-3.5 h-3.5" /> ปฏิเสธ
+                            </Button>
+                            <Button size="sm" onClick={() => approveCancelRequest(req)} disabled={approvingId === req.id} className="gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8">
+                              {approvingId === req.id && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                              <CheckCircle className="w-3.5 h-3.5" /> อนุมัติ
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 3: USER REPORTS */}
+        <TabsContent value="user_reports" className="space-y-4">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-[#8C6239] dark:text-[#EAD8C8] font-bold text-base">
+                      <Flag className="w-5 h-5 text-rose-500" />
+                      รายงานพฤติกรรมผู้ใช้ (User Reports)
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      รายการรายงานพฤติกรรมจากห้องแชทลับและระบบดูแลความปลอดภัย
+                    </CardDescription>
+                  </div>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-40 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD]">
+                      <SelectValue placeholder="กรองสถานะ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">ทั้งหมด</SelectItem>
+                      <SelectItem value="open">รอดำเนินการ</SelectItem>
+                      <SelectItem value="investigating">กำลังตรวจสอบ</SelectItem>
+                      <SelectItem value="resolved">แก้ไขแล้ว</SelectItem>
+                      <SelectItem value="dismissed">ยกเลิก</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <Input
+                    value={caseQuery}
+                    onChange={(e) => setCaseQuery(e.target.value)}
+                    placeholder="ค้นหาเลขเคส"
+                    className="h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+                  />
+                  <Input
+                    value={memberQuery}
+                    onChange={(e) => setMemberQuery(e.target.value)}
+                    placeholder="ค้นหา Member ID"
+                    className="h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+                  />
+                  <Input
+                    value={baristaQuery}
+                    onChange={(e) => setBaristaQuery(e.target.value)}
+                    placeholder="ค้นหา Barista ID"
+                    className="h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus-visible:ring-[#FAC4CD]"
+                  />
+                  <DatePicker
+                    value={dateQuery}
+                    onChange={setDateQuery}
+                    placeholder="เลือกวันที่"
+                    className="h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 sm:p-5">
+              {loading ? (
+                <div className="text-center py-12 text-xs text-muted-foreground">กำลังโหลดรายงาน...</div>
+              ) : filteredReports.length === 0 ? (
+                <div className="text-center py-12 text-xs text-muted-foreground border border-dashed border-[#EAD8C8] dark:border-[#2D2520] rounded-2xl bg-[#FAF6F0]/20 dark:bg-muted/5">
+                  ไม่มีรายงานในขณะนี้
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredReports.map((report) => {
+                    const config = statusConfig[report.status];
+                    const StatusIcon = config.icon;
+                    const statusBorderColor =
+                      report.status === 'open' ? 'border-l-amber-500' :
+                      report.status === 'investigating' ? 'border-l-sky-500 animate-pulse' :
+                      report.status === 'resolved' ? 'border-l-emerald-500' :
+                      'border-l-slate-400';
+
+                    return (
+                      <Card key={report.id} className={cn("bg-white dark:bg-[#1E1B18] border border-[#EAD8C8] dark:border-[#2D2520] border-l-4 rounded-2xl shadow-xs overflow-hidden", statusBorderColor)}>
+                        <CardContent className="p-4.5">
+                          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                            <div className="flex-1 space-y-3 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className={cn("text-[10px] px-2.5 rounded-full font-semibold", config.className)}>
+                                  <StatusIcon className="w-3 h-3 mr-1" />{config.label}
+                                </Badge>
+                                <Badge variant="secondary" className="bg-[#FAF5EE] dark:bg-[#25201C] text-[#8C6239] dark:text-[#EAD8C8] border border-[#EFE8DD] dark:border-[#382F28] text-[10px] px-2.5 rounded-full font-bold">
+                                  {typeLabels[report.report_type] || report.report_type}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                              </div>
+                              <div className="text-xs sm:text-sm bg-[#FAF6F0] dark:bg-[#25201C]/50 border border-[#F0E8DC] dark:border-[#2D2520] p-3.5 rounded-2xl text-[#4E3F30] dark:text-[#E8E1D9] whitespace-pre-wrap break-words max-h-32 overflow-y-auto pr-2">
+                                {report.description}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3.5 text-xs text-muted-foreground pt-1">
+                                <span className="flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-[#8C6239] dark:text-[#B8956A]" />
+                                  <span>ผู้แจ้ง (Barista ID):</span>
+                                  <span className="font-semibold text-foreground bg-[#FAF5EE] dark:bg-[#2A2420] border border-[#EFE7DC] dark:border-[#3E3229] px-2 py-0.5 rounded-lg font-mono">
+                                    {normalizeUserLabel(report.reporter?.username)}
+                                  </span>
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-[#8C6239] dark:text-[#B8956A]" />
+                                  <span>ผู้ถูกแจ้ง (Member ID):</span>
+                                  <span className="font-semibold text-foreground bg-[#FAF5EE] dark:bg-[#2A2420] border border-[#EFE7DC] dark:border-[#3E3229] px-2 py-0.5 rounded-lg font-mono">
+                                    {normalizeUserLabel(report.reported_user?.username)}
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                            <Select value={report.status} onValueChange={(value: ReportStatus) => updateReportStatus(report.id, value)}>
+                              <SelectTrigger className="w-36 h-9 text-xs border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] text-[#6B5A4B] dark:text-foreground rounded-xl focus:ring-[#FAC4CD] self-start sm:self-auto">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">รอดำเนินการ</SelectItem>
+                                <SelectItem value="investigating">กำลังตรวจสอบ</SelectItem>
+                                <SelectItem value="resolved">แก้ไขแล้ว</SelectItem>
+                                <SelectItem value="dismissed">ยกเลิก</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

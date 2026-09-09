@@ -723,5 +723,15 @@ html[data-magicui-theme-vt="active"] *::after {
   transition: none !important;
 }
 
+/* 📱 Mobile & iPad Touch Scrolling for Option Dropdowns (Radix Select & Popovers) */
+[data-radix-select-viewport] {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
 
-
+/* Override Radix body scroll lock on mobile to prevent touch freeze & layout jumps */
+body[data-scroll-locked] {
+  overflow: visible !important;
+  margin-right: 0 !important;
+}

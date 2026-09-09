@@ -28,6 +28,10 @@ description: วินิจฉัยและแก้ไขปัญหาบ�
 1. **React / Frontend Issues:**
    - **Syntax & Reference Errors:** เช่น `Identifier 'X' has already been declared` (Import ซ้ำ) หรือ `ReferenceError: X is not defined` (ลบ Import ทิ้งโดยที่คอมโพเนนต์อื่น/Dialog ในไฟล์ยังเรียกใช้อยู่)
    - **Missing React Hooks in Import:** `ReferenceError: useMemo is not defined` หรือ `useCallback is not defined` — เกิดจากการเรียกใช้ Hook โดยลืมใส่ชื่อ Hook ใน `{ useState, useEffect, ... } from 'react'` ที่ต้นไฟล์ (TypeScript อาจปล่อยผ่านจาก ambient types ทำให้ compile ไม่ฟ้อง แต่ runtime จะแครชทันทีที่ mount คอมโพเนนต์)
+   - **Radix UI Select / Popover Mobile & iPad Touch Scroll Freeze:**
+     - **อาการ:** บน PC ใช้ Mouse Wheel เลื่อนดูตัวเลือกใน Dropdown/Select ได้ตามปกติ แต่บนโทรศัพท์มือถือและ iPad ปัดเลื่อนไม่ไป (Freeze หรือเลื่อนหน้าหลักแทน)
+     - **ต้นตอ:** `SelectPrimitive.Viewport` ใส่คลาส `h-[var(--radix-select-trigger-height)]` ทำให้ความสูงกล่อง Viewport ถูกจำกัดไว้เพียง 36px/40px เมื่อผู้ใช้ทัชลากเนื้อหาแถวล่าง `react-remove-scroll` จะมองว่าแตะนอกพื้นที่เลื่อนและเรียก `event.preventDefault()`
+     - **การแก้ไข:** ปลด `h-[var(--radix-select-trigger-height)]` ออก แล้วแทนที่ด้วย `max-h-[inherit] overflow-y-auto w-full min-w-[var(--radix-select-trigger-width)] touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]` ซ่อนปุ่มเลื่อนหัว-ท้ายในโหมด popper และตั้งค่า CSS: `[data-radix-select-viewport] { touch-action: pan-y !important; -webkit-overflow-scrolling: touch !important; }` พร้อม `body[data-scroll-locked] { overflow: visible !important; margin-right: 0 !important; }`
    - Infinite re-render loop (จาก `useEffect` ที่ dependency array ไม่ถูกต้อง)
    - State mismatch / Stale closure
    - Hydration หรือ Component mounting issue

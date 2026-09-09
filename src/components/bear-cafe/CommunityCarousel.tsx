@@ -57,7 +57,7 @@ export function CommunityCarousel() {
           .order('sort_order', { ascending: true }),
         supabase
           .from('discord_servers')
-          .select('id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner')
+          .select('id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status')
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
@@ -67,7 +67,10 @@ export function CommunityCarousel() {
           .eq('status', 'approved'),
       ]);
       if (catRes.data) setCategories(catRes.data);
-      if (serverRes.data) setServers(serverRes.data);
+      if (serverRes.data) {
+        const activeServers = (serverRes.data as any[]).filter((s) => s.invite_status !== 'expired');
+        setServers(activeServers);
+      }
       setTotalCount(countRes.count ?? serverRes.data?.length ?? 0);
       setLoading(false);
     };
