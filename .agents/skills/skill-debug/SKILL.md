@@ -29,13 +29,16 @@ description: วินิจฉัยและแก้ไขปัญหาบ�
    - **Syntax & Reference Errors:** เช่น `Identifier 'X' has already been declared` (Import ซ้ำ) หรือ `ReferenceError: X is not defined` (ลบ Import ทิ้งโดยที่คอมโพเนนต์อื่น/Dialog ในไฟล์ยังเรียกใช้อยู่)
    - **Missing React Hooks in Import:** `ReferenceError: useMemo is not defined` หรือ `useCallback is not defined` — เกิดจากการเรียกใช้ Hook โดยลืมใส่ชื่อ Hook ใน `{ useState, useEffect, ... } from 'react'` ที่ต้นไฟล์ (TypeScript อาจปล่อยผ่านจาก ambient types ทำให้ compile ไม่ฟ้อง แต่ runtime จะแครชทันทีที่ mount คอมโพเนนต์)
    - **Radix UI Select / Popover Mobile & iPad Touch Scroll Freeze:**
-     - **อาการ:** บน PC ใช้ Mouse Wheel เลื่อนดูตัวเลือกใน Dropdown/Select ได้ตามปกติ แต่บนโทรศัพท์มือถือและ iPad ปัดเลื่อนไม่ไป (Freeze ค้างแข็ง)
-     - **ต้นตอ 1 (Viewport Height Locking):** `SelectPrimitive.Viewport` ใส่คลาส `h-[var(--radix-select-trigger-height)]` ทำให้ความสูงกล่อง Viewport ถูกจำกัดไว้เพียง 36px/40px เมื่อผู้ใช้ทัชลากเนื้อหาแถวล่าง `react-remove-scroll` จะมองว่าแตะนอกพื้นที่เลื่อนและเรียก `event.preventDefault()`
-     - **ต้นตอ 2 (Nested Overlay Conflict - กรณีอยู่ใน Dialog เช่น /tag-warn):** เมื่อ `RichSelect`, `Popover` หรือ `Select` เปิดอยู่ภายใน `Dialog` (Modal) ตัวเนื้อหา Dropdown จะถูก Portal ออกไปที่ `document.body` ทำให้ `RemoveScroll` ของ Dialog มองว่าผู้ใช้กำลังทัชนอก Dialog และสั่ง `event.preventDefault()` บน `document` ทันทีที่นิ้วขยับ
-     - **การแก้ไข:** 
-       1. ปลด `h-[var(--radix-select-trigger-height)]` ออก แล้วแทนที่ด้วย `max-h-[var(--radix-select-content-available-height,24rem)] overflow-y-auto w-full min-w-[var(--radix-select-trigger-width)] touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]`
-       2. ใส่ `e.stopPropagation()` บน native `touchmove` listener (`{ passive: false }`) ในกล่อง Popover/Select เสมอ เพื่อหยุดการ bubble ไม่ให้ไปถึง `document` ป้องกันไม่ให้ `RemoveScroll` ของ Dialog แม่มาสั่ง `preventDefault()`
-       3. เพิ่ม Direct Touch Drag tracking fallback (`onTouchStart` / `onTouchMove`) บน `RichSelect` และตั้งค่า Global CSS: `[data-radix-select-viewport] { touch-action: pan-y !important; -webkit-overflow-scrolling: touch !important; }` พร้อม `body[data-scroll-locked] { overflow: visible !important; margin-right: 0 !important; }`
+      - **อาการ:** บน PC ใช้ Mouse Wheel เลื่อนดูตัวเลือกใน Dropdown/Select ได้ตามปกติ แต่บนโทรศัพท์มือถือและ iPad ปัดเลื่อนไม่ไป (Freeze ค้างแข็ง 100%)
+      - **ต้นตอ 1 (Viewport Height Locking):** `SelectPrimitive.Viewport` ใส่คลาส `h-[var(--radix-select-trigger-height)]` ทำให้ความสูงกล่อง Viewport ถูกจำกัดไว้เพียง 36px/40px เมื่อผู้ใช้ทัชลากเนื้อหาแถวล่าง `react-remove-scroll` จะมองว่าแตะนอกพื้นที่เลื่อนและเรียก `event.preventDefault()`
+      - **ต้นตอ 2 (Nested Overlays & Portal Trap):** เมื่อ `RichSelect`, `Popover` หรือ `Select` เปิดขึ้นมา (โดยเฉพาะเมื่อเปิดใน `Dialog`):
+        1. เนื้อหาจะถูก Portal ออกไปที่ `document.body` ซึ่งอยู่นอก DOM Hierarchy ของ Dialog
+        2. Dialog จะสั่ง `document.body.style.pointerEvents = "none"` และสั่ง `react-remove-scroll` ดักฟัง `touchmove` บนระดับ `document` (Bubbling phase) พร้อมสั่ง `event.preventDefault()` สำหรับทุก Touch ที่ไม่ได้อยู่บน `DialogContent`
+        3. การผูก Listener ภายใน React Component ผ่าน `useEffect([open])` มักจะ Miss (ไม่ทำงาน) เนื่องจาก Radix Portal และ Presence เมานต์แบบ Asynchronous ทำให้ `ref.current` ยังคงเป็น `null` ในจังหวะที่ Effect ทำงาน
+      - **การแก้ไขที่เป็นมาตรฐานสากล (Global Body Interceptor Architecture):** 
+        1. **Global Body Bubbling Interceptor:** ใน `src/lib/touch-scroll-lock-fix.ts` ลงทะเบียน `document.body.addEventListener('touchmove', ..., { passive: false })` โดยตรงในระดับ Global ซึ่งจะทำงานก่อน `document` ในลำดับ Bubbling phase เสมอ และเรียก `e.stopPropagation()` ทันทีที่ Target อยู่ภายใน `[data-radix-popper-content-wrapper]`, `[data-radix-select-viewport]`, `[role="listbox"]`, `[role="menu"]`, `[role="dialog"]`
+        2. **Override Pointer Events:** ใส่ `pointer-events: auto !important` ใน `index.css` ให้กับ `[data-radix-popper-content-wrapper]` และลูกๆ ทุกตัว เพื่อไม่ให้ติดผลข้างเคียงจาก `pointer-events: none` ของ Dialog
+        3. **Viewport Height & Momentum:** ปลด `h-[var(--radix-select-trigger-height)]` ออกจาก `SelectContent` และแทนที่ด้วย `min-h-0 w-full max-h-[var(--radix-select-content-available-height,22rem)] overflow-y-auto touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]`
    - Infinite re-render loop (จาก `useEffect` ที่ dependency array ไม่ถูกต้อง)
    - State mismatch / Stale closure
    - Hydration หรือ Component mounting issue

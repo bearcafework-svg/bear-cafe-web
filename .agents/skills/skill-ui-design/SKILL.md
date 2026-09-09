@@ -343,3 +343,12 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
 7. ความเป็นทางการ
 
 > 💡 **เป้าหมายสูงสุด:** "ถ้าคนอ่านไม่รู้ว่าข้อความนี้สร้างโดย AI ก็คือผ่าน"
+
+---
+
+## 📱 มาตรฐาน Touch Device Scrolling สำหรับ Dropdowns & Overlays (Mobile & iPad)
+เมื่อออกแบบหรือใช้งาน Component ประเภท Dropdown, Popover, Select, Dialog หรือ Drawer บน Bear Cafe Web:
+1. **ห้ามพึ่งพาแค่ CSS Utility เดี่ยวๆ:** บน iOS Safari และ iPadOS การใส่ `overflow-y-auto` หรือ `touch-action: pan-y` เพียงอย่างเดียวไม่สามารถเอาชนะ JavaScript `preventDefault()` ของ Radix UI Body Scroll Lock (`react-remove-scroll`) ได้
+2. **Global Body Interceptor:** ทุก Overlay หรือ Dropdown ที่เป็น Portaled Content ต้องได้รับการคุ้มครองด้วย Global Touch Interceptor (`src/lib/touch-scroll-lock-fix.ts`) ซึ่งจะดักฟัง `touchmove` บนระดับ `document.body` ใน Bubbling phase และสั่ง `e.stopPropagation()` เพื่อป้องกันไม่ให้ Event ไหลไปถึง `document`
+3. **Pointer-Events Override:** เมนูที่แสดงผลแบบ Portal เข้าสู่ `document.body` ต้องมีคลาสหรือ CSS Rule `pointer-events: auto !important` เพื่อป้องกันการสืบทอด `pointer-events: none` จาก Dialog แม่
+4. **Viewport Sizing:** คอมโพเนนต์ประเภท Select Viewport ต้องไม่ถูกจำกัดความสูงไว้ที่ Trigger Height และต้องมี `min-h-0`, `max-h-[...]` และ `-webkit-overflow-scrolling: touch` เสมอ

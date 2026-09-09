@@ -723,7 +723,19 @@ html[data-magicui-theme-vt="active"] *::after {
   transition: none !important;
 }
 
-/* 📱 Mobile & iPad Touch Scrolling for Option Dropdowns (Radix Select & Popovers) */
+/* 📱 Mobile & iPad Touch Scrolling for Option Dropdowns (Radix Select, Popover, Menu) */
+[data-radix-popper-content-wrapper],
+[data-radix-select-viewport],
+[data-radix-dropdown-menu-content],
+[role="listbox"],
+[role="menu"],
+[data-touch-scroll="true"] {
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
 [data-radix-select-viewport] {
   -webkit-overflow-scrolling: touch !important;
   touch-action: pan-y !important;
@@ -735,3 +747,4 @@ body[data-scroll-locked] {
   overflow: visible !important;
   margin-right: 0 !important;
 }
+
