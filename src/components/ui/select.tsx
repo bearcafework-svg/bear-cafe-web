@@ -61,33 +61,56 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      ref={ref}
-      className={cn(
-        "relative z-50 max-h-[var(--radix-select-content-available-height,24rem)] min-w-[8rem] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        position === "popper" &&
-          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-        className,
-      )}
-      position={position}
-      {...props}
-    >
-      {position !== "popper" && <SelectScrollUpButton />}
-      <SelectPrimitive.Viewport
+>(({ className, children, position = "popper", ...props }, ref) => {
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    const stopTouch = (e: TouchEvent) => {
+      // Prevent bubbling to document where parent Dialog RemoveScroll blocks touchmove
+      e.stopPropagation();
+    };
+
+    el.addEventListener("touchmove", stopTouch, { passive: false });
+    return () => {
+      el.removeEventListener("touchmove", stopTouch);
+    };
+  }, []);
+
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        ref={(node) => {
+          contentRef.current = node;
+          if (typeof ref === "function") ref(node);
+          else if (ref) (ref as React.MutableRefObject<any>).current = node;
+        }}
         className={cn(
-          "p-1.5 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]",
+          "relative z-50 max-h-[var(--radix-select-content-available-height,24rem)] min-w-[8rem] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           position === "popper" &&
-            "w-full min-w-[var(--radix-select-trigger-width)] max-h-[inherit] overflow-y-auto",
+            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          className,
         )}
+        position={position}
+        {...props}
       >
-        {children}
-      </SelectPrimitive.Viewport>
-      {position !== "popper" && <SelectScrollDownButton />}
-    </SelectPrimitive.Content>
-  </SelectPrimitive.Portal>
-));
+        {position !== "popper" && <SelectScrollUpButton />}
+        <SelectPrimitive.Viewport
+          className={cn(
+            "p-1.5 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]",
+            position === "popper" &&
+              "w-full min-w-[var(--radix-select-trigger-width)] min-h-0 max-h-[var(--radix-select-content-available-height,22rem)] overflow-y-auto",
+          )}
+        >
+          {children}
+        </SelectPrimitive.Viewport>
+        {position !== "popper" && <SelectScrollDownButton />}
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  );
+});
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef<

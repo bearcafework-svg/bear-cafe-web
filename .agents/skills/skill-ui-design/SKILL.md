@@ -40,6 +40,7 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
   - **ห้ามใส่ `h-[var(--radix-select-trigger-height)]` บน Viewport:** เด็ดขาด เพราะจะล็อกความสูงกล่องเลื่อนเท่ากับปุ่ม Trigger (~36px-40px) ส่งผลให้ `react-remove-scroll` มองว่าการทัชแถวด้านล่างอยู่นอกขอบเขต และสั่ง `event.preventDefault()` ทำให้หน้าจอค้าง เลื่อนไม่ได้
   - **ใช้ `max-h-[inherit]` และ `touch-pan-y`:** บน `SelectPrimitive.Viewport`, `PopoverContent` และกล่องเลื่อนของ Dropdown ให้ใส่ `touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]` เสมอ เพื่อให้ WebKit บน iOS/iPadOS ทำงานร่วมกับระบบสัมผัสได้อย่างลื่นไหล
   - **ซ่อน Scroll Buttons ในโหมด Popper:** ปุ่มเลื่อนหัว-ท้าย (`SelectScrollUpButton`/`SelectScrollDownButton`) ให้แสดงเฉพาะเมื่อ `position !== "popper"` เพื่อไม่ให้แย่งพื้นที่และขัดขวางการปัดเลื่อนด้วยนิ้ว
+  - **กฎเหล็กเมื่อ Dropdown อยู่ใน Modal/Dialog (Nested Overlays):** เมื่อ `RichSelect`, `Popover` หรือ `Select` เปิดอยู่ภายใน `Dialog` ตัว `RemoveScroll` ของ Dialog จะดักจับอีเวนต์ `touchmove` บน `document` และสั่ง `event.preventDefault()` เพราะคิดว่าเป็นทัชนอก Dialog! วิธีแก้คือต้องใส่ `e.stopPropagation()` บน native `touchmove` ของกล่อง Popover/Select เสมอ เพื่อหยุดการ bubble ไม่ให้ไปถึง `document` พร้อมกับใส่ Direct Touch Drag fallback ให้ลากนิ้วเลื่อนได้ทันที
 * **Glassmorphism & Card Design:** ใช้การ์ดกึ่งโปร่งแสงผสมพื้นหลังเบลอ (เช่น `bg-[#1A1614]/80 backdrop-blur-md border border-[#2D2420]`)
 
 ---

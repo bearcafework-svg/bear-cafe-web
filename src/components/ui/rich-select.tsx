@@ -45,6 +45,11 @@ export function RichSelect({
   const [open, setOpen] = React.useState(false);
   const [internalValue, setInternalValue] = React.useState<string>(defaultValue ?? '');
 
+  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const touchStartYRef = React.useRef<number>(0);
+  const touchStartScrollTopRef = React.useRef<number>(0);
+  const isDraggingRef = React.useRef<boolean>(false);
+
   const currentValue = value !== undefined ? value : internalValue;
   const selectedItem = React.useMemo(
     () => safeData.find((item) => item.value === currentValue),
@@ -52,13 +57,61 @@ export function RichSelect({
   );
 
   const handleSelect = (itemValue: string) => {
-    if (disabled) return;
+    if (disabled || isDraggingRef.current) return;
     if (value === undefined) {
       setInternalValue(itemValue);
     }
     onValueChange?.(itemValue);
     setOpen(false);
   };
+
+  // 📱 Fix for Mobile & iPad touch scrolling (especially when inside Radix Dialog):
+  // Parent Dialog's RemoveScroll listens to native 'touchmove' on document and calls preventDefault().
+  // By stopping touchmove propagation directly on the scrollable container and manually tracking delta,
+  // we guarantee 100% reliable touch drag on iOS Safari, iPadOS, and Android.
+  React.useEffect(() => {
+    if (!open) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartYRef.current = e.touches[0].clientY;
+      touchStartScrollTopRef.current = el.scrollTop;
+      isDraggingRef.current = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      // Stop bubbling so parent Dialog RemoveScroll on document never sees and blocks this event
+      e.stopPropagation();
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchStartYRef.current - currentY;
+
+      if (Math.abs(deltaY) > 5) {
+        isDraggingRef.current = true;
+      }
+
+      // Smooth direct touch scroll fallback
+      el.scrollTop = touchStartScrollTopRef.current + deltaY;
+    };
+
+    const onTouchEnd = () => {
+      // Delay resetting drag flag slightly so onClick does not trigger immediately after drag
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 80);
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [open]);
 
   return (
     <div className={cn('w-full space-y-1.5', className)}>
@@ -116,6 +169,7 @@ export function RichSelect({
           )}
         >
           <div
+            ref={scrollContainerRef}
             onWheel={(e) => {
               e.stopPropagation();
               e.currentTarget.scrollTop += e.deltaY;
