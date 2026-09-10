@@ -26,7 +26,10 @@ description: วินิจฉัยและแก้ไขปัญหาบ�
 
 ### ขั้นตอนที่ 2: จำแนกประเภทของปัญหา (Classification)
 1. **React / Frontend Issues:**
-   - **Syntax & Reference Errors:** เช่น `Identifier 'X' has already been declared` (Import ซ้ำ) หรือ `ReferenceError: X is not defined` (ลบ Import ทิ้งโดยที่คอมโพเนนต์อื่น/Dialog ในไฟล์ยังเรียกใช้อยู่)
+   - **Syntax & Reference Errors:** เช่น `Identifier 'X' has already been declared` (Import ซ้ำ) หรือ `ReferenceError: X is not defined` (ลบ Import ทิ้ง หรือเพิ่ม JSX ของ Component ใหม่ เช่น `Dialog`, `DialogContent`, `DialogHeader` โดยลืม import จาก `@/components/ui/dialog`)
+   - **Vite Transpilation Blindspot (Black Screen / จอดำ):** 
+     - **กลไกที่ทำให้หลุด:** `vite build` ใช้ esbuild ซึ่งเป็น Transpile-only (ตัด TS types ออกโดยไม่ทำ Semantic Check ตัวแปร) ประกอบกับ `tsconfig.json` ตั้งเป็น Project Reference (`files: []`) ทำให้ `npx tsc --noEmit` แบบไม่มี flags มองข้ามไฟล์ใน `src/` ไป หากมีคอมโพเนนต์ที่ไม่ได้ Import จะไม่ฟ้อง error ใน Vite build แต่จะหลุดไปแครชเป็นจอดำบน Production ทันทีที่ผู้ใช้เปิดหน้า
+     - **การป้องกันตายตัว:** ต้องรัน `npm run check:imports` เสมอ เพื่อให้ AST Semantic TypeChecker ตรวจสอบความถูกต้องของทุกตัวแปรใน `src/` ก่อน Commit/Deploy ทุกครั้ง
    - **Missing React Hooks in Import:** `ReferenceError: useMemo is not defined` หรือ `useCallback is not defined` — เกิดจากการเรียกใช้ Hook โดยลืมใส่ชื่อ Hook ใน `{ useState, useEffect, ... } from 'react'` ที่ต้นไฟล์ (TypeScript อาจปล่อยผ่านจาก ambient types ทำให้ compile ไม่ฟ้อง แต่ runtime จะแครชทันทีที่ mount คอมโพเนนต์)
    - **Radix UI Select / Popover Mobile & iPad Touch Scroll Freeze:**
       - **อาการ:** บน PC ใช้ Mouse Wheel เลื่อนดูตัวเลือกใน Dropdown/Select ได้ตามปกติ แต่บนโทรศัพท์มือถือและ iPad ปัดเลื่อนไม่ไป (Freeze ค้างแข็ง 100%)

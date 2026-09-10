@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "check:imports": "node scripts/check-missing-imports.js",
     "preview": "vite preview",
     "supabase:start": "npx supabase start && npx supabase db query --local --file ./supabase/dev/grant_all_table_permissions.sql && npx supabase functions serve --env-file ./supabase/functions/.env",
     "supabase:stop": "npx supabase stop",

@@ -24,9 +24,9 @@ flowchart LR
    - ตรวจสอบว่าไม่มี API keys, Tokens หรือ Secrets หลุดในโค้ด
    - ลบ `console.log` ที่ใช้ชั่วคราวในการ Debug ออกให้หมด
    - ไม่มีไฟล์ขยะหรือไฟล์ทดสอบหลงเหลือ
-2. **ทดสอบการ Build จริง:**
-   - รันคำสั่งตรวจสอบการคอมไพล์ (เช่น `npm run build` หรือ `npm run typecheck`)
-   - ต้องมั่นใจว่า Vite build สำเร็จ 100% โดยไม่มีข้อผิดพลาด
+2. **ทดสอบการ Build และ Import จริง:**
+   - **รันตรวจสอบ Import และตัวแปรตกหล่น:** `npm run check:imports` (ต้องผ่าน 0 errors ป้องกันปัญหา `ReferenceError: Dialog is not defined` ที่ทำให้หน้าจอดำ)
+   - **รันคำสั่ง Build:** `npm run build` ต้องมั่นใจว่า Vite build สำเร็จ 100% โดยไม่มีข้อผิดพลาด
 
 ---
 
