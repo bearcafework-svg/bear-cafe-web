@@ -479,8 +479,11 @@ export function MinigamesManagement() {
 
   // Akari Cross-Project Sync State
   const [syncAkariOpen, setSyncAkariOpen] = useState(false);
-  const [akariUrl, setAkariUrl] = useState(() => localStorage.getItem('akari_sync_supabase_url') || '');
-  const [akariKey, setAkariKey] = useState(() => localStorage.getItem('akari_sync_supabase_key') || '');
+  const defaultAkariUrl = ((import.meta as any).env?.VITE_AKARI_SUPABASE_URL as string) || 'https://fqzhcpzxdlnvhvlqspgc.supabase.co';
+  const defaultAkariKey = ((import.meta as any).env?.VITE_AKARI_SUPABASE_ANON_KEY as string) || '';
+  const [akariUrl, setAkariUrl] = useState(() => localStorage.getItem('akari_sync_supabase_url') || defaultAkariUrl);
+  const [akariKey, setAkariKey] = useState(() => localStorage.getItem('akari_sync_supabase_key') || defaultAkariKey);
+  const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [syncCleanFirst, setSyncCleanFirst] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
@@ -2825,36 +2828,65 @@ export function MinigamesManagement() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Project URL</label>
-              <Input
-                placeholder="https://xxxxxxxxxxxx.supabase.co"
-                className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520]"
-                value={akariUrl}
-                onChange={(e) => setAkariUrl(e.target.value)}
-                disabled={isSyncing}
-              />
+            {/* Connection Status Card */}
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="font-bold text-emerald-900 dark:text-emerald-200 block">
+                    {akariKey ? 'พร้อมซิงค์ข้อมูล (ระบบเชื่อมต่อ Akari สำเร็จ)' : 'ยังไม่มี Key เชื่อมต่อ (โปรดกรอกหรือใส่ใน .env)'}
+                  </span>
+                  <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400 block truncate max-w-[280px]">
+                    เป้าหมาย: {akariUrl}
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+              >
+                {showAdvancedConfig ? 'ซ่อนการตั้งค่า' : 'แก้ไข URL/Key'}
+              </Button>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Key (Service Role หรือ Anon Key)</label>
-              <Input
-                type="password"
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520]"
-                value={akariKey}
-                onChange={(e) => setAkariKey(e.target.value)}
-                disabled={isSyncing}
-              />
-              <p className="text-[10px] text-muted-foreground">
-                * ข้อมูลจะถูกบันทึกไว้ในเบราว์เซอร์ของคุณ เพื่อความสะดวกในการซิงค์ครั้งต่อไป
-              </p>
-            </div>
+            {/* Inputs (only show if key is missing or user explicitly clicked edit) */}
+            {(!akariKey || showAdvancedConfig) && (
+              <div className="space-y-3 p-3.5 rounded-2xl bg-[#FAF6F0] dark:bg-[#25201C] border border-[#EAD8C8] dark:border-[#2D2520]">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Project URL</label>
+                  <Input
+                    placeholder="https://xxxxxxxxxxxx.supabase.co"
+                    className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                    value={akariUrl}
+                    onChange={(e) => setAkariUrl(e.target.value)}
+                    disabled={isSyncing}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Anon Key</label>
+                  <Input
+                    type="password"
+                    placeholder="ใส่ Anon Key ของ Akari"
+                    className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                    value={akariKey}
+                    onChange={(e) => setAkariKey(e.target.value)}
+                    disabled={isSyncing}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    * คุณสามารถระบุค่า <code>VITE_AKARI_SUPABASE_ANON_KEY</code> ในไฟล์ <code>.env</code> ของเว็บ เพื่อไม่ต้องกรอกตรงนี้อีกค่ะ
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF6F0] dark:bg-[#25201C] border border-[#EAD8C8] dark:border-[#2D2520]">
               <div>
-                <span className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">ล้างโจทย์เก่าใน Akari ก่อนซิงค์</span>
-                <span className="text-[11px] text-[#8C7A6B] dark:text-[#A89A8C]">ลบข้อมูลเก่าออกก่อน เพื่อป้องกันโจทย์ซ้ำซ้อน</span>
+                <span className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">ล้างโจทย์เก่าใน Akari ก่อนซิงค์ (Full Mirror)</span>
+                <span className="text-[11px] text-[#8C7A6B] dark:text-[#A89A8C]">ลบข้อมูลเก่าออกก่อน เพื่อให้โจทย์สองบอทตรงกัน 100%</span>
               </div>
               <Switch checked={syncCleanFirst} onCheckedChange={setSyncCleanFirst} disabled={isSyncing} />
             </div>
