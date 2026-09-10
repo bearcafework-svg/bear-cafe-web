@@ -171,6 +171,25 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
     />
     ```
 
+* **Admin Notification Toast Box (กล่องแจ้งเตือนมุมขวาล่างสำหรับระบบหลังบ้าน Admin):**
+  - แทนที่การใช้ Default Toast สีแดง/ขาวแข็ง ๆ ของ Shadcn ด้วยกล่องแจ้งเตือนสไตล์ Bear Cafe Warm Dark (`@/components/admin/AdminNotificationToast`)
+  - **โครงสร้างและการทำงาน:**
+    - กลอยลอยมุมขวาล่าง (Floating Stack ลิมิต 4 กล่องพร้อมกัน)
+    - พื้นหลัง Glassmorphism โค้งมน: `rounded-2xl dark:bg-[#1E1B18]/95 dark:backdrop-blur-md dark:border dark:border-white/10`
+    - ไอคอน Badge สีชัดเจน: สำเร็จ (`#00C9A7`), ข้อผิดพลาด (`#FF3D71`), คำเตือน (`#FFB800`), ข้อมูล (`#1E86FF`)
+    - แสดงชื่อหัวข้อ, เวลา ("เมื่อสักครู่") และคำอธิบายย่อยที่เป็นภาษาไทยธรรมชาติ สั้นกระชับ
+  - **การเรียกใช้:**
+    ```tsx
+    import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
+
+    const { notify } = useAdminNotification();
+
+    // ตัวอย่างการแจ้งเตือน
+    notify.success('สร้างสิทธิ์สำเร็จ', 'เพิ่มสิทธิ์ใหม่เข้าสู่ระบบแล้ว');
+    notify.error('เกิดข้อผิดพลาด', 'ไม่มีสิทธิ์บันทึกข้อมูลนี้');
+    notify.warning('ข้อมูลไม่ครบถ้วน', 'พิมพ์ชื่อสิทธิ์ก่อนบันทึก');
+    ```
+
 ---
 
 ## ✍️ มาตรฐานข้อความภาษาไทย (Thai Natural Language & UX Copy)

@@ -44,6 +44,10 @@ description: วินิจฉัยและแก้ไขปัญหาบ�
    - Hydration หรือ Component mounting issue
 2. **Supabase & API Issues:**
    - Error `401 Unauthorized` / `403 Forbidden` (เกิดจากสิทธิ์ RLS หรือ Token หมดอายุ)
+   - **RLS Policy Write Block (`new row violates row-level security policy for table 'X'`):**
+     - **อาการ:** ผู้ใช้กดเพิ่ม/แก้ไข/ลบข้อมูลแล้ว Supabase ฟ้อง error ว่าละเมิด RLS
+     - **ต้นตอ:** ตารางใน Supabase เปิด RLS ไว้ แต่มีเพียง Policy `FOR SELECT` หรือไม่มี Policy สำหรับ `FOR ALL` / `FOR INSERT` / `FOR UPDATE` / `FOR DELETE` ทำให้ PostgREST ปฏิเสธการเขียนข้อมูล
+     - **วิธีแก้:** เพิ่ม Migration ใส่ Policy `FOR ALL TO authenticated` ให้กับผู้ใช้ที่มีสิทธิ์ โดยครอบคลุมทั้ง Owner, Admin, และผู้ได้รับสิทธิ์หน้า (`public.is_owner() OR public.has_page_access('...') OR EXISTS (SELECT 1 FROM profiles WHERE role IN ('owner', 'admin'))`)
    - Error `PGRSTxxx` (PostgREST syntax หรือเรียกชื่อคอลัมน์ผิด)
    - Edge Function `500 Internal Server Error` หรือปัญหา CORS Headers
 3. **Cross-System Mismatch:**

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { withRetry } from '@/lib/retry';
-import { useToast } from '@/hooks/use-toast';
+import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ interface AssignedUser {
 }
 
 export function PermissionsManagement() {
-  const { toast } = useToast();
+  const { notify } = useAdminNotification();
   const { user } = useAuth();
 
   const [permissions, setPermissions] = useState<CustomPermission[]>([]);
@@ -121,11 +121,11 @@ export function PermissionsManagement() {
       })));
     } catch (e) {
       console.error(e);
-      toast({ title: 'โหลดข้อมูลล้มเหลว', variant: 'destructive' });
+      notify.error('โหลดข้อมูลไม่สำเร็จ', 'ไม่สามารถดึงข้อมูลสิทธิ์จากระบบได้');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [notify]);
 
   useEffect(() => { fetchPermissions(); }, [fetchPermissions]);
 
@@ -184,11 +184,14 @@ export function PermissionsManagement() {
         );
         if (error) throw error;
       }
-      toast({ title: 'อัปเดตสิทธิ์สมาชิกเรียบร้อยแล้ว' });
+      notify.success('บันทึกสิทธิ์สำเร็จ', `อัปเดตสิทธิ์ของ ${userQuickDialogUser.username} แล้ว`);
       setUserQuickDialogUser(null);
       fetchAssignedUsers();
     } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+      const errMsg = e?.message?.includes('row-level security')
+        ? 'ไม่มีสิทธิ์แก้ไขสิทธิ์สมาชิก (ติดเงื่อนไขความปลอดภัย RLS)'
+        : (e?.message || 'บันทึกสิทธิ์สมาชิกไม่สำเร็จ');
+      notify.error('เกิดข้อผิดพลาด', errMsg);
     } finally {
       setSavingUserQuick(false);
     }
@@ -214,11 +217,11 @@ export function PermissionsManagement() {
 
   async function handleSave() {
     if (!formName.trim()) {
-      toast({ title: 'กรุณาใส่ชื่อสิทธิ์', variant: 'destructive' });
+      notify.warning('ข้อมูลไม่ครบถ้วน', 'พิมพ์ชื่อสิทธิ์ก่อนบันทึก');
       return;
     }
     if (formPages.length === 0) {
-      toast({ title: 'กรุณาเลือกหน้าอย่างน้อย 1 หน้า', variant: 'destructive' });
+      notify.warning('ข้อมูลไม่ครบถ้วน', 'เลือกหน้าที่อนุญาตอย่างน้อย 1 หน้า');
       return;
     }
     setSaving(true);
@@ -237,7 +240,7 @@ export function PermissionsManagement() {
           .single();
         if (error) throw error;
         if (!data) throw new Error('ไม่สามารถอัปเดตได้');
-        toast({ title: 'อัปเดตสิทธิ์แล้ว' });
+        notify.success('อัปเดตสิทธิ์สำเร็จ', `บันทึกการแก้ไขสิทธิ์ "${formName.trim()}" แล้ว`);
       } else {
         const { data, error } = await supabase
           .from('custom_permissions')
@@ -252,13 +255,16 @@ export function PermissionsManagement() {
           .single();
         if (error) throw error;
         if (!data) throw new Error('ไม่สามารถสร้างได้');
-        toast({ title: 'สร้างสิทธิ์แล้ว' });
+        notify.success('สร้างสิทธิ์สำเร็จ', `เพิ่มสิทธิ์ "${formName.trim()}" ในระบบแล้ว`);
       }
       setDialogOpen(false);
       fetchPermissions();
     } catch (e: any) {
       console.error(e);
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+      const errMsg = e?.message?.includes('row-level security')
+        ? 'ไม่มีสิทธิ์บันทึกข้อมูลสิทธิ์ (ติดเงื่อนไขความปลอดภัย RLS)'
+        : (e?.message || 'บันทึกข้อมูลสิทธิ์ไม่สำเร็จ');
+      notify.error('เกิดข้อผิดพลาด', errMsg);
     } finally {
       setSaving(false);
     }
@@ -270,11 +276,14 @@ export function PermissionsManagement() {
       await supabase.from('user_custom_permissions').delete().eq('permission_id', deleteTarget.id);
       const { error } = await supabase.from('custom_permissions').delete().eq('id', deleteTarget.id);
       if (error) throw error;
-      toast({ title: 'ลบสิทธิ์แล้ว' });
+      notify.success('ลบสิทธิ์สำเร็จ', `ลบสิทธิ์ "${deleteTarget.name}" และถอนออกจากสมาชิกทั้งหมดแล้ว`);
       setDeleteTarget(null);
       fetchPermissions();
     } catch (e: any) {
-      toast({ title: 'ลบล้มเหลว', description: e.message, variant: 'destructive' });
+      const errMsg = e?.message?.includes('row-level security')
+        ? 'ไม่มีสิทธิ์ลบข้อมูลสิทธิ์นี้ (ติดเงื่อนไขความปลอดภัย RLS)'
+        : (e?.message || 'ลบข้อมูลสิทธิ์ไม่สำเร็จ');
+      notify.error('ลบสิทธิ์ไม่สำเร็จ', errMsg);
     }
   }
 
@@ -323,18 +332,21 @@ export function PermissionsManagement() {
           .eq('user_id', userId)
           .eq('permission_id', permissionId);
         if (error) throw error;
-        toast({ title: 'ลบสิทธิ์จากผู้ใช้แล้ว' });
+        notify.success('ถอดสิทธิ์สำเร็จ', 'นำสิทธิ์ออกจากสมาชิกแล้ว');
       } else {
         const { error } = await supabase
           .from('user_custom_permissions')
           .insert({ user_id: userId, permission_id: permissionId, assigned_by: user?.id });
         if (error) throw error;
-        toast({ title: 'เพิ่มสิทธิ์ให้ผู้ใช้แล้ว' });
+        notify.success('มอบสิทธิ์สำเร็จ', 'เพิ่มสิทธิ์ให้สมาชิกแล้ว');
       }
       openAssignDialog(assignPermission!);
       fetchAssignedUsers();
     } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message, variant: 'destructive' });
+      const errMsg = e?.message?.includes('row-level security')
+        ? 'ไม่มีสิทธิ์แก้ไขสิทธิ์สมาชิก (ติดเงื่อนไขความปลอดภัย RLS)'
+        : (e?.message || 'ปรับสิทธิ์ไม่สำเร็จ');
+      notify.error('เกิดข้อผิดพลาด', errMsg);
     }
   }
 
