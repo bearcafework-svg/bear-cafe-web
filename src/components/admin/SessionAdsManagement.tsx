@@ -85,188 +85,8 @@ const INITIAL_FORM: AdFormData = {
 };
 
 const BUCKET = 'campaign-images';
-const AD_WIDTH = 1200;
-const AD_HEIGHT = 480;
-
-// ── Canvas crop + resize to exact 1200×480 ────────────────────────────────────
-function cropAndResize(
-  img: HTMLImageElement,
-  cropX: number,
-  cropY: number,
-  cropW: number,
-  cropH: number,
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = AD_WIDTH;
-    canvas.height = AD_HEIGHT;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, AD_WIDTH, AD_HEIGHT);
-    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, AD_WIDTH, AD_HEIGHT);
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))),
-      'image/jpeg',
-      0.88,
-    );
-  });
-}
-
-// ── CropModal ─────────────────────────────────────────────────────────────────
-interface CropModalProps {
-  file: File;
-  onConfirm: (blob: Blob) => void;
-  onCancel: () => void;
-}
-
-function CropModal({ file, onConfirm, onCancel }: CropModalProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const [disp, setDisp] = useState({ w: 0, h: 0 }); // display size
-  const [crop, setCrop] = useState({ x: 0, y: 0, w: 0, h: 0 });
-  const [processing, setProcessing] = useState(false);
-
-  // drag state
-  const dragging = useRef<{ type: 'move' | 'resize'; sx: number; sy: number; ox: number; oy: number; ow: number; oh: number } | null>(null);
-
-  // Load image once
-  useEffect(() => {
-    const url = URL.createObjectURL(file);
-    const el = new Image();
-    el.onload = () => {
-      setImg(el);
-      URL.revokeObjectURL(url);
-      const cw = containerRef.current?.clientWidth || 560;
-      const scale = Math.min(1, cw / el.naturalWidth);
-      const dw = Math.round(el.naturalWidth * scale);
-      const dh = Math.round(el.naturalHeight * scale);
-      setDisp({ w: dw, h: dh });
-      // initial crop: max 2.5:1 rect centred
-      const ch = Math.min(dh, dw / 2.5);
-      const cW = ch * 2.5;
-      setCrop({ x: Math.round((dw - cW) / 2), y: Math.round((dh - ch) / 2), w: Math.round(cW), h: Math.round(ch) });
-    };
-    el.onerror = () => URL.revokeObjectURL(url);
-    el.src = url;
-  }, [file]);
-
-  // Draw overlay every time crop changes
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !img || disp.w === 0) return;
-    canvas.width = disp.w;
-    canvas.height = disp.h;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, disp.w, disp.h);
-    ctx.drawImage(img, 0, 0, disp.w, disp.h);
-    // dim outside
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(0, 0, disp.w, disp.h);
-    // show original image inside crop area
-    ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, crop.x, crop.y, crop.w, crop.h);
-    // border
-    ctx.strokeStyle = '#f5c518';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(crop.x, crop.y, crop.w, crop.h);
-    // resize handle corner
-    ctx.fillStyle = '#f5c518';
-    ctx.fillRect(crop.x + crop.w - 10, crop.y + crop.h - 10, 10, 10);
-  }, [img, crop, disp]);
-
-  const clamp = useCallback((c: typeof crop): typeof crop => {
-    const minH = 30;
-    let { x, y, w, h } = c;
-    w = Math.max(minH * 2.5, w);
-    h = w / 2.5;
-    x = Math.max(0, Math.min(x, disp.w - w));
-    y = Math.max(0, Math.min(y, disp.h - h));
-    if (x + w > disp.w) { w = disp.w - x; h = w / 2.5; }
-    if (y + h > disp.h) { h = disp.h - y; w = h * 2.5; x = Math.max(0, Math.min(x, disp.w - w)); }
-    return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
-  }, [disp]);
-
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const r = canvasRef.current!.getBoundingClientRect();
-    return { mx: e.clientX - r.left, my: e.clientY - r.top };
-  };
-
-  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const { mx, my } = getPos(e);
-    const inResize = mx >= crop.x + crop.w - 14 && mx <= crop.x + crop.w + 4
-      && my >= crop.y + crop.h - 14 && my <= crop.y + crop.h + 4;
-    const inMove = mx >= crop.x && mx <= crop.x + crop.w && my >= crop.y && my <= crop.y + crop.h;
-    if (inResize) {
-      dragging.current = { type: 'resize', sx: mx, sy: my, ox: crop.x, oy: crop.y, ow: crop.w, oh: crop.h };
-    } else if (inMove) {
-      dragging.current = { type: 'move', sx: mx, sy: my, ox: crop.x, oy: crop.y, ow: crop.w, oh: crop.h };
-    }
-  };
-
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!dragging.current) return;
-    const { mx, my } = getPos(e);
-    const d = dragging.current;
-    if (d.type === 'move') {
-      setCrop(prev => clamp({ ...prev, x: d.ox + (mx - d.sx), y: d.oy + (my - d.sy) }));
-    } else {
-      const newW = Math.max(75, d.ow + (mx - d.sx));
-      setCrop(prev => clamp({ ...prev, w: newW, h: newW / 2.5 }));
-    }
-  };
-
-  const onMouseUp = () => { dragging.current = null; };
-
-  const handleConfirm = async () => {
-    if (!img) return;
-    setProcessing(true);
-    try {
-      const scaleX = img.naturalWidth / disp.w;
-      const scaleY = img.naturalHeight / disp.h;
-      const blob = await cropAndResize(img, crop.x * scaleX, crop.y * scaleY, crop.w * scaleX, crop.h * scaleY);
-      onConfirm(blob);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>ครอปภาพโฆษณา (ผลลัพธ์ {AD_WIDTH} × {AD_HEIGHT} px)</DialogTitle>
-        </DialogHeader>
-        <p className="text-xs text-muted-foreground -mt-2 mb-2">
-          ลากกรอบสีทองเพื่อย้าย · ลากมุมขวาล่างเพื่อปรับขนาด (อัตราส่วน 2.5:1 ถูกล็อกไว้)
-        </p>
-        <div ref={containerRef} className="w-full rounded-xl overflow-hidden border border-border/50 bg-muted/20">
-          {disp.w > 0 ? (
-            <canvas
-              ref={canvasRef}
-              style={{ width: disp.w, height: disp.h, maxWidth: '100%', display: 'block', cursor: 'crosshair' }}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-36 gap-2 text-muted-foreground text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />กำลังโหลดภาพ...
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={processing}>ยกเลิก</Button>
-          <Button onClick={handleConfirm} disabled={processing || !img}>
-            {processing
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />กำลังครอป...</>
-              : 'ยืนยันครอป'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const MAX_IMAGE_WIDTH = 1920;
+const MAX_IMAGE_HEIGHT = 1080;
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function SessionAdsManagement() {
@@ -282,8 +102,7 @@ export function SessionAdsManagement() {
   const [saving, setSaving] = useState(false);
 
   // image selection
-  const [cropFile, setCropFile] = useState<File | null>(null);       // triggers crop modal
-  const [pendingImageUrl, setPendingImageUrl] = useState<string>(''); // url after crop+upload
+  const [pendingImageUrl, setPendingImageUrl] = useState<string>(''); // url after upload
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -344,21 +163,51 @@ export function SessionAdsManagement() {
 
   const closeDialog = () => {
     setDialogOpen(false);
-    setCropFile(null);
     setPendingImageUrl('');
     setIsDragging(false);
   };
 
-  // ── File select → open crop modal ───────────────────────────────────────────
+  // ── File upload & optimize (Free size, maintains aspect ratio) ─────────────
+  const uploadImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WebP)', variant: 'destructive' });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Compress keeping original aspect ratio up to max 1920x1080 and ≤ 1MB
+      const compressed = await compressImage(file, {
+        maxWidth: MAX_IMAGE_WIDTH,
+        maxHeight: MAX_IMAGE_HEIGHT,
+        maxSizeBytes: 1024 * 1024,
+        initialQuality: 0.90,
+        outputType: file.type === 'image/png' ? 'image/png' : 'image/jpeg',
+      });
+
+      const ext = file.type === 'image/png' ? 'png' : 'jpg';
+      const fileName = `${Date.now()}-session-ad.${ext}`;
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .upload(fileName, compressed, { cacheControl: '86400', upsert: false });
+
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
+      setPendingImageUrl(publicUrl);
+      setPickerFiles([]);
+      toast({ title: 'อัปโหลดสำเร็จ 🎉', description: 'อัปโหลดภาพโฆษณาเรียบร้อยแล้ว' });
+    } catch (err: any) {
+      toast({ title: 'อัปโหลดไม่สำเร็จ', description: err?.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'รองรับเฉพาะไฟล์รูปภาพ', variant: 'destructive' });
-      return;
-    }
-    setCropFile(file);
+    uploadImageFile(file);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -384,40 +233,7 @@ export function SessionAdsManagement() {
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'รองรับเฉพาะไฟล์รูปภาพ', variant: 'destructive' });
-        return;
-      }
-      setCropFile(file);
-    }
-  };
-
-  // ── After crop confirmed: compress → upload ─────────────────────────────────
-  const handleCropConfirm = async (blob: Blob) => {
-    setCropFile(null);
-    setUploading(true);
-    try {
-      const rawFile = new File([blob], `${Date.now()}-ad-raw.jpg`, { type: 'image/jpeg' });
-      const compressed = await compressImage(rawFile, {
-        maxWidth: AD_WIDTH,
-        maxHeight: AD_HEIGHT,
-        maxSizeBytes: 300 * 1024,
-        initialQuality: 0.88,
-        outputType: 'image/jpeg',
-      });
-      const fileName = `${Date.now()}-session-ad.jpg`;
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .upload(fileName, compressed, { cacheControl: '86400', upsert: false });
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
-      setPendingImageUrl(publicUrl);
-      setPickerFiles([]);
-      toast({ title: 'อัปโหลดสำเร็จ', description: 'ภาพถูกครอป บีบ และอัปโหลดแล้ว' });
-    } catch (err: any) {
-      toast({ title: 'อัปโหลดไม่สำเร็จ', description: err?.message, variant: 'destructive' });
-    } finally {
-      setUploading(false);
+      uploadImageFile(file);
     }
   };
 
@@ -651,15 +467,6 @@ export function SessionAdsManagement() {
       {/* hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-      {/* Crop modal */}
-      {cropFile && (
-        <CropModal
-          file={cropFile}
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
-        />
-      )}
-
       {/* Main card */}
       <Card className="rounded-2xl border-border/40 bg-card">
         <CardHeader className="p-4 sm:p-6 pb-2">
@@ -770,11 +577,15 @@ export function SessionAdsManagement() {
                               </div>
                             </div>
 
-                            {/* Left: Thumbnail */}
+                            {/* Left: Thumbnail (supports free aspect ratio) */}
                             <div className="flex sm:flex-col items-center gap-2 shrink-0">
-                              <div className="relative aspect-[2.5/1] w-44 sm:w-40 rounded-xl overflow-hidden border border-border/30 bg-muted">
-                                <img src={ad.image_url} alt={`ad-${index + 1}`} className="w-full h-full object-cover" />
-                                <div className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full select-none">
+                              <div className="relative w-44 sm:w-40 min-h-[72px] max-h-32 rounded-xl overflow-hidden border border-border/30 bg-black/40 flex items-center justify-center">
+                                <img
+                                  src={ad.image_url}
+                                  alt={`ad-${index + 1}`}
+                                  className="w-full h-full max-h-32 object-contain rounded-xl"
+                                />
+                                <div className="absolute top-1.5 left-1.5 bg-black/75 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full select-none shadow-sm">
                                   ลำดับที่ {index + 1}
                                 </div>
                               </div>
@@ -886,17 +697,17 @@ export function SessionAdsManagement() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <Label className="font-semibold text-foreground">ภาพโฆษณา *</Label>
-                <span className="text-[11px] text-muted-foreground">ขนาด 1200 × 480 px (2.5:1)</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">✨ ใช้งานขนาดและสัดส่วนภาพได้อิสระ</span>
               </div>
               {pendingImageUrl ? (
                 <div className="space-y-2">
-                  <div className="group relative w-full aspect-[2.5/1] overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-sm">
+                  <div className="group relative w-full min-h-[160px] max-h-[380px] overflow-hidden rounded-2xl border border-border/60 bg-black/50 shadow-sm flex items-center justify-center p-2">
                     <img
                       src={pendingImageUrl}
                       alt="preview"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="max-w-full max-h-[360px] object-contain rounded-xl transition-transform duration-500 group-hover:scale-[1.02]"
                     />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-[2px] transition-opacity duration-200 flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-[2px] transition-opacity duration-200 flex items-center justify-center gap-2 rounded-2xl">
                       <Button
                         type="button"
                         variant="secondary"
@@ -939,7 +750,7 @@ export function SessionAdsManagement() {
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={cn(
-                      'group relative flex w-full aspect-[2.5/1] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
+                      'group relative flex w-full min-h-[160px] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200',
                       'border-border/60 bg-muted/20 hover:border-amber-500/50 hover:bg-amber-500/[0.04]',
                       isDragging && 'border-amber-500 bg-amber-500/10 scale-[0.99]'
                     )}
@@ -953,10 +764,10 @@ export function SessionAdsManagement() {
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                        {uploading ? 'กำลังอัปโหลดและประมวลผลภาพ...' : 'คลิกเพื่ออัปโหลดและครอปภาพ หรือลากไฟล์ภาพมาวางที่นี่'}
+                        {uploading ? 'กำลังอัปโหลดและประมวลผลภาพ...' : 'คลิกเพื่ออัปโหลดภาพ หรือลากไฟล์ภาพมาวางที่นี่'}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        ผลลัพธ์ 1200 × 480 px · บีบอัดภาพให้อัตโนมัติ (≤ 300 KB)
+                        รองรับทุกขนาดและสัดส่วนภาพอย่างอิสระ · รองรับ JPG, PNG, WebP
                       </p>
                     </div>
                   </div>
@@ -1188,7 +999,7 @@ export function SessionAdsManagement() {
                           setPickerOpen(false);
                         }
                       }}
-                      className={`relative group rounded-2xl overflow-hidden border-2 transition-all aspect-[2.5/1] bg-muted cursor-pointer select-none ${
+                      className={`relative group rounded-2xl overflow-hidden border-2 transition-all aspect-video bg-black/40 flex items-center justify-center cursor-pointer select-none ${
                         isCheckedForDelete
                           ? 'border-destructive ring-4 ring-destructive/20 bg-destructive/10 scale-[0.98]'
                           : isChosen
@@ -1196,7 +1007,7 @@ export function SessionAdsManagement() {
                           : 'border-border/40 hover:border-primary/50 hover:shadow-md'
                       }`}
                     >
-                      <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
+                      <img src={f.url} alt={f.name} className="w-full h-full object-contain p-1 rounded-xl" />
 
                       {/* Large Checkbox Overlay top-left */}
                       <div
