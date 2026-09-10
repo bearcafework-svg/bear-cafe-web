@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
@@ -468,6 +468,107 @@ export function MinigamesManagement() {
   // Question Pagination state
   const [qPage, setQPage] = useState(1);
   const [qItemsPerPage, setQItemsPerPage] = useState(15);
+
+  // Akari Cross-Project Sync State
+  const [syncAkariOpen, setSyncAkariOpen] = useState(false);
+  const [akariUrl, setAkariUrl] = useState(() => localStorage.getItem('akari_sync_supabase_url') || '');
+  const [akariKey, setAkariKey] = useState(() => localStorage.getItem('akari_sync_supabase_key') || '');
+  const [syncCleanFirst, setSyncCleanFirst] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
+
+  const handleSyncToAkari = async () => {
+    if (!akariUrl.trim() || !akariKey.trim()) {
+      toast({
+        title: 'กรุณากรอกข้อมูลการเชื่อมต่อ',
+        description: 'กรุณากรอก Akari Supabase URL และ Key ค่ะ',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      setSyncProgress('กำลังเตรียมเชื่อมต่อ Akari Supabase...');
+
+      localStorage.setItem('akari_sync_supabase_url', akariUrl.trim());
+      localStorage.setItem('akari_sync_supabase_key', akariKey.trim());
+
+      const akariClient = createClient(akariUrl.trim(), akariKey.trim(), {
+        auth: { persistSession: false },
+      });
+
+      setSyncProgress('กำลังดึงข้อมูลคลังโจทย์จาก Bear Cafe...');
+      const { data: sourceQuestions, error: fetchErr } = await (supabase as any)
+        .from('minigame_questions')
+        .select('*')
+        .eq('is_active', true);
+
+      if (fetchErr) throw fetchErr;
+
+      if (!sourceQuestions || sourceQuestions.length === 0) {
+        toast({
+          title: 'ไม่พบคลังคำถาม',
+          description: 'ไม่พบรายการคำถามที่เปิดใช้งานในคลัง Bear Cafe ค่ะ',
+          variant: 'destructive',
+        });
+        setIsSyncing(false);
+        return;
+      }
+
+      if (syncCleanFirst) {
+        setSyncProgress('กำลังล้างโจทย์เก่าใน Akari Bot...');
+        const { error: delErr } = await (akariClient as any)
+          .from('akari_minigame_questions')
+          .delete()
+          .neq('id', 0);
+        if (delErr) {
+          console.warn('Akari clear warning:', delErr.message);
+        }
+      }
+
+      setSyncProgress(`กำลังซิงค์โจทย์ ${sourceQuestions.length} ข้อ ไปยัง Akari Bot...`);
+      const batchSize = 100;
+      let totalInserted = 0;
+
+      for (let i = 0; i < sourceQuestions.length; i += batchSize) {
+        const chunk = sourceQuestions.slice(i, i + batchSize).map((q: any) => ({
+          game_id: q.game_id,
+          word_or_question: q.word_or_question,
+          answer: q.answer,
+          options: q.options || null,
+          hints: q.hints || null,
+          category: q.category || 'คำทั่วไป',
+          difficulty: q.difficulty || 'medium',
+          is_active: q.is_active ?? true,
+        }));
+
+        const { error: insErr } = await (akariClient as any)
+          .from('akari_minigame_questions')
+          .insert(chunk);
+
+        if (insErr) throw insErr;
+        totalInserted += chunk.length;
+        setSyncProgress(`ซิงค์แล้ว ${totalInserted}/${sourceQuestions.length} ข้อ...`);
+      }
+
+      toast({
+        title: '✅ ซิงค์ข้อมูลสำเร็จ!',
+        description: `ถ่ายทอดโจทย์ทั้งหมด ${totalInserted} ข้อ สู่ Akari Bot สำเร็จแล้วค่ะ`,
+      });
+      setSyncAkariOpen(false);
+    } catch (err: any) {
+      console.error('Error syncing questions to Akari:', err);
+      toast({
+        title: '❌ เกิดข้อผิดพลาดในการซิงค์',
+        description: err.message || 'ไม่สามารถเขียนข้อมูลลง Akari Supabase ได้ กรุณาตรวจสอบสิทธิ์และ URL',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress('');
+    }
+  };
 
   useEffect(() => {
     setQPage(1);
@@ -1260,7 +1361,7 @@ export function MinigamesManagement() {
 
           {/* Staff vs Owner Permission Mode Banner */}
           {user?.is_owner ? (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
               <div className="flex items-center gap-2.5">
                 <Crown className="w-5 h-5 text-amber-600 shrink-0" />
                 <div>
@@ -1268,9 +1369,20 @@ export function MinigamesManagement() {
                   <span>ท่านมีสิทธิ์อนุมัติและปรับปรุงคลังคำศัพท์โดยตรง ทุกการดำเนินการจะถูกบันทึกประวัติผู้แก้ไขอัตโนมัติ</span>
                 </div>
               </div>
-              <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] shrink-0">
-                สิทธิ์ Owner
-              </Badge>
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSyncAkariOpen(true)}
+                  className="h-8 text-xs font-bold rounded-xl border-amber-500/40 bg-white/80 dark:bg-[#1E1B18]/80 hover:bg-amber-600 hover:text-white transition-all shadow-xs gap-1.5 cursor-pointer text-amber-900 dark:text-amber-100"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+                  ซิงค์โจทย์สู่ Akari Bot
+                </Button>
+                <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] shrink-0">
+                  สิทธิ์ Owner
+                </Badge>
+              </div>
             </div>
           ) : (
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
@@ -2687,6 +2799,90 @@ export function MinigamesManagement() {
           <DialogFooter className="gap-2">
             <Button variant="outline" className="rounded-xl text-xs font-bold border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
             <Button className="rounded-xl text-xs font-bold bg-[#8C6239] hover:bg-[#74502D] text-white cursor-pointer" onClick={handleUpdateQuestion}>บันทึกการแก้ไข</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: SYNC QUESTIONS TO AKARI BOT */}
+      <Dialog open={syncAkariOpen} onOpenChange={setSyncAkariOpen}>
+        <DialogContent className="max-w-lg bg-white dark:bg-[#1A1614] border-[#EAD8C8] dark:border-[#2D2520] rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-primary" />
+              ซิงค์คลังโจทย์สู่ Akari Bot (Cross-Account Sync)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-[#8C7A6B] dark:text-[#A89A8C]">
+              คัดลอกโจทย์ที่อนุมัติแล้วทั้งหมดจาก Bear Cafe (<code>minigame_questions</code>) ไปยังฐานข้อมูลของ Akari Bot (<code>akari_minigame_questions</code>) เพื่อให้ทั้งสองบอทใช้คำถามตรงกัน 100%
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Project URL</label>
+              <Input
+                placeholder="https://xxxxxxxxxxxx.supabase.co"
+                className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520]"
+                value={akariUrl}
+                onChange={(e) => setAkariUrl(e.target.value)}
+                disabled={isSyncing}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">Akari Supabase Key (Service Role หรือ Anon Key)</label>
+              <Input
+                type="password"
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520]"
+                value={akariKey}
+                onChange={(e) => setAkariKey(e.target.value)}
+                disabled={isSyncing}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                * ข้อมูลจะถูกบันทึกไว้ในเบราว์เซอร์ของคุณ เพื่อความสะดวกในการซิงค์ครั้งต่อไป
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF6F0] dark:bg-[#25201C] border border-[#EAD8C8] dark:border-[#2D2520]">
+              <div>
+                <span className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">ล้างโจทย์เก่าใน Akari ก่อนซิงค์</span>
+                <span className="text-[11px] text-[#8C7A6B] dark:text-[#A89A8C]">ลบข้อมูลเก่าออกก่อน เพื่อป้องกันโจทย์ซ้ำซ้อน</span>
+              </div>
+              <Switch checked={syncCleanFirst} onCheckedChange={setSyncCleanFirst} disabled={isSyncing} />
+            </div>
+
+            {isSyncing && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
+                <span>{syncProgress}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl text-xs font-bold border-[#EAD8C8] dark:border-[#2D2520]"
+              onClick={() => setSyncAkariOpen(false)}
+              disabled={isSyncing}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              className="rounded-xl text-xs font-bold bg-[#8C6239] hover:bg-[#74502D] text-white cursor-pointer gap-1.5"
+              onClick={handleSyncToAkari}
+              disabled={isSyncing}
+            >
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" /> กำลังซิงค์...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" /> เริ่มต้นซิงค์ทันที
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
