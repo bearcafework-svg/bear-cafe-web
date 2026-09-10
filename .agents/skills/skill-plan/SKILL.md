@@ -44,3 +44,9 @@ description: วางแผน ออกแบบสถาปัตยกรร
 * แผนการตรวจสอบทางเทคนิค เช่น `npm run build` หรือ `npm run typecheck`
 * แผนการทดสอบหน้าบ้าน (UI / Interaction / Form validation)
 * แผนการทดสอบความเข้ากันได้กับบอท (Data consistency)
+
+### ขั้นตอนที่ 5: สถาปัตยกรรมคลังข้อมูลและสระร่วม (Shared Content Pools & Duplicate Detection)
+* **Consolidated Content Pools:** หากฐานข้อมูลหรือ Discord Bot มีการแชร์คลังโจทย์ร่วมกันระหว่างหลายเกม (เช่น Game 1 เติมคำไทย + Game 6 พิมพ์เร็วไทย หรือ Game 2 เติมคำอังกฤษ + Game 7 พิมพ์เร็วอังกฤษ) ต้องจัดกลุ่มตัวเลือกในฟอร์มให้เข้าใจง่าย ไม่ให้ผู้ใช้สับสนว่าต้องเพิ่มข้อไหน
+* **Real-time Cross-Game Duplicate Prevention:** การตรวจสอบข้อมูลซ้ำ (Duplicate Detection) ต้องค้นหาครอบคลุมทั้งกลุ่มเกมที่แชร์คลังคำศัพท์ร่วมกัน (Shared Target IDs) โดยใช้ Fast Memory Matching + Debounced Query เพื่อป้องกันการส่งคำขอซ้ำหรือข้อมูลซ้ำในบอท
+* **Zero-Redundancy Input Principle:** ถ้ามินิเกมหรือแบบฟอร์มใดที่ผลลัพธ์คำตอบเป็นค่าเดียวกับโจทย์โดยธรรมชาติ (Prompt == Answer) ต้องตัดช่องกรอกเฉลยออกทันที ไม่ทิ้งช่องกรอกว่างหรือใส่ placeholder ให้ผู้ใช้เว้นว่าง
+

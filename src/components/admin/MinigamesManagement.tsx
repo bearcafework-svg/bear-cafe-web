@@ -17,7 +17,8 @@ import {
   Gamepad2, Plus, Trash2, Save, RefreshCw, Trophy, Sparkles, Medal, Award, Crown,
   Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, ListFilter,
   CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Eye, Volume2, Headphones,
-  Keyboard, Laptop, Globe, Check, AlertCircle, Radio, Clock, ShieldCheck, User
+  Keyboard, Laptop, Globe, Check, AlertCircle, Radio, Clock, ShieldCheck, User,
+  AlertTriangle
 } from 'lucide-react';
 
 export interface MinigameConfig {
@@ -252,6 +253,81 @@ const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
   },
 ];
 
+export const ADD_QUESTION_GAME_OPTIONS: RichSelectItem[] = [
+  {
+    id: 'pool-1',
+    label: '🇹🇭 คำศัพท์ & ประโยคไทย (เกม 1 + 6)',
+    value: '1',
+    description: 'แชร์คลังอัตโนมัติ: เกม 1 (เติมคำไทย) และ เกม 6 (พิมพ์เร็วไทย)',
+    icon: '🇹🇭',
+    badge: 'เติมคำ + พิมพ์เร็ว',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+  },
+  {
+    id: 'pool-2',
+    label: '🇬🇧 คำศัพท์ & ประโยคอังกฤษ (เกม 2 + 7)',
+    value: '2',
+    description: 'แชร์คลังอัตโนมัติ: เกม 2 (เติมคำอังกฤษ) และ เกม 7 (พิมพ์เร็วอังกฤษ)',
+    icon: '🇬🇧',
+    badge: 'เติมคำ + พิมพ์เร็ว',
+    badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25',
+  },
+  {
+    id: 'pool-4',
+    label: '💡 ทายคำจากคำใบ้ 3 ข้อ (เกม 4)',
+    value: '4',
+    description: 'ทายคำศัพท์จากคำใบ้ 3 ข้อความ • ระบุระดับความยากได้',
+    icon: '💡',
+    badge: 'คำใบ้ 3 ข้อ',
+    badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25',
+  },
+  {
+    id: 'pool-5',
+    label: '🎧 ฟังเสียงแล้วพิมพ์ตอบ อังกฤษ (เกม 5)',
+    value: '5',
+    description: 'คำศัพท์ภาษาอังกฤษ • บอทส่งไฟล์เสียง TTS อังกฤษในดิสคอร์ด',
+    icon: '🎧',
+    badge: 'เสียง TTS อังกฤษ',
+    badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+  },
+  {
+    id: 'pool-11',
+    label: '🔊 ฟังเสียงแล้วพิมพ์ตอบ ไทย (เกม 11)',
+    value: '11',
+    description: 'คำศัพท์ภาษาไทย • บอทสังเคราะห์เสียง TTS ไทยให้ฟังในดิสคอร์ด',
+    icon: '🔊',
+    badge: 'เสียง TTS ไทย',
+    badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25',
+  },
+  {
+    id: 'pool-8',
+    label: '🌐 คู่คำแปลภาษา (เกม 8 + 9)',
+    value: '8',
+    description: 'แชร์คลังอัตโนมัติ: เกม 8 (EN ➔ TH) และ เกม 9 (TH ➔ EN)',
+    icon: '🌐',
+    badge: 'คู่คำแปล EN ⇄ TH',
+    badgeColor: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25',
+  },
+  {
+    id: 'pool-10',
+    label: '🔗 เกมต่อคำศัพท์ (เกม 10)',
+    value: '10',
+    description: 'ต่อคำศัพท์เชื่อมโยง: คำขึ้นต้น (คำหน้า) ➔ คำต่อท้าย (คำหลัง)',
+    icon: '🔗',
+    badge: 'ต่อคำเชื่อมโยง',
+    badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25',
+  },
+  {
+    id: 'pool-12',
+    label: '❓ คำถามจริงหรือเท็จ (เกม 12)',
+    value: '12',
+    description: 'ข้อความหรือข้อเท็จจริง • เลือกตอบ จริง [✅] หรือ เท็จ [❌]',
+    icon: '❓',
+    badge: 'จริง / เท็จ',
+    badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
+  },
+];
+
 const GAME_GROUPS = [
   { id: 'all', label: 'ทั้งหมด (12 เกม)', icon: '🎮' },
   { id: 'vocab_typing', label: 'คำศัพท์ & พิมพ์เร็ว (1, 2, 6, 7)', icon: '⌨️' },
@@ -362,6 +438,10 @@ export function MinigamesManagement() {
   const [formHint2, setFormHint2] = useState<string>('');
   const [formHint3, setFormHint3] = useState<string>('');
 
+  // Duplicate detection state
+  const [duplicateMatch, setDuplicateMatch] = useState<Question | null>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState<boolean>(false);
+
   // Category filter state
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
@@ -396,6 +476,79 @@ export function MinigamesManagement() {
   useEffect(() => {
     setLbPage(1);
   }, [lbTimeFilter, lbGameFilter]);
+
+  // Real-time Duplicate Detection across target pool (debounced 300ms)
+  useEffect(() => {
+    const gId = Number(formGameId);
+    const queryText = formQuestion.trim();
+
+    if (!queryText || queryText.length < 2 || gId === 3) {
+      setDuplicateMatch(null);
+      setCheckingDuplicate(false);
+      return;
+    }
+
+    const targetGIds = getBotTargetGameIds(gId);
+    const normalizedQuery = queryText.toLowerCase();
+
+    // 1. Fast Check in loaded memory questions
+    const memoryMatch = questions.find(q => {
+      if (!targetGIds.includes(q.game_id)) return false;
+      const qText = (q.word_or_question || '').trim().toLowerCase();
+      const aText = (q.answer || '').trim().toLowerCase();
+      if (qText === normalizedQuery) return true;
+      if (targetGIds.some(id => [8, 9, 10].includes(id)) && aText === normalizedQuery) return true;
+      return false;
+    });
+
+    if (memoryMatch) {
+      setDuplicateMatch(memoryMatch);
+      setCheckingDuplicate(false);
+      return;
+    }
+
+    // 2. Debounced DB Check
+    setCheckingDuplicate(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('minigame_questions')
+          .select('id, game_id, word_or_question, answer, category, difficulty')
+          .in('game_id', targetGIds)
+          .ilike('word_or_question', queryText)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          setDuplicateMatch(data[0]);
+          setCheckingDuplicate(false);
+          return;
+        }
+
+        if (targetGIds.some(id => [8, 9, 10].includes(id))) {
+          const { data: aData, error: aErr } = await (supabase as any)
+            .from('minigame_questions')
+            .select('id, game_id, word_or_question, answer, category, difficulty')
+            .in('game_id', targetGIds)
+            .ilike('answer', queryText)
+            .limit(1);
+
+          if (!aErr && aData && aData.length > 0) {
+            setDuplicateMatch(aData[0]);
+            setCheckingDuplicate(false);
+            return;
+          }
+        }
+
+        setDuplicateMatch(null);
+      } catch (e) {
+        console.error('Error checking duplicate question:', e);
+      } finally {
+        setCheckingDuplicate(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formQuestion, formGameId, questions]);
 
   // Fetch Settings
   const fetchSettings = useCallback(async () => {
@@ -669,11 +822,12 @@ export function MinigamesManagement() {
     const gId = Number(formGameId);
     if (gId === 3) return; // Game 3 is auto-generated math
 
+    const isSingleText = [1, 2, 5, 6, 7, 11].includes(gId);
     const finalQuestion = formQuestion.trim();
     let finalAnswer = formAnswer.trim();
 
-    // Auto-fill answer for typing games (Game 6 & 7) or audio games (Game 5 & 11) if left blank
-    if ((gId === 5 || gId === 6 || gId === 7 || gId === 11) && !finalAnswer) {
+    // Auto-fill answer for single text games (Game 1, 2, 5, 6, 7, 11) if left blank
+    if (isSingleText && !finalAnswer) {
       finalAnswer = finalQuestion;
     }
 
@@ -684,6 +838,16 @@ export function MinigamesManagement() {
 
     if (!finalQuestion || !finalAnswer) {
       toast({ title: 'กรุณากรอกข้อมูลให้ครบถ้วน', variant: 'destructive' });
+      return;
+    }
+
+    // Duplicate prevention check
+    if (duplicateMatch) {
+      toast({
+        title: 'พบข้อมูลซ้ำในระบบ ⚠️',
+        description: `ข้อความนี้ซ้ำกับ ID #${duplicateMatch.id} (เกม ${duplicateMatch.game_id}: "${duplicateMatch.word_or_question}") ไม่สามารถเพิ่มซ้ำได้ค่ะ`,
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -794,7 +958,8 @@ export function MinigamesManagement() {
     const finalQuestion = editQuestion.trim();
     let finalAnswer = editAnswer.trim();
 
-    if ((gId === 5 || gId === 6 || gId === 7 || gId === 11) && !finalAnswer) {
+    const isSingleText = [1, 2, 5, 6, 7, 11].includes(gId);
+    if (isSingleText) {
       finalAnswer = finalQuestion;
     }
 
@@ -1283,7 +1448,7 @@ export function MinigamesManagement() {
                           label="เลือกมินิเกมที่จะเพิ่ม"
                           value={formGameId}
                           onValueChange={(val) => setFormGameId(val)}
-                          data={MINIGAME_RICH_OPTIONS}
+                          data={ADD_QUESTION_GAME_OPTIONS}
                           placeholder="เลือกมินิเกม..."
                         />
                       </div>
@@ -1328,105 +1493,151 @@ export function MinigamesManagement() {
                     ) : (
                       <>
                         {/* Dynamic Input Rows */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Question Input */}
-                          <div className="space-y-1.5">
-                            <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
-                              {selectedGId === 1 && 'คำศัพท์ภาษาไทย (คำตอบที่ต้องการให้เติม)'}
-                              {selectedGId === 2 && 'คำศัพท์ภาษาอังกฤษ (คำตอบที่ต้องการให้เติม)'}
-                              {selectedGId === 4 && 'ชื่อคำศัพท์ / สิ่งของ (เฉลยข้อนี้)'}
-                              {selectedGId === 5 && 'คำศัพท์ภาษาอังกฤษ (บอทจะพูดคำนี้)'}
-                              {selectedGId === 6 && 'ข้อความ / ประโยคภาษาไทยสำหรับฝึกพิมพ์'}
-                              {selectedGId === 7 && 'ข้อความ / ประโยคภาษาอังกฤษสำหรับฝึกพิมพ์'}
-                              {selectedGId === 8 && 'คำศัพท์ภาษาอังกฤษ (โจทย์ EN ➔ TH)'}
-                              {selectedGId === 9 && 'คำศัพท์ภาษาอังกฤษ (โจทย์คู่แปล TH ➔ EN)'}
-                              {selectedGId === 10 && 'คำขึ้นต้น (คำหน้า เช่น "น้ำ", "ไฟ")'}
-                              {selectedGId === 11 && 'คำศัพท์ภาษาไทย (บอทจะพูดคำนี้)'}
-                              {selectedGId === 12 && 'ข้อความ / คำถามจริงหรือเท็จ'}
-                            </label>
-                            <Input
-                              className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                              placeholder={
-                                selectedGId === 1 ? 'เช่น สวัสดี, ไอศกรีม, ประเทศไทย' :
-                                selectedGId === 2 ? 'เช่น banana, strawberry, computer' :
-                                selectedGId === 4 ? 'เช่น ช้าง, ดวงอาทิตย์, แมว' :
-                                selectedGId === 5 ? 'เช่น butterfly, welcome, adventure' :
-                                selectedGId === 6 ? 'เช่น หมีคาเฟ่ยินดีต้อนรับเสมอ' :
-                                selectedGId === 7 ? 'เช่น Welcome to Bear Cafe' :
-                                selectedGId === 8 || selectedGId === 9 ? 'เช่น Apple, Banana, House' :
-                                selectedGId === 10 ? 'เช่น น้ำ, รถ, ดาว, พัด' :
-                                selectedGId === 11 ? 'เช่น ก้านกล้วย, ธรรมชาติ, มิตรภาพ' :
-                                selectedGId === 12 ? 'เช่น แมวเป็นสัตว์เลี้ยงลูกด้วยนม' :
-                                'กรอกโจทย์/คำศัพท์...'
-                              }
-                              value={formQuestion}
-                              onChange={(e) => setFormQuestion(e.target.value)}
-                              required
-                            />
-                            {selectedGId === 1 && (
-                              <span className="text-[11px] text-muted-foreground">💡 บอทจะนำคำนี้ไปสุ่มซ่อนขีดเส้นใต้ให้อัตโนมัติ (ไม่ต้องใส่ _)</span>
-                            )}
-                            {selectedGId === 2 && (
-                              <span className="text-[11px] text-muted-foreground">💡 บอทจะนำคำนี้ไปสุ่มซ่อนตัวอักษรให้อัตโนมัติ (ไม่ต้องใส่ _)</span>
-                            )}
-                          </div>
-
-                          {/* Answer Input or True/False Selector */}
-                          <div className="space-y-1.5">
-                            <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
-                              {selectedGId === 1 && 'เฉลยคำตอบ (บันทึกอัตโนมัติ)'}
-                              {selectedGId === 2 && 'เฉลยคำตอบ (บันทึกอัตโนมัติ)'}
-                              {selectedGId === 4 && 'คำตอบที่ต้องพิมพ์ตอบ'}
-                              {selectedGId === 5 && 'คำตอบภาษาอังกฤษ'}
-                              {selectedGId === 6 && 'คำตอบ (บันทึกประโยคเดียวกันอัตโนมัติ)'}
-                              {selectedGId === 7 && 'คำตอบ (บันทึกประโยคเดียวกันอัตโนมัติ)'}
-                              {selectedGId === 8 && 'คำแปลภาษาไทย (เฉลย)'}
-                              {selectedGId === 9 && 'คำแปลภาษาไทย (เฉลย)'}
-                              {selectedGId === 10 && 'คำต่อท้าย (คำหลัง เช่น "แข็ง", "ไฟ")'}
-                              {selectedGId === 11 && 'คำตอบภาษาไทย'}
-                              {selectedGId === 12 && 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'}
-                            </label>
-
-                            {selectedGId === 12 ? (
-                              <div className="flex gap-2 h-10">
-                                <Button
-                                  type="button"
-                                  variant={formAnswer === 'จริง' || !formAnswer ? 'default' : 'outline'}
-                                  className={cn(
-                                    "flex-1 rounded-xl text-xs font-bold gap-1.5",
-                                    (formAnswer === 'จริง' || !formAnswer) && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        {(() => {
+                          const isSingleTextGame = [1, 2, 5, 6, 7, 11].includes(selectedGId);
+                          return (
+                            <div className={cn("grid gap-4", isSingleTextGame ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+                              {/* Question Input */}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
+                                    {selectedGId === 1 && '🇹🇭 คำศัพท์ภาษาไทย (เติมคำ & พิมพ์เร็ว)'}
+                                    {selectedGId === 2 && '🇬🇧 คำศัพท์ภาษาอังกฤษ (เติมคำ & พิมพ์เร็ว)'}
+                                    {selectedGId === 4 && '💡 ชื่อคำศัพท์ / สิ่งของ (เฉลยข้อนี้)'}
+                                    {selectedGId === 5 && '🎧 คำศัพท์ภาษาอังกฤษ (บอทจะอ่านออกเสียง TTS)'}
+                                    {selectedGId === 6 && '🇹🇭 ข้อความ / ประโยคภาษาไทยสำหรับฝึกพิมพ์'}
+                                    {selectedGId === 7 && '🇬🇧 ข้อความ / ประโยคภาษาอังกฤษสำหรับฝึกพิมพ์'}
+                                    {selectedGId === 8 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์ EN ➔ TH)'}
+                                    {selectedGId === 9 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์คู่แปล TH ➔ EN)'}
+                                    {selectedGId === 10 && '🔗 คำขึ้นต้น (คำหน้า เช่น "น้ำ", "ไฟ")'}
+                                    {selectedGId === 11 && '🔊 คำศัพท์ภาษาไทย (บอทจะอ่านออกเสียง TTS)'}
+                                    {selectedGId === 12 && '❓ ข้อความ / คำถามจริงหรือเท็จ'}
+                                  </label>
+                                  {isSingleTextGame && (
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                      ✨ ช่องเดียวจบ บันทึกคำตอบตรงกันอัตโนมัติ
+                                    </span>
                                   )}
-                                  onClick={() => setFormAnswer('จริง')}
-                                >
-                                  <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={formAnswer === 'เท็จ' ? 'destructive' : 'outline'}
-                                  className="flex-1 rounded-xl text-xs font-bold gap-1.5"
-                                  onClick={() => setFormAnswer('เท็จ')}
-                                >
-                                  <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
-                                </Button>
+                                </div>
+                                <Input
+                                  className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                                  placeholder={
+                                    selectedGId === 1 ? 'เช่น สวัสดี, ไอศกรีม, ประเทศไทย' :
+                                    selectedGId === 2 ? 'เช่น banana, strawberry, computer' :
+                                    selectedGId === 4 ? 'เช่น ช้าง, ดวงอาทิตย์, แมว' :
+                                    selectedGId === 5 ? 'เช่น butterfly, welcome, adventure' :
+                                    selectedGId === 6 ? 'เช่น หมีคาเฟ่ยินดีต้อนรับเสมอ' :
+                                    selectedGId === 7 ? 'เช่น Welcome to Bear Cafe' :
+                                    selectedGId === 8 || selectedGId === 9 ? 'เช่น Apple, Banana, House' :
+                                    selectedGId === 10 ? 'เช่น น้ำ, รถ, ดาว, พัด' :
+                                    selectedGId === 11 ? 'เช่น ก้านกล้วย, ธรรมชาติ, มิตรภาพ' :
+                                    selectedGId === 12 ? 'เช่น แมวเป็นสัตว์เลี้ยงลูกด้วยนม' :
+                                    'กรอกโจทย์/คำศัพท์...'
+                                  }
+                                  value={formQuestion}
+                                  onChange={(e) => setFormQuestion(e.target.value)}
+                                  required
+                                />
+                                {selectedGId === 1 && (
+                                  <span className="text-[11px] text-muted-foreground block">
+                                    💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 1 (สุ่มซ่อนขีดเส้นใต้) และเกม 6 (ประโยคพิมพ์เร็ว)
+                                  </span>
+                                )}
+                                {selectedGId === 2 && (
+                                  <span className="text-[11px] text-muted-foreground block">
+                                    💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 2 (สุ่มซ่อนตัวอักษร) และเกม 7 (ประโยคพิมพ์เร็วอังกฤษ)
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <Input
-                                className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                                placeholder={
-                                  selectedGId === 1 || selectedGId === 2 || selectedGId === 5 || selectedGId === 6 || selectedGId === 7 || selectedGId === 11
-                                    ? '(เว้นว่างไว้จะใช้ค่าเดียวกับโจทย์อัตโนมัติ)'
-                                    : selectedGId === 8 || selectedGId === 9
-                                    ? 'เช่น แอปเปิ้ล, กล้วย, บ้าน'
-                                    : selectedGId === 10
-                                    ? 'เช่น แข็ง (รวมเป็น น้ำแข็ง), ไฟ (รถไฟ)'
-                                    : 'พิมพ์เฉลยคำตอบ...'
-                                }
-                                value={formAnswer}
-                                onChange={(e) => setFormAnswer(e.target.value)}
-                              />
-                            )}
+
+                              {/* Answer Input or True/False Selector (HIDDEN for single-text games) */}
+                              {!isSingleTextGame && (
+                                <div className="space-y-1.5">
+                                  <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
+                                    {selectedGId === 4 && 'คำตอบที่ต้องพิมพ์ตอบ'}
+                                    {selectedGId === 8 && 'คำแปลภาษาไทย (เฉลย)'}
+                                    {selectedGId === 9 && 'คำแปลภาษาไทย (เฉลย)'}
+                                    {selectedGId === 10 && 'คำต่อท้าย (คำหลัง เช่น "แข็ง", "ไฟ")'}
+                                    {selectedGId === 12 && 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'}
+                                  </label>
+
+                                  {selectedGId === 12 ? (
+                                    <div className="flex gap-2 h-10">
+                                      <Button
+                                        type="button"
+                                        variant={formAnswer === 'จริง' || !formAnswer ? 'default' : 'outline'}
+                                        className={cn(
+                                          "flex-1 rounded-xl text-xs font-bold gap-1.5",
+                                          (formAnswer === 'จริง' || !formAnswer) && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        )}
+                                        onClick={() => setFormAnswer('จริง')}
+                                      >
+                                        <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={formAnswer === 'เท็จ' ? 'destructive' : 'outline'}
+                                        className="flex-1 rounded-xl text-xs font-bold gap-1.5"
+                                        onClick={() => setFormAnswer('เท็จ')}
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Input
+                                      className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                                      placeholder={
+                                        selectedGId === 8 || selectedGId === 9
+                                          ? 'เช่น แอปเปิ้ล, กล้วย, บ้าน'
+                                          : selectedGId === 10
+                                          ? 'เช่น แข็ง (รวมเป็น น้ำแข็ง), ไฟ (รถไฟ)'
+                                          : 'พิมพ์เฉลยคำตอบ...'
+                                      }
+                                      value={formAnswer}
+                                      onChange={(e) => setFormAnswer(e.target.value)}
+                                      required
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Real-time Duplicate Detection Status Banner */}
+                        {duplicateMatch ? (
+                          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <strong className="font-bold text-amber-700 dark:text-amber-300">
+                                  ตรวจพบข้อมูลซ้ำในระบบ!
+                                </strong>
+                                <Badge variant="outline" className="text-[10px] bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300">
+                                  ID #{duplicateMatch.id}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] leading-relaxed">
+                                ข้อความนี้มีอยู่แล้วใน <strong>เกม {duplicateMatch.game_id} ({MINIGAME_CONFIGS[duplicateMatch.game_id]?.name || 'มินิเกม'})</strong>
+                                {duplicateMatch.category && <span> • หมวด: {duplicateMatch.category}</span>}
+                              </p>
+                              <div className="p-2 rounded-xl bg-white/70 dark:bg-[#1E1B18]/70 border border-amber-500/20 font-mono text-[11px] text-foreground flex flex-wrap gap-x-4 gap-y-1">
+                                <span>โจทย์: <strong>"{duplicateMatch.word_or_question}"</strong></span>
+                                {duplicateMatch.answer && <span>เฉลย: <strong>"{duplicateMatch.answer}"</strong></span>}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : formQuestion.trim().length >= 2 && !checkingDuplicate ? (
+                          <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>ไม่พบข้อมูลซ้ำในคลัง สามารถเพิ่มคำนี้ได้ทันที</span>
+                          </div>
+                        ) : checkingDuplicate ? (
+                          <div className="px-3 py-1.5 rounded-xl bg-muted/60 flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>กำลังตรวจสอบข้อมูลซ้ำในคลังบอท...</span>
+                          </div>
+                        ) : null}
 
                         {/* Category Input for Game 4 */}
                         {selectedGId === 4 && (
@@ -1458,7 +1669,16 @@ export function MinigamesManagement() {
                           </div>
                         )}
 
-                        <Button type="submit" className="w-full rounded-2xl h-11 gap-2 bg-[#8C6239] hover:bg-[#74502D] text-white font-bold text-sm shadow-xs cursor-pointer mt-2">
+                        <Button
+                          type="submit"
+                          disabled={!!duplicateMatch}
+                          className={cn(
+                            "w-full rounded-2xl h-11 gap-2 text-white font-bold text-sm shadow-xs cursor-pointer mt-2 transition-all",
+                            duplicateMatch
+                              ? "bg-muted-foreground/50 cursor-not-allowed opacity-60"
+                              : "bg-[#8C6239] hover:bg-[#74502D]"
+                          )}
+                        >
                           <Plus className="w-4 h-4 text-white" /> บันทึกเข้าคลังคำศัพท์เกม {selectedGId}
                         </Button>
                       </>
@@ -2381,43 +2601,53 @@ export function MinigamesManagement() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
-                  {editingQuestion.game_id === 8 || editingQuestion.game_id === 9
-                    ? 'คำแปลภาษาไทย (เฉลย)'
-                    : editingQuestion.game_id === 10
-                    ? 'คำต่อท้าย (คำหลัง เช่น "แข็ง")'
-                    : editingQuestion.game_id === 12
-                    ? 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'
-                    : 'คำตอบที่ถูกต้อง (เฉลย)'}
-                </label>
-                {editingQuestion.game_id === 12 ? (
-                  <div className="flex gap-2 h-10">
-                    <Button
-                      type="button"
-                      variant={editAnswer === 'จริง' ? 'default' : 'outline'}
-                      className={cn("flex-1 rounded-xl text-xs font-bold gap-1.5", editAnswer === 'จริง' && "bg-emerald-600 hover:bg-emerald-700 text-white")}
-                      onClick={() => setEditAnswer('จริง')}
-                    >
-                      <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={editAnswer === 'เท็จ' ? 'destructive' : 'outline'}
-                      className="flex-1 rounded-xl text-xs font-bold gap-1.5"
-                      onClick={() => setEditAnswer('เท็จ')}
-                    >
-                      <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
-                    </Button>
-                  </div>
-                ) : (
-                  <Input
-                    className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                    value={editAnswer}
-                    onChange={(e) => setEditAnswer(e.target.value)}
-                  />
-                )}
-              </div>
+              {/* Answer Input or True/False Selector */}
+              {[1, 2, 5, 6, 7, 11].includes(editingQuestion.game_id) ? (
+                <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                  <span>✨ คำตอบจะตรงกับโจทย์อัตโนมัติ</span>
+                  <Badge variant="outline" className="text-[10px] bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono">
+                    Auto-synced
+                  </Badge>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
+                    {editingQuestion.game_id === 8 || editingQuestion.game_id === 9
+                      ? 'คำแปลภาษาไทย (เฉลย)'
+                      : editingQuestion.game_id === 10
+                      ? 'คำต่อท้าย (คำหลัง เช่น "แข็ง")'
+                      : editingQuestion.game_id === 12
+                      ? 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'
+                      : 'คำตอบที่ถูกต้อง (เฉลย)'}
+                  </label>
+                  {editingQuestion.game_id === 12 ? (
+                    <div className="flex gap-2 h-10">
+                      <Button
+                        type="button"
+                        variant={editAnswer === 'จริง' ? 'default' : 'outline'}
+                        className={cn("flex-1 rounded-xl text-xs font-bold gap-1.5", editAnswer === 'จริง' && "bg-emerald-600 hover:bg-emerald-700 text-white")}
+                        onClick={() => setEditAnswer('จริง')}
+                      >
+                        <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={editAnswer === 'เท็จ' ? 'destructive' : 'outline'}
+                        className="flex-1 rounded-xl text-xs font-bold gap-1.5"
+                        onClick={() => setEditAnswer('เท็จ')}
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
+                      </Button>
+                    </div>
+                  ) : (
+                    <Input
+                      className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                      value={editAnswer}
+                      onChange={(e) => setEditAnswer(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">หมวดหมู่ (Category)</label>

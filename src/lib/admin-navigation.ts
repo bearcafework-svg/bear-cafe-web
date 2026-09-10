@@ -194,7 +194,7 @@ export function getAdminNavTree(
             {
               id: 'minigames',
               label: 'จัดการมินิเกม',
-              description: 'คลังคำศัพท์และตั้งค่ามินิเกมทั้ง 13 เกม',
+              description: 'คลังคำศัพท์และตั้งค่ามินิเกมทั้ง 12 เกม',
               icon: Gamepad2,
             },
           ],
