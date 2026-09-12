@@ -171,20 +171,21 @@ export default function LeaderboardPage() {
                 <SelectValue placeholder="เลือกมินิเกม" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">มินิเกมทั้งหมดรวมกัน</SelectItem>
-                <SelectItem value="1">1. เติมคำศัพท์ไทย</SelectItem>
-                <SelectItem value="2">2. เติมคำศัพท์ภาษาอังกฤษ</SelectItem>
+                <SelectItem value="all">🎮 มินิเกมทั้งหมดรวมกัน (14 เกม)</SelectItem>
+                <SelectItem value="1">1. เติมคำศัพท์ (ไทย)</SelectItem>
+                <SelectItem value="2">2. เติมคำศัพท์ (อังกฤษ)</SelectItem>
                 <SelectItem value="3">3. สุ่มโจทย์คณิตฯ</SelectItem>
                 <SelectItem value="4">4. ทายคำจากคำใบ้</SelectItem>
-                <SelectItem value="5">5. เรียงคำศัพท์ไทย</SelectItem>
-                <SelectItem value="6">6. เรียงคำศัพท์อังกฤษ</SelectItem>
-                <SelectItem value="7">7. พิมพ์คำต่อไปนี้ (ไทย)</SelectItem>
-                <SelectItem value="8">8. พิมพ์คำต่อไปนี้ (อังกฤษ)</SelectItem>
-                <SelectItem value="9">9. ทายคำแปลภาษาอังกฤษ</SelectItem>
-                <SelectItem value="10">10. ทายคำแปลภาษาไทย</SelectItem>
-                <SelectItem value="11">11. เกมต่อคำ</SelectItem>
-                <SelectItem value="12">12. ข้อไหนไม่เข้าพวก</SelectItem>
-                <SelectItem value="13">13. จริงหรือเท็จ</SelectItem>
+                <SelectItem value="5">5. ฟังเสียงแล้วพิมพ์ตอบ (อังกฤษ)</SelectItem>
+                <SelectItem value="6">6. พิมพ์คำต่อไปนี้ (ไทย)</SelectItem>
+                <SelectItem value="7">7. พิมพ์คำต่อไปนี้ (อังกฤษ)</SelectItem>
+                <SelectItem value="8">8. ทายคำแปลภาษาอังกฤษ</SelectItem>
+                <SelectItem value="9">9. ทายคำแปลภาษาไทย</SelectItem>
+                <SelectItem value="10">10. เกมต่อคำ</SelectItem>
+                <SelectItem value="11">11. ฟังเสียงแล้วพิมพ์ตอบ (ไทย)</SelectItem>
+                <SelectItem value="12">12. จริงหรือเท็จ</SelectItem>
+                <SelectItem value="13">13. เรียงประโยคภาษาอังกฤษ</SelectItem>
+                <SelectItem value="14">14. เรียงประโยคภาษาไทย</SelectItem>
               </SelectContent>
             </Select>
 

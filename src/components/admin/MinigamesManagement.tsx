@@ -148,6 +148,24 @@ export const MINIGAME_CONFIGS: Record<number, MinigameConfig> = {
     desc: 'ทายว่าข้อความหรือข้อเท็จจริงนั้น จริง หรือ เท็จ',
     discordNote: 'บอทแสดงข้อความคำถาม และแสดงปุ่มกด 2 ตัวเลือก: [จริง] และ [เท็จ]',
   },
+  13: {
+    id: 13,
+    name: 'เรียงประโยคภาษาอังกฤษ',
+    icon: '🔤',
+    tag: 'เรียงประโยค EN',
+    categoryGroup: 'sentence_builder',
+    desc: 'โจทย์ความหมายไทย ➔ เติมคำศัพท์ภาษาอังกฤษลงในประโยคที่มีช่องว่าง {1}, {2}...',
+    discordNote: 'บอทจะส่งการ์ดโจทย์พร้อมปุ่มคำศัพท์ให้ผู้เล่นกดเรียงลำดับให้ถูกต้องใน Discord',
+  },
+  14: {
+    id: 14,
+    name: 'เรียงประโยคภาษาไทย',
+    icon: '🇹🇭',
+    tag: 'เรียงประโยค TH',
+    categoryGroup: 'sentence_builder',
+    desc: 'โจทย์ประโยคอังกฤษ ➔ เติมคำศัพท์ภาษาไทยลงในประโยคที่มีช่องว่าง {1}, {2}...',
+    discordNote: 'บอทจะส่งการ์ดโจทย์พร้อมปุ่มคำศัพท์ให้ผู้เล่นกดเรียงลำดับให้ถูกต้องใน Discord',
+  },
 };
 
 const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
@@ -259,6 +277,24 @@ const MINIGAME_RICH_OPTIONS: RichSelectItem[] = [
     badge: 'จริง / เท็จ',
     badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
   },
+  {
+    id: 'game-13',
+    label: 'เกม 13: เรียงประโยคภาษาอังกฤษ',
+    value: '13',
+    description: 'โจทย์ความหมายไทย • เรียงคำศัพท์ภาษาอังกฤษใส่ในประโยค {1}, {2}...',
+    icon: '🔤',
+    badge: 'เรียงประโยค EN',
+    badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25',
+  },
+  {
+    id: 'game-14',
+    label: 'เกม 14: เรียงประโยคภาษาไทย',
+    value: '14',
+    description: 'โจทย์ประโยคอังกฤษ • เรียงคำศัพท์ภาษาไทยใส่ในประโยค {1}, {2}...',
+    icon: '🇹🇭',
+    badge: 'เรียงประโยค TH',
+    badgeColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/25',
+  },
 ];
 
 export const ADD_QUESTION_GAME_OPTIONS: RichSelectItem[] = [
@@ -334,13 +370,32 @@ export const ADD_QUESTION_GAME_OPTIONS: RichSelectItem[] = [
     badge: 'จริง / เท็จ',
     badgeColor: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
   },
+  {
+    id: 'pool-13',
+    label: '🔤 เรียงประโยคภาษาอังกฤษ (เกม 13)',
+    value: '13',
+    description: 'โจทย์ความหมายไทย ➔ แม่แบบอังกฤษ {1}, {2} และคำตอบที่ถูกต้อง',
+    icon: '🔤',
+    badge: 'เรียงประโยค EN',
+    badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25',
+  },
+  {
+    id: 'pool-14',
+    label: '🇹🇭 เรียงประโยคภาษาไทย (เกม 14)',
+    value: '14',
+    description: 'โจทย์ประโยคอังกฤษ ➔ แม่แบบไทย {1}, {2} และคำตอบที่ถูกต้อง',
+    icon: '🇹🇭',
+    badge: 'เรียงประโยค TH',
+    badgeColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/25',
+  },
 ];
 
 const GAME_GROUPS = [
-  { id: 'all', label: 'ทั้งหมด (12 เกม)', icon: '🎮' },
+  { id: 'all', label: 'ทั้งหมด (14 เกม)', icon: '🎮' },
   { id: 'vocab_typing', label: 'คำศัพท์ & พิมพ์เร็ว (1, 2, 6, 7)', icon: '⌨️' },
   { id: 'audio_tts', label: 'ฟังเสียง TTS (5, 11)', icon: '🎧' },
   { id: 'translation_chain', label: 'คำแปล & ต่อคำ (8, 9, 10)', icon: '🌐' },
+  { id: 'sentence_builder', label: 'เรียงประโยค (13, 14)', icon: '🔤' },
   { id: 'logic_math', label: 'คำใบ้, จริงเท็จ & คณิต (3, 4, 12)', icon: '💡' },
 ];
 
@@ -681,7 +736,7 @@ export function MinigamesManagement() {
   const fetchGameCounts = useCallback(async () => {
     try {
       const direct: Record<number, number> = {};
-      const gameIds = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+      const gameIds = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
       await Promise.all(
         gameIds.map(async (gid) => {
@@ -711,6 +766,8 @@ export function MinigamesManagement() {
         10: direct[10] || 0,
         11: direct[11] || 0,
         12: direct[12] || 0,
+        13: direct[13] || 0,
+        14: direct[14] || 0,
       };
       setBotPoolCounts(botPool);
     } catch (err) {
@@ -969,6 +1026,8 @@ export function MinigamesManagement() {
     let hintsArray: string[] = [];
     if (gId === 4) {
       hintsArray = [formHint1.trim(), formHint2.trim(), formHint3.trim()].filter(Boolean);
+    } else if (gId === 13 || gId === 14) {
+      hintsArray = [formHint1.trim()].filter(Boolean);
     }
 
     let optionsArray: string[] = [];
@@ -1087,6 +1146,8 @@ export function MinigamesManagement() {
     let hintsArray: string[] = [];
     if (gId === 4) {
       hintsArray = [editHint1.trim(), editHint2.trim(), editHint3.trim()].filter(Boolean);
+    } else if (gId === 13 || gId === 14) {
+      hintsArray = [editHint1.trim()].filter(Boolean);
     }
 
     const finalDiff = (gId === 4) ? editDifficulty : null;
@@ -1094,6 +1155,8 @@ export function MinigamesManagement() {
     let optionsArray: string[] = [];
     if (gId === 12) {
       optionsArray = ['จริง', 'เท็จ'];
+    } else if (editingQuestion.options?.length) {
+      optionsArray = editingQuestion.options;
     }
 
     const operatorId = user?.discord_id || user?.id || 'admin';
@@ -1340,12 +1403,12 @@ export function MinigamesManagement() {
             ระบบจัดการมินิเกมและคลังโจทย์ (Mini-Games Hub)
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            ศูนย์กลางควบคุมคลังคำศัพท์ทั้ง 12 มินิเกมของ Bear Cafe Discord Bot, กำหนด Channel ID & แต้มรางวัล, และติดตาม Hall of Fame
+            ศูนย์กลางควบคุมคลังคำศัพท์ทั้ง 14 มินิเกมของ Bear Cafe Discord Bot, กำหนด Channel ID & แต้มรางวัล, และติดตาม Hall of Fame
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="px-3 py-1 rounded-xl text-xs font-semibold bg-primary/10 text-primary border-primary/20">
-            🎮 ครบ 12 มินิเกม
+            🎮 ครบ 14 มินิเกม
           </Badge>
           <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => { fetchQuestions(); fetchGameCounts(); fetchSettings(); }}>
             <RefreshCw className={cn("w-3.5 h-3.5", loadingQuestions && "animate-spin")} /> ดึงข้อมูลสด
@@ -1360,7 +1423,7 @@ export function MinigamesManagement() {
             <Edit3 className="w-4 h-4 text-blue-500" /> 1. คลังคำศัพท์ & จัดการโจทย์
           </TabsTrigger>
           <TabsTrigger value="settings" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Settings2 className="w-4 h-4 text-purple-500" /> 2. ตั้งค่าห้อง & แต้มรางวัล (12 เกม)
+            <Settings2 className="w-4 h-4 text-purple-500" /> 2. ตั้งค่าห้อง & แต้มรางวัล (14 เกม)
           </TabsTrigger>
           <TabsTrigger value="leaderboard" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
             <Trophy className="w-4 h-4 text-amber-500" /> 3. ตารางจัดอันดับผู้ชนะ
@@ -1635,6 +1698,8 @@ export function MinigamesManagement() {
                                     {selectedGId === 10 && '🔗 คำขึ้นต้น (คำหน้า เช่น "น้ำ", "ไฟ")'}
                                     {selectedGId === 11 && '🔊 คำศัพท์ภาษาไทย (บอทจะอ่านออกเสียง TTS)'}
                                     {selectedGId === 12 && '❓ ข้อความ / คำถามจริงหรือเท็จ'}
+                                     {selectedGId === 13 && '🔤 ความหมายสำนวน / คำแปลภาษาไทย (โจทย์)'}
+                                     {selectedGId === 14 && '🇹🇭 ประโยคภาษาอังกฤษต้นฉบับ (โจทย์)'}
                                   </label>
                                   {isSingleTextGame && (
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
@@ -1655,6 +1720,8 @@ export function MinigamesManagement() {
                                     selectedGId === 10 ? 'เช่น น้ำ, รถ, ดาว, พัด' :
                                     selectedGId === 11 ? 'เช่น ก้านกล้วย, ธรรมชาติ, มิตรภาพ' :
                                     selectedGId === 12 ? 'เช่น แมวเป็นสัตว์เลี้ยงลูกด้วยนม' :
+                                     selectedGId === 13 ? 'เช่น ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น' :
+                                     selectedGId === 14 ? 'เช่น Slow and steady wins the race.' :
                                     'กรอกโจทย์/คำศัพท์...'
                                   }
                                   value={formQuestion}
@@ -1682,6 +1749,8 @@ export function MinigamesManagement() {
                                     {selectedGId === 9 && 'คำแปลภาษาไทย (เฉลย)'}
                                     {selectedGId === 10 && 'คำต่อท้าย (คำหลัง เช่น "แข็ง", "ไฟ")'}
                                     {selectedGId === 12 && 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'}
+                                     {selectedGId === 13 && 'คำตอบภาษาอังกฤษเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น where, will)'}
+                                     {selectedGId === 14 && 'คำตอบภาษาไทยเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น พร้าเล่ม)'}
                                   </label>
 
                                   {selectedGId === 12 ? (
@@ -1714,6 +1783,10 @@ export function MinigamesManagement() {
                                           ? 'เช่น แอปเปิ้ล, กล้วย, บ้าน'
                                           : selectedGId === 10
                                           ? 'เช่น แข็ง (รวมเป็น น้ำแข็ง), ไฟ (รถไฟ)'
+                                          : selectedGId === 13
+                                          ? 'เช่น where, will, way (คำตอบที่นำไปเติมใน {1}, {2}...)'
+                                          : selectedGId === 14
+                                          ? 'เช่น พร้าเล่ม (คำตอบที่นำไปเติมใน {1}, {2}...)'
                                           : 'พิมพ์เฉลยคำตอบ...'
                                       }
                                       value={formAnswer}
@@ -1789,6 +1862,30 @@ export function MinigamesManagement() {
                               <Input className="h-8 text-xs rounded-lg" placeholder="คำใบ้ที่ 2 (เช่น มีงวงและงา)" value={formHint2} onChange={(e) => setFormHint2(e.target.value)} required />
                               <Input className="h-8 text-xs rounded-lg" placeholder="คำใบ้ที่ 3 (เช่น ตัวใหญ่ชอบกินอ้อย)" value={formHint3} onChange={(e) => setFormHint3(e.target.value)} required />
                             </div>
+                          </div>
+                        )}
+
+                        {/* Sentence Template Input (for Game 13 & 14) */}
+                        {(selectedGId === 13 || selectedGId === 14) && (
+                          <div className="p-4 rounded-2xl bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 border border-[#EAD8C8] dark:border-[#2D2520] space-y-2">
+                            <label className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+                              <Info className="w-3.5 h-3.5 text-teal-500" />
+                              แม่แบบประโยคพร้อมช่องว่าง &#123;1&#125;, &#123;2&#125;...
+                            </label>
+                            <Input
+                              className="h-9 text-xs rounded-xl bg-white dark:bg-[#1E1B18]"
+                              placeholder={
+                                selectedGId === 13
+                                  ? 'เช่น Where there is a {1}, there is a {2}.'
+                                  : 'เช่น ช้าๆ ได้{1}งาม'
+                              }
+                              value={formHint1}
+                              onChange={(e) => setFormHint1(e.target.value)}
+                              required
+                            />
+                            <span className="text-[11px] text-muted-foreground block">
+                              💡 ใส่ &#123;1&#125;, &#123;2&#125; ในตำแหน่งที่ต้องการเว้นเป็นช่องว่างให้ผู้เล่นกดเรียงคำศัพท์
+                            </span>
                           </div>
                         )}
 
@@ -2035,7 +2132,7 @@ export function MinigamesManagement() {
                       <SelectValue placeholder="เลือกมินิเกม" />
                     </SelectTrigger>
                     <SelectContent className="max-h-80">
-                      <SelectItem value="all">🎮 ทุกมินิเกม (12 เกม)</SelectItem>
+                      <SelectItem value="all">🎮 ทุกมินิเกม (14 เกม)</SelectItem>
                       {Object.values(MINIGAME_CONFIGS).map((g) => {
                         const bCount = botPoolCounts[g.id];
                         return (
@@ -2156,6 +2253,10 @@ export function MinigamesManagement() {
                                 <span className="text-purple-600 dark:text-purple-400 font-medium">🔗 {q.word_or_question} ➔ {q.answer}</span>
                               ) : (q.game_id === 12) ? (
                                 <span className="text-orange-600 dark:text-orange-400 font-medium">❓ ชอยส์ จริง/เท็จ</span>
+                              ) : (q.game_id === 13 || q.game_id === 14) ? (
+                                <span className="text-teal-600 dark:text-teal-400 font-medium truncate max-w-[200px]" title={q.hints?.[0] || ''}>
+                                  🔤 {q.hints?.[0] || 'เรียงประโยค'}
+                                </span>
                               ) : (
                                 '-'
                               )}
@@ -2277,7 +2378,7 @@ export function MinigamesManagement() {
             <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
               <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500" />
-                ตั้งค่าห้อง Channel ID & แต้มรางวัล (ครบ 12 มินิเกม)
+                ตั้งค่าห้อง Channel ID & แต้มรางวัล (ครบ 14 มินิเกม)
               </CardTitle>
               <CardDescription className="text-xs">
                 กำหนดห้อง Discord Channel ID, ช่วงแต้มรางวัล Min/Max Points ที่ผู้เล่นจะได้รับเมื่อตอบถูก, และเปิด/ปิดการทำงานของแต่ละเกมได้ทันที
@@ -2444,7 +2545,7 @@ export function MinigamesManagement() {
                   <SelectValue placeholder="เลือกมินิเกม" />
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
-                  <SelectItem value="all">🎮 ทุกมินิเกมรวมกัน (12 เกม)</SelectItem>
+                  <SelectItem value="all">🎮 ทุกมินิเกมรวมกัน (14 เกม)</SelectItem>
                   {Object.values(MINIGAME_CONFIGS).map((g) => (
                     <SelectItem key={g.id} value={String(g.id)}>
                       {g.icon} เกม {g.id}: {g.name}
@@ -2716,6 +2817,8 @@ export function MinigamesManagement() {
                   {editingQuestion.game_id === 10 && 'คำขึ้นต้น (คำหน้า เช่น "น้ำ")'}
                   {editingQuestion.game_id === 11 && 'คำศัพท์ภาษาไทย (TTS Audio)'}
                   {editingQuestion.game_id === 12 && 'ข้อความ / คำถามจริงหรือเท็จ'}
+                  {editingQuestion.game_id === 13 && 'ความหมายสำนวน / คำแปลภาษาไทย (โจทย์)'}
+                  {editingQuestion.game_id === 14 && 'ประโยคภาษาอังกฤษต้นฉบับ (โจทย์)'}
                 </label>
                 <Input
                   className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
@@ -2741,6 +2844,10 @@ export function MinigamesManagement() {
                       ? 'คำต่อท้าย (คำหลัง เช่น "แข็ง")'
                       : editingQuestion.game_id === 12
                       ? 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'
+                      : editingQuestion.game_id === 13
+                      ? 'คำตอบภาษาอังกฤษเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น where, will)'
+                      : editingQuestion.game_id === 14
+                      ? 'คำตอบภาษาไทยเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น พร้าเล่ม)'
                       : 'คำตอบที่ถูกต้อง (เฉลย)'}
                   </label>
                   {editingQuestion.game_id === 12 ? (
@@ -2802,6 +2909,21 @@ export function MinigamesManagement() {
                   <Input className="h-8 text-xs rounded-lg" placeholder="คำใบ้ที่ 1" value={editHint1} onChange={(e) => setEditHint1(e.target.value)} />
                   <Input className="h-8 text-xs rounded-lg" placeholder="คำใบ้ที่ 2" value={editHint2} onChange={(e) => setEditHint2(e.target.value)} />
                   <Input className="h-8 text-xs rounded-lg" placeholder="คำใบ้ที่ 3" value={editHint3} onChange={(e) => setEditHint3(e.target.value)} />
+                </div>
+              )}
+
+              {/* Sentence Template Input (for Game 13 & 14 in Edit Dialog) */}
+              {(editingQuestion.game_id === 13 || editingQuestion.game_id === 14) && (
+                <div className="p-3.5 rounded-2xl bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 border border-[#EAD8C8] dark:border-[#2D2520] space-y-1.5">
+                  <label className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] block">
+                    แม่แบบประโยคพร้อมช่องว่าง &#123;1&#125;, &#123;2&#125;...
+                  </label>
+                  <Input
+                    className="h-9 text-xs rounded-xl bg-white dark:bg-[#1E1B18]"
+                    placeholder="เช่น Where there is a {1}, there is a {2}."
+                    value={editHint1}
+                    onChange={(e) => setEditHint1(e.target.value)}
+                  />
                 </div>
               )}
             </div>
