@@ -18,6 +18,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -417,11 +418,22 @@ function AdminPageContent() {
               title="สลับธีม (โหมดมืด / สว่าง)"
             />
 
-            {/* User Profile */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-base text-primary shrink-0">
-              <User className="w-4 h-4" />
-            </div>
-            <span className="font-medium hidden xl:block text-sm max-w-[120px] truncate">{user?.username}</span>
+            {/* User Profile Avatar */}
+            <Avatar
+              className="w-8 h-8 rounded-full border border-border/60 shadow-xs shrink-0 ring-1 ring-primary/20 overflow-hidden"
+              title={user?.username || 'โปรไฟล์ผู้ใช้งาน'}
+            >
+              {user?.avatar_url && (
+                <AvatarImage
+                  src={user.avatar_url}
+                  alt={user.username || 'User Profile'}
+                  className="object-cover w-full h-full"
+                />
+              )}
+              <AvatarFallback className="w-full h-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-primary">
+                <User className="w-4 h-4" />
+              </AvatarFallback>
+            </Avatar>
 
             {/* Mobile / Tablet Navigation Sheet */}
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
