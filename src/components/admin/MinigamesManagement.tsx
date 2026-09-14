@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +28,7 @@ import {
   Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, ListFilter,
   CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Eye, Volume2, Headphones,
   Keyboard, Laptop, Globe, Check, AlertCircle, Radio, Clock, ShieldCheck, User,
-  AlertTriangle
+  AlertTriangle, Tag, ChevronsUpDown, X
 } from 'lucide-react';
 
 export interface MinigameConfig {
@@ -473,6 +475,205 @@ export function getBotTargetGameIds(gameId: number): number[] {
   if (gameId === 2 || gameId === 7) return [2, 7];
   if (gameId === 8 || gameId === 9) return [8, 9];
   return [gameId];
+}
+
+export const DEFAULT_CATEGORIES = [
+  'คำทั่วไป',
+  'สัตว์และธรรมชาติ',
+  'สิ่งของเครื่องใช้',
+  'อาหารและเครื่องดื่ม',
+  'บุคคลและอาชีพ',
+  'สถานที่และการเดินทาง',
+  'เทคโนโลยี',
+  'เทศกาลและบันเทิง',
+  'กีฬา',
+  'คุณธรรมและจริยธรรม',
+  'สังคมและกฎหมาย',
+  'บทสนทนาทั่วไป',
+  'สำนวนและสุภาษิต',
+];
+
+interface CategoryComboboxProps {
+  value: string;
+  onChange: (value: string) => void;
+  categories: string[];
+  categoryCounts?: Record<string, number>;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+export function CategoryCombobox({
+  value,
+  onChange,
+  categories,
+  categoryCounts = {},
+  placeholder = 'เลือกหรือพิมพ์หมวดหมู่...',
+  className,
+  disabled = false,
+}: CategoryComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // รวมหมวดหมู่ทั้งหมด และตัดตัวซ้ำ
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    categories.forEach((c) => {
+      if (c && typeof c === 'string' && c.trim()) set.add(c.trim());
+    });
+    DEFAULT_CATEGORIES.forEach((c) => set.add(c));
+    return Array.from(set);
+  }, [categories]);
+
+  const query = searchQuery.trim();
+  const normalizedQuery = query.toLowerCase();
+
+  const filteredCategories = useMemo(() => {
+    if (!normalizedQuery) return allCategories;
+    return allCategories.filter((cat) =>
+      cat.toLowerCase().includes(normalizedQuery)
+    );
+  }, [allCategories, normalizedQuery]);
+
+  const exactMatch = useMemo(() => {
+    return allCategories.some(
+      (cat) => cat.toLowerCase() === normalizedQuery
+    );
+  }, [allCategories, normalizedQuery]);
+
+  const handleSelect = (selectedCat: string) => {
+    onChange(selectedCat);
+    setOpen(false);
+    setSearchQuery('');
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            'w-full justify-between font-normal text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18] hover:bg-[#FAF6F0] dark:hover:bg-[#25201C] transition-colors h-10 px-3',
+            !value && 'text-muted-foreground',
+            className
+          )}
+        >
+          <div className="flex items-center gap-2 min-w-0 truncate">
+            <Tag className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 opacity-80" />
+            <span className="truncate text-[#2D2520] dark:text-[#F8EBD8] font-medium">
+              {value || placeholder}
+            </span>
+            {value && categoryCounts[value] !== undefined && categoryCounts[value] > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium shrink-0 ml-1">
+                {categoryCounts[value]} ข้อ
+              </span>
+            )}
+          </div>
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] min-w-[280px] p-0 z-50 bg-[#FDFBF7] dark:bg-[#1D1815] border-[#EAD8C8] dark:border-[#2D2520] shadow-lg rounded-2xl overflow-hidden"
+        align="start"
+      >
+        <Command shouldFilter={false}>
+          <div className="flex items-center border-b border-[#EAD8C8] dark:border-[#2D2520] px-3 bg-white/60 dark:bg-[#181513]/60">
+            <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50 text-amber-700 dark:text-amber-400" />
+            <input
+              className="flex h-10 w-full rounded-md bg-transparent py-2 text-xs outline-none placeholder:text-muted-foreground text-[#2D2520] dark:text-[#F8EBD8]"
+              placeholder="ค้นหา หรือพิมพ์หมวดหมู่ใหม่..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && query) {
+                  e.preventDefault();
+                  handleSelect(query);
+                }
+              }}
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-1 text-muted-foreground hover:text-foreground text-xs"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <CommandList className="max-h-60 p-1.5 overflow-y-auto">
+            {/* ตัวเลือกเพิ่มหมวดหมู่ใหม่ เมื่อผู้ใช้พิมพ์คำที่ยังไม่มีในระบบ */}
+            {query && !exactMatch && (
+              <div className="p-1 mb-1">
+                <button
+                  type="button"
+                  onClick={() => handleSelect(query)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-medium transition-colors border border-amber-500/25 text-left"
+                >
+                  <Plus className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="truncate">
+                    เพิ่มหมวดหมู่ใหม่: <strong className="font-bold underline decoration-amber-500/50">&ldquo;{query}&rdquo;</strong>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {filteredCategories.length === 0 && !query && (
+              <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                ไม่มีข้อมูลหมวดหมู่
+              </CommandEmpty>
+            )}
+
+            {filteredCategories.length === 0 && query && exactMatch && (
+              <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                ไม่พบหมวดหมู่อื่น
+              </CommandEmpty>
+            )}
+
+            <CommandGroup heading={query ? "หมวดหมู่ที่ตรงกับการค้นหา" : "หมวดหมู่ทั้งหมดในระบบ"}>
+              {filteredCategories.map((cat) => {
+                const isSelected = value === cat;
+                const count = categoryCounts[cat];
+                return (
+                  <CommandItem
+                    key={cat}
+                    value={cat}
+                    onSelect={() => handleSelect(cat)}
+                    className={cn(
+                      'flex items-center justify-between px-3 py-2 text-xs rounded-xl cursor-pointer transition-colors my-0.5',
+                      isSelected
+                        ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200 font-semibold'
+                        : 'hover:bg-amber-500/10 hover:text-amber-800 dark:hover:text-amber-300 text-[#4A3B32] dark:text-[#EAD8C8]'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 truncate">
+                      <Check
+                        className={cn(
+                          'w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 transition-opacity',
+                          isSelected ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                      <span className="truncate">{cat}</span>
+                    </div>
+                    {count !== undefined && count > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#EAD8C8]/60 dark:bg-[#2D2520] text-[#6B5A4B] dark:text-[#EAD8C8] font-normal shrink-0 ml-2">
+                        {count} ข้อ
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function MinigamesManagement() {
@@ -1380,6 +1581,15 @@ export function MinigamesManagement() {
     );
   }, [questions]);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    questions.forEach((q) => {
+      const cat = q.category || 'คำทั่วไป';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [questions]);
+
   const selectedGId = Number(formGameId);
   const selectedConfig = MINIGAME_CONFIGS[selectedGId] || MINIGAME_CONFIGS[1];
 
@@ -1655,11 +1865,13 @@ export function MinigamesManagement() {
                           <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] mb-1.5 block">
                             หมวดหมู่ (Category)
                           </label>
-                          <Input
-                            className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                            placeholder="เช่น ผลไม้, สัตว์, คำทั่วไป, อาหาร"
+                          <CategoryCombobox
                             value={formCategory}
-                            onChange={(e) => setFormCategory(e.target.value)}
+                            onChange={(val) => setFormCategory(val)}
+                            categories={categoriesList}
+                            categoryCounts={categoryCounts}
+                            placeholder="เลือกหรือพิมพ์หมวดหมู่..."
+                            className="h-10"
                           />
                         </div>
                       )}
@@ -1841,11 +2053,13 @@ export function MinigamesManagement() {
                             <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
                               หมวดหมู่ (Category)
                             </label>
-                            <Input
-                              className="h-9 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                              placeholder="เช่น สัตว์, ธรรมชาติ, ผลไม้, เครื่องใช้"
+                            <CategoryCombobox
                               value={formCategory}
-                              onChange={(e) => setFormCategory(e.target.value)}
+                              onChange={(val) => setFormCategory(val)}
+                              categories={categoriesList}
+                              categoryCounts={categoryCounts}
+                              placeholder="เลือกหรือพิมพ์หมวดหมู่..."
+                              className="h-9"
                             />
                           </div>
                         )}
@@ -2881,11 +3095,13 @@ export function MinigamesManagement() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">หมวดหมู่ (Category)</label>
-                <Input
-                  className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                <CategoryCombobox
                   value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  placeholder="เช่น ผลไม้, สัตว์, คำทั่วไป"
+                  onChange={(val) => setEditCategory(val)}
+                  categories={categoriesList}
+                  categoryCounts={categoryCounts}
+                  placeholder="เลือกหรือพิมพ์หมวดหมู่..."
+                  className="h-10"
                 />
               </div>
 
