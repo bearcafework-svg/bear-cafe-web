@@ -197,12 +197,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [buildFallbackUser, fetchUserProfile]);
 
-  const syncDiscordProfile = useCallback(async (opVersion: number) => {
+  const syncDiscordProfile = useCallback(async (opVersion: number, userId?: string) => {
     try {
       if (opVersion !== authOpVersionRef.current) return;
+
+      // Throttling: ซิงก์ไม่เกิน 1 ครั้งทุกๆ 6 ชั่วโมงต่อผู้ใช้ เพื่อประหยัด Edge Function Invocations
+      if (userId) {
+        const cacheKey = `last_profile_sync_${userId}`;
+        const lastSync = localStorage.getItem(cacheKey);
+        const sixHours = 6 * 60 * 60 * 1000;
+        if (lastSync && Date.now() - Number(lastSync) < sixHours) {
+          return;
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('sync-discord-profile');
       if (opVersion !== authOpVersionRef.current) return;
       if (error) { console.warn('[Auth] Profile sync failed:', error.message); return; }
+
+      if (userId) {
+        localStorage.setItem(`last_profile_sync_${userId}`, Date.now().toString());
+      }
+
       if (data?.updated) {
         console.log('[Auth] Discord profile synced:', data.username);
         setUser(prev => (prev && opVersion === authOpVersionRef.current) ? { ...prev, username: data.username, avatar_url: data.avatar_url, banner_url: data.banner_url } : prev);
@@ -223,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     console.log('[Auth] Setting up real-time profile watch for user:', user.id);
-    syncDiscordProfile(currentOpVersion);
+    syncDiscordProfile(currentOpVersion, user.id);
 
     const channel = supabase
       .channel(`profile-watch-${user.id}`)

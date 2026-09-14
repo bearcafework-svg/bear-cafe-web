@@ -31,12 +31,10 @@ async function syncPointsFromApi(
   discordId: string,
 ): Promise<{ points: number; maxCap: number } | null> {
   const pointsApiUrl = import.meta.env.VITE_POINTS_API_URL;
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const baseUrl =
-    pointsApiUrl ||
-    (supabaseUrl ? `${supabaseUrl}/functions/v1/bdfd-api` : null);
+  // หากไม่มีการระบุ VITE_POINTS_API_URL ให้อ่านจากตาราง user_points ตรงๆ เพื่อลดการเรียก Edge Function (bdfd-api) และ CORS OPTIONS
+  if (!pointsApiUrl) return null;
 
-  if (!baseUrl) return null;
+  const baseUrl = pointsApiUrl;
 
   try {
     const headers: Record<string, string> = {};
