@@ -20,6 +20,7 @@ import {
   MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +28,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu } from '@/components/ui/dropdown-menu';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { TagsSelector, type TagItem } from '@/components/ui/tags-selector';
 import {
@@ -181,31 +184,40 @@ function StarRating({
 
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center -space-x-0.5 sm:space-x-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
             disabled={saving}
             onClick={() => handleRate(star)}
-            onMouseEnter={() => setHover(star)}
-            onMouseLeave={() => setHover(0)}
-            className="focus:outline-none disabled:opacity-50 transition-transform hover:scale-110"
+            onMouseEnter={() => {
+              if (typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches) {
+                setHover(star);
+              }
+            }}
+            onMouseLeave={() => {
+              if (typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches) {
+                setHover(0);
+              }
+            }}
+            className="p-1 sm:p-0.5 focus:outline-none disabled:opacity-50 transition-transform active:scale-125 sm:hover:scale-110 touch-manipulation"
             aria-label={`ให้ ${star} ดาว`}
           >
             <Star
-              className={`w-3.5 h-3.5 transition-colors ${
+              className={cn(
+                'w-4 h-4 sm:w-3.5 sm:h-3.5 transition-colors',
                 star <= display
-                  ? 'fill-yellow-400 text-yellow-400'
-                  : 'fill-none text-muted-foreground/40'
-              }`}
+                  ? 'fill-yellow-400 text-yellow-400 drop-shadow-[0_1px_2px_rgba(250,204,21,0.3)]'
+                  : 'fill-none text-muted-foreground/40 hover:text-yellow-400/60'
+              )}
             />
           </button>
         ))}
       </div>
       {ratingCount > 0 && (
-        <span className="text-[10px] text-muted-foreground">
-          {avgRating.toFixed(1)} ({ratingCount})
+        <span className="text-[11px] sm:text-[10px] text-muted-foreground font-medium">
+          {avgRating.toFixed(1)} <span className="opacity-70">({ratingCount})</span>
         </span>
       )}
     </div>
@@ -222,10 +234,12 @@ function FeaturedCarousel({
   onClickJoin: (s: DiscordServer) => void;
   carouselConfig?: { mode: 'manual' | 'auto_top7'; window_days: number; limit: number };
 }) {
+  const isMobile = useIsMobile();
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   const len = servers.length;
 
   const prev = useCallback(() => setActive((i) => (i - 1 + len) % len), [len]);
@@ -247,10 +261,16 @@ function FeaturedCarousel({
     if (n === 0) return { transform: 'translateX(0) scale(1)', opacity: 1, zIndex: 20, filter: 'brightness(1)' };
     if (Math.abs(n) === 1) {
       const dir = n > 0 ? 1 : -1;
-      return { transform: `translateX(${dir * 64}%) scale(0.86)`, opacity: 0.58, zIndex: 12, filter: 'brightness(0.72)' };
+      const offset = isMobile ? 38 : 64;
+      const scale = isMobile ? 0.90 : 0.86;
+      const opacity = isMobile ? 0.40 : 0.58;
+      return { transform: `translateX(${dir * offset}%) scale(${scale})`, opacity, zIndex: 12, filter: 'brightness(0.72)' };
     }
     if (Math.abs(n) === 2) {
       const dir = n > 0 ? 1 : -1;
+      if (isMobile) {
+        return { transform: `translateX(${dir * 72}%) scale(0.70)`, opacity: 0.12, zIndex: 6, filter: 'brightness(0.45)' };
+      }
       return { transform: `translateX(${dir * 106}%) scale(0.76)`, opacity: 0.28, zIndex: 8, filter: 'brightness(0.52)' };
     }
     return { transform: 'translateX(0) scale(0)', opacity: 0, zIndex: 0 };
@@ -279,28 +299,38 @@ function FeaturedCarousel({
       </div>
 
       <div
-        className="relative w-full overflow-visible group px-0 sm:px-2"
-        style={{ height: 'clamp(160px, 24vw, 280px)' }}
+        className="relative w-full overflow-hidden sm:overflow-visible group px-0 sm:px-2 h-[215px] sm:h-[245px] md:h-[280px] touch-pan-y select-none"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocusCapture={() => setIsInteracting(true)}
         onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsInteracting(false); }}
-        onTouchStart={(e) => { setIsInteracting(true); touchStartX.current = e.touches[0].clientX; }}
-        onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - touchStartX.current; if (Math.abs(dx) > 50) dx > 0 ? prev() : next(); setIsInteracting(false); }}
+        onTouchStart={(e) => {
+          setIsInteracting(true);
+          touchStartX.current = e.touches[0].clientX;
+          touchStartY.current = e.touches[0].clientY;
+        }}
+        onTouchEnd={(e) => {
+          const dx = e.changedTouches[0].clientX - touchStartX.current;
+          const dy = e.changedTouches[0].clientY - touchStartY.current;
+          if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+            dx > 0 ? prev() : next();
+          }
+          setIsInteracting(false);
+        }}
       >
         {servers.map((server, index) => {
           const style = getStyle(index);
           return (
             <div
               key={server.id}
-              className="absolute inset-0 mx-auto w-[66%] sm:w-[62%] md:w-[60%] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] rounded-2xl overflow-hidden cursor-pointer will-change-transform"
+              className="absolute inset-0 mx-auto w-[86%] sm:w-[68%] md:w-[60%] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer will-change-transform shadow-md"
               style={{ ...style, pointerEvents: index === active ? 'auto' : 'none' }}
             >
               <div className="relative w-full h-full">
                 {server.banner_url
                   ? <img src={server.banner_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/30" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 
                 {/* Top Badge */}
                 {isAutoMode && (
@@ -321,21 +351,21 @@ function FeaturedCarousel({
                   </div>
                 )}
 
-                <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex items-end gap-3 sm:gap-4">
-                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 border-white/30 shadow-lg shrink-0 bg-white/10 backdrop-blur-sm">
+                <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex items-end gap-2.5 sm:gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/40 shadow-lg shrink-0 bg-white/10 backdrop-blur-sm">
                     {server.icon_url
                       ? <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       : <div className="w-full h-full flex items-center justify-center text-white text-lg sm:text-xl font-bold">{server.name[0]}</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <h4 className="text-white font-bold text-sm sm:text-lg truncate drop-shadow-lg">{server.name}</h4>
+                      <h4 className="text-white font-bold text-sm sm:text-base md:text-lg truncate drop-shadow-md">{server.name}</h4>
                       {server.is_verified && <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />}
                       {server.is_partner && <Handshake className="w-4 h-4 text-purple-400 shrink-0" />}
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[10px] sm:text-xs text-white/70">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(server.member_count || 0).toLocaleString()}</span>
-                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{(server.impression_count || 0).toLocaleString()}</span>
+                    <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[11px] sm:text-xs text-white/80">
+                      <span className="flex items-center gap-1"><Users className="w-3 h-3 text-white/90" />{(server.member_count || 0).toLocaleString()}</span>
+                      <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-white/90" />{(server.impression_count || 0).toLocaleString()}</span>
                       {(server.rating_count ?? 0) > 0 && (
                         <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{(server.avg_rating ?? 0).toFixed(1)}</span>
                       )}
@@ -354,7 +384,7 @@ function FeaturedCarousel({
                   ) : (
                     <Button
                       size="sm"
-                      className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3 sm:px-5 shrink-0 text-xs sm:text-sm"
+                      className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3.5 sm:px-5 shrink-0 text-xs sm:text-sm font-semibold h-8 sm:h-9"
                       onClick={() => onClickJoin(server)}
                     >
                       <span className="hidden sm:inline">เข้าดิสคอร์ด</span>
@@ -368,10 +398,10 @@ function FeaturedCarousel({
         })}
         {len > 1 && (
           <>
-            <button onClick={prev} className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Previous">
+            <button onClick={prev} className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm hidden sm:flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Previous">
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            <button onClick={next} className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Next">
+            <button onClick={next} className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm hidden sm:flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Next">
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </>
@@ -497,7 +527,7 @@ function ServerCard({
         style={getHighlightStyle(server.highlight_color)}
       >
         {/* Banner */}
-        <div className="relative h-20 sm:h-28 overflow-hidden shrink-0">
+        <div className="relative h-24 sm:h-28 overflow-hidden shrink-0">
           {server.banner_url
             ? <img
                 ref={bannerRef}
@@ -547,41 +577,41 @@ function ServerCard({
           )}
 
           {/* Badges: Expired, Trending, Rising, New, Partner, Category */}
-          <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 flex-wrap justify-end">
+          <div className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 flex gap-1 sm:gap-1.5 flex-wrap justify-end max-w-[72%]">
             {isExpired ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+              <Badge className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" />ลิงก์หมดอายุ
               </Badge>
             ) : server.is_rising ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Flame className="w-2.5 h-2.5 fill-white" />โตเร็ว
               </Badge>
             ) : (server.discovery_score || 0) >= 8 ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Flame className="w-2.5 h-2.5 fill-white" />กำลังมาแรง
               </Badge>
             ) : server.is_new ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-emerald-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+              <Badge className="text-[9px] sm:text-[10px] bg-emerald-500/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Sparkles className="w-2.5 h-2.5" />ใหม่
               </Badge>
             ) : null}
 
             {server.is_partner && (
-              <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-sm px-1.5 sm:px-2 flex items-center gap-0.5">
+              <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
                 <Handshake className="w-2.5 h-2.5" />Partner
               </Badge>
             )}
             {getCategoryName(server.category_id) && (
-              <Badge className="text-[9px] sm:text-[10px] bg-white/80 dark:bg-card/80 text-foreground border-none backdrop-blur-md shadow-sm font-medium px-1.5 sm:px-2">
+              <Badge className="text-[9px] sm:text-[10px] bg-white/85 dark:bg-card/85 text-foreground border-none backdrop-blur-md shadow-xs font-medium px-1.5 sm:px-2 max-w-[110px] sm:max-w-[140px] truncate">
                 {getCategoryName(server.category_id)}
               </Badge>
             )}
           </div>
         </div>
 
-        <CardContent className="p-3 sm:p-5 -mt-8 sm:-mt-12 relative flex-1 flex flex-col">
+        <CardContent className="p-3.5 sm:p-5 -mt-8 sm:-mt-10 relative flex-1 flex flex-col">
           {/* Icon */}
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
+          <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
             {server.icon_url
               ? <img src={server.icon_url} alt={server.name} className={cn('w-full h-full object-cover', isExpired && 'grayscale-[30%]')} loading="lazy" decoding="async" />
               : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
@@ -641,31 +671,33 @@ function ServerCard({
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-1.5 sm:gap-2">
             <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
 
-            {/* Refresh — only for owner */}
+            {/* Owner Management Menu */}
             {user && server.owner_id === user.discord_id && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-full h-8 w-8 p-0 shrink-0"
-                onClick={() => onRefresh(server)}
-                disabled={refreshingId === server.id}
-                title="รีโหลดข้อมูลจาก Discord"
+              <DropdownMenu
+                options={[
+                  {
+                    label: "รีโหลดข้อมูลจาก Discord",
+                    onClick: () => onRefresh(server),
+                    Icon: <RefreshCw className={cn("w-3.5 h-3.5", refreshingId === server.id && "animate-spin")} />,
+                    disabled: refreshingId === server.id,
+                  },
+                  ...(onEditLink ? [{
+                    label: "แก้ไขลิงก์เชิญ",
+                    onClick: () => onEditLink(server),
+                    Icon: <LinkIcon className="w-3.5 h-3.5 text-amber-500" />,
+                  }] : []),
+                  ...(onDelete ? [{
+                    label: "ลบเซิร์ฟเวอร์",
+                    onClick: () => onDelete(server),
+                    Icon: <Trash2 className="w-3.5 h-3.5" />,
+                    variant: "destructive" as const,
+                  }] : []),
+                ]}
+                align="start"
+                triggerClassName="rounded-full h-8 w-8 p-0 shrink-0 border border-border/60 text-muted-foreground hover:text-foreground"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === server.id ? 'animate-spin' : ''}`} />
-              </Button>
-            )}
-
-            {/* Delete button — strictly for owner only */}
-            {user && server.owner_id === user.discord_id && onDelete && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="rounded-full h-8 w-8 p-0 shrink-0 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => onDelete(server)}
-                title="ลบเซิร์ฟเวอร์ออกจากระบบ"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+                <MoreHorizontal className="w-4 h-4" />
+              </DropdownMenu>
             )}
 
             {/* Main Action Button (Right aligned) */}
@@ -697,7 +729,7 @@ function ServerCard({
               /* Normal Join button */
               <Button
                 size="sm"
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3 sm:px-5 ml-auto text-xs sm:text-sm shrink-0"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3.5 sm:px-5 ml-auto text-xs sm:text-sm shrink-0 font-medium"
                 onClick={() => handleClickJoin(server)}
               >
                 เข้าดิสคอร์ด
@@ -1513,65 +1545,69 @@ export default function DiscordServersPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="ค้นหาเซิร์ฟเวอร์..." className="pl-10 rounded-xl bg-white/50 dark:bg-card/50 border-latte/30 dark:border-coffee/30 h-9 sm:h-10 text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
-                <div className="flex gap-1 sm:gap-1.5 items-center overflow-x-auto pb-0.5 no-scrollbar">
-                  <Button
-                    variant={sortMode === 'recommendation' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('recommendation')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm gap-1.5 shrink-0 shadow-sm"
-                    size="sm"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="font-semibold">
-                      {userState === 'ESTABLISHED' || userState === 'EARLY'
-                        ? 'แนะนำสำหรับคุณ'
-                        : 'น่าสนใจตอนนี้'}
-                    </span>
-                  </Button>
-                  <Button
-                    variant={sortMode === 'trending' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('trending')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                    size="sm"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>กำลังมาแรง</span>
-                  </Button>
-                  <Button
-                    variant={sortMode === 'rising' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('rising')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                    size="sm"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-purple-500" />
-                    <span>โตเร็ว</span>
-                  </Button>
-                  <Button
-                    variant={sortMode === 'new' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('new')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                    size="sm"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>ใหม่</span>
-                  </Button>
-                  <Button
-                    variant={sortMode === 'recent' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('recent')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                    size="sm"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>ล่าสุด</span>
-                  </Button>
-                  <Button
-                    variant={sortMode === 'rating' ? 'default' : 'outline'}
-                    onClick={() => setSortMode('rating')}
-                    className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                    size="sm"
-                  >
-                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                    <span>คะแนน</span>
-                  </Button>
+                <div className="relative flex-1 sm:flex-initial min-w-0">
+                  <div className="flex gap-1 sm:gap-1.5 items-center overflow-x-auto pb-0.5 no-scrollbar touch-pan-x pr-6 sm:pr-0">
+                    <Button
+                      variant={sortMode === 'recommendation' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('recommendation')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm gap-1.5 shrink-0 shadow-xs font-semibold"
+                      size="sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span>
+                        {userState === 'ESTABLISHED' || userState === 'EARLY'
+                          ? 'แนะนำสำหรับคุณ'
+                          : 'น่าสนใจตอนนี้'}
+                      </span>
+                    </Button>
+                    <Button
+                      variant={sortMode === 'trending' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('trending')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                      size="sm"
+                    >
+                      <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      <span>กำลังมาแรง</span>
+                    </Button>
+                    <Button
+                      variant={sortMode === 'rising' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('rising')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                      size="sm"
+                    >
+                      <Flame className="w-3.5 h-3.5 text-purple-500" />
+                      <span>โตเร็ว</span>
+                    </Button>
+                    <Button
+                      variant={sortMode === 'new' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('new')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                      size="sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>ใหม่</span>
+                    </Button>
+                    <Button
+                      variant={sortMode === 'recent' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('recent')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                      size="sm"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>ล่าสุด</span>
+                    </Button>
+                    <Button
+                      variant={sortMode === 'rating' ? 'default' : 'outline'}
+                      onClick={() => setSortMode('rating')}
+                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
+                      size="sm"
+                    >
+                      <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                      <span>คะแนน</span>
+                    </Button>
+                  </div>
+                  {/* Subtle right gradient mask for mobile indicating horizontal scroll */}
+                  <div className="pointer-events-none absolute right-0 top-0 bottom-0.5 w-6 bg-gradient-to-l from-cream/90 via-cream/40 to-transparent dark:from-background/90 dark:via-background/40 to-transparent sm:hidden" />
                 </div>
               </div>
 
@@ -1655,10 +1691,18 @@ export default function DiscordServersPage() {
                   </Button>
                 </div>
                 {user && (
-                  <div className="flex items-center gap-1.5 shrink-0 bg-white/50 dark:bg-card/50 rounded-full px-2.5 py-1.5 border border-border/40">
-                    <Switch checked={showMyOnly} onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }} className="scale-75" />
-                    <span className="text-[10px] sm:text-xs text-muted-foreground font-medium whitespace-nowrap">ของฉัน</span>
-                  </div>
+                  <label
+                    htmlFor="show-my-switch"
+                    className="flex items-center gap-2 shrink-0 bg-white/60 dark:bg-card/60 hover:bg-white/80 dark:hover:bg-card/80 transition-colors rounded-full px-3 py-1.5 border border-border/50 cursor-pointer shadow-2xs select-none touch-manipulation"
+                    title="แสดงเฉพาะเซิร์ฟเวอร์ที่คุณเป็นเจ้าของ"
+                  >
+                    <Switch
+                      id="show-my-switch"
+                      checked={showMyOnly}
+                      onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }}
+                    />
+                    <span className="text-xs text-foreground font-medium whitespace-nowrap">ของฉัน</span>
+                  </label>
                 )}
               </div>
 
