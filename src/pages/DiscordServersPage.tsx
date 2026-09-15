@@ -611,7 +611,7 @@ function ServerCard({
 
         <CardContent className="p-3.5 sm:p-5 -mt-8 sm:-mt-10 relative flex-1 flex flex-col">
           {/* Icon */}
-          <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 aspect-square shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
             {server.icon_url
               ? <img src={server.icon_url} alt={server.name} className={cn('w-full h-full object-cover', isExpired && 'grayscale-[30%]')} loading="lazy" decoding="async" />
               : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
