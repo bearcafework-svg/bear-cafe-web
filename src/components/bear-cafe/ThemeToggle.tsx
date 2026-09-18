@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 
+import { cn } from '@/lib/utils';
+
 // Sparkle particle component
 const Sparkle = ({ delay, x, y }: { delay: number; x: number; y: number }) => (
   <motion.span
@@ -27,7 +29,7 @@ const Sparkle = ({ delay, x, y }: { delay: number; x: number; y: number }) => (
   />
 );
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string } = {}) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [isAnimating, setIsAnimating] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -58,7 +60,10 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="relative w-10 h-10 rounded-xl bg-cream/80 dark:bg-muted/80 backdrop-blur-sm border border-latte dark:border-border shadow-sm"
+        className={cn(
+          "relative w-10 h-10 rounded-xl bg-cream/80 dark:bg-muted/80 backdrop-blur-sm border border-latte dark:border-border shadow-sm",
+          className
+        )}
       >
         <div className="w-5 h-5" />
       </Button>
@@ -84,15 +89,10 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      className={`
-        relative w-10 h-10 rounded-xl 
-        bg-cream/80 dark:bg-muted/80 backdrop-blur-sm 
-        border border-latte dark:border-border
-        shadow-sm hover:shadow-md
-        transition-all duration-300 ease-out
-        overflow-visible
-        group
-      `}
+      className={cn(
+        "relative w-10 h-10 rounded-xl bg-cream/80 dark:bg-muted/80 backdrop-blur-sm border border-latte dark:border-border shadow-sm hover:shadow-md transition-all duration-300 ease-out overflow-visible group",
+        className
+      )}
       title={isDark ? 'เปลี่ยนเป็นธีมสว่าง' : 'เปลี่ยนเป็นธีมมืด'}
     >
       {/* Glow ring effect */}

@@ -41,6 +41,13 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
   - **ใช้ `max-h-[inherit]` และ `touch-pan-y`:** บน `SelectPrimitive.Viewport`, `PopoverContent` และกล่องเลื่อนของ Dropdown ให้ใส่ `touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]` เสมอ เพื่อให้ WebKit บน iOS/iPadOS ทำงานร่วมกับระบบสัมผัสได้อย่างลื่นไหล
   - **ซ่อน Scroll Buttons ในโหมด Popper:** ปุ่มเลื่อนหัว-ท้าย (`SelectScrollUpButton`/`SelectScrollDownButton`) ให้แสดงเฉพาะเมื่อ `position !== "popper"` เพื่อไม่ให้แย่งพื้นที่และขัดขวางการปัดเลื่อนด้วยนิ้ว
   - **กฎเหล็กเมื่อ Dropdown อยู่ใน Modal/Dialog (Nested Overlays):** เมื่อ `RichSelect`, `Popover` หรือ `Select` เปิดอยู่ภายใน `Dialog` ตัว `RemoveScroll` ของ Dialog จะดักจับอีเวนต์ `touchmove` บน `document` และสั่ง `event.preventDefault()` เพราะคิดว่าเป็นทัชนอก Dialog! วิธีแก้คือต้องใส่ `e.stopPropagation()` บน native `touchmove` ของกล่อง Popover/Select เสมอ เพื่อหยุดการ bubble ไม่ให้ไปถึง `document` พร้อมกับใส่ Direct Touch Drag fallback ให้ลากนิ้วเลื่อนได้ทันที
+* **Tailwind Sizing Guard (ป้องกันรูปภาพ/ไอคอนขยายยักษ์บน Mobile):**
+  - **ระวังคลาสขนาดที่ไม่มีจริงใน Tailwind:** Tailwind ไม่มี step เลขคี่ระหว่าง 12-16 (`w-13`, `h-13` ไม่มีอยู่จริง มีเพียง `w-12`, `w-14`, `w-16`)
+  - **ระวัง `aspect-square` ขยาย 100%:** หากใส่คลาสที่ไม่มีจริง เช่น `w-13 h-13` ร่วมกับ `aspect-square` บราวเซอร์จะละเลย width/height ส่งผลให้กล่องกลายเป็น `width: 100%` ของการ์ด และ `aspect-square` จะดันความสูงเป็น 1:1 จนกลายเป็นรูปภาพยักษ์ขนาด 350px+ กินพื้นที่ทั้งการ์ดบน Mobile ทันที!
+  - **มาตรฐานขนาด Server Icon / Avatar บนการ์ด:** ต้องใช้ `w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-2xl overflow-hidden` เสมอ
+* **Carousel 3D Card Layout Guard (ป้องกันการ์ดหลุดเฟรมทับหน้าเว็บ):**
+  - **ห้ามใส่ `position: relative` บน Utility/Effect classes** ที่จะนำไปใช้กับการ์ด Carousel ที่ถูกวางตำแหน่งด้วย `position: absolute; inset: 0;` (เช่น คลาส `.rainbow-border-glow` หรือ Glow borders) เพราะจะทำลาย Stacking context แล้วการ์ดจะร่วงลงไปใน document flow ปกติ ทับช่องค้นหาหรือคอนเทนต์ด้านล่าง
+  - **การ์ดนอกระยะมองเห็น (`Math.abs(n) > 2`):** ต้องใส่ `visibility: 'hidden'` และ `pointerEvents: 'none'` ควบคู่กับ `opacity: 0` เสมอ เพื่อไม่ให้เงาหรือการ์ดที่ถูกซ่อนแอบแสดงผลบนหน้าจอ
 * **Glassmorphism & Card Design:** ใช้การ์ดกึ่งโปร่งแสงผสมพื้นหลังเบลอ (เช่น `bg-[#1A1614]/80 backdrop-blur-md border border-[#2D2420]`)
 
 ---
@@ -384,3 +391,34 @@ Skill นี้ถูกออกแบบมาให้พัฒนาคว�
 2. **Global Body Interceptor:** ทุก Overlay หรือ Dropdown ที่เป็น Portaled Content ต้องได้รับการคุ้มครองด้วย Global Touch Interceptor (`src/lib/touch-scroll-lock-fix.ts`) ซึ่งจะดักฟัง `touchmove` บนระดับ `document.body` ใน Bubbling phase และสั่ง `e.stopPropagation()` เพื่อป้องกันไม่ให้ Event ไหลไปถึง `document`
 3. **Pointer-Events Override:** เมนูที่แสดงผลแบบ Portal เข้าสู่ `document.body` ต้องมีคลาสหรือ CSS Rule `pointer-events: auto !important` เพื่อป้องกันการสืบทอด `pointer-events: none` จาก Dialog แม่
 4. **Viewport Sizing:** คอมโพเนนต์ประเภท Select Viewport ต้องไม่ถูกจำกัดความสูงไว้ที่ Trigger Height และต้องมี `min-h-0`, `max-h-[...]` และ `-webkit-overflow-scrolling: touch` เสมอ
+
+---
+
+## 🛡️ Tailwind Sizing & Mobile Display Guards (ข้อบังคับขนาดและการจัดวางบนมือถือ)
+1. **ห้ามใช้ Tailwind Steps ที่ไม่มีอยู่จริง (Invalid Classes):**
+   - Tailwind CSS โดยมาตรฐานไม่มี step เลขคี่ระหว่าง 12-16 (เช่น ไม่มี `w-13`, `h-13`, `w-15`, `h-15`)
+   - ขนาดมาตรฐาน: `w-12` (48px), `w-14` (56px), `w-16` (64px) หรือใช้ Arbitrary Value เช่น `w-[52px]`
+2. **อันตรายของ Invalid Size ร่วมกับ `aspect-square`:**
+   - เมื่อระบุ `className="w-13 h-13 ... aspect-square"` บน Mobile (<640px) เบราว์เซอร์จะไม่รู้จัก `w-13` ทำให้ Block กว้างตาม Contained Parent (100%) และ `aspect-square` จะบังคับให้ความสูงเท่ากับความกว้าง ส่งผลให้ไอคอน/รูปขยายตัวยักษ์เต็มหน้าจอ (Giant Icon Bug)
+   - **กฎเหล็ก:** Avatar หรือ Icon ภายใน Card ต้องระบุขนาดที่ถูกต้องคู่กันเสมอ เช่น `w-14 h-14 sm:w-16 sm:h-16 shrink-0` และหลีกเลี่ยงการพึ่งพา `aspect-square` เดี่ยวๆ โดยไม่มี Width ที่แน่นอน
+3. **Card Media & Icon Standard Sizes:**
+   - เซิร์ฟเวอร์การ์ด / โปรไฟล์การ์ด:
+     - Mobile (2-column layout): `w-12 h-12 shrink-0 rounded-2xl overflow-hidden border-2 border-background shadow-md bg-card`
+     - Tablet/Desktop: `sm:w-16 sm:h-16`
+     - Banner/Cover: `w-full aspect-[16/9] sm:aspect-[2.2/1] object-cover` หรือความสูงแบบยืดหยุ่น `h-20 sm:h-28` เพื่อป้องกันการยืดหดผิดสัดส่วน
+4. **Mobile 2-Column Grid Layout & Typography Guard (มาตรฐานการ์ด 2 คอลัมน์และขนาดฟอนต์บนมือถือ):**
+   - **โครงสร้าง Grid:** การ์ดแสดงผลรายการ (เช่น Discord Servers, Market Items) ให้ใช้ `grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6` บนมือถือ แทนที่จะแสดงแบบ 1 ช่องเต็ม (`grid-cols-1`) เพื่อไม่ให้การ์ดดูใหญ่เทอะทะและเลื่อนยาวจนเกินไป ทำให้ผู้ใช้สามารถกวาดสายตาดูได้ 4-6 การ์ดพร้อมกัน
+   - **Padding & Proportions:** ปรับ CardContent เป็น `p-3 sm:p-5 -mt-6 sm:-mt-8` เพื่อให้เนื้อหามีพื้นที่หายใจ ไม่ล้นขอบ
+   - **กฎเหล็กเรื่องขนาดตัวอักษร (Typography for Mobile 2-Cols):**
+     - ภาษาไทยมีสระบน/ล่างและวรรณยุกต์ การใช้ขนาดต่ำกว่า 11px (เช่น `text-[10px]`) จะอ่านยากมากบนมือถือ
+     - **ชื่อหัวข้อ/เซิร์ฟเวอร์:** `font-bold text-sm sm:text-base` คมชัด เด่นสะดุดตา
+     - **คำอธิบาย:** `text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-2`
+     - **ป้ายหมวดหมู่ & Badges:** `text-[11px] sm:text-xs font-semibold`
+     - **ตัวเลขสถิติ (Stats):** `text-xs font-semibold`
+     - **ปุ่ม Action:** `w-full sm:w-auto text-xs sm:text-sm font-bold h-8` เต็มความกว้างการ์ดบนมือถือ กดง่ายถนัดนิ้วโป้ง
+5. **Featured 3D Carousel Mobile Proportions Guard (มาตรฐาน Carousel 3D บนมือถือ ไม่ให้การ์ดสูงเทอะทะ):**
+   - **ความกว้างการ์ดหลัก (Card Width):** บนมือถือใช้ `w-[93%]` (แทน `w-[86%]`) เพื่อขยายพื้นที่แนวนอนให้กว้างเต็มตา รองรับชื่อเซิร์ฟเวอร์และปุ่มโดยไม่เบียด
+   - **ความสูงคอนเทนเนอร์ (Height):** บนมือถือใช้ความสูงกะทัดรัด `h-[150px] sm:h-[220px] md:h-[260px]` สไตล์ Sleek Banner ไม่กินพื้นที่หน้าจอสูงเกินไป ทำให้มองเห็น Search / Filter และรายการการ์ดด้านล่างได้ทันที
+   - **ระยะเลื่อนซ้อน (3D Offset):** บนมือถือใช้ `offset: 30%` และ `scale: 0.92` พร้อม `opacity: 0.32` เพื่อให้การ์ดข้าง ๆ โผล่มาเป็นไกด์แบบพอดีขอบ ไม่ทับหรือรบกวนการ์ดตรงกลาง
+   - **การจัดวางด้านล่าง (Bottom Layout):** จัดแถวล่างด้วย `items-center` ไอคอน `w-10 h-10`, กล่องชื่อเซิร์ฟเวอร์ `flex-1 min-w-0 pr-1`, ตัวเลขสถิติ `text-[11px] text-white/90`, และปุ่มเข้าร่วมใช้ `bg-primary text-primary-foreground font-bold h-7 sm:h-9 px-3 sm:px-5` กะทัดรัดและสวยงาม
+

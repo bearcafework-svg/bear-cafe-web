@@ -46,16 +46,16 @@ export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServe
         {/* Warning badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            className="text-[10px] bg-orange-500/90 text-white border-none backdrop-blur-md shadow-sm px-2 flex items-center gap-1"
+            className="text-[11px] font-bold bg-orange-500/90 text-white border-none backdrop-blur-md shadow-sm px-2 flex items-center gap-1"
             aria-label="ลิงก์หมดอายุ"
           >
-            <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+            <AlertTriangle className="w-3 h-3" aria-hidden="true" />
             ลิงก์หมดอายุ
           </Badge>
         </div>
       </div>
 
-      <CardContent className="p-4 -mt-8 relative">
+      <CardContent className="p-3 sm:p-4 -mt-6 sm:-mt-8 relative">
         {/* Icon */}
         <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white dark:border-card shadow-md bg-white dark:bg-card mb-2 ring-2 ring-orange-300/30 grayscale opacity-70">
           {server.icon_url ? (
@@ -74,22 +74,22 @@ export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServe
         </div>
 
         {/* Name */}
-        <h3 className="font-bold text-sm truncate text-muted-foreground mb-1">{server.name}</h3>
+        <h3 className="font-bold text-sm sm:text-base truncate text-muted-foreground mb-1">{server.name}</h3>
 
         {/* Description */}
-        <p className="text-xs text-muted-foreground/70 leading-relaxed line-clamp-2 mb-4">
+        <p className="text-xs sm:text-sm text-muted-foreground/70 leading-relaxed line-clamp-2 mb-3">
           {server.description || 'ไม่มีคำอธิบาย'}
         </p>
 
         {/* Actions */}
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-1.5 sm:gap-2 items-center">
           <Button
             size="sm"
-            className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md text-xs h-8"
+            className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md text-xs h-8 px-2"
             onClick={() => onEditLink(server)}
             aria-label={`แก้ไขลิงก์สำหรับ ${server.name}`}
           >
-            <AlertTriangle className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
+            <AlertTriangle className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
             แก้ไขลิงก์
           </Button>
 

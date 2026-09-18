@@ -1,26 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { GlowCard } from '@/components/ui/spotlight-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Footer } from '@/components/bear-cafe/Footer';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { ExpiredServerCard } from '@/components/discord/ExpiredServerCard';
 import { EditLinkDialog } from '@/components/discord/EditLinkDialog';
+import { EditVibeDialog } from '@/components/discord/EditVibeDialog';
+import { FindYourVibeDialog } from '@/components/discord/FindYourVibeDialog';
+import discordLogo from '@/assets/discord-logo-wordmark.png';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, Plus, Users, Info, Loader2,
-  MessageSquare, Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
+  Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
-  MoreHorizontal,
+  MoreHorizontal, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -31,7 +34,6 @@ import { Switch } from '@/components/ui/switch';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { TagsSelector, type TagItem } from '@/components/ui/tags-selector';
 import {
   trackDiscoveryEvent,
   trackSearchIntent,
@@ -45,6 +47,22 @@ import {
   RECOMMENDATION_CONSTANTS,
   UserStateType,
 } from '@/lib/recommendation-engine';
+import {
+  CURATED_TRAITS,
+  getTraitById,
+  VIBE_GOALS,
+  VIBE_ATMOSPHERES,
+  type DiscordTrait,
+  type ServerVibeProfile,
+} from '@/lib/discord-traits';
+import {
+  calculateWeeklyActiveScore,
+  getTimeSince,
+  isRainbow,
+  getHighlightCardStyle,
+  getNameHighlightClass,
+  getNameHighlightStyle,
+} from '@/lib/discord-server-helpers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; icon: string; }
@@ -73,6 +91,15 @@ interface DiscordServer {
   invite_status: "valid" | "expired" | "unknown";
   invite_last_checked_at: string | null;
   created_at?: string;
+  // Live Activity from Akari Bot (Phase 1)
+  live_voice_count?: number | null;
+  weekly_joins_count?: number | null;
+  has_akari_bot?: boolean | null;
+  activity_synced_at?: string | null;
+  // Phase 2: Traits & Server Type
+  server_type?: 'community' | 'shop' | null;
+  traits?: string[] | null;
+  server_profile?: ServerVibeProfile | null;
   // joined client-side / discovery engine
   avg_rating?: number;
   rating_count?: number;
@@ -93,16 +120,100 @@ interface DiscordServer {
   recommendation_reason?: string;
   is_exploration?: boolean;
   user_state?: UserStateType | string;
+  // Carousel Trending & Active (Real Weekly Data)
+  trending_active_score?: number;
+  trending_badge?: {
+    text: string;
+    color: string;
+  };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getHighlightStyle(color: string | null): React.CSSProperties {
-  if (!color) return {};
-  if (color === 'rainbow') return {};          // handled via className
-  return { borderColor: color, borderWidth: 2 };
+// ─── Smart Image Fallback Components ──────────────────────────────────────────
+function SafeServerBanner({
+  url,
+  alt = '',
+  className,
+  imgRef,
+  style,
+  isExpired,
+}: {
+  url?: string | null;
+  alt?: string;
+  className?: string;
+  imgRef?: React.RefObject<HTMLImageElement | null>;
+  style?: React.CSSProperties;
+  isExpired?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  if (!url || failed) {
+    return (
+      <div className={cn('w-full h-full bg-gradient-to-br from-amber-600/25 via-amber-900/20 to-stone-900/40 relative overflow-hidden', className)}>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/15 via-transparent to-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      ref={imgRef}
+      src={url}
+      alt={alt}
+      className={cn(className, isExpired && 'grayscale-[40%]')}
+      style={style}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
-function isRainbow(color: string | null) { return color === 'rainbow'; }
+function SafeServerIcon({
+  url,
+  name,
+  className,
+  fallbackClassName,
+  textClassName = 'text-white text-base sm:text-lg font-black',
+  isExpired,
+}: {
+  url?: string | null;
+  name: string;
+  className?: string;
+  fallbackClassName?: string;
+  textClassName?: string;
+  isExpired?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  const initial = (name || '?').trim()[0]?.toUpperCase() || '?';
+
+  if (!url || failed) {
+    return (
+      <div className={cn('w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-700 select-none shadow-inner', fallbackClassName)}>
+        <span className={textClassName}>{initial}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={name}
+      className={cn(className, isExpired && 'grayscale-[30%]')}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 // ─── Bump countdown ───────────────────────────────────────────────────────────
 function useBumpCountdown(bumpedAt: string | null) {
@@ -224,86 +335,200 @@ function StarRating({
   );
 }
 
-// ─── Featured Carousel ────────────────────────────────────────────────────────
-function FeaturedCarousel({
+// ─── Server Spotlight (Cozy Discovery Hero) ─────────────────────────────────
+function ServerSpotlight({
   servers,
   onClickJoin,
   carouselConfig,
+  categories,
 }: {
   servers: DiscordServer[];
   onClickJoin: (s: DiscordServer) => void;
   carouselConfig?: { mode: 'manual' | 'auto_top7'; window_days: number; limit: number };
+  categories?: { id: string; name: string; icon: string }[];
 }) {
-  const isMobile = useIsMobile();
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [timerKey, setTimerKey] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const len = servers.length;
 
-  const prev = useCallback(() => setActive((i) => (i - 1 + len) % len), [len]);
-  const next = useCallback(() => setActive((i) => (i + 1) % len), [len]);
+  const prev = useCallback(() => {
+    setActive((i) => (i - 1 + len) % len);
+    setTimerKey((k) => k + 1);
+  }, [len]);
 
+  const next = useCallback(() => {
+    setActive((i) => (i + 1) % len);
+    setTimerKey((k) => k + 1);
+  }, [len]);
+
+  const goTo = useCallback((index: number) => {
+    setActive(index);
+    setTimerKey((k) => k + 1);
+  }, []);
+
+  // 8s Autoplay with smart pause and reset
   useEffect(() => {
     if (len <= 1 || paused || isInteracting) return;
-    const id = setInterval(next, 5000);
+    const id = setInterval(next, 8000);
     return () => clearInterval(id);
-  }, [len, paused, isInteracting, next]);
+  }, [len, paused, isInteracting, next, timerKey]);
+
+  // Pause when browser tab is inactive
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setPaused(true);
+      } else {
+        setPaused(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   if (len === 0) return null;
 
-  const isAutoMode = carouselConfig?.mode !== 'manual';
+  // Active server
+  const server = servers[active] || servers[0];
+  const isExpired = server.invite_status === 'expired';
 
-  const getStyle = (index: number) => {
-    const diff = ((index - active) % len + len) % len;
-    const n = diff > len / 2 ? diff - len : diff;
-    if (n === 0) return { transform: 'translateX(0) scale(1)', opacity: 1, zIndex: 20, filter: 'brightness(1)' };
-    if (Math.abs(n) === 1) {
-      const dir = n > 0 ? 1 : -1;
-      const offset = isMobile ? 38 : 64;
-      const scale = isMobile ? 0.90 : 0.86;
-      const opacity = isMobile ? 0.40 : 0.58;
-      return { transform: `translateX(${dir * offset}%) scale(${scale})`, opacity, zIndex: 12, filter: 'brightness(0.72)' };
+  // Category name resolution
+  const categoryName = categories && server.category_id
+    ? (() => {
+        const cat = categories.find((c) => c.id === server.category_id);
+        return cat ? `${cat.icon} ${cat.name}` : null;
+      })()
+    : null;
+
+  // Activity Signal: 1. Real Voice > 2. New Community > 3. Real Member Growth > 4. Web Interest > 5. Category/Trait Fallback
+  const getActivitySignal = (): { text: string; icon?: string; className: string } => {
+    if ((server.live_voice_count || 0) > 0) {
+      return {
+        text: `${server.live_voice_count} คนกำลังคุยไมค์`,
+        icon: '🟢',
+        className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-950/30',
+      };
     }
-    if (Math.abs(n) === 2) {
-      const dir = n > 0 ? 1 : -1;
-      if (isMobile) {
-        return { transform: `translateX(${dir * 72}%) scale(0.70)`, opacity: 0.12, zIndex: 6, filter: 'brightness(0.45)' };
+
+    if (server.is_new) {
+      return {
+        text: 'ชุมชนเปิดใหม่',
+        icon: '✨',
+        className: 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-sky-950/30',
+      };
+    }
+
+    if ((server.weekly_joins_count || 0) >= 10) {
+      return {
+        text: 'สมาชิกใหม่เข้าต่อเนื่อง',
+        icon: '📈',
+        className: 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-amber-950/30',
+      };
+    }
+
+    if ((server.recent_clicks || 0) >= 15) {
+      return {
+        text: 'ผู้คนบนเว็บกำลังสนใจ',
+        icon: '🔥',
+        className: 'bg-orange-500/20 text-orange-300 border-orange-500/40 shadow-orange-950/30',
+      };
+    }
+
+    if (categoryName) {
+      return {
+        text: categoryName,
+        className: 'bg-stone-900/80 text-stone-200 border-stone-700/60',
+      };
+    }
+
+    if (server.traits && server.traits.length > 0) {
+      const firstTrait = getTraitById(server.traits[0]);
+      if (firstTrait) {
+        return {
+          text: `${firstTrait.icon} ${firstTrait.label}`,
+          className: 'bg-stone-900/80 text-stone-200 border-stone-700/60',
+        };
       }
-      return { transform: `translateX(${dir * 106}%) scale(0.76)`, opacity: 0.28, zIndex: 8, filter: 'brightness(0.52)' };
     }
-    return { transform: 'translateX(0) scale(0)', opacity: 0, zIndex: 0 };
+
+    return {
+      text: 'ชุมชนแนะนำ',
+      icon: '☕',
+      className: 'bg-stone-900/80 text-stone-200 border-stone-700/60',
+    };
   };
 
+  const signal = getActivitySignal();
+
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-6 sm:mb-10">
-      <div className="flex items-center justify-between mb-3 sm:mb-4">
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="mb-6 sm:mb-8"
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="เซิร์ฟเวอร์น่าสนใจ"
+    >
+      {/* Header Bar */}
+      <div className="flex items-center justify-between mb-2.5 sm:mb-3">
         <div className="flex items-center gap-2">
-          {isAutoMode ? (
-            <Flame className="w-5 h-5 text-orange-500 fill-orange-500 animate-pulse" />
-          ) : (
-            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary fill-primary" />
-          )}
-          <div>
-            <h3 className="text-sm sm:text-lg font-bold text-foreground flex items-center gap-2">
-              <span>{isAutoMode ? `Top ${len} เซิร์ฟเวอร์ดันบ่อยสุด` : 'เซิร์ฟเวอร์แนะนำ'}</span>
-              {isAutoMode && (
-                <Badge variant="outline" className="text-[10px] py-0.5 px-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 rounded-full font-medium">
-                  Active 7 วัน
-                </Badge>
-              )}
-            </h3>
-          </div>
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 fill-amber-400" />
+          <h2 className="text-sm sm:text-lg font-bold text-foreground tracking-tight">
+            เซิร์ฟเวอร์น่าสนใจ
+          </h2>
         </div>
+
+        {len > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={prev}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+              aria-label="เซิร์ฟเวอร์ก่อนหน้า"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[11px] sm:text-xs font-mono font-medium text-muted-foreground px-1 select-none">
+              {active + 1}/{len}
+            </span>
+            <button
+              type="button"
+              onClick={next}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+              aria-label="เซิร์ฟเวอร์ถัดไป"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Hero Spotlight Card */}
       <div
-        className="relative w-full overflow-hidden sm:overflow-visible group px-0 sm:px-2 h-[215px] sm:h-[245px] md:h-[280px] touch-pan-y select-none"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prev();
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            next();
+          }
+        }}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
-        onFocusCapture={() => setIsInteracting(true)}
-        onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsInteracting(false); }}
+        onFocusCapture={() => setPaused(true)}
+        onBlurCapture={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setPaused(false);
+          }
+        }}
         onTouchStart={(e) => {
           setIsInteracting(true);
           touchStartX.current = e.touches[0].clientX;
@@ -317,121 +542,187 @@ function FeaturedCarousel({
           }
           setIsInteracting(false);
         }}
+        className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-border/60 dark:border-[#2A221E] shadow-md bg-[#14100E] min-h-[170px] sm:min-h-[210px] md:min-h-[230px] flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
       >
-        {servers.map((server, index) => {
-          const style = getStyle(index);
-          return (
-            <div
-              key={server.id}
-              className="absolute inset-0 mx-auto w-[86%] sm:w-[68%] md:w-[60%] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer will-change-transform shadow-md"
-              style={{ ...style, pointerEvents: index === active ? 'auto' : 'none' }}
-            >
-              <div className="relative w-full h-full">
-                {server.banner_url
-                  ? <img src={server.banner_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                  : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/30" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={server.id}
+            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.25, ease: 'easeInOut' }}
+            className="absolute inset-0"
+          >
+            {/* Backdrop Banner */}
+            <SafeServerBanner
+              url={server.banner_url}
+              alt={server.name}
+              className="w-full h-full object-cover"
+              isExpired={isExpired}
+            />
 
-                {/* Top Badge */}
-                {isAutoMode && (
-                  <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 z-10 flex items-center gap-1.5 bg-black/65 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-[10px] sm:text-xs font-bold border border-white/20 shadow-md">
-                    <span className={cn(
-                      'w-4 h-4 rounded-full flex items-center justify-center text-[10px]',
-                      index === 0 ? 'bg-yellow-500 text-black font-extrabold' :
-                      index === 1 ? 'bg-slate-300 text-black' :
-                      index === 2 ? 'bg-amber-600 text-white' :
-                      'bg-white/20 text-white'
-                    )}>
-                      #{index + 1}
-                    </span>
-                    <span className="flex items-center gap-0.5 text-orange-300 font-semibold">
-                      <Flame className="w-3 h-3 fill-orange-400 text-orange-400" />
-                      {server.bump_count || 1} ดัน
-                    </span>
-                  </div>
+            {/* Cozy Warm Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#12100E] via-[#12100E]/85 to-[#12100E]/40 sm:bg-gradient-to-r sm:from-[#12100E] sm:via-[#12100E]/85 sm:to-[#12100E]/40 backdrop-blur-[1px]" />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Content Container (Card Body is NOT a click CTA) */}
+        <div className="relative z-10 p-4 sm:p-6 flex flex-col justify-between h-full flex-1 pointer-events-auto">
+          {/* Upper Section */}
+          <div className="flex items-start gap-3 sm:gap-4">
+            {/* Server Icon */}
+            <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-2xl overflow-hidden border-2 border-white/20 shadow-md bg-stone-900 ring-1 ring-primary/20">
+              <SafeServerIcon
+                url={server.icon_url}
+                name={server.name}
+                className="w-full h-full object-cover"
+                isExpired={isExpired}
+              />
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              {/* Activity Signal + Trust Badges */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-md border shadow-xs',
+                    signal.className
+                  )}
+                >
+                  {signal.icon && <span>{signal.icon}</span>}
+                  <span>{signal.text}</span>
+                </span>
+
+                {server.is_partner && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-purple-950/50 text-purple-200 border border-purple-400/40 backdrop-blur-md">
+                    <Handshake className="w-3 h-3 text-purple-300" />
+                    Partner
+                  </span>
                 )}
 
-                <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex items-end gap-2.5 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/40 shadow-lg shrink-0 bg-white/10 backdrop-blur-sm">
-                    {server.icon_url
-                      ? <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      : <div className="w-full h-full flex items-center justify-center text-white text-lg sm:text-xl font-bold">{server.name[0]}</div>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-white font-bold text-sm sm:text-base md:text-lg truncate drop-shadow-md">{server.name}</h4>
-                      {server.is_verified && <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />}
-                      {server.is_partner && <Handshake className="w-4 h-4 text-purple-400 shrink-0" />}
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[11px] sm:text-xs text-white/80">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3 text-white/90" />{(server.member_count || 0).toLocaleString()}</span>
-                      <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-white/90" />{(server.impression_count || 0).toLocaleString()}</span>
-                      {(server.rating_count ?? 0) > 0 && (
-                        <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />{(server.avg_rating ?? 0).toFixed(1)}</span>
-                      )}
-                    </div>
-                  </div>
-                  {server.invite_status === 'expired' ? (
-                    <Button
-                      size="sm"
-                      disabled
-                      className="rounded-full bg-red-600/70 text-white border border-red-500/60 shadow-lg px-3 sm:px-4 shrink-0 text-xs sm:text-sm cursor-not-allowed font-medium select-none"
-                      title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
-                    >
-                      <AlertTriangle className="w-3 h-3 mr-1 text-red-200" />
-                      <span>ลิงก์พัง</span>
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3.5 sm:px-5 shrink-0 text-xs sm:text-sm font-semibold h-8 sm:h-9"
-                      onClick={() => onClickJoin(server)}
-                    >
-                      <span className="hidden sm:inline">เข้าดิสคอร์ด</span>
-                      <span className="sm:hidden">เข้าร่วม</span>
-                    </Button>
-                  )}
-                </div>
+                {server.is_verified && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-sky-950/50 text-sky-200 border border-sky-400/40 backdrop-blur-md">
+                    <ShieldCheck className="w-3 h-3 text-sky-300" />
+                    ยืนยันแล้ว
+                  </span>
+                )}
               </div>
+
+              {/* Server Name */}
+              <h3 className="text-white font-bold text-base sm:text-lg md:text-xl truncate tracking-tight drop-shadow-sm">
+                {server.name}
+              </h3>
+
+              {/* Description */}
+              <p className="text-xs sm:text-sm text-stone-300/90 line-clamp-1 sm:line-clamp-2 leading-relaxed mt-1 max-w-2xl">
+                {server.description || 'ยินดีต้อนรับสู่คอมมูนิตี้ของเรา'}
+              </p>
+
+              {/* Traits Tags (sm+ screens) */}
+              {server.traits && server.traits.length > 0 && (
+                <div className="hidden sm:flex flex-wrap gap-1.5 mt-2">
+                  {server.traits.slice(0, 2).map((tId) => {
+                    const trait = getTraitById(tId);
+                    if (!trait) return null;
+                    return (
+                      <span
+                        key={tId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/10 text-stone-300 border border-white/15 backdrop-blur-xs"
+                      >
+                        <span>{trait.icon}</span>
+                        <span>{trait.label}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          );
-        })}
-        {len > 1 && (
-          <>
-            <button onClick={prev} className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm hidden sm:flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Previous">
-              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-            <button onClick={next} className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-sm hidden sm:flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Next">
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          </>
+          </div>
+
+          {/* Lower Action & Stats Bar */}
+          <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-white/10">
+            <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-white/90">
+              <span className="flex items-center gap-1 font-medium" title="จำนวนสมาชิก">
+                <Users className="w-3.5 h-3.5 text-stone-300 shrink-0" />
+                <span>{(server.member_count || 0).toLocaleString()} สมาชิก</span>
+              </span>
+              {categoryName && (
+                <span className="hidden sm:inline text-xs text-stone-400 font-medium">
+                  • {categoryName}
+                </span>
+              )}
+            </div>
+
+            {/* Primary Action Button (Single point for Direct Join) */}
+            {isExpired ? (
+              <Button
+                size="sm"
+                disabled
+                className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-4 shrink-0 text-xs sm:text-sm cursor-not-allowed font-medium select-none h-8 sm:h-9"
+                title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
+              >
+                <AlertTriangle className="w-3 h-3 mr-1 text-red-200" />
+                <span>ลิงก์หมดอายุ</span>
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all border-0 px-4 sm:px-6 h-8 sm:h-9 text-xs sm:text-sm cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClickJoin(server);
+                }}
+              >
+                <span className="hidden sm:inline">เข้าดิสคอร์ด</span>
+                <span className="sm:hidden">เข้าร่วม</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Timed Progress Bar (Only when multiple servers & not paused) */}
+        {len > 1 && !paused && !isInteracting && !shouldReduceMotion && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 overflow-hidden z-20">
+            <div
+              key={timerKey}
+              className="h-full bg-primary"
+              style={{
+                animation: 'spotlight-progress 8000ms linear forwards',
+              }}
+            />
+          </div>
         )}
       </div>
+
+      {/* Bottom Dots Indicator */}
       {len > 1 && (
-        <div className="flex justify-center gap-1.5 mt-3">
+        <div className="flex justify-center items-center gap-1.5 mt-3">
           {servers.map((_, i) => (
-            <button key={i} onClick={() => setActive(i)} className={`rounded-full transition-all ${i === active ? 'w-5 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-primary/30 hover:bg-primary/50'}`} aria-label={`Go to ${i + 1}`} />
+            <button
+              key={i}
+              type="button"
+              onClick={() => goTo(i)}
+              className={cn(
+                'rounded-full transition-all duration-300 cursor-pointer',
+                i === active
+                  ? 'w-6 h-1.5 bg-primary shadow-xs'
+                  : 'w-1.5 h-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60'
+              )}
+              aria-label={`ไปยังเซิร์ฟเวอร์ที่ ${i + 1}`}
+            />
           ))}
         </div>
       )}
-    </motion.div>
+    </motion.section>
   );
 }
 
-// ─── Rainbow border animation ─────────────────────────────────────────────────
-const rainbowStyle = `
-@keyframes rainbow-border {
-  0%   { border-color: #ff0000; }
-  17%  { border-color: #ff8800; }
-  33%  { border-color: #ffff00; }
-  50%  { border-color: #00cc00; }
-  67%  { border-color: #0088ff; }
-  83%  { border-color: #8800ff; }
-  100% { border-color: #ff0000; }
-}
-.rainbow-card {
-  border-width: 2px !important;
-  animation: rainbow-border 3s linear infinite;
+// ─── Spotlight Progress Animation ───────────────────────────────────────────
+const spotlightProgressStyle = `
+@keyframes spotlight-progress {
+  0%   { width: 0%; }
+  100% { width: 100%; }
 }
 `;
 
@@ -488,6 +779,7 @@ interface ServerCardProps {
   onRefresh: (server: DiscordServer) => void;
   refreshingId: string | null;
   onEditLink?: (server: DiscordServer) => void;
+  onEditVibe?: (server: DiscordServer) => void;
   onDelete?: (server: DiscordServer) => void;
   onToggleSave?: (serverId: string) => void;
 }
@@ -495,7 +787,7 @@ interface ServerCardProps {
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
-  onRefresh, refreshingId, onEditLink, onDelete, onToggleSave,
+  onRefresh, refreshingId, onEditLink, onEditVibe, onDelete, onToggleSave,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
@@ -519,30 +811,30 @@ function ServerCard({
       onMouseEnter={handleCardMouseEnter}
       onMouseLeave={handleCardMouseLeave}
     >
-      <GlowCard
-        className={[
-          'group relative overflow-hidden rounded-2xl sm:rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 bg-white/70 dark:bg-card/70 backdrop-blur-xl h-full flex flex-col',
-          isExpired ? 'opacity-90 border-red-500/30' : isRainbow(server.highlight_color) ? 'rainbow-card' : 'border-border/40',
-        ].join(' ')}
-        style={getHighlightStyle(server.highlight_color)}
+      <div
+        className={cn(
+          'group relative overflow-hidden rounded-3xl border transition-all duration-300 h-full flex flex-col',
+          'bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] shadow-sm',
+          'hover:border-amber-500/40 hover:shadow-xl hover:shadow-amber-500/5 hover:-translate-y-0.5',
+          isRainbow(server.highlight_color) && 'rainbow-border-glow',
+          isExpired && 'opacity-90 border-red-500/30'
+        )}
+        style={getHighlightCardStyle(server.highlight_color)}
       >
         {/* Banner */}
-        <div className="relative h-24 sm:h-28 overflow-hidden shrink-0">
-          {server.banner_url
-            ? <img
-                ref={bannerRef}
-                src={server.banner_url}
-                alt=""
-                className={cn('w-full h-full object-cover', isExpired && 'grayscale-[40%]')}
-                style={canAnimate ? {
-                  transition: 'transform 700ms ease-out',
-                  willChange: 'transform',
-                } : undefined}
-                loading="lazy"
-                decoding="async"
-              />
-            : <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-accent/20" />}
-          <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-card/80 via-transparent to-transparent" />
+        <div className="relative h-20 sm:h-28 overflow-hidden shrink-0 bg-muted/20">
+          <SafeServerBanner
+            imgRef={bannerRef}
+            url={server.banner_url}
+            alt={server.name}
+            className="w-full h-full object-cover"
+            isExpired={isExpired}
+            style={canAnimate ? {
+              transition: 'transform 700ms ease-out',
+              willChange: 'transform',
+            } : undefined}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
           {/* Top-Left Save Button (Micro-interaction) */}
           {onToggleSave && (
@@ -554,127 +846,152 @@ function ServerCard({
                 onToggleSave(server.id);
               }}
               className={cn(
-                'absolute top-2 sm:top-2.5 left-2 sm:left-2.5 z-10 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 shadow-sm flex items-center gap-1 group/save',
+                'absolute top-2 left-2 sm:top-2.5 sm:left-2.5 z-10 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 shadow-sm flex items-center gap-1 group/save',
                 server.is_saved
                   ? 'bg-rose-500 text-white hover:bg-rose-600 scale-105 ring-2 ring-white/40'
                   : 'bg-black/40 hover:bg-black/60 text-white/90 hover:text-white'
               )}
-              title={server.is_saved ? 'บันทึกไว้แล้ว (คลิกเพื่อยกเลิก)' : 'บันทึกไว้ดูทีหลัง'}
-              aria-label={server.is_saved ? 'บันทึกไว้แล้ว' : 'บันทึกเซิร์ฟเวอร์'}
+              title={server.is_saved ? 'ลบออกจากที่บันทึกไว้' : 'บันทึกเซิร์ฟเวอร์นี้'}
+              aria-label={server.is_saved ? 'Unsave server' : 'Save server'}
             >
               <Heart
                 className={cn(
-                  'w-3.5 h-3.5 transition-transform group-active/save:scale-125',
-                  server.is_saved && 'fill-white'
+                  'w-3.5 h-3.5 transition-all duration-200',
+                  server.is_saved
+                    ? 'fill-current scale-110'
+                    : 'group-hover/save:scale-110'
                 )}
               />
-              {(server.save_count || 0) > 0 && (
-                <span className="text-[10px] font-bold pr-0.5 leading-none">
+              {(server.save_count ?? 0) > 0 && (
+                <span className="text-[10px] font-bold font-mono px-0.5">
                   {server.save_count}
                 </span>
               )}
             </button>
           )}
 
-          {/* Badges: Expired, Trending, Rising, New, Partner, Category */}
-          <div className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 flex gap-1 sm:gap-1.5 flex-wrap justify-end max-w-[72%]">
+          {/* Top-Right Badges */}
+          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex items-center gap-1.5 z-10 flex-wrap justify-end">
             {isExpired ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-red-600/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
-                <AlertTriangle className="w-2.5 h-2.5" />ลิงก์หมดอายุ
-              </Badge>
-            ) : server.is_rising ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
-                <Flame className="w-2.5 h-2.5 fill-white" />โตเร็ว
-              </Badge>
-            ) : (server.discovery_score || 0) >= 8 ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
-                <Flame className="w-2.5 h-2.5 fill-white" />กำลังมาแรง
-              </Badge>
-            ) : server.is_new ? (
-              <Badge className="text-[9px] sm:text-[10px] bg-emerald-500/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" />ใหม่
-              </Badge>
-            ) : null}
-
-            {server.is_partner && (
-              <Badge className="text-[9px] sm:text-[10px] bg-purple-500/90 text-white border-none backdrop-blur-md shadow-xs px-1.5 sm:px-2 flex items-center gap-0.5">
-                <Handshake className="w-2.5 h-2.5" />Partner
-              </Badge>
-            )}
-            {getCategoryName(server.category_id) && (
-              <Badge className="text-[9px] sm:text-[10px] bg-white/85 dark:bg-card/85 text-foreground border-none backdrop-blur-md shadow-xs font-medium px-1.5 sm:px-2 max-w-[110px] sm:max-w-[140px] truncate">
-                {getCategoryName(server.category_id)}
-              </Badge>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> ลิงก์หมดอายุ
+              </span>
+            ) : (
+              <>
+                {server.is_featured && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 shadow-xs flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-stone-950" /> แนะนำ
+                  </span>
+                )}
+                {server.is_partner && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-600/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
+                    <Handshake className="w-3 h-3" /> Partner
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        <CardContent className="p-3.5 sm:p-5 -mt-8 sm:-mt-10 relative flex-1 flex flex-col">
+        <CardContent className="p-3 sm:p-5 -mt-6 sm:-mt-8 relative flex-1 flex flex-col">
           {/* Icon */}
-          <div className="w-12 h-12 sm:w-16 sm:h-16 aspect-square shrink-0 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-[3px] border-white dark:border-card shadow-lg bg-white dark:bg-card mb-2 sm:mb-3 ring-2 ring-primary/10">
-            {server.icon_url
-              ? <img src={server.icon_url} alt={server.name} className={cn('w-full h-full object-cover', isExpired && 'grayscale-[30%]')} loading="lazy" decoding="async" />
-              : <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary">{server.name[0]}</div>}
-          </div>
-
-          {/* Name + badges */}
-          <div className="flex items-center gap-1.5 mb-1">
-            <h3 className="font-bold text-sm sm:text-lg truncate text-foreground group-hover:text-primary transition-colors">{server.name}</h3>
-            {server.is_verified && (
-              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0" aria-label="Verified" />
-            )}
-          </div>
-
-          {/* Description */}
-          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words flex-1">
-            {server.description || 'ไม่มีคำอธิบาย'}
-          </p>
-
-          {/* Recommendation Reason (Plan 2) */}
-          {server.recommendation_reason && (
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-primary dark:text-primary-foreground font-medium bg-primary/10 dark:bg-primary/20 rounded-lg px-2.5 py-1 w-fit border border-primary/20">
-              <span>{server.recommendation_reason}</span>
-            </div>
-          )}
-
-          {/* Star rating */}
-          <div className="mt-2 sm:mt-3">
-            <StarRating
-              serverId={server.id}
-              myRating={server.my_rating ?? 0}
-              avgRating={server.avg_rating ?? 0}
-              ratingCount={server.rating_count ?? 0}
-              userId={userId}
-              onRated={handleRated}
+          <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-2xl overflow-hidden border-2 border-background shadow-md bg-card mb-2 sm:mb-2.5 ring-1 ring-border/40">
+            <SafeServerIcon
+              url={server.icon_url}
+              name={server.name}
+              className="w-full h-full object-cover"
+              isExpired={isExpired}
             />
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-[10px] sm:text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
-              <span className="font-medium">{(server.member_count || 0).toLocaleString()}</span>
-            </span>
-            <span className="flex items-center gap-1" title="จำนวนครั้งที่การ์ดถูกแสดง (Impression)">
-              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary/70" />
-              <span className="font-medium">{(server.impression_count || 0).toLocaleString()}</span>
-            </span>
-            {server.bumped_at && (
-              <span className="flex items-center gap-1 ml-auto">
-                <Clock className="w-3 h-3 opacity-50" />
-                <span className="opacity-60">{getTimeSince(server.bumped_at)}</span>
+          {/* Name + Category Tag */}
+          <div className="flex items-center gap-1 sm:gap-1.5 mb-1 flex-wrap min-w-0">
+            <h3
+              className={cn(
+                "font-bold text-sm sm:text-base truncate text-foreground group-hover:text-amber-500 transition-colors",
+                getNameHighlightClass(server.highlight_color)
+              )}
+              style={getNameHighlightStyle(server.highlight_color)}
+            >
+              {server.name}
+            </h3>
+            {server.is_verified && (
+              <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 shrink-0" aria-label="Verified" />
+            )}
+            {getCategoryName(server.category_id) && (
+              <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground border border-border/40">
+                {getCategoryName(server.category_id)}
               </span>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center gap-1.5 sm:gap-2">
+          {/* Description */}
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-2 sm:mb-3 flex-1">
+            {server.description || 'ไม่มีคำอธิบาย'}
+          </p>
+
+          {/* Phase 2: Traits Badges */}
+          {server.traits && server.traits.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2.5 sm:mb-3">
+              {server.traits.slice(0, 2).map((traitId) => {
+                const trait = getTraitById(traitId);
+                if (!trait) return null;
+                return (
+                  <span
+                    key={traitId}
+                    className={cn(
+                      "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium border",
+                      trait.color
+                    )}
+                    title={trait.description}
+                  >
+                    <span>{trait.icon}</span>
+                    <span>{trait.label}</span>
+                  </span>
+                );
+              })}
+              {server.traits.length > 2 && (
+                <span className="text-[10px] text-muted-foreground self-center px-1 font-mono">
+                  +{server.traits.length - 2}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Footer Stats */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2 sm:pt-2.5 mt-auto gap-1">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+              <span className="flex items-center gap-1 font-semibold text-foreground/80">
+                <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span>{server.member_count ? server.member_count.toLocaleString() : 0}</span>
+              </span>
+              {(server.live_voice_count || 0) > 0 && (
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
+                </span>
+              )}
+              {getTimeSince(server.bumped_at) && (
+                <span className="text-muted-foreground/60 hidden sm:inline text-[11px]">
+                  ดันเมื่อ {getTimeSince(server.bumped_at)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Actions Bar */}
+          <div className="mt-2.5 sm:mt-3 flex items-center gap-1.5 sm:gap-2">
             <BumpButton server={server} user={user} onBump={handleBump} bumpingId={bumpingId} />
 
             {/* Owner Management Menu */}
             {user && server.owner_id === user.discord_id && (
               <DropdownMenu
                 options={[
+                  ...(onEditVibe ? [{
+                    label: "ตั้งค่า Vibe & จุดเด่น",
+                    onClick: () => onEditVibe(server),
+                    Icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" />,
+                  }] : []),
                   {
                     label: "รีโหลดข้อมูลจาก Discord",
                     onClick: () => onRefresh(server),
@@ -700,13 +1017,12 @@ function ServerCard({
               </DropdownMenu>
             )}
 
-            {/* Main Action Button (Right aligned) */}
+            {/* Main Action Button */}
             {isExpired ? (
               user && server.owner_id === user.discord_id && onEditLink ? (
-                /* For Owner: Direct "แก้ลิงก์" button */
                 <Button
                   size="sm"
-                  className="rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 px-3.5 sm:px-4 ml-auto text-xs sm:text-sm font-medium shrink-0 gap-1"
+                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shadow-primary/20 px-3 sm:px-4 w-full sm:w-auto ml-auto text-xs font-medium shrink-0 gap-1"
                   onClick={() => onEditLink(server)}
                   title="แก้ไขลิงก์เชิญใหม่"
                 >
@@ -714,11 +1030,10 @@ function ServerCard({
                   <span>แก้ลิงก์</span>
                 </Button>
               ) : (
-                /* For Visitors: Disabled "ลิงก์พัง" button */
                 <Button
                   size="sm"
                   disabled
-                  className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-4 ml-auto text-xs sm:text-sm cursor-not-allowed opacity-90 font-medium select-none shrink-0"
+                  className="rounded-full bg-destructive/15 text-destructive dark:bg-destructive/25 dark:text-red-300 border border-destructive/30 px-3 sm:px-3.5 w-full sm:w-auto ml-auto text-xs cursor-not-allowed opacity-90 font-medium select-none shrink-0"
                   title="ลิงก์เชิญหมดอายุ ไม่สามารถเข้าร่วมได้"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 mr-1 text-destructive shrink-0" />
@@ -726,10 +1041,9 @@ function ServerCard({
                 </Button>
               )
             ) : (
-              /* Normal Join button */
               <Button
                 size="sm"
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/15 px-3.5 sm:px-5 ml-auto text-xs sm:text-sm shrink-0 font-medium"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 px-3 sm:px-5 w-full sm:w-auto ml-auto text-xs sm:text-sm h-8 shrink-0 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 onClick={() => handleClickJoin(server)}
               >
                 เข้าดิสคอร์ด
@@ -737,7 +1051,7 @@ function ServerCard({
             )}
           </div>
         </CardContent>
-      </GlowCard>
+      </div>
     </div>
   );
 }
@@ -752,26 +1066,31 @@ export default function DiscordServersPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isVibeOpen, setIsVibeOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const [bumpingId, setBumpingId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<'recommendation' | 'trending' | 'rising' | 'new' | 'recent' | 'rating' | 'popular'>('recommendation');
+  const [sortMode, setSortMode] = useState<'recommendation' | 'trending' | 'rising' | 'new' | 'recent' | 'popular' | 'live_voice'>('recommendation');
   const [userState, setUserState] = useState<UserStateType>('NEW');
   const [showMyOnly, setShowMyOnly] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [savingServerId, setSavingServerId] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  // Phase 2: Add server form states
+  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
+  const [addPrimaryGoal, setAddPrimaryGoal] = useState<string>('');
+  const [addAtmosphere, setAddAtmosphere] = useState<string>('');
+  const [editVibeServer, setEditVibeServer] = useState<DiscordServer | null>(null);
+  const [isEditVibeOpen, setIsEditVibeOpen] = useState(false);
   const [carouselConfig, setCarouselConfig] = useState<{
     mode: 'manual' | 'auto_top7';
     window_days: number;
     limit: number;
     prioritize_partners?: boolean;
-  }>({ mode: 'auto_top7', window_days: 7, limit: 7 });
+  }>({ mode: 'auto_top7', window_days: 7, limit: 5 });
 
   // ── Invite status state ───────────────────────────────────────────────────
   const [ownerExpiredServers, setOwnerExpiredServers] = useState<DiscordServer[]>([]);
@@ -802,7 +1121,7 @@ export default function DiscordServersPage() {
         setCarouselConfig({
           mode: val.mode || 'auto_top7',
           window_days: val.window_days || 7,
-          limit: val.limit || 7,
+          limit: val.limit || 5,
           prioritize_partners: !!val.prioritize_partners,
         });
       }
@@ -1083,6 +1402,9 @@ export default function DiscordServersPage() {
         return;
       }
 
+      const isShopCategory = categoryId === '4cf49c38-0cd3-480e-aa16-f4a0d0e6d6bc';
+      const determinedServerType = isShopCategory ? 'shop' : 'community';
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-discord-invite`,
         {
@@ -1094,6 +1416,12 @@ export default function DiscordServersPage() {
           body: JSON.stringify({
             invite_url: inviteUrl,
             category_id: categoryId,
+            server_type: determinedServerType,
+            traits: selectedTraits,
+            server_profile: {
+              primary_goal: addPrimaryGoal || undefined,
+              atmosphere: addAtmosphere || undefined,
+            },
           }),
         }
       );
@@ -1119,7 +1447,13 @@ export default function DiscordServersPage() {
     }
   };
 
-  const resetForm = () => { setInviteUrl(''); setCategoryId(''); };
+  const resetForm = () => {
+    setInviteUrl('');
+    setCategoryId('');
+    setSelectedTraits([]);
+    setAddPrimaryGoal('');
+    setAddAtmosphere('');
+  };
 
   // ── Bump ─────────────────────────────────────────────────────────────────────
   const handleBump = async (serverId: string) => {
@@ -1347,14 +1681,6 @@ export default function DiscordServersPage() {
   };
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const getTimeSince = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    const hours = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60));
-    if (hours < 1) return 'เมื่อสักครู่';
-    if (hours < 24) return `${hours} ชม. ที่แล้ว`;
-    return `${Math.floor(hours / 24)} วันที่แล้ว`;
-  };
-
   const getCategoryName = (catId: string | null) => {
     if (!catId) return null;
     const cat = categories.find((c) => c.id === catId);
@@ -1368,31 +1694,40 @@ export default function DiscordServersPage() {
       .filter((s) => s.is_featured && s.invite_status !== 'expired')
       .sort((a, b) => (a.carousel_order ?? 999) - (b.carousel_order ?? 999));
   } else {
-    // Auto Top 7 mode: Active within window_days (default 7 days) and ranked by bump_count DESC, bumped_at DESC
+    // Auto Top 7 mode: Active within window_days (default 7 days) and ranked by weekly active score
     const windowDays = carouselConfig.window_days || 7;
     const cutoffTime = Date.now() - windowDays * 24 * 60 * 60 * 1000;
-    const limitCount = carouselConfig.limit || 7;
+    const limitCount = carouselConfig.limit || 5;
 
-    featuredServers = [...servers]
+    const scoredServers = servers
       .filter((s) => {
         if (s.invite_status === 'expired') return false;
         if (!s.bumped_at) return false;
         return new Date(s.bumped_at).getTime() >= cutoffTime;
       })
+      .map((s) => {
+        const computed = calculateWeeklyActiveScore(s);
+        return {
+          ...s,
+          trending_active_score: computed.score,
+          trending_badge: computed.badge,
+        };
+      });
+
+    featuredServers = scoredServers
       .sort((a, b) => {
         if (carouselConfig.prioritize_partners && a.is_partner !== b.is_partner) {
           return a.is_partner ? -1 : 1;
         }
-        const bumpA = a.bump_count ?? 0;
-        const bumpB = b.bump_count ?? 0;
-        if (bumpB !== bumpA) return bumpB - bumpA;
+        const scoreA = a.trending_active_score ?? 0;
+        const scoreB = b.trending_active_score ?? 0;
+        if (Math.abs(scoreB - scoreA) > 0.01) return scoreB - scoreA;
         return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
       })
       .slice(0, limitCount);
   }
 
-  const activeTagId = selectedTags[0] || (selectedCategory !== 'all' ? selectedCategory : null);
-  const activeCategory = categories.find((c) => c.id === activeTagId);
+  const activeCategory = selectedCategory !== 'all' ? categories.find((c) => c.id === selectedCategory) : null;
 
   const filteredServers = servers
     .filter((server) => {
@@ -1407,7 +1742,7 @@ export default function DiscordServersPage() {
         (server.discord_id ?? '').toLowerCase().includes(q) ||
         (server.owner_id ?? '').toLowerCase().includes(q);
 
-      const matchCat = !activeTagId || server.category_id === activeTagId;
+      const matchCat = selectedCategory === 'all' || server.category_id === selectedCategory;
       const matchMine = !showMyOnly || (user && server.owner_id === user.discord_id);
       const matchSaved = !showSavedOnly || server.is_saved === true;
       return matchSearch && matchCat && matchMine && matchSaved;
@@ -1420,6 +1755,11 @@ export default function DiscordServersPage() {
         const recDiff = (b.recommendation_score || 0) - (a.recommendation_score || 0);
         if (recDiff !== 0) return recDiff;
         return (b.discovery_score || 0) - (a.discovery_score || 0);
+      }
+      if (sortMode === 'live_voice') {
+        const voiceDiff = (b.live_voice_count || 0) - (a.live_voice_count || 0);
+        if (voiceDiff !== 0) return voiceDiff;
+        return (b.member_count || 0) - (a.member_count || 0);
       }
       if (sortMode === 'trending') {
         const scoreDiff = (b.discovery_score || 0) - (a.discovery_score || 0);
@@ -1435,11 +1775,6 @@ export default function DiscordServersPage() {
       }
       if (sortMode === 'new') {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      }
-      if (sortMode === 'rating') {
-        const ratingDiff = (b.avg_rating || 0) - (a.avg_rating || 0);
-        if (ratingDiff !== 0) return ratingDiff;
-        return (b.rating_count || 0) - (a.rating_count || 0);
       }
       if (sortMode === 'popular') {
         return (b.impression_count || 0) - (a.impression_count || 0);
@@ -1457,7 +1792,7 @@ export default function DiscordServersPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-cream via-peach/10 to-blush/20 dark:from-background dark:via-background dark:to-muted/20">
-      <style>{rainbowStyle}</style>
+      <style>{spotlightProgressStyle}</style>
 
       {/* Header */}
       <div className="bg-white/40 dark:bg-card/40 backdrop-blur-md border-b border-latte/20 dark:border-coffee/20 sticky top-0 z-30">
@@ -1466,37 +1801,73 @@ export default function DiscordServersPage() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full w-9 h-9 sm:w-10 sm:h-10">
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <h1 className="text-base sm:text-xl font-bold flex items-center gap-1.5 sm:gap-2">
-              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+            <h1 className="text-base sm:text-xl font-bold">
               <span className="hidden sm:inline">โปรโมทเซิร์ฟเวอร์ฟรี</span>
               <span className="sm:hidden">โปรโมทเซิร์ฟเวอร์</span>
             </h1>
           </div>
-          <Button onClick={handleOpenAdd} size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 text-xs sm:text-sm px-3 sm:px-4">
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">แปะเซิร์ฟเวอร์ฟรี</span>
-            <span className="sm:hidden">แปะเซิร์ฟ</span>
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <AnimatedThemeToggler
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-latte/40 dark:border-border/60 bg-white/80 dark:bg-card/80 hover:bg-white dark:hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs shrink-0"
+              title="สลับธีม (โหมดมืด / สว่าง)"
+            />
+            <Button onClick={handleOpenAdd} size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 text-xs sm:text-sm px-3 sm:px-4">
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">แปะเซิร์ฟเวอร์ฟรี</span>
+              <span className="sm:hidden">แปะเซิร์ฟ</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="container max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 flex-1">
         {/* Hero */}
-        <div className="text-center mb-6 sm:mb-12 space-y-2 sm:space-y-4">
-          <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-2xl sm:text-4xl md:text-5xl font-black text-foreground">
+        <div className="text-center mb-6 sm:mb-10 space-y-3">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex justify-center items-center pt-2"
+          >
+            <img
+              src={discordLogo}
+              alt="Discord"
+              className="h-9 sm:h-12 md:h-14 w-auto object-contain drop-shadow-md select-none hover:scale-105 transition-transform duration-300"
+              loading="eager"
+              decoding="async"
+            />
+          </motion.div>
+          <motion.h2 initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="text-2xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight">
             หาเพื่อนใหม่ <span className="text-primary">เข้าดิสคอร์ด</span>
           </motion.h2>
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto">
-            ศูนย์รวมเซิร์ฟเวอร์ดิสคอร์ดคุณภาพจากชุมชน Bear Cafe แปะฟรี! ไม่มีค่าใช้จ่าย
+          <motion.p initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-muted-foreground text-xs sm:text-base max-w-xl mx-auto">
+            ศูนย์รวมเซิร์ฟเวอร์ดิสคอร์ดคุณภาพจากชุมชน Bear Cafe แปะฟรี ปลอดภัย ไม่มีค่าใช้จ่าย
           </motion.p>
+          {/* Quiz Button (ซ่อนไว้ชั่วคราวตามคำขอ)
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="flex items-center justify-center pt-1"
+          >
+            <button
+              type="button"
+              onClick={() => setIsVibeOpen(true)}
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs sm:text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xs group max-w-full flex-wrap justify-center text-center"
+            >
+              <span>🎯 หาเซิร์ฟเวอร์ที่ใช่</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold ml-0.5">Quiz 7 ข้อ</span>
+            </button>
+          </motion.div>
+          */}
         </div>
 
-        {/* UI Design Switcher (Kawaii Shop vs Classic Grid) */}
-        {/* Featured Carousel */}
-        <FeaturedCarousel
+        {/* Server Spotlight */}
+        <ServerSpotlight
           servers={featuredServers}
           onClickJoin={handleClickJoin}
           carouselConfig={carouselConfig}
+          categories={categories}
         />
 
         {/* Owner Expired Alert Banner */}
@@ -1538,229 +1909,181 @@ export default function DiscordServersPage() {
           </motion.div>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-8">
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="ค้นหาเซิร์ฟเวอร์..." className="pl-10 rounded-xl bg-white/50 dark:bg-card/50 border-latte/30 dark:border-coffee/30 h-9 sm:h-10 text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                </div>
-                <div className="relative flex-1 sm:flex-initial min-w-0">
-                  <div className="flex gap-1 sm:gap-1.5 items-center overflow-x-auto pb-0.5 no-scrollbar touch-pan-x pr-6 sm:pr-0">
-                    <Button
-                      variant={sortMode === 'recommendation' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('recommendation')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm gap-1.5 shrink-0 shadow-xs font-semibold"
-                      size="sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                      <span>
-                        {userState === 'ESTABLISHED' || userState === 'EARLY'
-                          ? 'แนะนำสำหรับคุณ'
-                          : 'น่าสนใจตอนนี้'}
-                      </span>
-                    </Button>
-                    <Button
-                      variant={sortMode === 'trending' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('trending')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                      size="sm"
-                    >
-                      <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      <span>กำลังมาแรง</span>
-                    </Button>
-                    <Button
-                      variant={sortMode === 'rising' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('rising')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                      size="sm"
-                    >
-                      <Flame className="w-3.5 h-3.5 text-purple-500" />
-                      <span>โตเร็ว</span>
-                    </Button>
-                    <Button
-                      variant={sortMode === 'new' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('new')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                      size="sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>ใหม่</span>
-                    </Button>
-                    <Button
-                      variant={sortMode === 'recent' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('recent')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                      size="sm"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>ล่าสุด</span>
-                    </Button>
-                    <Button
-                      variant={sortMode === 'rating' ? 'default' : 'outline'}
-                      onClick={() => setSortMode('rating')}
-                      className="rounded-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm gap-1 shrink-0"
-                      size="sm"
-                    >
-                      <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                      <span>คะแนน</span>
-                    </Button>
-                  </div>
-                  {/* Subtle right gradient mask for mobile indicating horizontal scroll */}
-                  <div className="pointer-events-none absolute right-0 top-0 bottom-0.5 w-6 bg-gradient-to-l from-cream/90 via-cream/40 to-transparent dark:from-background/90 dark:via-background/40 to-transparent sm:hidden" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar flex-1 items-center">
-                  <Button
-                    variant={!activeCategory && !showSavedOnly ? 'default' : 'outline'}
-                    onClick={() => { setSelectedCategory('all'); setShowSavedOnly(false); setSelectedTags([]); }}
-                    className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3"
-                    size="sm"
-                  >
-                    ทั้งหมด
-                  </Button>
-                  <Button
-                    variant={showSavedOnly ? 'default' : 'outline'}
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        toast({
-                          title: 'กรุณาเข้าสู่ระบบก่อน',
-                          description: 'เข้าสู่ระบบด้วย Discord เพื่อดูเซิร์ฟเวอร์ที่คุณบันทึกไว้',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      setShowSavedOnly(!showSavedOnly);
-                      if (!showSavedOnly) {
-                        setSelectedCategory('all');
-                        setSelectedTags([]);
-                      }
-                    }}
-                    className={cn(
-                      'rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-medium',
-                      showSavedOnly && 'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
-                    )}
-                    size="sm"
-                  >
-                    <Heart className={cn('w-3.5 h-3.5', showSavedOnly ? 'fill-white text-white' : 'text-rose-500')} />
-                    <span>ที่บันทึกไว้</span>
-                  </Button>
-
-                  {/* แสดงเฉพาะแท็กล่าสุดที่เลือก (Single Latest Tag) */}
-                  {activeCategory && !showSavedOnly && (
-                    <Button
-                      variant="default"
-                      onClick={() => setIsTagFilterOpen(true)}
-                      className="rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-xs group"
-                      size="sm"
-                      title="แท็กล่าสุดที่เลือก (คลิกเพื่อเปลี่ยน หรือกด X เพื่อล้าง)"
-                    >
-                      <Tag className="w-3.5 h-3.5" />
-                      <span>{activeCategory.icon} {activeCategory.name}</span>
-                      <span
-                        role="button"
-                        aria-label="ล้างแท็ก"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCategory('all');
-                          setSelectedTags([]);
-                        }}
-                        className="ml-0.5 p-0.5 rounded-full hover:bg-white/20 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </span>
-                    </Button>
-                  )}
-
-                  {/* ปุ่มเปิดกล่องเลือกแท็ก */}
-                  <Button
-                    variant={isTagFilterOpen ? 'secondary' : 'outline'}
-                    onClick={() => setIsTagFilterOpen((prev) => !prev)}
-                    className={cn(
-                      'rounded-full whitespace-nowrap text-xs sm:text-sm h-8 sm:h-9 px-3 gap-1.5 font-medium transition-all',
-                      isTagFilterOpen && 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'
-                    )}
-                    size="sm"
-                    title="เลือกแท็กเซิร์ฟเวอร์"
-                  >
-                    <Tag className="w-3.5 h-3.5 text-amber-500" />
-                    <span>{activeCategory ? 'เปลี่ยนแท็ก' : 'เลือกแท็ก...'}</span>
-                    <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isTagFilterOpen && 'rotate-180')} />
-                  </Button>
-                </div>
-                {user && (
-                  <label
-                    htmlFor="show-my-switch"
-                    className="flex items-center gap-2 shrink-0 bg-white/60 dark:bg-card/60 hover:bg-white/80 dark:hover:bg-card/80 transition-colors rounded-full px-3 py-1.5 border border-border/50 cursor-pointer shadow-2xs select-none touch-manipulation"
-                    title="แสดงเฉพาะเซิร์ฟเวอร์ที่คุณเป็นเจ้าของ"
-                  >
-                    <Switch
-                      id="show-my-switch"
-                      checked={showMyOnly}
-                      onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }}
-                    />
-                    <span className="text-xs text-foreground font-medium whitespace-nowrap">ของฉัน</span>
-                  </label>
+        {/* Filters & Discovery Hub */}
+        <div className="flex flex-col gap-3 mb-6 sm:mb-8">
+          {/* Row 1: Search Input */}
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="ค้นหาชื่อเซิร์ฟเวอร์ คำค้น หรือเจ้าของ..."
+              className="pl-10 pr-4 rounded-2xl bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] h-10 text-xs sm:text-sm focus-visible:ring-amber-500/30 w-full shadow-2xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          {/* Row 2: Sort Pills & Category Filters */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            {/* Sort pills */}
+            <div className="flex gap-1.5 items-center overflow-x-auto pb-1 no-scrollbar touch-pan-x">
+              <Button
+                variant={sortMode === 'recommendation' ? 'default' : 'outline'}
+                onClick={() => setSortMode('recommendation')}
+                className={cn(
+                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1.5 shrink-0 transition-all font-semibold',
+                  sortMode === 'recommendation' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border/60 hover:bg-muted/30'
                 )}
-              </div>
-
-              {/* Tag Selector Box (Single Latest Mode) */}
-              {isTagFilterOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="bg-card/80 dark:bg-card/50 backdrop-blur-md p-3.5 sm:p-4 rounded-3xl border border-border/50 shadow-xs space-y-2.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-amber-500" />
-                        เลือกแท็ก (ระบบจะเลือกเฉพาะอันล่าสุด)
-                      </span>
-                      {activeCategory && (
-                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full font-semibold">
-                          พบ {filteredServers.length} เซิร์ฟเวอร์
-                        </Badge>
-                      )}
-                    </div>
-                    {activeCategory && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedTags([]);
-                          setSelectedCategory('all');
-                        }}
-                        className="h-6 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-full"
-                      >
-                        ล้างแท็ก
-                      </Button>
-                    )}
-                  </div>
-                  <TagsSelector
-                    tags={categories.map((c) => ({ id: c.id, label: `${c.icon} ${c.name}` }))}
-                    selectedTags={activeTagId ? [activeTagId] : []}
-                    onTagsChange={(newTags) => {
-                      const latest = newTags.slice(-1);
-                      setSelectedTags(latest);
-                      if (latest.length > 0) {
-                        setSelectedCategory(latest[0]);
-                        setShowSavedOnly(false);
-                      } else {
-                        setSelectedCategory('all');
-                      }
-                    }}
-                    maxSelected={1}
-                    keepLatestOnly={true}
-                    label=""
-                    placeholder="คลิกเลือกแท็กด้านล่าง (ระบบจะสลับเป็นแท็กล่าสุดให้อัตโนมัติ)..."
-                  />
-                </motion.div>
-              )}
+                size="sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>
+                  {userState === 'ESTABLISHED' || userState === 'EARLY' ? 'แนะนำสำหรับคุณ' : 'น่าสนใจตอนนี้'}
+                </span>
+              </Button>
+              <Button
+                variant={sortMode === 'live_voice' ? 'default' : 'outline'}
+                onClick={() => setSortMode('live_voice')}
+                className={cn(
+                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1.5 shrink-0 transition-all font-medium',
+                  sortMode === 'live_voice'
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                    : 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10'
+                )}
+                size="sm"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span>กำลังคุยสด</span>
+              </Button>
+              <Button
+                variant={sortMode === 'trending' ? 'default' : 'outline'}
+                onClick={() => setSortMode('trending')}
+                className={cn(
+                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
+                  sortMode === 'trending' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
+                )}
+                size="sm"
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>กำลังมาแรง</span>
+              </Button>
+              <Button
+                variant={sortMode === 'new' ? 'default' : 'outline'}
+                onClick={() => setSortMode('new')}
+                className={cn(
+                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
+                  sortMode === 'new' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
+                )}
+                size="sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ใหม่</span>
+              </Button>
+              <Button
+                variant={sortMode === 'recent' ? 'default' : 'outline'}
+                onClick={() => setSortMode('recent')}
+                className={cn(
+                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
+                  sortMode === 'recent' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
+                )}
+                size="sm"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>ล่าสุด</span>
+              </Button>
             </div>
+
+            {/* Right: My Only switch */}
+            {user && (
+              <label
+                htmlFor="show-my-switch"
+                className="flex items-center gap-2 shrink-0 bg-card/60 hover:bg-card/90 transition-colors rounded-full px-3 py-1 border border-border/50 cursor-pointer shadow-2xs select-none h-8 self-end sm:self-auto"
+                title="แสดงเฉพาะเซิร์ฟเวอร์ที่คุณเป็นเจ้าของ"
+              >
+                <Switch
+                  id="show-my-switch"
+                  checked={showMyOnly}
+                  onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }}
+                />
+                <span className="text-xs text-foreground font-medium whitespace-nowrap">ของฉัน</span>
+              </label>
+            )}
+          </div>
+
+          {/* Row 3: Horizontal Cafe Category Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar touch-pan-x">
+            {/* Chip: All */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('all');
+                setShowSavedOnly(false);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                selectedCategory === 'all' && !showSavedOnly
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              )}
+            >
+              <span>🌐</span>
+              <span>ทั้งหมด</span>
+            </button>
+
+            {/* Chip: Saved */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  toast({
+                    title: 'กรุณาเข้าสู่ระบบก่อน',
+                    description: 'เข้าสู่ระบบด้วย Discord เพื่อดูเซิร์ฟเวอร์ที่คุณบันทึกไว้',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                setShowSavedOnly(!showSavedOnly);
+                if (!showSavedOnly) {
+                  setSelectedCategory('all');
+                }
+              }}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                showSavedOnly
+                  ? 'bg-rose-500 text-white shadow-xs'
+                  : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              )}
+            >
+              <Heart className={cn('w-3.5 h-3.5', showSavedOnly ? 'fill-white text-white' : 'text-rose-500')} />
+              <span>ที่บันทึกไว้</span>
+            </button>
+
+            {/* Chips: Categories from DB */}
+            {categories.map((cat) => {
+              const isSelected = selectedCategory === cat.id && !showSavedOnly;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(isSelected ? 'all' : cat.id);
+                    setShowSavedOnly(false);
+                  }}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                    isSelected
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                  )}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
             {/* Server Grid */}
             {loading ? (
@@ -1797,7 +2120,7 @@ export default function DiscordServersPage() {
                 </div>
               )
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-stretch">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 items-stretch">
                 {filteredServers.map((server, index) => (
                   <motion.div key={server.id} className="h-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.35 }}>
                     <ServerCard
@@ -1816,6 +2139,10 @@ export default function DiscordServersPage() {
                         setEditLinkServer(s);
                         setIsEditLinkOpen(true);
                       }}
+                      onEditVibe={(s) => {
+                        setEditVibeServer(s);
+                        setIsEditVibeOpen(true);
+                      }}
                       onDelete={(s) => setDeleteTarget(s)}
                       onToggleSave={handleToggleSave}
                     />
@@ -1833,7 +2160,7 @@ export default function DiscordServersPage() {
                 เซิร์ฟเวอร์ของคุณที่ลิงก์หมดอายุ <span className="text-xs sm:text-sm font-normal text-muted-foreground">(ถูกซ่อนอยู่จนกว่าจะแก้ไขลิงก์)</span>
               </h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
               {ownerExpiredServers.map((server) => (
                 <ExpiredServerCard
                   key={server.id}
@@ -1886,6 +2213,30 @@ export default function DiscordServersPage() {
           );
           setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== serverId));
           setEditLinkServer(null);
+        }}
+      />
+
+      {/* EditVibeDialog — for owner to configure Server Vibe Profile & Traits */}
+      <EditVibeDialog
+        server={editVibeServer}
+        open={isEditVibeOpen}
+        onOpenChange={(open) => {
+          setIsEditVibeOpen(open);
+          if (!open) setEditVibeServer(null);
+        }}
+        onSuccess={(serverId, updatedData) => {
+          setServers((prev) =>
+            prev.map((s) =>
+              s.id === serverId
+                ? {
+                    ...s,
+                    traits: updatedData.traits,
+                    server_profile: updatedData.server_profile,
+                  }
+                : s
+            )
+          );
+          setEditVibeServer(null);
         }}
       />
 
@@ -1945,17 +2296,142 @@ export default function DiscordServersPage() {
               <p className="text-[10px] text-muted-foreground flex items-center gap-1 italic"><Info className="w-3 h-3" /> แนะนำให้ใช้ลิงก์ที่ไม่มีวันหมดอายุ</p>
             </div>
             <div className="space-y-2">
-              <TagsSelector
-                tags={categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.name}` }))}
-                value={categoryId ? [categoryId] : []}
-                onValueChange={(val) => {
-                  const id = Array.isArray(val) ? (val[0] || '') : (val || '');
-                  setCategoryId(id);
-                }}
-                maxSelected={1}
-                label="หมวดหมู่ *"
-                placeholder="คลิกเลือกหมวดหมู่ที่เหมาะสมที่สุด..."
-              />
+              <Label className="font-semibold text-sm">หมวดหมู่ <span className="text-destructive">*</span></Label>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {categories.map((cat) => {
+                  const isSelected = categoryId === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategoryId(cat.id)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
+                        isSelected
+                          ? 'border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-200 ring-2 ring-amber-500/25 shadow-xs'
+                          : 'border-border/60 bg-muted/20 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <span>{cat.icon}</span>
+                      <span>{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vibe Profile: Primary Goal */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold text-sm">
+                  1. เป้าหมาย / จุดเด่นหลักของเซิร์ฟเวอร์
+                </Label>
+                <span className="text-[10px] text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {VIBE_GOALS.map((goal) => {
+                  const isSelected = addPrimaryGoal === goal.id;
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => setAddPrimaryGoal(isSelected ? '' : goal.id)}
+                      className={cn(
+                        'p-2 rounded-xl border text-left transition-all flex items-center gap-2 relative',
+                        isSelected
+                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30'
+                          : 'border-border/60 bg-muted/20 hover:bg-muted/40'
+                      )}
+                    >
+                      <span className="text-base shrink-0">{goal.icon}</span>
+                      <span className="text-xs font-semibold text-foreground truncate flex-1">{goal.label}</span>
+                      {isSelected && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vibe Profile: Atmosphere */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold text-sm">
+                  2. บรรยากาศ & มู้ดในเซิร์ฟเวอร์
+                </Label>
+                <span className="text-[10px] text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {VIBE_ATMOSPHERES.map((vibe) => {
+                  const isSelected = addAtmosphere === vibe.id;
+                  return (
+                    <button
+                      key={vibe.id}
+                      type="button"
+                      onClick={() => setAddAtmosphere(isSelected ? '' : vibe.id)}
+                      className={cn(
+                        'p-2 rounded-xl border text-left transition-all flex items-center gap-2 relative',
+                        isSelected
+                          ? 'border-amber-500 bg-amber-500/10 shadow-xs ring-1 ring-amber-500/30'
+                          : 'border-border/60 bg-muted/20 hover:bg-muted/40'
+                      )}
+                    >
+                      <span className="text-base shrink-0">{vibe.icon}</span>
+                      <span className="text-xs font-semibold text-foreground truncate flex-1">{vibe.label}</span>
+                      {isSelected && <Check className="w-3 h-3 text-amber-500 shrink-0 ml-auto" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vibe & Trait Tags Selector */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold text-sm">
+                  3. แท็ก Vibe & กิจกรรม
+                </Label>
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  {selectedTraits.length}/7 แท็ก
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                เลือกแท็กที่ตรงกับกิจกรรมและสไตล์ของสมาชิก เพื่อให้ระบบ Find Your Vibe แนะนำได้แม่นยำ
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {CURATED_TRAITS.map((trait) => {
+                  const isSelected = selectedTraits.includes(trait.id);
+                  return (
+                    <button
+                      key={trait.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedTraits(selectedTraits.filter((t) => t !== trait.id));
+                        } else {
+                          if (selectedTraits.length >= 7) {
+                            toast({
+                              title: 'เลือกได้สูงสุด 7 แท็ก',
+                              description: 'กรุณาเอาแท็กที่ไม่ต้องการออกก่อนเลือกแท็กใหม่',
+                              variant: 'destructive',
+                            });
+                            return;
+                          }
+                          setSelectedTraits([...selectedTraits, trait.id]);
+                        }
+                      }}
+                      className={cn(
+                        'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                        isSelected
+                          ? 'border-primary/50 bg-primary/20 text-primary shadow-sm font-semibold'
+                          : 'border-border/60 bg-background/50 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      )}
+                    >
+                      <span>{trait.icon}</span>
+                      <span>{trait.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-3 sm:p-4 text-xs space-y-2 border border-primary/10">
               <p className="font-semibold text-foreground">✨ ระบบจะดึงข้อมูลให้อัตโนมัติ:</p>
@@ -1982,6 +2458,14 @@ export default function DiscordServersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Find Your Vibe Matchmaker Dialog (Phase 3) */}
+      <FindYourVibeDialog
+        open={isVibeOpen}
+        onOpenChange={setIsVibeOpen}
+        servers={servers}
+        onJoinServer={handleClickJoin}
+      />
     </div>
   );
 }

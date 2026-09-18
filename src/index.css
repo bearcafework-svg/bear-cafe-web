@@ -748,3 +748,67 @@ body[data-scroll-locked] {
   margin-right: 0 !important;
 }
 
+/* 🌈 Discord Servers Highlight & Rainbow Effects */
+@keyframes rainbow-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.rainbow-text-shimmer {
+  background: linear-gradient(
+    90deg,
+    #ff4b4b,
+    #ff9800,
+    #ffeb3b,
+    #4caf50,
+    #00bcd4,
+    #2196f3,
+    #9c27b0,
+    #ff4b4b
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rainbow-shimmer 4s ease infinite;
+}
+
+@keyframes rainbow-border-glow-kf {
+  0% {
+    border-color: #ff4b4b;
+    box-shadow: 0 0 16px -2px rgba(255, 75, 75, 0.45);
+  }
+  17% {
+    border-color: #ff9800;
+    box-shadow: 0 0 16px -2px rgba(255, 152, 0, 0.45);
+  }
+  33% {
+    border-color: #ffeb3b;
+    box-shadow: 0 0 16px -2px rgba(255, 235, 59, 0.45);
+  }
+  50% {
+    border-color: #4caf50;
+    box-shadow: 0 0 16px -2px rgba(76, 175, 80, 0.45);
+  }
+  67% {
+    border-color: #00bcd4;
+    box-shadow: 0 0 16px -2px rgba(0, 188, 212, 0.45);
+  }
+  83% {
+    border-color: #9c27b0;
+    box-shadow: 0 0 16px -2px rgba(156, 39, 176, 0.45);
+  }
+  100% {
+    border-color: #ff4b4b;
+    box-shadow: 0 0 16px -2px rgba(255, 75, 75, 0.45);
+  }
+}
+
+.rainbow-border-glow {
+  border-width: 2px !important;
+  border-style: solid !important;
+  animation: rainbow-border-glow-kf 4s linear infinite !important;
+}
+
+

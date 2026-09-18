@@ -208,7 +208,7 @@ export function CozySidebar() {
 
   const usageItems: NavItemConfig[] = [
     { label: 'กระเป๋าเก็บของ', href: authHref('/inventory'), matchPath: '/inventory', requireAuth: true, icon: <TeaBagPackagingColorIcon size={20} /> },
-    { label: 'ข้อตกลง', href: NOTION_RULES_URL, external: true, icon: <GreenTeaCupArtIcon size={20} /> },
+    { label: 'ข้อตกลง', href: '/terms', matchPath: '/terms', icon: <GreenTeaCupArtIcon size={20} /> },
   ];
 
   return (

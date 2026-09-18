@@ -81,10 +81,16 @@ Deno.serve(async (req): Promise<Response> => {
     // Parse body
     let invite_url: string;
     let category_id: string;
+    let server_type: string = "community";
+    let traits: string[] = [];
+    let server_profile: Record<string, any> = {};
     try {
       const body = await req.json();
       invite_url = body.invite_url ?? "";
       category_id = body.category_id ?? "";
+      server_type = body.server_type === "shop" ? "shop" : "community";
+      traits = Array.isArray(body.traits) ? body.traits.slice(0, 7) : [];
+      server_profile = (body.server_profile && typeof body.server_profile === "object") ? body.server_profile : {};
     } catch {
       return new Response(
         JSON.stringify({ error: "Invalid JSON body" }),
@@ -197,6 +203,9 @@ Deno.serve(async (req): Promise<Response> => {
         invite_url: `https://discord.gg/${inviteCode}`,
         owner_id: userDiscordId,
         category_id,
+        server_type,
+        traits,
+        server_profile,
         status: "pending",
       })
       .select("id, name")

@@ -1,5 +1,5 @@
 import React, { forwardRef, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { BearLogo } from '@/components/bear-cafe/BearLogo';
 import { Footer } from '@/components/bear-cafe/Footer';
 import { Button } from '@/components/ui/button';
@@ -188,12 +188,10 @@ const handleLogin = async () => {
             {/* Notice */}
             <p className="text-xs sm:text-sm text-center text-muted-foreground animate-fade-in" style={{ animationDelay: '450ms' }}>
               เมื่อเข้าสู่ระบบ แสดงว่าคุณยอมรับ
-              <a 
-                href="https://www.notion.so/2f4fa9ff914e80b29e13e5225887e07d" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline transition-colors duration-200"
-              > กฎชุมชน </a>
+              <Link 
+                to="/terms" 
+                className="text-primary hover:underline transition-colors duration-200 font-medium"
+              > ข้อตกลงและกฎชุมชน </Link>
               ของเรา
             </p>
           </CardContent>

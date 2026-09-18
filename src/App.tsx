@@ -27,6 +27,9 @@ import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 import InventoryPage from "./pages/InventoryPage";
 import GachaPage from "./pages/GachaPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import PrivacyPermissionsPage from "./pages/PrivacyPermissionsPage";
 
 const queryClient = new QueryClient();
 
@@ -137,6 +140,10 @@ export function AppRoutes() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/privacy/permissions" element={<PrivacyPermissionsPage />} />
+      <Route path="/rules" element={<Navigate to="/terms" replace />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/banned-role" element={<RoleBannedPage />} />
 
@@ -149,6 +156,7 @@ export function AppRoutes() {
 
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<DiscordServersPage />} />
+      <Route path="/discord-server" element={<Navigate to="/discord-servers" replace />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/leaderboard" element={<LeaderboardPage />} />

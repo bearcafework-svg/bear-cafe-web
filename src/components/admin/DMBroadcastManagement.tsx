@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ProgressIndicator } from '@/components/ui/progress-indicator';
 import { TaskSteps, type TaskStepItem } from '@/components/ui/task-steps';
-import { OrderTrackingParallaxCard } from '@/components/ui/order-tracking-parallax-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -415,11 +414,32 @@ export function DMBroadcastManagement() {
     unknown: 0
   });
 
-  // Campaigns list
+  // Campaigns list & discovery filters
   const [campaigns, setCampaigns] = useState<CampaignQueue[]>([]);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [campaignsPage, setCampaignsPage] = useState(1);
   const campaignsPageSize = 5;
+  const [campaignSearchQuery, setCampaignSearchQuery] = useState('');
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState<'all' | 'processing' | 'paused' | 'pending' | 'completed' | 'cancelled'>('all');
+
+  // Filtered campaigns for history list
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(c => {
+      const matchSearch = !campaignSearchQuery.trim() || c.title.toLowerCase().includes(campaignSearchQuery.toLowerCase().trim());
+      const matchStatus = campaignStatusFilter === 'all' || c.status === campaignStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [campaigns, campaignSearchQuery, campaignStatusFilter]);
+
+  const campaignStatusCounts = useMemo(() => {
+    const counts = { all: campaigns.length, processing: 0, paused: 0, pending: 0, completed: 0, cancelled: 0 };
+    campaigns.forEach(c => {
+      if (c.status in counts) {
+        counts[c.status as keyof typeof counts]++;
+      }
+    });
+    return counts;
+  }, [campaigns]);
 
   // JSON Payload Viewer Modal
   const [jsonViewCampaign, setJsonViewCampaign] = useState<CampaignQueue | null>(null);
@@ -604,6 +624,17 @@ export function DMBroadcastManagement() {
     return 0;
   }, [targetType, targetOption, subStats, testUserId]);
 
+  const dynamicTargetOptionOptions = useMemo<RichSelectItem[]>(() => {
+    return TARGET_OPTION_RICH_OPTIONS.map((opt) => {
+      const count = subStats.options[opt.value as keyof typeof subStats.options] ?? 0;
+      return {
+        ...opt,
+        label: `${opt.label} (${count.toLocaleString()} คน)`,
+        badge: `${count.toLocaleString()} คน`,
+      };
+    });
+  }, [subStats.options]);
+
   // Auto-scroll terminal when new systemLogs arrive
   useEffect(() => {
     if (logAutoScroll && terminalEndRef.current) {
@@ -612,24 +643,42 @@ export function DMBroadcastManagement() {
   }, [systemLogs, logAutoScroll]);
 
   // Fetch Subscribers List
+  // Helper to fetch all rows from dms_options with pagination (bypassing Supabase PostgREST 1000 row limit)
+  const fetchAllDmsOptions = async (): Promise<{ user_id: string; option_value: string; created_at?: string }[]> => {
+    let allRows: { user_id: string; option_value: string; created_at?: string }[] = [];
+    let from = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      const { data, error: subErr } = await supabase
+        .from('dms_options' as any)
+        .select('user_id, option_value, created_at')
+        .range(from, from + pageSize - 1);
+
+      if (subErr) {
+        // Fallback without created_at
+        const { data: fbData, error: fbErr } = await supabase
+          .from('dms_options' as any)
+          .select('user_id, option_value')
+          .range(from, from + pageSize - 1);
+
+        if (fbErr || !fbData || fbData.length === 0) break;
+        allRows = allRows.concat(fbData as any);
+        if (fbData.length < pageSize) break;
+      } else {
+        if (!data || data.length === 0) break;
+        allRows = allRows.concat(data as any);
+        if (data.length < pageSize) break;
+      }
+      from += pageSize;
+    }
+    return allRows;
+  };
+
   const fetchMemberSubscriptions = useCallback(async () => {
     try {
       setLoadingMembers(true);
-      let rawSubs: any[] | null = null;
-      
-      const { data, error: subErr } = await supabase
-        .from('dms_options' as any)
-        .select('user_id, option_value, created_at');
-
-      if (subErr) {
-        console.warn('Fallback selecting dms_options without created_at:', subErr.message);
-        const { data: fallbackData } = await supabase
-          .from('dms_options' as any)
-          .select('user_id, option_value');
-        rawSubs = fallbackData || [];
-      } else {
-        rawSubs = data || [];
-      }
+      const rawSubs = await fetchAllDmsOptions();
 
       const grouped: { [userId: string]: { options: string[]; updatedAt: string } } = {};
       (rawSubs || []).forEach((row: any) => {
@@ -699,10 +748,8 @@ export function DMBroadcastManagement() {
   const fetchDashboardData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      // 1. Fetch Subscription Stats
-      const { data: rawSubs } = await supabase
-        .from('dms_options' as any)
-        .select('user_id, option_value');
+      // 1. Fetch Subscription Stats (Paginated to bypass PostgREST 1000 row limit)
+      const rawSubs = await fetchAllDmsOptions();
 
       if (rawSubs) {
         const counts = { '49B40A9yBS': 0, 'JNySCX80ja': 0, 'DsMHlVrjze': 0, '6io1xnaMWJ': 0 };
@@ -1268,9 +1315,13 @@ export function DMBroadcastManagement() {
                               label="หมวดหมู่ข่าวสาร"
                               value={targetOption}
                               onValueChange={setTargetOption}
-                              data={TARGET_OPTION_RICH_OPTIONS}
+                              data={dynamicTargetOptionOptions}
                               placeholder="เลือกหมวดหมู่..."
                             />
+                            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                              <Users className="w-3.5 h-3.5 text-amber-500" />
+                              <span>สมาชิกที่กดรับหมวดหมู่นี้ในฐานข้อมูล: <strong className="text-[#4E3F30] dark:text-[#EAD8C8]">{subStats.options[targetOption as keyof typeof subStats.options] ?? 0} คน</strong></span>
+                            </p>
                           </div>
                         )}
 
@@ -1439,16 +1490,17 @@ export function DMBroadcastManagement() {
         {/* TAB 2: Campaigns History & Paginated Logs */}
         <TabsContent value="campaigns" className="space-y-6">
 
-          {/* 1. Featured Active / Latest Campaign Parallax Tracker */}
+          {/* 1. Featured Active / Latest Campaign Tracker (Cozy Live Tracker) */}
           {(() => {
             const activeCampaign = campaigns.find(c => c.status === 'processing' || c.status === 'pending' || c.status === 'paused') || (campaigns.length > 0 ? campaigns[0] : null);
             if (!activeCampaign) return null;
 
             const activeEta = calculateETA(activeCampaign);
             const pipeline = getCampaignPipelineSteps(activeCampaign);
+            const activePercent = activeCampaign.total_targets > 0 ? Math.round(((activeCampaign.sent_count + activeCampaign.failed_count) / activeCampaign.total_targets) * 100) : 0;
 
             return (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between px-1">
                   <span className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -1456,67 +1508,305 @@ export function DMBroadcastManagement() {
                       ? 'ระบบติดตามงานบรอดแคสต์สด (Live Active Tracking)' 
                       : 'ระบบติดตามงานบรอดแคสต์ล่าสุด (Recent Broadcast Tracking)'}
                   </span>
-                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold">
-                    Interactive 3D Parallax
+                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-semibold flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-amber-500" /> อัปเดตสดอัตโนมัติ
                   </Badge>
                 </div>
 
-                <OrderTrackingParallaxCard
-                  campaignId={activeCampaign.id}
-                  title={activeCampaign.title}
-                  subTitle={`เป้าหมาย: ${
-                    activeCampaign.target_type === 'all' 
-                      ? 'สมาชิกทุกคน' 
-                      : activeCampaign.target_type === 'test' 
-                      ? 'ทดสอบเฉพาะบุคคล' 
-                      : 'แยกตามหมวดหมู่'
-                  } • สร้างเมื่อ ${new Date(activeCampaign.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`}
-                  status={
-                    activeCampaign.status === 'processing' ? 'กำลังกระจายส่งข้อความ DM...' :
-                    activeCampaign.status === 'pending' ? 'รอคิวออกอากาศ' :
-                    activeCampaign.status === 'completed' ? 'จัดส่งเสร็จสิ้นสมบูรณ์' :
-                    activeCampaign.status === 'paused' ? 'พักส่งชั่วคราว' : 'ยกเลิกการส่งแล้ว'
-                  }
-                  statusType={activeCampaign.status}
-                  eta={
-                    (activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused')
-                      ? activeEta.text.replace('⏱️ ประเมินเวลาเสร็จสิ้น: ~ ', '')
-                      : undefined
-                  }
-                  totalTargets={activeCampaign.total_targets}
-                  sentCount={activeCampaign.sent_count}
-                  failedCount={activeCampaign.failed_count}
-                  tokenType={activeCampaign.token_type}
-                  safetyMode={activeCampaign.message_payload?.options?.min_delay_sec >= 15 ? 'safe' : 'balanced'}
-                  onViewLogs={() => handleToggleExpand(activeCampaign.id)}
-                  onPause={activeCampaign.status === 'processing' ? () => handlePauseCampaign(activeCampaign.id) : undefined}
-                  onResume={activeCampaign.status === 'paused' ? () => handleResumeCampaign(activeCampaign.id) : undefined}
-                  onCancel={(activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused') ? () => handleCancelCampaign(activeCampaign.id) : undefined}
-                  onRetry={activeCampaign.failed_count > 0 && activeCampaign.status !== 'processing' ? () => handleRetryFailedCampaign(activeCampaign.id) : undefined}
-                  onViewJson={() => setJsonViewCampaign(activeCampaign)}
-                >
-                  <TaskSteps
-                    steps={pipeline.steps}
-                    current={pipeline.current}
-                    label="ขั้นตอนกระบวนการจัดส่ง (Broadcast Pipeline)"
-                  />
-                </OrderTrackingParallaxCard>
+                <Card className="border border-[#EAD8C8] dark:border-[#2D2520] bg-white/95 dark:bg-[#181412] shadow-xs rounded-3xl overflow-hidden">
+                  <div className="p-5 sm:p-6 space-y-5">
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-bold text-[#4E3F30] dark:text-[#F3EDE6]">
+                            {activeCampaign.title}
+                          </h3>
+                          <Badge variant="outline" className="text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25 font-semibold">
+                            {activeCampaign.token_type === 'token2' ? '🧸 บอทสำรอง' : '🤖 บอทหลัก'}
+                          </Badge>
+                          {activeCampaign.status === 'processing' && (
+                            <span className="relative flex h-2.5 w-2.5" title="กำลังทำงาน">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          เป้าหมาย: {
+                            activeCampaign.target_type === 'all' 
+                              ? 'สมาชิกทุกคน' 
+                              : activeCampaign.target_type === 'test' 
+                              ? 'ทดสอบเฉพาะบุคคล' 
+                              : 'แยกตามหมวดหมู่'
+                          } • สร้างเมื่อ {new Date(activeCampaign.created_at).toLocaleString('th-TH')}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getStatusBadge(activeCampaign)}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs font-semibold gap-1.5 rounded-xl border-[#EAD8C8] dark:border-[#2D2520] hover:bg-muted/40 text-muted-foreground hover:text-foreground cursor-pointer"
+                          onClick={() => setJsonViewCampaign(activeCampaign)}
+                        >
+                          <Code className="w-3.5 h-3.5 text-blue-500" /> ดู JSON
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* TaskSteps pipeline */}
+                    <div className="py-1">
+                      <TaskSteps
+                        steps={pipeline.steps}
+                        current={pipeline.current}
+                        label="ขั้นตอนกระบวนการจัดส่ง (Broadcast Pipeline)"
+                      />
+                    </div>
+
+                    {/* Progress & Live ETA Banner */}
+                    <div className="space-y-2.5 bg-[#FAF6F0] dark:bg-[#201A17] p-4 rounded-2xl border border-[#EAD8C8]/60 dark:border-[#2D2420]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <span className="text-[#8C6239] dark:text-[#EAD8C8] font-medium">
+                          ความคืบหน้ารวม: <strong className="font-bold text-foreground">{activeCampaign.sent_count + activeCampaign.failed_count} / {activeCampaign.total_targets} คน</strong> ({activePercent}%)
+                        </span>
+                        <div className="flex items-center gap-3 font-semibold text-xs">
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" /> สำเร็จ: {activeCampaign.sent_count}
+                          </span>
+                          {activeCampaign.failed_count > 0 && (
+                            <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" /> ไม่สำเร็จ: {activeCampaign.failed_count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <ProgressIndicator
+                        value={activePercent}
+                        showLabel={false}
+                        size="md"
+                        variant={activeCampaign.status === 'completed' ? 'emerald' : activeCampaign.status === 'processing' ? 'amber' : 'default'}
+                      />
+
+                      {(activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused') && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                          <span className="text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
+                            {activeEta.text}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {activeEta.subText}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions Row */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520] hover:bg-muted/40 font-semibold cursor-pointer"
+                        onClick={() => handleToggleExpand(activeCampaign.id)}
+                      >
+                        <FileText className="w-3.5 h-3.5 text-amber-500" />
+                        {expandedCampaignId === activeCampaign.id ? 'ซ่อน Log รายคน' : 'ดู Log รายคนแบบละเอียด'}
+                      </Button>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {activeCampaign.status === 'processing' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1.5 border-amber-500/40 text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 cursor-pointer"
+                            onClick={() => handlePauseCampaign(activeCampaign.id)}
+                          >
+                            <Pause className="w-3.5 h-3.5" /> พักส่งชั่วคราว
+                          </Button>
+                        )}
+                        {activeCampaign.status === 'paused' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1.5 border-emerald-500/40 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 cursor-pointer"
+                            onClick={() => handleResumeCampaign(activeCampaign.id)}
+                          >
+                            <Play className="w-3.5 h-3.5 fill-emerald-600" /> ส่งข้อความต่อ
+                          </Button>
+                        )}
+                        {activeCampaign.failed_count > 0 && activeCampaign.status !== 'processing' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl text-xs font-bold gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 cursor-pointer"
+                            onClick={() => handleRetryFailedCampaign(activeCampaign.id)}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> ส่งซ่อมคนที่ล้มเหลว ({activeCampaign.failed_count})
+                          </Button>
+                        )}
+                        {(activeCampaign.status === 'processing' || activeCampaign.status === 'pending' || activeCampaign.status === 'paused') && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer"
+                            onClick={() => handleCancelCampaign(activeCampaign.id)}
+                          >
+                            <Square className="w-3 h-3" /> ยกเลิกการส่ง
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               </div>
             );
           })()}
 
-          {/* 2. All Campaigns List */}
-          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
-            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
-              <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8]">รายการงานบรอดแคสต์ทั้งหมด ({campaigns.length})</CardTitle>
-              <CardDescription className="text-xs">แสดงงานบรอดแคสต์และความคืบหน้าพร้อมการเรียกดู Log รายคนและโครงสร้าง JSON แบบแบ่งหน้า</CardDescription>
+          {/* 2. All Campaigns History with Search & Filter Chips */}
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl overflow-hidden">
+            <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-amber-500" /> รายการงานบรอดแคสต์ทั้งหมด ({campaigns.length})
+                  </CardTitle>
+                  <CardDescription className="text-xs">ประวัติการจัดส่ง ตรวจสอบ Log รายคน และสถานะคิวออกอากาศ</CardDescription>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="flex flex-col gap-2.5 pt-1">
+                {/* Search Input */}
+                <div className="relative w-full">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="ค้นหาชื่องานบรอดแคสต์..."
+                    className="pl-10 pr-4 rounded-2xl bg-white dark:bg-[#181412] border-[#EAD8C8] dark:border-[#2D2420] h-9 text-xs sm:text-sm focus-visible:ring-amber-500/30 w-full shadow-2xs"
+                    value={campaignSearchQuery}
+                    onChange={(e) => {
+                      setCampaignSearchQuery(e.target.value);
+                      setCampaignsPage(1);
+                    }}
+                  />
+                </div>
+
+                {/* Horizontal Status Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar touch-pan-x">
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('all'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'all'
+                        ? 'bg-amber-500 text-stone-950 shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>🌐</span>
+                    <span>ทั้งหมด ({campaignStatusCounts.all})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('processing'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'processing'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>📡</span>
+                    <span>กำลังส่ง ({campaignStatusCounts.processing})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('paused'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'paused'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>⏸️</span>
+                    <span>พักส่ง ({campaignStatusCounts.paused})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('pending'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'pending'
+                        ? 'bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-500/40 shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>⏳</span>
+                    <span>รอเข้าคิว ({campaignStatusCounts.pending})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('completed'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'completed'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>✓</span>
+                    <span>สำเร็จ ({campaignStatusCounts.completed})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCampaignStatusFilter('cancelled'); setCampaignsPage(1); }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer',
+                      campaignStatusFilter === 'cancelled'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white/80 dark:bg-[#181412] border border-[#EAD8C8] dark:border-[#2D2420] text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    )}
+                  >
+                    <span>❌</span>
+                    <span>ยกเลิก ({campaignStatusCounts.cancelled})</span>
+                  </button>
+                </div>
+              </div>
             </CardHeader>
+
             <CardContent className="p-4 space-y-4">
               {campaigns.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground text-sm">ยังไม่มีงานบรอดแคสต์ใดๆ ถูกสร้างขึ้น</div>
+              ) : filteredCampaigns.length === 0 ? (
+                <div className="text-center py-12 space-y-3 bg-white/40 dark:bg-card/20 rounded-2xl border-2 border-dashed border-[#EAD8C8]/60 dark:border-[#2D2420]">
+                  <Search className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">ไม่พบงานบรอดแคสต์ที่ตรงกับเงื่อนไข</p>
+                    <p className="text-xs text-muted-foreground">ลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองสถานะเป็น &quot;ทั้งหมด&quot; ดูนะคะ</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl text-xs border-[#EAD8C8] dark:border-[#2D2520] cursor-pointer"
+                    onClick={() => {
+                      setCampaignSearchQuery('');
+                      setCampaignStatusFilter('all');
+                      setCampaignsPage(1);
+                    }}
+                  >
+                    ล้างตัวกรองทั้งหมด
+                  </Button>
+                </div>
               ) : (() => {
-                const totalCampaignPages = Math.max(1, Math.ceil(campaigns.length / campaignsPageSize));
-                const paginatedCampaigns = campaigns.slice((campaignsPage - 1) * campaignsPageSize, campaignsPage * campaignsPageSize);
+                const totalCampaignPages = Math.max(1, Math.ceil(filteredCampaigns.length / campaignsPageSize));
+                const paginatedCampaigns = filteredCampaigns.slice((campaignsPage - 1) * campaignsPageSize, campaignsPage * campaignsPageSize);
 
                 return (
                   <div className="space-y-4">
@@ -1546,7 +1836,7 @@ export function DMBroadcastManagement() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 text-xs font-bold gap-1 border-[#EAD8C8] dark:border-[#2D2520] hover:bg-white text-[#8C6239] cursor-pointer"
+                                    className="h-7 text-xs font-bold gap-1 border-[#EAD8C8] dark:border-[#2D2520] hover:bg-muted/40 text-[#8C6239] dark:text-[#EAD8C8] cursor-pointer"
                                     onClick={() => setJsonViewCampaign(c)}
                                   >
                                     <Code className="w-3.5 h-3.5 text-blue-500" /> ดู JSON
@@ -1599,7 +1889,7 @@ export function DMBroadcastManagement() {
                               {/* Progress Indicator Component */}
                               <div className="space-y-2 bg-[#FAF6F0]/60 dark:bg-[#25201C]/60 p-3.5 rounded-xl border border-[#F0E8DC] dark:border-[#2D2520]">
                                 <div className="flex justify-between items-center text-xs text-[#8C6239] dark:text-[#EAD8C8]">
-                                  <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong></span>
+                                  <span>ความคืบหน้า: <strong>{c.sent_count + c.failed_count} / {c.total_targets} คน</strong> ({percent}%)</span>
                                   <div className="flex gap-3 font-semibold text-xs">
                                     <span className="text-emerald-600 dark:text-emerald-400">สำเร็จ: {c.sent_count}</span>
                                     {c.failed_count > 0 && (
@@ -1658,17 +1948,60 @@ export function DMBroadcastManagement() {
                                         <TableBody>
                                           {campaignLogs.map((log) => (
                                             <TableRow key={log.id} className="h-8 text-xs">
-                                              <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id}</TableCell>
-                                              <TableCell className="truncate max-w-[120px]">{log.username || '-'}</TableCell>
+                                              <TableCell className="font-mono text-xs truncate max-w-[140px]">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span>{log.user_id}</span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText(log.user_id);
+                                                      toast({ title: 'คัดลอก User ID สำเร็จ', description: log.user_id });
+                                                    }}
+                                                    className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                                                    title="คัดลอก ID"
+                                                  >
+                                                    <Copy className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="truncate max-w-[120px] font-medium">{log.username || '-'}</TableCell>
                                               <TableCell>
                                                 {log.status === 'success' ? (
-                                                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">สำเร็จ</Badge>
-                                                ) : log.status === 'failed' ? (
-                                                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]" title={log.error_message || ''}>
-                                                    ล้มเหลว ({log.error_message || 'Closed DM'})
+                                                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-semibold">
+                                                    ✓ สำเร็จ
                                                   </Badge>
+                                                ) : log.status === 'failed' ? (
+                                                  (() => {
+                                                    const err = log.error_message || '';
+                                                    if (err.includes('50007') || err.toLowerCase().includes('cannot send messages') || err.includes('closed in database')) {
+                                                      return (
+                                                        <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/25 text-[10px] font-semibold flex items-center gap-1 w-fit" title={err}>
+                                                          <span>🔒</span> <span>ปิด DM (50007)</span>
+                                                        </Badge>
+                                                      );
+                                                    }
+                                                    if (err.includes('50001') || err.toLowerCase().includes('missing access')) {
+                                                      return (
+                                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/25 text-[10px] font-semibold flex items-center gap-1 w-fit" title={err}>
+                                                          <span>🚫</span> <span>ออกจากกิลด์/บล็อก (50001)</span>
+                                                        </Badge>
+                                                      );
+                                                    }
+                                                    if (err.includes('10013') || err.toLowerCase().includes('unknown user')) {
+                                                      return (
+                                                        <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/25 text-[10px] font-semibold flex items-center gap-1 w-fit" title={err}>
+                                                          <span>👤</span> <span>ลบบัญชี (10013)</span>
+                                                        </Badge>
+                                                      );
+                                                    }
+                                                    return (
+                                                      <Badge variant="outline" className="bg-stone-500/10 text-stone-600 border-stone-500/25 text-[10px] font-semibold w-fit" title={err}>
+                                                        ⚠️ ล้มเหลว ({err.slice(0, 25)}...)
+                                                      </Badge>
+                                                    );
+                                                  })()
                                                 ) : (
-                                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600">รอส่ง</Badge>
+                                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 font-semibold">รอส่ง</Badge>
                                                 )}
                                               </TableCell>
                                             </TableRow>
@@ -1703,7 +2036,7 @@ export function DMBroadcastManagement() {
                     {totalCampaignPages > 1 && (
                       <div className="flex justify-between items-center pt-3 border-t border-[#EAD8C8] dark:border-[#2D2520]">
                         <span className="text-xs text-muted-foreground font-semibold">
-                          หน้า {campaignsPage} จาก {totalCampaignPages} (รวม {campaigns.length} รายการ)
+                          หน้า {campaignsPage} จาก {totalCampaignPages} (แสดง {paginatedCampaigns.length} จาก {filteredCampaigns.length} รายการ)
                         </span>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" className="h-8 text-xs font-bold rounded-xl cursor-pointer" disabled={campaignsPage <= 1} onClick={() => setCampaignsPage(p => p - 1)}>

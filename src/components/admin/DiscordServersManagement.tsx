@@ -28,6 +28,15 @@ import { cn } from '@/lib/utils';
 import { refreshServerFromDiscord } from '@/lib/discord-server-refresh';
 import { batchScanDiscordServers, validateAndUpdateServerInvite } from '@/lib/discord-invite-checker';
 import { DiscoveryAnalyticsSection } from './DiscoveryAnalyticsSection';
+import {
+  calculateWeeklyActiveScore,
+  getTimeSince,
+  getRemainingTime,
+  isRainbow,
+  getHighlightCardStyle,
+  getNameHighlightClass,
+  getNameHighlightStyle,
+} from '@/lib/discord-server-helpers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DiscordServer {
@@ -83,6 +92,45 @@ const COLOR_PRESETS = [
   { label: 'Violet', value: '#A78BFA' },
   { label: 'Rainbow', value: 'rainbow' },
 ];
+
+// ─── Smart Image Fallback for Admin ───────────────────────────────────────────
+function SafeAdminServerIcon({
+  url,
+  name,
+  className = "w-full h-full object-cover",
+}: {
+  url?: string | null;
+  name: string;
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+  useEffect(() => { setError(false); }, [url]);
+  if (!url || error) {
+    return (
+      <div className="w-full h-full bg-peach flex items-center justify-center text-xs font-bold text-white select-none">
+        {(name || '?')[0]?.toUpperCase() || '?'}
+      </div>
+    );
+  }
+  return <img src={url} alt={name} className={className} onError={() => setError(true)} />;
+}
+
+function SafeAdminServerBanner({
+  url,
+  alt = "",
+  className = "h-28 w-full object-cover",
+}: {
+  url?: string | null;
+  alt?: string;
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+  useEffect(() => { setError(false); }, [url]);
+  if (!url || error) {
+    return <div className="h-28 w-full bg-gradient-to-br from-peach/30 to-blush/30" />;
+  }
+  return <img src={url} alt={alt} className={className} onError={() => setError(true)} />;
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function DiscordServersManagement() {
@@ -539,7 +587,7 @@ export function DiscordServersManagement() {
       toast({
         title: 'บันทึกการตั้งค่า Carousel สำเร็จ',
         description: activeMode === 'auto_top7'
-          ? `เปิดใช้งานโหมด อัตโนมัติ Top ${carouselSettings.limit || 7} (ดันเซิร์ฟใน ${carouselSettings.window_days || 7} วันล่าสุด)`
+          ? `เปิดใช้งานโหมด อัตโนมัติ Top ${carouselSettings.limit || 7} ชุมชนมาแรง (Trending & Active)`
           : 'เปิดใช้งานโหมด กำหนดเอง (Manual)',
         className: 'bg-success text-success-foreground',
       });
@@ -562,9 +610,7 @@ export function DiscordServersManagement() {
   const getOwnerName = (ownerId: string) => profileMap.get(ownerId)?.username || ownerId;
 
   const highlightStyle = (color: string | null): React.CSSProperties => {
-    if (!color) return {};
-    if (color === 'rainbow') return { borderImage: 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f) 1' };
-    return { borderColor: color };
+    return getHighlightCardStyle(color);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -732,26 +778,17 @@ export function DiscordServersManagement() {
               key={server.id}
               className={cn(
                 'overflow-hidden border-2 border-latte/20 dark:border-coffee/20',
-                server.invite_status === 'expired' && 'border-red-500/40 dark:border-red-800/50'
+                server.invite_status === 'expired' && 'border-red-500/40 dark:border-red-800/50',
+                isRainbow(server.highlight_color) && 'rainbow-border-glow'
               )}
               style={highlightStyle(server.highlight_color)}
             >
-              {server.banner_url ? (
-                <div className="h-28 w-full bg-cover bg-center" style={{ backgroundImage: `url(${server.banner_url})` }} />
-              ) : (
-                <div className="h-28 w-full bg-gradient-to-br from-peach/30 to-blush/30" />
-              )}
+              <SafeAdminServerBanner url={server.banner_url} alt={server.name} />
 
               <CardContent className="p-4 -mt-10">
                 <div className="flex justify-between items-end mb-3">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden border-4 border-white dark:border-coffee shadow-lg bg-white">
-                    {server.icon_url ? (
-                      <img src={server.icon_url} alt={server.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-peach flex items-center justify-center text-xl font-bold text-white">
-                        {server.name[0]}
-                      </div>
-                    )}
+                    <SafeAdminServerIcon url={server.icon_url} name={server.name} />
                   </div>
                   <div className="flex flex-wrap gap-1 justify-end">
                     {server.invite_status === 'expired' && (
@@ -771,7 +808,15 @@ export function DiscordServersManagement() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <h3 className="font-bold text-base truncate">{server.name}</h3>
+                  <h3
+                    className={cn(
+                      "font-bold text-base truncate",
+                      getNameHighlightClass(server.highlight_color)
+                    )}
+                    style={getNameHighlightStyle(server.highlight_color)}
+                  >
+                    {server.name}
+                  </h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">
                     {server.description || 'ไม่มีคำอธิบาย'}
                   </p>
@@ -1082,7 +1127,7 @@ export function DiscordServersManagement() {
               <LayoutList className="h-5 w-5 text-primary" /> จัดการระบบ Discord Carousel
             </DialogTitle>
             <DialogDescription>
-              เลือกรูปแบบการแสดงผล Carousel ระหว่างระบบอัตโนมัติ Top 7 ดันบ่อย หรือกำหนดเอง
+              เลือกรูปแบบการแสดงผล Carousel ระหว่างระบบอัตโนมัติ ชุมชนมาแรง (Trending & Active) หรือกำหนดเอง
             </DialogDescription>
           </DialogHeader>
 
@@ -1090,7 +1135,7 @@ export function DiscordServersManagement() {
             <TabsList className="grid grid-cols-2 w-full mb-4">
               <TabsTrigger value="auto" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Flame className="w-4 h-4 text-orange-400" />
-                <span>อัตโนมัติ Top {carouselSettings.limit || 7} (ดันใน 7 วัน)</span>
+                <span>อัตโนมัติ Top {carouselSettings.limit || 7} (ชุมชนมาแรง)</span>
               </TabsTrigger>
               <TabsTrigger value="manual" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <LayoutList className="w-4 h-4" />
@@ -1098,16 +1143,15 @@ export function DiscordServersManagement() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ── Tab 1: Auto Mode (Top 7 Active Bumps) ── */}
+            {/* ── Tab 1: Auto Mode (Top 7 Trending & Active) ── */}
             <TabsContent value="auto" className="space-y-4 m-0">
               <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs text-foreground space-y-1.5">
                 <div className="flex items-center gap-1.5 font-semibold text-orange-600 dark:text-orange-400 text-sm">
-                  <Flame className="w-4 h-4" /> เงื่อนไขระบบอัตโนมัติ (Top {carouselSettings.limit || 7})
+                  <Flame className="w-4 h-4" /> เงื่อนไขระบบอัตโนมัติ (Top {carouselSettings.limit || 7} ชุมชนมาแรง & คึกคัก)
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  • เฉพาะเซิร์ฟเวอร์ที่มีการกดดันในรอบ <strong>{carouselSettings.window_days || 7} วันล่าสุด</strong> เท่านั้นที่จะมีสิทธิ์แสดงผล<br />
-                  • หากเซิร์ฟเวอร์ใดไม่ได้กดดันเกิน {carouselSettings.window_days || 7} วัน จะ <strong>หลุดออกจาก Carousel ทันทีโดยอัตโนมัติ</strong><br />
-                  • ระบบจัดอันดับตาม <strong>จำนวนครั้งที่กดดันสะสม (🔥 Total Bumps)</strong> และเวลาที่เพิ่งดันล่าสุด คัดเฉพาะ <strong>Top {carouselSettings.limit || 7}</strong> ขึ้นแสดง
+                  • เฉพาะเซิร์ฟเวอร์ที่ Active ในรอบ <strong>{carouselSettings.window_days || 7} วันล่าสุด</strong> หรือกำลังมีสมาชิกคุยไมค์สด (`live_voice_count &gt; 0`) เท่านั้นที่จะมีสิทธิ์แสดงผล<br />
+                  • จัดอันดับด้วย <strong>คะแนนผสมผสาน (Trending & Active Score)</strong>: คนคุยไมค์สด, ยอดคลิกเข้าชม, คะแนนรีวิว, และกิจกรรมในรอบสัปดาห์ คัดเฉพาะ <strong>Top {carouselSettings.limit || 7}</strong> ขึ้นแสดง
                 </p>
               </div>
 
@@ -1155,42 +1199,28 @@ export function DiscordServersManagement() {
                 const limitCount = carouselSettings.limit || 7;
                 const approved = servers.filter((s) => s.status === 'approved');
 
-                const activeBumpServers = approved
+                const scoredServers = approved
                   .filter((s) => s.bumped_at && new Date(s.bumped_at).getTime() >= cutoffTime)
+                  .map((s) => {
+                    const computed = calculateWeeklyActiveScore(s);
+                    return {
+                      ...s,
+                      weekly_score: computed.score,
+                      trending_badge: computed.badge,
+                    };
+                  })
                   .sort((a, b) => {
                     if (carouselSettings.prioritize_partners && a.is_partner !== b.is_partner) {
                       return a.is_partner ? -1 : 1;
                     }
-                    const bumpA = a.bump_count ?? 0;
-                    const bumpB = b.bump_count ?? 0;
-                    if (bumpB !== bumpA) return bumpB - bumpA;
-                    return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
+                    return b.weekly_score - a.weekly_score;
                   });
 
-                const topList = activeBumpServers.slice(0, limitCount);
-                const waitList = activeBumpServers.slice(limitCount);
+                const topList = scoredServers.slice(0, limitCount);
+                const waitList = scoredServers.slice(limitCount);
                 const inactiveList = approved.filter(
                   (s) => !s.bumped_at || new Date(s.bumped_at).getTime() < cutoffTime
                 );
-
-                const getRemainingTime = (dateStr: string | null) => {
-                  if (!dateStr) return 'หมดอายุแล้ว';
-                  const expireMs = new Date(dateStr).getTime() + windowDays * 24 * 60 * 60 * 1000;
-                  const rem = expireMs - Date.now();
-                  if (rem <= 0) return 'หมดอายุแล้ว';
-                  const hours = Math.floor(rem / (1000 * 60 * 60));
-                  const d = Math.floor(hours / 24);
-                  const h = hours % 24;
-                  return d > 0 ? `${d} วัน ${h} ชม.` : `${h} ชม.`;
-                };
-
-                const getTimeSince = (dateStr: string | null) => {
-                  if (!dateStr) return 'ไม่เคยดัน';
-                  const hours = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60));
-                  if (hours < 1) return 'เมื่อสักครู่';
-                  if (hours < 24) return `${hours} ชม. ที่แล้ว`;
-                  return `${Math.floor(hours / 24)} วันที่แล้ว`;
-                };
 
                 return (
                   <div className="space-y-4">
@@ -1216,7 +1246,11 @@ export function DiscordServersManagement() {
                           {topList.map((s, idx) => (
                             <div
                               key={s.id}
-                              className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-card/60 hover:bg-muted/30 transition-colors"
+                              className={cn(
+                                "flex items-center gap-2.5 p-2.5 rounded-xl border bg-card/60 hover:bg-muted/30 transition-colors",
+                                isRainbow(s.highlight_color) && "rainbow-border-glow"
+                              )}
+                              style={getHighlightCardStyle(s.highlight_color)}
                             >
                               <span className={cn(
                                 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
@@ -1228,28 +1262,32 @@ export function DiscordServersManagement() {
                                 {idx + 1}
                               </span>
 
-                              {s.icon_url ? (
-                                <img src={s.icon_url} alt={s.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
-                              ) : (
-                                <div className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                                  {s.name[0]}
-                                </div>
-                              )}
+                              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border bg-background">
+                                <SafeAdminServerIcon url={s.icon_url} name={s.name} />
+                              </div>
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-sm font-semibold text-foreground truncate">{s.name}</span>
+                                  <span
+                                    className={cn(
+                                      "text-sm font-semibold text-foreground truncate",
+                                      getNameHighlightClass(s.highlight_color)
+                                    )}
+                                    style={getNameHighlightStyle(s.highlight_color)}
+                                  >
+                                    {s.name}
+                                  </span>
                                   {s.is_verified && <ShieldCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
                                   {s.is_partner && <Handshake className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
                                 </div>
-                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400 font-medium">
-                                    <Flame className="w-3 h-3" /> ดัน {s.bump_count || 1} ครั้ง
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+                                  <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold border shadow-xs', s.trending_badge?.color)}>
+                                    {s.trending_badge?.text || `🔥 ดัน ${s.bump_count || 1} ครั้ง`}
                                   </span>
                                   <span>•</span>
                                   <span>ดัน {getTimeSince(s.bumped_at)}</span>
                                   <span>•</span>
-                                  <span className="text-green-600 dark:text-green-400">เหลือ {getRemainingTime(s.bumped_at)}</span>
+                                  <span className="text-green-600 dark:text-green-400">เหลือ {getRemainingTime(s.bumped_at, windowDays)}</span>
                                 </div>
                               </div>
 

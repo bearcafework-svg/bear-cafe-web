@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,8 +30,14 @@ import {
   Calendar, Infinity as InfinityIcon, Settings2, Edit3, Search, Info, ListFilter,
   CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Eye, Volume2, Headphones,
   Keyboard, Laptop, Globe, Check, AlertCircle, Radio, Clock, ShieldCheck, User,
-  AlertTriangle, Tag, ChevronsUpDown, X
+  AlertTriangle, Tag, ChevronsUpDown, X, XCircle, Edit2
 } from 'lucide-react';
+import {
+  Game13SentenceBuilder,
+  Game13FlowGuide,
+  GAME_13_PRESETS,
+  validateGame13Sentence,
+} from './minigames/Game13SentenceBuilder';
 
 export interface MinigameConfig {
   id: number;
@@ -654,6 +662,154 @@ export function CategoryCombobox({
   );
 }
 
+interface UserAvatarBadgeProps {
+  userId?: string | null;
+  fallbackName?: string | null;
+  userProfilesMap: Record<string, { username: string; discord_username: string | null; avatar_url: string | null }>;
+  className?: string;
+  showName?: boolean;
+}
+
+function UserAvatarBadge({
+  userId,
+  fallbackName,
+  userProfilesMap,
+  className,
+  showName = true,
+}: UserAvatarBadgeProps) {
+  const profile = userId ? userProfilesMap[userId] : null;
+  const isSystem = !userId || userId === 'system' || userId === 'bot' || fallbackName === 'ระบบ';
+  const displayName = profile?.username || fallbackName || (isSystem ? 'ระบบ' : 'Staff');
+  const discordTag = profile?.discord_username;
+  const avatarUrl = profile?.avatar_url;
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : '?';
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={cn("inline-flex items-center gap-1.5 min-w-0 cursor-default select-none group", className)}>
+            <Avatar className="w-5 h-5 rounded-full ring-1 ring-[#EAD8C8] dark:ring-[#3D322A] shrink-0 bg-[#F5EBE1] dark:bg-[#2A221C] transition-transform group-hover:scale-105">
+              {isSystem ? (
+                <AvatarFallback className="text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                  🐻
+                </AvatarFallback>
+              ) : (
+                <>
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} className="object-cover" />}
+                  <AvatarFallback className="text-[9px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-200">
+                    {initial}
+                  </AvatarFallback>
+                </>
+              )}
+            </Avatar>
+            {showName && (
+              <span className="truncate text-foreground font-medium text-xs leading-none">
+                {displayName}
+              </span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs p-2 rounded-xl shadow-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]">
+          <div className="flex items-center gap-2">
+            <Avatar className="w-7 h-7 rounded-full shrink-0 ring-1 ring-amber-500/30">
+              {isSystem ? (
+                <AvatarFallback className="text-xs bg-amber-500/20 text-amber-700">🐻</AvatarFallback>
+              ) : avatarUrl ? (
+                <AvatarImage src={avatarUrl} alt={displayName} />
+              ) : (
+                <AvatarFallback className="text-xs font-bold">{initial}</AvatarFallback>
+              )}
+            </Avatar>
+            <div className="min-w-0">
+              <p className="font-bold text-xs leading-tight text-foreground truncate">{displayName}</p>
+              {discordTag && <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 truncate">@{discordTag}</p>}
+              {userId && !isSystem && (
+                <p className="text-[9px] text-muted-foreground/70 font-mono leading-tight mt-0.5 truncate">
+                  ID: {userId}
+                </p>
+              )}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+interface QuickCategoryEditorProps {
+  currentCategory: string;
+  categories: string[];
+  categoryCounts?: Record<string, number>;
+  onSave: (newCat: string) => Promise<void> | void;
+  disabled?: boolean;
+}
+
+function QuickCategoryEditor({
+  currentCategory,
+  categories,
+  categoryCounts = {},
+  onSave,
+  disabled = false,
+}: QuickCategoryEditorProps) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSelect = async (newCat: string) => {
+    if (newCat === currentCategory) {
+      setOpen(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(newCat);
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild disabled={disabled || saving}>
+        <button
+          type="button"
+          className="group inline-flex items-center gap-1 text-left focus:outline-none"
+          title="คลิกเพื่อแก้ไขหมวดหมู่ (เฉพาะ Owner)"
+        >
+          <Badge
+            variant="secondary"
+            className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 font-medium group-hover:bg-purple-500/20 group-hover:border-purple-500/40 transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <span>{currentCategory || 'คำทั่วไป'}</span>
+            <Edit2 className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-72 p-3 z-50 bg-[#FDFBF7] dark:bg-[#1D1815] border-[#EAD8C8] dark:border-[#2D2520] shadow-xl rounded-2xl"
+        align="start"
+      >
+        <div className="space-y-2">
+          <div className="flex items-center justify-between pb-1 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+            <span className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-amber-600" /> แก้ไขหมวดหมู่
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium">สิทธิ์ Owner</span>
+          </div>
+          <CategoryCombobox
+            value={currentCategory}
+            onChange={handleSelect}
+            categories={categories}
+            categoryCounts={categoryCounts}
+            disabled={saving}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function MinigamesManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -682,7 +838,24 @@ export function MinigamesManagement() {
 
   // Duplicate detection state
   const [duplicateMatch, setDuplicateMatch] = useState<Question | null>(null);
+  const [pendingDuplicateMatch, setPendingDuplicateMatch] = useState<{
+    id: string;
+    game_id: number;
+    word_or_question: string;
+    requested_by?: string;
+    requested_by_name?: string;
+    created_at?: string;
+  } | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState<boolean>(false);
+
+  // Pending Change Requests state
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [loadingPending, setLoadingPending] = useState<boolean>(false);
+  const [pendingFilterGame, setPendingFilterGame] = useState<string>('all');
+  const [pendingSearchQuery, setPendingSearchQuery] = useState<string>('');
+  const [processingPendingId, setProcessingPendingId] = useState<string | null>(null);
+  const [rejectDialogTarget, setRejectDialogTarget] = useState<any | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
 
   // Category filter state
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
@@ -823,13 +996,14 @@ export function MinigamesManagement() {
     setLbPage(1);
   }, [lbTimeFilter, lbGameFilter]);
 
-  // Real-time Duplicate Detection across target pool (debounced 300ms)
+  // Real-time Duplicate Detection across target pool + pending requests (debounced 300ms)
   useEffect(() => {
     const gId = Number(formGameId);
     const queryText = formQuestion.trim();
 
     if (!queryText || queryText.length < 2 || gId === 3) {
       setDuplicateMatch(null);
+      setPendingDuplicateMatch(null);
       setCheckingDuplicate(false);
       return;
     }
@@ -849,23 +1023,49 @@ export function MinigamesManagement() {
 
     if (memoryMatch) {
       setDuplicateMatch(memoryMatch);
+      setPendingDuplicateMatch(null);
       setCheckingDuplicate(false);
       return;
     }
 
-    // 2. Debounced DB Check
+    // 2. Fast Check in loaded memory pending requests
+    const memoryPendingMatch = pendingRequests.find(r => {
+      if (!targetGIds.includes(r.game_id)) return false;
+      const pText = (r.new_data?.word_or_question || '').trim().toLowerCase();
+      const pAns = (r.new_data?.answer || '').trim().toLowerCase();
+      if (pText === normalizedQuery) return true;
+      if (targetGIds.some(id => [8, 9, 10].includes(id)) && pAns === normalizedQuery) return true;
+      return false;
+    });
+
+    if (memoryPendingMatch) {
+      setDuplicateMatch(null);
+      setPendingDuplicateMatch({
+        id: memoryPendingMatch.id,
+        game_id: memoryPendingMatch.game_id,
+        word_or_question: memoryPendingMatch.new_data?.word_or_question || '',
+        requested_by: memoryPendingMatch.requested_by,
+        requested_by_name: memoryPendingMatch.requested_by_name || 'Staff',
+        created_at: memoryPendingMatch.created_at,
+      });
+      setCheckingDuplicate(false);
+      return;
+    }
+
+    // 3. Debounced DB Check
     setCheckingDuplicate(true);
     const timer = setTimeout(async () => {
       try {
         const { data, error } = await (supabase as any)
           .from('minigame_questions')
-          .select('id, game_id, word_or_question, answer, category, difficulty')
+          .select('id, game_id, word_or_question, answer, category, difficulty, created_by, created_by_name')
           .in('game_id', targetGIds)
           .ilike('word_or_question', queryText)
           .limit(1);
 
         if (!error && data && data.length > 0) {
           setDuplicateMatch(data[0]);
+          setPendingDuplicateMatch(null);
           setCheckingDuplicate(false);
           return;
         }
@@ -873,19 +1073,52 @@ export function MinigamesManagement() {
         if (targetGIds.some(id => [8, 9, 10].includes(id))) {
           const { data: aData, error: aErr } = await (supabase as any)
             .from('minigame_questions')
-            .select('id, game_id, word_or_question, answer, category, difficulty')
+            .select('id, game_id, word_or_question, answer, category, difficulty, created_by, created_by_name')
             .in('game_id', targetGIds)
             .ilike('answer', queryText)
             .limit(1);
 
           if (!aErr && aData && aData.length > 0) {
             setDuplicateMatch(aData[0]);
+            setPendingDuplicateMatch(null);
+            setCheckingDuplicate(false);
+            return;
+          }
+        }
+
+        // DB Check in pending change requests
+        const { data: pData, error: pErr } = await (supabase as any)
+          .from('minigame_change_requests')
+          .select('id, game_id, new_data, requested_by, requested_by_name, created_at')
+          .eq('status', 'pending')
+          .in('game_id', targetGIds);
+
+        if (!pErr && pData && pData.length > 0) {
+          const dbPendingMatch = pData.find((r: any) => {
+            const pText = (r.new_data?.word_or_question || '').trim().toLowerCase();
+            const pAns = (r.new_data?.answer || '').trim().toLowerCase();
+            if (pText === normalizedQuery) return true;
+            if (targetGIds.some((id: number) => [8, 9, 10].includes(id)) && pAns === normalizedQuery) return true;
+            return false;
+          });
+
+          if (dbPendingMatch) {
+            setDuplicateMatch(null);
+            setPendingDuplicateMatch({
+              id: dbPendingMatch.id,
+              game_id: dbPendingMatch.game_id,
+              word_or_question: dbPendingMatch.new_data?.word_or_question || '',
+              requested_by: dbPendingMatch.requested_by,
+              requested_by_name: dbPendingMatch.requested_by_name || 'Staff',
+              created_at: dbPendingMatch.created_at,
+            });
             setCheckingDuplicate(false);
             return;
           }
         }
 
         setDuplicateMatch(null);
+        setPendingDuplicateMatch(null);
       } catch (e) {
         console.error('Error checking duplicate question:', e);
       } finally {
@@ -894,7 +1127,7 @@ export function MinigamesManagement() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [formQuestion, formGameId, questions]);
+  }, [formQuestion, formGameId, questions, pendingRequests]);
 
   // Fetch Settings
   const fetchSettings = useCallback(async () => {
@@ -1097,28 +1330,7 @@ export function MinigamesManagement() {
 
       // Fetch profiles for leaderboard discord_ids
       const discordIds = sorted.map((item) => item.discord_id).filter(Boolean);
-      if (discordIds.length > 0) {
-        const uniqueIds = Array.from(new Set(discordIds));
-        const profilesMap: Record<string, { username: string; discord_username: string | null; avatar_url: string | null }> = {};
-        const chunkSize = 100;
-        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-          const chunk = uniqueIds.slice(i, i + chunkSize);
-          const { data: pData } = await (supabase as any)
-            .from('profiles')
-            .select('discord_id, username, discord_username, avatar_url')
-            .in('discord_id', chunk);
-          if (pData) {
-            for (const p of pData) {
-              profilesMap[p.discord_id] = {
-                username: p.username,
-                discord_username: p.discord_username ?? null,
-                avatar_url: p.avatar_url ?? null,
-              };
-            }
-          }
-        }
-        setUserProfilesMap(profilesMap);
-      }
+      fetchMissingProfiles(discordIds);
     } catch (err: any) {
       toast({ title: 'เกิดข้อผิดพลาดในการดึงข้อมูลจัดอันดับ', description: err.message, variant: 'destructive' });
     } finally {
@@ -1126,10 +1338,101 @@ export function MinigamesManagement() {
     }
   }, [lbGameFilter, lbTimeFilter, toast]);
 
+  // Batch fetch profiles from Supabase
+  const fetchMissingProfiles = useCallback(async (discordIds: (string | null | undefined)[]) => {
+    const validIds = Array.from(
+      new Set(discordIds.filter((id): id is string => Boolean(id && id !== 'admin' && id !== 'system' && id !== 'bot')))
+    );
+    const missingIds = validIds.filter((id) => !userProfilesMap[id]);
+    if (missingIds.length === 0) return;
+
+    try {
+      const newMap: Record<string, { username: string; discord_username: string | null; avatar_url: string | null }> = {};
+      const chunkSize = 100;
+      for (let i = 0; i < missingIds.length; i += chunkSize) {
+        const chunk = missingIds.slice(i, i + chunkSize);
+        const { data: pData } = await (supabase as any)
+          .from('profiles')
+          .select('discord_id, username, discord_username, avatar_url')
+          .in('discord_id', chunk);
+        if (pData) {
+          for (const p of pData) {
+            newMap[p.discord_id] = {
+              username: p.username,
+              discord_username: p.discord_username ?? null,
+              avatar_url: p.avatar_url ?? null,
+            };
+          }
+        }
+      }
+      if (Object.keys(newMap).length > 0) {
+        setUserProfilesMap((prev) => ({ ...prev, ...newMap }));
+      }
+    } catch (e) {
+      console.error('Error fetching missing user profiles:', e);
+    }
+  }, [userProfilesMap]);
+
+  // Automatically fetch profiles for questions and pending requests
+  useEffect(() => {
+    const ids: (string | null | undefined)[] = [];
+    questions.forEach((q) => {
+      if (q.created_by) ids.push(q.created_by);
+      if (q.updated_by) ids.push(q.updated_by);
+    });
+    pendingRequests.forEach((r) => {
+      if (r.requested_by) ids.push(r.requested_by);
+    });
+    if (pendingDuplicateMatch?.requested_by) {
+      ids.push(pendingDuplicateMatch.requested_by);
+    }
+    if (duplicateMatch?.created_by) {
+      ids.push(duplicateMatch.created_by);
+    }
+    if (ids.length > 0) {
+      fetchMissingProfiles(ids);
+    }
+  }, [questions, pendingRequests, pendingDuplicateMatch?.requested_by, duplicateMatch?.created_by, fetchMissingProfiles]);
+
+  // Fetch Pending Requests
+  const fetchPendingRequests = useCallback(async () => {
+    try {
+      setLoadingPending(true);
+      let query = (supabase as any)
+        .from('minigame_change_requests')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      // If not owner, only show requests submitted by current staff
+      if (!user?.is_owner) {
+        const operatorId = user?.discord_id || user?.id;
+        if (operatorId) {
+          query = query.eq('requested_by', operatorId);
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        if (error.code !== '42P01' && error.code !== 'PGRST205') {
+          console.error('Error fetching minigame pending requests:', error);
+        }
+        return;
+      }
+
+      setPendingRequests(data || []);
+    } catch (err: any) {
+      console.error('Error in fetchPendingRequests:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [user?.is_owner, user?.discord_id, user?.id]);
+
   useEffect(() => {
     fetchSettings();
     fetchGameCounts();
-  }, [fetchSettings, fetchGameCounts]);
+    fetchPendingRequests();
+  }, [fetchSettings, fetchGameCounts, fetchPendingRequests]);
 
   useEffect(() => {
     fetchQuestions();
@@ -1198,6 +1501,15 @@ export function MinigamesManagement() {
       return;
     }
 
+    if (pendingDuplicateMatch) {
+      toast({
+        title: 'พบคำนี้อยู่ในคิวรอดำเนินการ ⏳',
+        description: `ข้อความนี้มีผู้ส่งคำขอเข้ามาแล้ว (เกม ${pendingDuplicateMatch.game_id}: "${pendingDuplicateMatch.word_or_question}" โดย ${pendingDuplicateMatch.requested_by_name || 'Staff'}) รอให้ Owner ตรวจสอบและอนุมัติก่อนนะคะ`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const isDiffGame = (gId === 4);
     const finalDiff = isDiffGame ? formDifficulty : null;
 
@@ -1205,6 +1517,15 @@ export function MinigamesManagement() {
     if (gId === 4) {
       hintsArray = [formHint1.trim(), formHint2.trim(), formHint3.trim()].filter(Boolean);
     } else if (gId === 13) {
+      const vError = validateGame13Sentence(formHint1, finalAnswer);
+      if (vError) {
+        toast({
+          title: 'รูปแบบประโยคเกม 13 ไม่ถูกต้อง ⚠️',
+          description: vError,
+          variant: 'destructive',
+        });
+        return;
+      }
       hintsArray = [formHint1.trim()].filter(Boolean);
     }
 
@@ -1243,8 +1564,9 @@ export function MinigamesManagement() {
 
         toast({
           title: 'ส่งคำขอเพิ่มคำศัพท์สำเร็จ 📨',
-          description: `คำขอเพิ่มคำศัพท์เกม #${gId} ถูกส่งไปยังหน้า Reports เพื่อรอให้ Owner อนุมัติแล้วค่ะ`,
+          description: `คำขอเพิ่มคำศัพท์เกม #${gId} ถูกส่งไปยังแท็บรอดำเนินการ เพื่อรอให้ Owner อนุมัติแล้วค่ะ`,
         });
+        fetchPendingRequests();
       } else {
         // Owner mode: Insert directly into minigame_questions
         const insertData: any = {
@@ -1327,6 +1649,15 @@ export function MinigamesManagement() {
     if (gId === 4) {
       hintsArray = [editHint1.trim(), editHint2.trim(), editHint3.trim()].filter(Boolean);
     } else if (gId === 13) {
+      const vError = validateGame13Sentence(editHint1, finalAnswer);
+      if (vError) {
+        toast({
+          title: 'รูปแบบประโยคเกม 13 ไม่ถูกต้อง ⚠️',
+          description: vError,
+          variant: 'destructive',
+        });
+        return;
+      }
       hintsArray = [editHint1.trim()].filter(Boolean);
     }
 
@@ -1511,6 +1842,232 @@ export function MinigamesManagement() {
     }
   };
 
+  // ─── Owner Management for Pending Requests ──────────────────────────────────────
+  const handleApprovePendingRequest = async (req: any) => {
+    if (!user?.is_owner) {
+      toast({ title: 'ไม่มีสิทธิ์', description: 'เฉพาะ Owner เท่านั้นที่สามารถอนุมัติได้', variant: 'destructive' });
+      return;
+    }
+
+    setProcessingPendingId(req.id);
+    const approverId = user?.discord_id || user?.id || 'admin';
+    const approverName = user?.username || user?.discord_username || 'Owner';
+
+    try {
+      if (req.action_type === 'create') {
+        const { data: inserted, error: insErr } = await (supabase as any)
+          .from('minigame_questions')
+          .insert({
+            game_id: req.game_id,
+            word_or_question: req.new_data?.word_or_question || '',
+            answer: req.new_data?.answer || '',
+            category: req.new_data?.category || 'คำทั่วไป',
+            hints: req.new_data?.hints || [],
+            options: req.new_data?.options || [],
+            difficulty: req.new_data?.difficulty || null,
+            is_active: req.new_data?.is_active ?? true,
+            status: 'approved',
+            created_by: req.requested_by,
+            created_by_name: req.requested_by_name,
+            updated_by: approverId,
+            updated_by_name: approverName,
+          })
+          .select('id')
+          .single();
+
+        if (insErr) throw insErr;
+
+        await (supabase as any)
+          .from('minigame_change_requests')
+          .update({
+            status: 'approved',
+            question_id: inserted?.id,
+            approved_by: approverId,
+            approved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', req.id);
+      } else if (req.action_type === 'update' && req.question_id) {
+        const { error: updErr } = await (supabase as any)
+          .from('minigame_questions')
+          .update({
+            word_or_question: req.new_data?.word_or_question,
+            answer: req.new_data?.answer,
+            category: req.new_data?.category || 'คำทั่วไป',
+            hints: req.new_data?.hints || [],
+            options: req.new_data?.options || [],
+            difficulty: req.new_data?.difficulty || null,
+            status: 'approved',
+            pending_request_id: null,
+            updated_by: req.requested_by,
+            updated_by_name: req.requested_by_name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', req.question_id);
+
+        if (updErr) throw updErr;
+
+        await (supabase as any)
+          .from('minigame_change_requests')
+          .update({
+            status: 'approved',
+            approved_by: approverId,
+            approved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', req.id);
+      } else if (req.action_type === 'delete' && req.question_id) {
+        const { error: delErr } = await (supabase as any)
+          .from('minigame_questions')
+          .delete()
+          .eq('id', req.question_id);
+
+        if (delErr) throw delErr;
+
+        await (supabase as any)
+          .from('minigame_change_requests')
+          .update({
+            status: 'approved',
+            approved_by: approverId,
+            approved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', req.id);
+      }
+
+      toast({
+        title: 'อนุมัติคำขอสำเร็จ 🎉',
+        description: `อนุมัติคำขอ "${req.new_data?.word_or_question || 'มินิเกม'}" เข้าสู่คลังเรียบร้อยแล้ว`,
+      });
+
+      await fetchPendingRequests();
+      await fetchQuestions();
+      await fetchGameCounts();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการอนุมัติ', description: err.message, variant: 'destructive' });
+    } finally {
+      setProcessingPendingId(null);
+    }
+  };
+
+  const handleRejectPendingRequest = async (reqId: string, reason?: string) => {
+    if (!user?.is_owner) {
+      toast({ title: 'ไม่มีสิทธิ์', description: 'เฉพาะ Owner เท่านั้นที่สามารถปฏิเสธได้', variant: 'destructive' });
+      return;
+    }
+
+    setProcessingPendingId(reqId);
+    const rejectorId = user?.discord_id || user?.id || 'admin';
+
+    try {
+      const { error } = await (supabase as any)
+        .from('minigame_change_requests')
+        .update({
+          status: 'rejected',
+          rejected_by: rejectorId,
+          rejected_at: new Date().toISOString(),
+          rejection_reason: reason || 'ไม่ผ่านเกณฑ์การพิจารณา',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', reqId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'ปฏิเสธคำขอเรียบร้อย',
+        description: 'คำขอนี้ถูกปรับสถานะเป็น rejected แล้วค่ะ',
+      });
+
+      setRejectDialogTarget(null);
+      setRejectionReason('');
+      await fetchPendingRequests();
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการปฏิเสธคำขอ', description: err.message, variant: 'destructive' });
+    } finally {
+      setProcessingPendingId(null);
+    }
+  };
+
+  const handleUpdatePendingCategory = async (requestId: string, newCategory: string) => {
+    if (!user?.is_owner) {
+      toast({ title: 'ไม่มีสิทธิ์', description: 'เฉพาะ Owner เท่านั้นที่สามารถแก้ไขหมวดหมู่ได้', variant: 'destructive' });
+      return;
+    }
+
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req) return;
+
+    const updatedNewData = {
+      ...req.new_data,
+      category: newCategory.trim() || 'คำทั่วไป',
+    };
+
+    try {
+      const { error } = await (supabase as any)
+        .from('minigame_change_requests')
+        .update({
+          new_data: updatedNewData,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'แก้ไขหมวดหมู่สำเร็จ ✨',
+        description: `เปลี่ยนหมวดหมู่คำขอเป็น "${newCategory}" เรียบร้อยแล้วค่ะ`,
+      });
+
+      setPendingRequests(prev => prev.map(r => r.id === requestId ? { ...r, new_data: updatedNewData } : r));
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการแก้ไขหมวดหมู่', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleQuickUpdateCategory = async (questionId: number, newCategory: string) => {
+    if (!user?.is_owner) {
+      toast({ title: 'ไม่มีสิทธิ์', description: 'เฉพาะ Owner เท่านั้นที่สามารถแก้ไขหมวดหมู่ได้', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const operatorId = user?.discord_id || user?.id || 'admin';
+      const operatorName = user?.username || user?.discord_username || 'Owner';
+
+      const updateData: any = {
+        category: newCategory.trim() || 'คำทั่วไป',
+        updated_by: operatorId,
+        updated_by_name: operatorName,
+        updated_at: new Date().toISOString(),
+      };
+
+      let res = await (supabase as any)
+        .from('minigame_questions')
+        .update(updateData)
+        .eq('id', questionId);
+
+      if (res.error && (res.error.code === '42703' || res.error.message?.includes('updated_by'))) {
+        delete updateData.updated_by;
+        delete updateData.updated_by_name;
+        res = await (supabase as any)
+          .from('minigame_questions')
+          .update(updateData)
+          .eq('id', questionId);
+      }
+
+      if (res.error) throw res.error;
+
+      toast({
+        title: 'แก้ไขหมวดหมู่สำเร็จ ✨',
+        description: `เปลี่ยนหมวดหมู่ข้อ #${questionId} เป็น "${newCategory}" เรียบร้อยแล้วค่ะ`,
+      });
+
+      setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, category: newCategory.trim() || 'คำทั่วไป' } : q));
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการแก้ไขหมวดหมู่', description: err.message, variant: 'destructive' });
+    }
+  };
+
   // Filtered games based on selected Group Tab
   const visibleGameConfigs = useMemo(() => {
     return Object.values(MINIGAME_CONFIGS).filter((g) => {
@@ -1601,7 +2158,7 @@ export function MinigamesManagement() {
           <Badge variant="outline" className="px-3 py-1 rounded-xl text-xs font-semibold bg-primary/10 text-primary border-primary/20">
             🎮 ครบ 13 มินิเกม
           </Badge>
-          <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => { fetchQuestions(); fetchGameCounts(); fetchSettings(); }}>
+          <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5 border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => { fetchQuestions(); fetchGameCounts(); fetchSettings(); fetchPendingRequests(); }}>
             <RefreshCw className={cn("w-3.5 h-3.5", loadingQuestions && "animate-spin")} /> ดึงข้อมูลสด
           </Button>
         </div>
@@ -1609,15 +2166,23 @@ export function MinigamesManagement() {
 
       {/* Main Tabs Navigation */}
       <Tabs defaultValue="questions" className="w-full space-y-6">
-        <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-1 sm:grid-cols-3 h-auto gap-1">
+        <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-2 sm:grid-cols-4 h-auto gap-1">
           <TabsTrigger value="questions" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
             <Edit3 className="w-4 h-4 text-blue-500" /> 1. คลังคำศัพท์ & จัดการโจทย์
           </TabsTrigger>
+          <TabsTrigger value="pending" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
+            <Clock className="w-4 h-4 text-amber-500" /> 2. รายการรอดำเนินการ
+            {pendingRequests.length > 0 && (
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full font-bold ml-1">
+                {pendingRequests.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="settings" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Settings2 className="w-4 h-4 text-purple-500" /> 2. ตั้งค่าห้อง & แต้มรางวัล (13 เกม)
+            <Settings2 className="w-4 h-4 text-purple-500" /> 3. ตั้งค่าห้อง & แต้มรางวัล
           </TabsTrigger>
           <TabsTrigger value="leaderboard" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Trophy className="w-4 h-4 text-amber-500" /> 3. ตารางจัดอันดับผู้ชนะ
+            <Trophy className="w-4 h-4 text-amber-500" /> 4. จัดอันดับผู้ชนะ
           </TabsTrigger>
         </TabsList>
 
@@ -1878,113 +2443,133 @@ export function MinigamesManagement() {
                         {(() => {
                           const isSingleTextGame = [1, 2, 5, 6, 7, 11].includes(selectedGId);
                           return (
-                            <div className={cn("grid gap-4", isSingleTextGame ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-                              {/* Question Input */}
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
-                                    {selectedGId === 1 && '🇹🇭 คำศัพท์ภาษาไทย (เติมคำ & พิมพ์เร็ว)'}
-                                    {selectedGId === 2 && '🇬🇧 คำศัพท์ภาษาอังกฤษ (เติมคำ & พิมพ์เร็ว)'}
-                                    {selectedGId === 4 && '💡 ชื่อคำศัพท์ / สิ่งของ (เฉลยข้อนี้)'}
-                                    {selectedGId === 5 && '🎧 คำศัพท์ภาษาอังกฤษ (บอทจะอ่านออกเสียง TTS)'}
-                                    {selectedGId === 6 && '🇹🇭 ข้อความ / ประโยคภาษาไทยสำหรับฝึกพิมพ์'}
-                                    {selectedGId === 7 && '🇬🇧 ข้อความ / ประโยคภาษาอังกฤษสำหรับฝึกพิมพ์'}
-                                    {selectedGId === 8 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์ EN ➔ TH)'}
-                                    {selectedGId === 9 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์คู่แปล TH ➔ EN)'}
-                                    {selectedGId === 10 && '🔗 คำขึ้นต้น (คำหน้า เช่น "น้ำ", "ไฟ")'}
-                                    {selectedGId === 11 && '🔊 คำศัพท์ภาษาไทย (บอทจะอ่านออกเสียง TTS)'}
-                                    {selectedGId === 12 && '❓ ข้อความ / คำถามจริงหรือเท็จ'}
-                                    {selectedGId === 13 && '🔤 ความหมายสำนวน / คำแปลภาษาไทย (โจทย์)'}
-                                  </label>
-                                  {isSingleTextGame && (
-                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                                      ✨ ช่องเดียวจบ บันทึกคำตอบตรงกันอัตโนมัติ
+                            <div className="space-y-4">
+                              <div className={cn("grid gap-4", (isSingleTextGame || selectedGId === 13) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+                                {/* Question Input */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
+                                      {selectedGId === 1 && '🇹🇭 คำศัพท์ภาษาไทย (เติมคำ & พิมพ์เร็ว)'}
+                                      {selectedGId === 2 && '🇬🇧 คำศัพท์ภาษาอังกฤษ (เติมคำ & พิมพ์เร็ว)'}
+                                      {selectedGId === 4 && '💡 ชื่อคำศัพท์ / สิ่งของ (เฉลยข้อนี้)'}
+                                      {selectedGId === 5 && '🎧 คำศัพท์ภาษาอังกฤษ (บอทจะอ่านออกเสียง TTS)'}
+                                      {selectedGId === 6 && '🇹🇭 ข้อความ / ประโยคภาษาไทยสำหรับฝึกพิมพ์'}
+                                      {selectedGId === 7 && '🇬🇧 ข้อความ / ประโยคภาษาอังกฤษสำหรับฝึกพิมพ์'}
+                                      {selectedGId === 8 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์ EN ➔ TH)'}
+                                      {selectedGId === 9 && '🌐 คำศัพท์ภาษาอังกฤษ (โจทย์คู่แปล TH ➔ EN)'}
+                                      {selectedGId === 10 && '🔗 คำขึ้นต้น (คำหน้า เช่น "น้ำ", "ไฟ")'}
+                                      {selectedGId === 11 && '🔊 คำศัพท์ภาษาไทย (บอทจะอ่านออกเสียง TTS)'}
+                                      {selectedGId === 12 && '❓ ข้อความ / คำถามจริงหรือเท็จ'}
+                                      {selectedGId === 13 && '🔤 ความหมายสำนวน / คำแปลภาษาไทย (โจทย์)'}
+                                    </label>
+                                    {isSingleTextGame && (
+                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                        ✨ ช่องเดียวจบ บันทึกคำตอบตรงกันอัตโนมัติ
+                                      </span>
+                                    )}
+                                  </div>
+                                  <Input
+                                    className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                                    placeholder={
+                                      selectedGId === 1 ? 'เช่น สวัสดี, ไอศกรีม, ประเทศไทย' :
+                                      selectedGId === 2 ? 'เช่น banana, strawberry, computer' :
+                                      selectedGId === 4 ? 'เช่น ช้าง, ดวงอาทิตย์, แมว' :
+                                      selectedGId === 5 ? 'เช่น butterfly, welcome, adventure' :
+                                      selectedGId === 6 ? 'เช่น หมีคาเฟ่ยินดีต้อนรับเสมอ' :
+                                      selectedGId === 7 ? 'เช่น Welcome to Bear Cafe' :
+                                      selectedGId === 8 || selectedGId === 9 ? 'เช่น Apple, Banana, House' :
+                                      selectedGId === 10 ? 'เช่น น้ำ, รถ, ดาว, พัด' :
+                                      selectedGId === 11 ? 'เช่น ก้านกล้วย, ธรรมชาติ, มิตรภาพ' :
+                                      selectedGId === 12 ? 'เช่น แมวเป็นสัตว์เลี้ยงลูกด้วยนม' :
+                                      selectedGId === 13 ? 'เช่น ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น' :
+                                      'กรอกโจทย์/คำศัพท์...'
+                                    }
+                                    value={formQuestion}
+                                    onChange={(e) => setFormQuestion(e.target.value)}
+                                    required
+                                  />
+                                  {selectedGId === 1 && (
+                                    <span className="text-[11px] text-muted-foreground block">
+                                      💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 1 (สุ่มซ่อนขีดเส้นใต้) และเกม 6 (ประโยคพิมพ์เร็ว)
+                                    </span>
+                                  )}
+                                  {selectedGId === 2 && (
+                                    <span className="text-[11px] text-muted-foreground block">
+                                      💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 2 (สุ่มซ่อนตัวอักษร) และเกม 7 (ประโยคพิมพ์เร็วอังกฤษ)
                                     </span>
                                   )}
                                 </div>
-                                <Input
-                                  className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                                  placeholder={
-                                    selectedGId === 1 ? 'เช่น สวัสดี, ไอศกรีม, ประเทศไทย' :
-                                    selectedGId === 2 ? 'เช่น banana, strawberry, computer' :
-                                    selectedGId === 4 ? 'เช่น ช้าง, ดวงอาทิตย์, แมว' :
-                                    selectedGId === 5 ? 'เช่น butterfly, welcome, adventure' :
-                                    selectedGId === 6 ? 'เช่น หมีคาเฟ่ยินดีต้อนรับเสมอ' :
-                                    selectedGId === 7 ? 'เช่น Welcome to Bear Cafe' :
-                                    selectedGId === 8 || selectedGId === 9 ? 'เช่น Apple, Banana, House' :
-                                    selectedGId === 10 ? 'เช่น น้ำ, รถ, ดาว, พัด' :
-                                    selectedGId === 11 ? 'เช่น ก้านกล้วย, ธรรมชาติ, มิตรภาพ' :
-                                    selectedGId === 12 ? 'เช่น แมวเป็นสัตว์เลี้ยงลูกด้วยนม' :
-                                    selectedGId === 13 ? 'เช่น ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น' :
-                                    'กรอกโจทย์/คำศัพท์...'
-                                  }
-                                  value={formQuestion}
-                                  onChange={(e) => setFormQuestion(e.target.value)}
-                                  required
-                                />
-                                {selectedGId === 1 && (
-                                  <span className="text-[11px] text-muted-foreground block">
-                                    💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 1 (สุ่มซ่อนขีดเส้นใต้) และเกม 6 (ประโยคพิมพ์เร็ว)
-                                  </span>
-                                )}
-                                {selectedGId === 2 && (
-                                  <span className="text-[11px] text-muted-foreground block">
-                                    💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 2 (สุ่มซ่อนตัวอักษร) และเกม 7 (ประโยคพิมพ์เร็วอังกฤษ)
-                                  </span>
+
+                                {/* Answer Input or True/False Selector (HIDDEN for single-text games and Game 13) */}
+                                {!isSingleTextGame && selectedGId !== 13 && (
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
+                                      {selectedGId === 4 && 'คำตอบที่ต้องพิมพ์ตอบ'}
+                                      {selectedGId === 8 && 'คำแปลภาษาไทย (เฉลย)'}
+                                      {selectedGId === 9 && 'คำแปลภาษาไทย (เฉลย)'}
+                                      {selectedGId === 10 && 'คำต่อท้าย (คำหลัง เช่น "แข็ง", "ไฟ")'}
+                                      {selectedGId === 12 && 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'}
+                                    </label>
+
+                                    {selectedGId === 12 ? (
+                                      <div className="flex gap-2 h-10">
+                                        <Button
+                                          type="button"
+                                          variant={formAnswer === 'จริง' || !formAnswer ? 'default' : 'outline'}
+                                          className={cn(
+                                            "flex-1 rounded-xl text-xs font-bold gap-1.5",
+                                            (formAnswer === 'จริง' || !formAnswer) && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                          )}
+                                          onClick={() => setFormAnswer('จริง')}
+                                        >
+                                          <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant={formAnswer === 'เท็จ' ? 'destructive' : 'outline'}
+                                          className="flex-1 rounded-xl text-xs font-bold gap-1.5"
+                                          onClick={() => setFormAnswer('เท็จ')}
+                                        >
+                                          <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Input
+                                        className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
+                                        placeholder={
+                                          selectedGId === 8 || selectedGId === 9
+                                            ? 'เช่น แอปเปิ้ล, กล้วย, บ้าน'
+                                            : selectedGId === 10
+                                            ? 'เช่น แข็ง (รวมเป็น น้ำแข็ง), ไฟ (รถไฟ)'
+                                            : 'พิมพ์เฉลยคำตอบ...'
+                                        }
+                                        value={formAnswer}
+                                        onChange={(e) => setFormAnswer(e.target.value)}
+                                        required
+                                      />
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Answer Input or True/False Selector (HIDDEN for single-text games) */}
-                              {!isSingleTextGame && (
-                                <div className="space-y-1.5">
-                                  <label className="text-xs sm:text-sm font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
-                                    {selectedGId === 4 && 'คำตอบที่ต้องพิมพ์ตอบ'}
-                                    {selectedGId === 8 && 'คำแปลภาษาไทย (เฉลย)'}
-                                    {selectedGId === 9 && 'คำแปลภาษาไทย (เฉลย)'}
-                                    {selectedGId === 10 && 'คำต่อท้าย (คำหลัง เช่น "แข็ง", "ไฟ")'}
-                                    {selectedGId === 12 && 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'}
-                                    {selectedGId === 13 && 'คำตอบภาษาอังกฤษเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น where, will)'}
-                                  </label>
-
-                                  {selectedGId === 12 ? (
-                                    <div className="flex gap-2 h-10">
-                                      <Button
-                                        type="button"
-                                        variant={formAnswer === 'จริง' || !formAnswer ? 'default' : 'outline'}
-                                        className={cn(
-                                          "flex-1 rounded-xl text-xs font-bold gap-1.5",
-                                          (formAnswer === 'จริง' || !formAnswer) && "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                        )}
-                                        onClick={() => setFormAnswer('จริง')}
-                                      >
-                                        <Check className="w-3.5 h-3.5" /> ✅ จริง (True)
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant={formAnswer === 'เท็จ' ? 'destructive' : 'outline'}
-                                        className="flex-1 rounded-xl text-xs font-bold gap-1.5"
-                                        onClick={() => setFormAnswer('เท็จ')}
-                                      >
-                                        <AlertCircle className="w-3.5 h-3.5" /> ❌ เท็จ (False)
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <Input
-                                      className="h-10 text-xs rounded-xl border-[#EAD8C8] dark:border-[#2D2520] bg-white dark:bg-[#1E1B18]"
-                                      placeholder={
-                                        selectedGId === 8 || selectedGId === 9
-                                          ? 'เช่น แอปเปิ้ล, กล้วย, บ้าน'
-                                          : selectedGId === 10
-                                          ? 'เช่น แข็ง (รวมเป็น น้ำแข็ง), ไฟ (รถไฟ)'
-                                          : selectedGId === 13
-                                          ? 'เช่น where, will, way (คำตอบที่นำไปเติมใน {1}, {2}...)'
-                                          : 'พิมพ์เฉลยคำตอบ...'
-                                      }
-                                      value={formAnswer}
-                                      onChange={(e) => setFormAnswer(e.target.value)}
-                                      required
-                                    />
-                                  )}
+                              {/* Dedicated Smart Sentence Builder for Game 13 */}
+                              {selectedGId === 13 && (
+                                <div className="space-y-3 pt-1">
+                                  <Game13FlowGuide />
+                                  <Game13SentenceBuilder
+                                    template={formHint1}
+                                    answers={formAnswer}
+                                    onChange={(newT, newAns) => {
+                                      setFormHint1(newT);
+                                      setFormAnswer(newAns);
+                                    }}
+                                    onPresetSelect={(preset) => {
+                                      setFormQuestion(preset.question);
+                                      setFormHint1(preset.template);
+                                      setFormAnswer(preset.answers);
+                                      if (preset.category) setFormCategory(preset.category);
+                                    }}
+                                  />
                                 </div>
                               )}
                             </div>
@@ -1998,31 +2583,75 @@ export function MinigamesManagement() {
                             <div className="space-y-1 min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <strong className="font-bold text-amber-700 dark:text-amber-300">
-                                  ตรวจพบข้อมูลซ้ำในระบบ!
+                                  ตรวจพบข้อมูลซ้ำในคลัง!
                                 </strong>
                                 <Badge variant="outline" className="text-[10px] bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300">
                                   ID #{duplicateMatch.id}
                                 </Badge>
                               </div>
-                              <p className="text-[11px] leading-relaxed">
-                                ข้อความนี้มีอยู่แล้วใน <strong>เกม {duplicateMatch.game_id} ({MINIGAME_CONFIGS[duplicateMatch.game_id]?.name || 'มินิเกม'})</strong>
+                              <div className="flex items-center gap-2 text-[11px] leading-relaxed flex-wrap">
+                                <span>
+                                  ข้อความนี้มีอยู่แล้วใน <strong>เกม {duplicateMatch.game_id} ({MINIGAME_CONFIGS[duplicateMatch.game_id]?.name || 'มินิเกม'})</strong>
+                                </span>
                                 {duplicateMatch.category && <span> • หมวด: {duplicateMatch.category}</span>}
-                              </p>
+                                {duplicateMatch.created_by_name && (
+                                  <span className="flex items-center gap-1">
+                                    <span>• เพิ่มโดย:</span>
+                                    <UserAvatarBadge
+                                      userId={duplicateMatch.created_by}
+                                      fallbackName={duplicateMatch.created_by_name}
+                                      userProfilesMap={userProfilesMap}
+                                    />
+                                  </span>
+                                )}
+                              </div>
                               <div className="p-2 rounded-xl bg-white/70 dark:bg-[#1E1B18]/70 border border-amber-500/20 font-mono text-[11px] text-foreground flex flex-wrap gap-x-4 gap-y-1">
                                 <span>โจทย์: <strong>"{duplicateMatch.word_or_question}"</strong></span>
                                 {duplicateMatch.answer && <span>เฉลย: <strong>"{duplicateMatch.answer}"</strong></span>}
                               </div>
                             </div>
                           </div>
+                        ) : pendingDuplicateMatch ? (
+                          <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
+                            <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <strong className="font-bold text-amber-800 dark:text-amber-300">
+                                  พบคำนี้อยู่ในคิวรอดำเนินการ (Pending)!
+                                </strong>
+                                <Badge variant="outline" className="text-[10px] bg-amber-500/25 border-amber-500/50 text-amber-800 dark:text-amber-200 font-bold">
+                                  รอ Owner ตรวจสอบ
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] leading-relaxed flex-wrap">
+                                <span>
+                                  มีผู้ส่งคำขอนี้เข้ามาแล้วใน <strong>เกม {pendingDuplicateMatch.game_id} ({MINIGAME_CONFIGS[pendingDuplicateMatch.game_id]?.name || 'มินิเกม'})</strong>
+                                </span>
+                                {pendingDuplicateMatch.requested_by_name && (
+                                  <span className="flex items-center gap-1">
+                                    <span>• ส่งโดย:</span>
+                                    <UserAvatarBadge
+                                      userId={pendingDuplicateMatch.requested_by}
+                                      fallbackName={pendingDuplicateMatch.requested_by_name}
+                                      userProfilesMap={userProfilesMap}
+                                    />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="p-2 rounded-xl bg-white/70 dark:bg-[#1E1B18]/70 border border-amber-500/20 font-mono text-[11px] text-foreground flex flex-wrap gap-x-4 gap-y-1">
+                                <span>โจทย์: <strong>"{pendingDuplicateMatch.word_or_question}"</strong></span>
+                              </div>
+                            </div>
+                          </div>
                         ) : formQuestion.trim().length >= 2 && !checkingDuplicate ? (
                           <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>ไม่พบข้อมูลซ้ำในคลัง สามารถเพิ่มคำนี้ได้ทันที</span>
+                            <span>ไม่พบข้อมูลซ้ำทั้งในคลังและคิวรอดำเนินการ สามารถเพิ่มคำนี้ได้ทันที</span>
                           </div>
                         ) : checkingDuplicate ? (
                           <div className="px-3 py-1.5 rounded-xl bg-muted/60 flex items-center gap-2 text-[11px] text-muted-foreground">
                             <RefreshCw className="w-3 h-3 animate-spin" />
-                            <span>กำลังตรวจสอบข้อมูลซ้ำในคลังบอท...</span>
+                            <span>กำลังตรวจสอบข้อมูลซ้ำในคลังและคำที่รอดำเนินการ...</span>
                           </div>
                         ) : null}
 
@@ -2041,32 +2670,17 @@ export function MinigamesManagement() {
                           </div>
                         )}
 
-                        {/* Sentence Template Input (for Game 13) */}
-                        {selectedGId === 13 && (
-                          <div className="p-4 rounded-2xl bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 border border-[#EAD8C8] dark:border-[#2D2520] space-y-2">
-                            <label className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] flex items-center gap-1.5">
-                              <Info className="w-3.5 h-3.5 text-teal-500" />
-                              แม่แบบประโยคพร้อมช่องว่าง &#123;1&#125;, &#123;2&#125;...
-                            </label>
-                            <Input
-                              className="h-9 text-xs rounded-xl bg-white dark:bg-[#1E1B18]"
-                              placeholder="เช่น Where there is a {1}, there is a {2}."
-                              value={formHint1}
-                              onChange={(e) => setFormHint1(e.target.value)}
-                              required
-                            />
-                            <span className="text-[11px] text-muted-foreground block">
-                              💡 ใส่ &#123;1&#125;, &#123;2&#125; ในตำแหน่งที่ต้องการเว้นเป็นช่องว่างให้ผู้เล่นกดเรียงคำศัพท์
-                            </span>
-                          </div>
-                        )}
-
                         <Button
                           type="submit"
-                          disabled={!!duplicateMatch}
+                          disabled={
+                            !!duplicateMatch ||
+                            !!pendingDuplicateMatch ||
+                            checkingDuplicate ||
+                            (selectedGId === 13 && !!validateGame13Sentence(formHint1, formAnswer))
+                          }
                           className={cn(
                             "w-full rounded-2xl h-11 gap-2 text-white font-bold text-sm shadow-xs cursor-pointer mt-2 transition-all",
-                            duplicateMatch
+                            duplicateMatch || pendingDuplicateMatch || (selectedGId === 13 && !!validateGame13Sentence(formHint1, formAnswer))
                               ? "bg-muted-foreground/50 cursor-not-allowed opacity-60"
                               : "bg-[#8C6239] hover:bg-[#74502D]"
                           )}
@@ -2228,6 +2842,96 @@ export function MinigamesManagement() {
                               <div className={cn("flex-1 p-2 rounded-lg text-xs font-bold text-center border", formAnswer === 'เท็จ' ? "bg-rose-500/20 border-rose-500 text-rose-400" : "bg-[#1e1f22] border-zinc-700 text-zinc-400")}>
                                 [ ❌ เท็จ ]
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Game 13 Sentence Builder Discord Preview */}
+                        {selectedGId === 13 && (
+                          <div className="space-y-2.5">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px]">
+                                เรียงประโยคภาษาอังกฤษ
+                              </Badge>
+                              <span className="text-[11px] text-zinc-400">กดปุ่มคำศัพท์ตามลำดับให้ครบ</span>
+                            </div>
+
+                            {/* Prompt Card */}
+                            <div className="bg-[#1e1f22] p-2.5 rounded-lg text-xs space-y-1">
+                              <p className="text-[11px] text-zinc-400">📝 ความหมาย / คำแปลไทย:</p>
+                              <p className="font-semibold text-white">
+                                "{formQuestion || 'ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น'}"
+                              </p>
+                            </div>
+
+                            {/* Sentence with Blanks */}
+                            <div className="bg-[#2b2d31] p-3 rounded-xl border border-zinc-700/80 space-y-1.5">
+                              <p className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider">ATTACHMENT: sentence_card.png</p>
+                              <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-700/80 font-mono text-xs leading-relaxed text-zinc-200">
+                                {(() => {
+                                  const t = formHint1 || 'Where there is a {1}, there is a {2}.';
+                                  const parts = t.split(/(\{\d+\})/g);
+                                  return parts.map((part, idx) => {
+                                    const m = part.match(/^\{(\d+)\}$/);
+                                    if (m) {
+                                      return (
+                                        <span
+                                          key={idx}
+                                          className="inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-500/40 font-bold text-[11px]"
+                                        >
+                                          [ ___ ] <span className="text-[9px] opacity-75 ml-1">({m[1]})</span>
+                                        </span>
+                                      );
+                                    }
+                                    return <span key={idx}>{part}</span>;
+                                  });
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Simulated Choice Buttons */}
+                            <div className="space-y-1.5 pt-1">
+                              <p className="text-[11px] text-zinc-400">🎮 ปุ่มคำศัพท์ที่บอทจะสุ่มส่งใน Discord:</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(() => {
+                                  const realWords = (formAnswer || 'will, way')
+                                    .split(/[,|]/)
+                                    .map((s) => s.trim())
+                                    .filter(Boolean);
+                                  const dummyPool = ['hope', 'path', 'mind', 'power', 'try', 'step'];
+                                  const fakeWords = dummyPool
+                                    .filter((w) => !realWords.includes(w))
+                                    .slice(0, Math.max(2, 5 - realWords.length));
+                                  const allDisplay = [...realWords, ...fakeWords];
+                                  return (
+                                    <>
+                                      {allDisplay.map((w, idx) => {
+                                        const isCorrect = realWords.includes(w);
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className={cn(
+                                              "px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 border",
+                                              isCorrect
+                                                ? "bg-[#5865F2] text-white border-indigo-400/40"
+                                                : "bg-[#4e5058] text-zinc-200 border-zinc-600"
+                                            )}
+                                          >
+                                            {w}
+                                            {isCorrect && <span className="text-[9px] opacity-75">(เฉลย)</span>}
+                                          </div>
+                                        );
+                                      })}
+                                      <div className="px-2 py-1 rounded-md text-xs font-semibold bg-rose-900/60 text-rose-200 border border-rose-700/50 flex items-center gap-1">
+                                        🔄 เริ่มใหม่
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                              <p className="text-[10px] text-zinc-400">
+                                💡 ผู้เล่นต้องกดปุ่มตามลำดับ 1, 2... ใครกดครบคนแรกรับคะแนนทันที
+                              </p>
                             </div>
                           </div>
                         )}
@@ -2398,10 +3102,21 @@ export function MinigamesManagement() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {isCategoryGame(q.game_id) && q.category ? (
-                                <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 font-medium">
-                                  {q.category}
-                                </Badge>
+                              {isCategoryGame(q.game_id) ? (
+                                user?.is_owner ? (
+                                  <QuickCategoryEditor
+                                    currentCategory={q.category || 'คำทั่วไป'}
+                                    categories={categoriesList}
+                                    categoryCounts={categoryCounts}
+                                    onSave={(newCat) => handleQuickUpdateCategory(q.id, newCat)}
+                                  />
+                                ) : q.category ? (
+                                  <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 font-medium">
+                                    {q.category}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )
                               ) : (
                                 <span className="text-xs text-muted-foreground">-</span>
                               )}
@@ -2476,14 +3191,22 @@ export function MinigamesManagement() {
 
                             {/* Audit Info Cell */}
                             <TableCell>
-                              <div className="text-[11px] leading-tight space-y-0.5">
-                                <div className="flex items-center gap-1 text-foreground font-medium truncate max-w-[120px]" title={`เพิ่มโดย: ${q.created_by_name || 'ระบบ'}`}>
-                                  <User className="w-3 h-3 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{q.created_by_name || 'ระบบ'}</span>
+                              <div className="text-[11px] leading-tight space-y-1">
+                                <div className="flex items-center gap-1 text-foreground font-medium truncate max-w-[130px]" title={`เพิ่มโดย: ${q.created_by_name || 'ระบบ'}`}>
+                                  <UserAvatarBadge
+                                    userId={q.created_by}
+                                    fallbackName={q.created_by_name}
+                                    userProfilesMap={userProfilesMap}
+                                  />
                                 </div>
                                 {q.updated_by_name && q.updated_by_name !== q.created_by_name && (
-                                  <div className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={`แก้ไขล่าสุดโดย: ${q.updated_by_name}`}>
-                                    แก้: {q.updated_by_name}
+                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground truncate max-w-[130px]" title={`แก้ไขล่าสุดโดย: ${q.updated_by_name}`}>
+                                    <span className="text-[9px] text-muted-foreground/80">แก้:</span>
+                                    <UserAvatarBadge
+                                      userId={q.updated_by}
+                                      fallbackName={q.updated_by_name}
+                                      userProfilesMap={userProfilesMap}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -2550,7 +3273,251 @@ export function MinigamesManagement() {
           </Card>
         </TabsContent>
 
-        {/* TAB 2: GAME SETTINGS & CHANNELS */}
+        {/* TAB 2: PENDING REQUESTS MANAGER */}
+        <TabsContent value="pending" className="space-y-4">
+          <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="font-bold text-xs sm:text-sm text-[#8C6239] dark:text-[#EAD8C8]">
+                    คำศัพท์รอดำเนินการ
+                  </span>
+                  {pendingRequests.length > 0 && (
+                    <Badge className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0 h-4 min-w-4 rounded-full">
+                      {pendingRequests.length}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Inline Compact Toolbar */}
+                <div className="flex items-center gap-1.5 flex-1 sm:flex-initial justify-end">
+                  <div className="relative w-full sm:w-44">
+                    <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="ค้นหาคำขอ..."
+                      value={pendingSearchQuery}
+                      onChange={(e) => setPendingSearchQuery(e.target.value)}
+                      className="pl-7 pr-6 h-8 text-xs rounded-xl bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520]"
+                    />
+                    {pendingSearchQuery && (
+                      <button
+                        onClick={() => setPendingSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="w-36 sm:w-44 shrink-0">
+                    <Select value={pendingFilterGame} onValueChange={setPendingFilterGame}>
+                      <SelectTrigger className="h-8 text-xs rounded-xl bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520]">
+                        <SelectValue placeholder="มินิเกม" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 rounded-xl text-xs">
+                        <SelectItem value="all">🎮 ทุกเกม (1-13)</SelectItem>
+                        {Object.values(MINIGAME_CONFIGS).map((conf) => (
+                          <SelectItem key={conf.id} value={String(conf.id)}>
+                            {conf.icon} เกม {conf.id}: {conf.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 rounded-xl border-[#EAD8C8] dark:border-[#2D2520] shrink-0"
+                    onClick={fetchPendingRequests}
+                    disabled={loadingPending}
+                    title="รีเฟรชคำขอ"
+                  >
+                    <RefreshCw className={cn("w-3.5 h-3.5", loadingPending && "animate-spin")} />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-3">
+              {(() => {
+                const filteredPending = pendingRequests.filter((req) => {
+                  if (pendingFilterGame !== 'all' && String(req.game_id) !== pendingFilterGame) return false;
+                  if (pendingSearchQuery.trim()) {
+                    const kw = pendingSearchQuery.trim().toLowerCase();
+                    const qWord = (req.new_data?.word_or_question || req.old_data?.word_or_question || '').toLowerCase();
+                    const qAns = (req.new_data?.answer || req.old_data?.answer || '').toLowerCase();
+                    const qReqBy = (req.requested_by_name || '').toLowerCase();
+                    const qCat = (req.new_data?.category || '').toLowerCase();
+                    return qWord.includes(kw) || qAns.includes(kw) || qReqBy.includes(kw) || qCat.includes(kw);
+                  }
+                  return true;
+                });
+
+                if (loadingPending) {
+                  return (
+                    <div className="py-8 flex flex-col items-center justify-center gap-1.5 text-muted-foreground text-xs">
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
+                      <span>กำลังโหลดรายการคำขอที่รอดำเนินการ...</span>
+                    </div>
+                  );
+                }
+
+                if (filteredPending.length === 0) {
+                  return (
+                    <div className="py-6 px-4 text-center rounded-xl border border-dashed border-[#EAD8C8] dark:border-[#2D2520] bg-[#FAF6F0]/30 dark:bg-[#25201C]/30 space-y-1">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <p className="text-xs font-semibold text-foreground">
+                        {pendingSearchQuery || pendingFilterGame !== 'all'
+                          ? 'ไม่พบคำขอที่ตรงกับเงื่อนไข'
+                          : 'ไม่มีคำขอรอดำเนินการในขณะนี้ 🎉'}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {user?.is_owner
+                          ? 'คำขอเพิ่มคำศัพท์ทั้งหมดได้รับการตรวจสอบเรียบร้อยแล้วค่ะ'
+                          : 'คำขอของคุณได้รับการอนุมัติทั้งหมดแล้ว หรือยังไม่มีคำขอใหม่'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="rounded-xl border border-[#EAD8C8] dark:border-[#2D2520] overflow-hidden bg-white dark:bg-[#1E1B18] max-h-[380px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-[#FAF6F0] dark:bg-[#25201C] sticky top-0 z-10 shadow-xs">
+                        <TableRow className="h-8">
+                          <TableHead className="w-24 text-[11px] font-bold">มินิเกม</TableHead>
+                          <TableHead className="w-20 text-[11px] font-bold">ประเภท</TableHead>
+                          <TableHead className="text-[11px] font-bold">โจทย์ / คำศัพท์</TableHead>
+                          <TableHead className="text-[11px] font-bold">คำตอบ / เฉลย</TableHead>
+                          <TableHead className="w-28 text-[11px] font-bold">หมวดหมู่</TableHead>
+                          <TableHead className="text-[11px] font-bold">รายละเอียด</TableHead>
+                          <TableHead className="w-24 text-[11px] font-bold">ผู้ส่งคำขอ</TableHead>
+                          <TableHead className="w-24 text-[11px] font-bold">วันที่ส่ง</TableHead>
+                          <TableHead className="text-right w-32 text-[11px] font-bold">การจัดการ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPending.map((req) => {
+                          const conf = MINIGAME_CONFIGS[req.game_id];
+                          const isProcessing = processingPendingId === req.id;
+                          const createdDate = new Date(req.created_at).toLocaleDateString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          });
+
+                          return (
+                            <TableRow key={req.id} className="h-9 text-xs hover:bg-[#FAF6F0]/40 dark:hover:bg-[#25201C]/40 transition-colors">
+                              <TableCell className="py-1.5">
+                                <Badge variant="outline" className="text-[10px] font-semibold flex items-center gap-1 w-fit bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                                  <span>{conf?.icon || '🎮'}</span>
+                                  <span>เกม {req.game_id}</span>
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <Badge
+                                  className={cn(
+                                    "text-[10px] font-bold",
+                                    req.action_type === 'create' && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                                    req.action_type === 'update' && "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                                    req.action_type === 'delete' && "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+                                  )}
+                                  variant="outline"
+                                >
+                                  {req.action_type === 'create' ? '➕ เพิ่ม' : req.action_type === 'update' ? '✏️ แก้' : '🗑️ ลบ'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-1.5 font-semibold text-xs max-w-[160px] truncate" title={req.new_data?.word_or_question || req.old_data?.word_or_question}>
+                                {req.new_data?.word_or_question || req.old_data?.word_or_question || '-'}
+                              </TableCell>
+                              <TableCell className="py-1.5 font-semibold text-xs text-emerald-600 dark:text-emerald-400 max-w-[160px] truncate" title={req.new_data?.answer || req.old_data?.answer}>
+                                {req.new_data?.answer || req.old_data?.answer || '-'}
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                {isCategoryGame(req.game_id) ? (
+                                  user?.is_owner ? (
+                                    <QuickCategoryEditor
+                                      currentCategory={req.new_data?.category || 'คำทั่วไป'}
+                                      categories={categoriesList}
+                                      categoryCounts={categoryCounts}
+                                      onSave={(newCat) => handleUpdatePendingCategory(req.id, newCat)}
+                                      disabled={isProcessing}
+                                    />
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 font-medium">
+                                      {req.new_data?.category || 'คำทั่วไป'}
+                                    </Badge>
+                                  )
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs text-muted-foreground max-w-[130px] truncate">
+                                {req.new_data?.hints?.length ? (
+                                  <span>💡 ใบ้ {req.new_data.hints.length} ข้อ</span>
+                                ) : req.new_data?.difficulty ? (
+                                  <span>{req.new_data.difficulty === 'easy' ? 'ง่าย' : req.new_data.difficulty === 'medium' ? 'ปานกลาง' : 'ยาก'}</span>
+                                ) : (
+                                  '-'
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-xs font-medium">
+                                <UserAvatarBadge
+                                  userId={req.requested_by}
+                                  fallbackName={req.requested_by_name}
+                                  userProfilesMap={userProfilesMap}
+                                />
+                              </TableCell>
+                              <TableCell className="py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
+                                {createdDate}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-right">
+                                {user?.is_owner ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="sm"
+                                      disabled={isProcessing}
+                                      onClick={() => handleApprovePendingRequest(req)}
+                                      className="h-6 px-2 text-[10px] font-bold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-2.5 h-2.5" />
+                                      อนุมัติ
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isProcessing}
+                                      onClick={() => setRejectDialogTarget(req)}
+                                      className="h-6 px-1.5 text-[10px] font-bold rounded-md border-rose-500/40 text-rose-600 hover:bg-rose-500/10 gap-0.5 cursor-pointer"
+                                    >
+                                      <XCircle className="w-2.5 h-2.5" />
+                                      ปฏิเสธ
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium gap-1">
+                                    <Clock className="w-2.5 h-2.5" /> รอ Owner
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 3: GAME SETTINGS & CHANNELS */}
         <TabsContent value="settings" className="space-y-6">
           <Card className="border-[#EAD8C8] bg-[#FDFBF7] dark:bg-[hsl(var(--card))] dark:border-[#2D2520] shadow-sm rounded-3xl">
             <CardHeader className="pb-3 border-b border-[#EAD8C8]/60 dark:border-[#2D2520]">
@@ -3012,7 +3979,7 @@ export function MinigamesManagement() {
                     Auto-synced
                   </Badge>
                 </div>
-              ) : (
+              ) : editingQuestion.game_id === 13 ? null : (
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[#6B5A4B] dark:text-[#EAD8C8] block">
                     {editingQuestion.game_id === 8 || editingQuestion.game_id === 9
@@ -3021,8 +3988,6 @@ export function MinigamesManagement() {
                       ? 'คำต่อท้าย (คำหลัง เช่น "แข็ง")'
                       : editingQuestion.game_id === 12
                       ? 'เฉลยที่ถูกต้อง (จริง หรือ เท็จ)'
-                      : editingQuestion.game_id === 13
-                      ? 'คำตอบภาษาอังกฤษเรียงตามลำดับ (คั่นด้วยจุลภาค เช่น where, will)'
                       : 'คำตอบที่ถูกต้อง (เฉลย)'}
                   </label>
                   {editingQuestion.game_id === 12 ? (
@@ -3092,17 +4057,16 @@ export function MinigamesManagement() {
                 </div>
               )}
 
-              {/* Sentence Template Input (for Game 13 in Edit Dialog) */}
+              {/* Dedicated Smart Sentence Builder for Game 13 in Edit Dialog */}
               {editingQuestion.game_id === 13 && (
-                <div className="p-3.5 rounded-2xl bg-[#FAF6F0]/80 dark:bg-[#25201C]/80 border border-[#EAD8C8] dark:border-[#2D2520] space-y-1.5">
-                  <label className="text-xs font-bold text-[#8C6239] dark:text-[#EAD8C8] block">
-                    แม่แบบประโยคพร้อมช่องว่าง &#123;1&#125;, &#123;2&#125;...
-                  </label>
-                  <Input
-                    className="h-9 text-xs rounded-xl bg-white dark:bg-[#1E1B18]"
-                    placeholder="เช่น Where there is a {1}, there is a {2}."
-                    value={editHint1}
-                    onChange={(e) => setEditHint1(e.target.value)}
+                <div className="space-y-2 pt-1">
+                  <Game13SentenceBuilder
+                    template={editHint1}
+                    answers={editAnswer}
+                    onChange={(newT, newAns) => {
+                      setEditHint1(newT);
+                      setEditAnswer(newAns);
+                    }}
                   />
                 </div>
               )}
@@ -3111,7 +4075,18 @@ export function MinigamesManagement() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" className="rounded-xl text-xs font-bold border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
-            <Button className="rounded-xl text-xs font-bold bg-[#8C6239] hover:bg-[#74502D] text-white cursor-pointer" onClick={handleUpdateQuestion}>บันทึกการแก้ไข</Button>
+            <Button
+              disabled={editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer)}
+              className={cn(
+                "rounded-xl text-xs font-bold text-white cursor-pointer",
+                editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer)
+                  ? "bg-muted-foreground/50 cursor-not-allowed opacity-60"
+                  : "bg-[#8C6239] hover:bg-[#74502D]"
+              )}
+              onClick={handleUpdateQuestion}
+            >
+              บันทึกการแก้ไข
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3223,6 +4198,80 @@ export function MinigamesManagement() {
                 <>
                   <RefreshCw className="w-4 h-4" /> เริ่มต้นซิงค์ทันที
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Request Confirmation Dialog */}
+      <Dialog open={!!rejectDialogTarget} onOpenChange={(open) => !open && setRejectDialogTarget(null)}>
+        <DialogContent className="max-w-md rounded-3xl border-[#EAD8C8] dark:border-[#2D2520] bg-[#FDFBF7] dark:bg-[hsl(var(--card))]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-rose-600 flex items-center gap-2">
+              <XCircle className="w-5 h-5" /> ยืนยันการปฏิเสธคำขอ
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              คำขอนี้จะถูกเปลี่ยนสถานะเป็น &ldquo;rejected&rdquo; และจะไม่ถูกนำเข้าสู่คลังคำศัพท์ของบอท
+            </DialogDescription>
+          </DialogHeader>
+
+          {rejectDialogTarget && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 rounded-2xl bg-muted/60 space-y-1">
+                <div className="font-semibold text-foreground">
+                  เกม {rejectDialogTarget.game_id} ({MINIGAME_CONFIGS[rejectDialogTarget.game_id]?.name || 'มินิเกม'})
+                </div>
+                <div className="text-muted-foreground truncate">
+                  โจทย์: &ldquo;{rejectDialogTarget.new_data?.word_or_question || rejectDialogTarget.old_data?.word_or_question}&rdquo;
+                </div>
+                {rejectDialogTarget.requested_by_name && (
+                  <div className="text-[11px] text-muted-foreground">
+                    ส่งโดย: {rejectDialogTarget.requested_by_name}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-xs text-[#8C6239] dark:text-[#EAD8C8]">
+                  เหตุผลในการปฏิเสธ (ระบุเพื่อให้ผู้ส่งทราบ):
+                </label>
+                <Input
+                  className="rounded-xl text-xs bg-white dark:bg-[#1E1B18] border-[#EAD8C8] dark:border-[#2D2520]"
+                  placeholder="เช่น คำตอบไม่ถูกต้อง, ซ้ำซ้อน, คำศัพท์ไม่เหมาะสม..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl text-xs font-bold border-[#EAD8C8] dark:border-[#2D2520]"
+              onClick={() => {
+                setRejectDialogTarget(null);
+                setRejectionReason('');
+              }}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
+              disabled={processingPendingId === rejectDialogTarget?.id}
+              onClick={() => {
+                if (rejectDialogTarget) {
+                  handleRejectPendingRequest(rejectDialogTarget.id, rejectionReason);
+                }
+              }}
+            >
+              {processingPendingId === rejectDialogTarget?.id ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" /> กำลังปฏิเสธ...
+                </>
+              ) : (
+                'ยืนยันปฏิเสธคำขอ'
               )}
             </Button>
           </DialogFooter>

@@ -155,6 +155,14 @@ export default function LandingPage() {
             <p className="text-xs sm:text-sm text-muted-foreground">
               สร้างขึ้นด้วยความรัก สำหรับคอมมูนิตี้ Discord ของเรา 🐻☕
             </p>
+            <div className="mt-2">
+              <button
+                onClick={() => navigate('/terms')}
+                className="text-xs text-honey hover:underline font-medium"
+              >
+                ข้อตกลงการใช้งานและนโยบายความเป็นส่วนตัว
+              </button>
+            </div>
           </div>
         </footer>
       </main>
