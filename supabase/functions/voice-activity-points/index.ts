@@ -8,7 +8,7 @@ const corsHeaders = {
 const CYCLE_SECONDS      = 600;
 const BASE_PER_CYCLE     = 8;
 const MAX_EARNED         = 150;
-const NOTIFY_CHANNEL_ID  = "1264915852214538280";
+const NOTIFY_CHANNEL_ID  = "1524123147987714158";
 const NOTIFY_COOLDOWN_MS = 15 * 60 * 1000;
 
 const MULTIPLIER_TABLE = [
@@ -170,22 +170,51 @@ async function handleNotification(
       if (profile?.avatar_url) avatarUrl = profile.avatar_url;
     } catch { /* silent */ }
 
-    const embedPayload = {
-      content: `<@${discordId}>`,
-      embeds: [{
-        description: `<:line:1144701793989840997>\n- <:bearcafe_star:1212856675053346897>︲__\` Activity Points \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ <:strawbear:1280194407014076447> **+${pending}** จากการลงห้อง **\`"${channelName}"\`** <:cuteplant:1152834055528783872>\n<:line:1144701793989840997>`,
-        color: 16768911,
-        thumbnail: { url: avatarUrl },
-      }],
-      components: [{
-        type: 1,
-        components: [{
-          type: 2, style: 5,
-          label: "︲เช็กแต้มของคุณ",
-          emoji: { id: "1212856675053346897", name: "bearcafe_star", animated: false },
-          url: "https://discord.com/channels/1144251788493602848/1145305334806741122",
-        }],
-      }],
+    const componentPayload = {
+      flags: 32768,
+      components: [
+        {
+          type: 17,
+          accent_color: null,
+          components: [
+            {
+              type: 9,
+              components: [
+                {
+                  type: 10,
+                  content: `## <:strawberryv2:1520439075100688614>︲__\` 𝖠𝖼𝗍𝗂𝗏𝗂𝗍𝗒 𝗉𝗈𝗂𝗇𝗍𝗌 ₊ แต้มลงห้อง 𓂃 \`__\n  - ยินดีด้วยนะคะ : <@${discordId}> *!*\n  - คุณได้รับ **+${pending}** จากการลงห้อง **\`"${channelName}"\`** <:cuteplant:1152834055528783872>`,
+                },
+              ],
+              accessory: {
+                type: 11,
+                media: {
+                  url: avatarUrl,
+                },
+              },
+            },
+            {
+              type: 14,
+              spacing: 2,
+            },
+            {
+              type: 1,
+              components: [
+                {
+                  type: 2,
+                  style: 5,
+                  label: "︲เช็กแต้มของคุณ",
+                  emoji: {
+                    id: "1212856675053346897",
+                    name: "bearcafe_star",
+                    animated: false,
+                  },
+                  url: "https://discord.com/channels/1144251788493602848/1524123727724417276",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const res = await fetch(
@@ -193,7 +222,7 @@ async function handleNotification(
       {
         method: "POST",
         headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify(embedPayload),
+        body: JSON.stringify(componentPayload),
       }
     );
 
