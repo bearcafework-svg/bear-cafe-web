@@ -214,18 +214,6 @@ export const DATA_TYPES: DataTypeItem[] = [
     evidence: 'src/pages/PointsPage.tsx, handlers/transfer.js',
   },
   {
-    id: 'act-2',
-    category: 'Community & Activity',
-    name: 'Daily Quests & Streaks',
-    system: 'ทั้งสองระบบ',
-    storage: 'Supabase (ตาราง user_daily_quests, user_quest_daily_summary)',
-    purpose: 'ติดตามภารกิจประจำวันและการเช็คชื่อต่อเนื่อง',
-    retention: 'มีระบบ Auto-delete ลบข้อมูลเควสต์เก่าที่เกิน 7 วัน และ summary เกิน 30 วัน',
-    deletable: 'ลบอัตโนมัติ',
-    status: 'Confirmed',
-    evidence: 'dailyQuestManager.js (Cron cleanup ทุก 24 ชั่วโมง)',
-  },
-  {
     id: 'act-3',
     category: 'Community & Activity',
     name: 'Minigame & Gacha Wins',
@@ -347,24 +335,6 @@ export const THIRD_PARTY_SERVICES: ThirdPartyServiceItem[] = [
 ];
 
 export const RETENTION_TABLE: RetentionItem[] = [
-  {
-    tableOrData: 'user_daily_quests',
-    system: 'bearcafe-bot',
-    retention: '7 วัน',
-    deleteMethod: 'ลบอัตโนมัติด้วย Cron Job ประจำวัน (dailyQuestManager.js)',
-    hasAutoDelete: true,
-    evidence: 'dailyQuestManager.js บรรทัดที่ 442-454',
-    status: 'Confirmed',
-  },
-  {
-    tableOrData: 'user_quest_daily_summary',
-    system: 'bearcafe-bot',
-    retention: '30 วัน',
-    deleteMethod: 'ลบอัตโนมัติด้วย Cron Job ประจำวัน',
-    hasAutoDelete: true,
-    evidence: 'dailyQuestManager.js บรรทัดที่ 456-467',
-    status: 'Confirmed',
-  },
   {
     tableOrData: 'flower_sessions',
     system: 'bearcafe-bot',
