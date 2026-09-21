@@ -27,6 +27,7 @@ import {
   Globe,
   Receipt,
   Gift,
+  Target,
 } from 'lucide-react';
 import { NavItem } from '@/components/ui/dropdown-navigation';
 
@@ -150,6 +151,12 @@ export function getAdminNavTree(
               label: 'จัดการยศกลุ่ม',
               description: 'เพิ่มหรือถอนยศให้สมาชิกพร้อมกัน',
               icon: UserCheck,
+            },
+            {
+              id: 'daily-quests',
+              label: 'เควสประจำวัน',
+              description: 'จัดการเควสและดูสถิติภารกิจประจำวัน',
+              icon: Target,
             },
           ],
         },

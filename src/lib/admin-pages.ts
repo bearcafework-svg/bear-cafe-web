@@ -35,6 +35,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'healing-messages', label: 'กระดานฮีลใจ', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'role-transfer', label: 'ย้ายบทบาท', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'bulk-role-manage', label: 'จัดการยศกลุ่ม', group: 'community', groupLabel: 'ดูแลชุมชน' },
+  { id: 'daily-quests', label: 'เควสประจำวัน', group: 'community', groupLabel: 'ดูแลชุมชน', ownerOnly: true },
 
   // ─── สื่อและคอนเทนต์ ───
   { id: 'discord-servers', label: 'จัดการเซิร์ฟเวอร์', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },

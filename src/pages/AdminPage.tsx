@@ -33,7 +33,7 @@ import {
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
-  Copy,
+  Copy, Target,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -74,6 +74,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
 import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
+import { DailyQuestsManagement } from '@/components/admin/DailyQuestsManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -131,6 +132,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'manage-staff': Users,
   'sticky-messages': Pin,
   'minigames': Gamepad2,
+  'daily-quests': Target,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -295,6 +297,7 @@ function AdminPageContent() {
         case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
         case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;
+        case 'daily-quests': return canAccessPage('daily-quests') ? <DailyQuestsManagement /> : null;
 
         default: return null;
       }
