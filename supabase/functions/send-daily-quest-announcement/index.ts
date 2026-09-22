@@ -11,12 +11,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_CHANNEL_ID = "1544088196332134491";
+const DEFAULT_CHANNEL_ID = "1529885509260673034";
 const BANNER_IMAGE_URL =
-  "https://cdn.discordapp.com/attachments/1524704267015819274/1550771948592701500/ChatGPT_Image_19_.._2569_13_54_04.png?ex=6ab22f6c&is=6ab0ddec&hm=96c8ddf6e00c32e67ad20ae92c200c38dc3409e90d763061a102fe442458d17f&";
+  "https://cdn.discordapp.com/attachments/1524704267015819274/1550771948592701500/ChatGPT_Image_19_.._2569_13_54_04.png?ex=6ab380ec&is=6ab22f6c&hm=aa882b8c0feaf2104b4d078998ab385af499e9a24803e3a0d7b70f4541c55f1a&";
+const SPECIAL_REWARD_ICON_URL =
+  "https://cdn.discordapp.com/attachments/1524704267015819274/1551949346981806090/06b20e483bfac611d837c1db30d5fbad.png?ex=6ab3d4f6&is=6ab28376&hm=c9873c872cb823c9a7c41ff041eb4ff0ba44b8287f3a588acbeecda8c973551b&";
 const POINT_ICON_STR = "<:strawberryv2:1520439075100688614>";
 const FULL_COMPLETION_BONUS_POINTS = 50;
 const CUSTOM_ID_PROGRESS = "daily_quest_progress";
+const ANNOUNCE_PING_ROLE_ID = "1144700895020462200";
 
 function getBangkokTodayDate(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
@@ -46,10 +49,17 @@ function formatThaiDate(dateStr: string): string {
 export function buildAnnouncementPayload(questDate: string, quests: any[], nextResetTs: number) {
   const thaiDate = formatThaiDate(questDate);
 
-  const questComponents = quests.map((q) => ({
-    type: 10,
-    content: `### ${q.title} (${POINT_ICON_STR} +${q.reward_points})\n> ${q.description}`,
-  }));
+  const questComponents: any[] = [];
+  for (const q of quests) {
+    questComponents.push({
+      type: 10,
+      content: `## ${q.title}\n- __\`วิธีทำเควส\`__ : ${q.description}\n- __\`รางวัล\`__ : ${POINT_ICON_STR} **+${q.reward_points}**`,
+    });
+    questComponents.push({
+      type: 14,
+      spacing: 2,
+    });
+  }
 
   return {
     flags: 32768, // Component V2
@@ -68,48 +78,45 @@ export function buildAnnouncementPayload(questDate: string, quests: any[], nextR
             ],
           },
           {
+            type: 9,
+            components: [
+              {
+                type: 10,
+                content:
+                  `## <:bee20000:1256669436350562355>︲__\` เควสประจำวันที่ ${thaiDate} 𓂃 \`__\n` +
+                  `> (<a:7596clock:1160230591892029510>)⠀รีเซ็ตเควสในอีก: <t:${nextResetTs}:R>`,
+              },
+            ],
+            accessory: {
+              style: 3,
+              type: 2,
+              flow: {
+                actions: [],
+              },
+              custom_id: CUSTOM_ID_PROGRESS,
+              label: "ดูความคืบหน้าเควส",
+            },
+          },
+          {
             type: 14,
-            divider: true,
             spacing: 1,
-          },
-          {
-            type: 10,
-            content:
-              `## <a:60400daisy:1429009311178297388>︲__\` เควสประจำวันที่ ${thaiDate} 𓂃 \`__\n` +
-              `> (<a:3602exclamationmarkbubble:1372837492205555812>)⠀วันนี้มีเควสทั้งหมด **${quests.length} เควส** ยังไงก็สู้ ๆ นะคะ *!*\n` +
-              `> (<a:7596clock:1160230591892029510>)⠀รีเซ็ตเควสในอีก: <t:${nextResetTs}:R>`,
-          },
-          {
-            type: 14,
             divider: false,
-            spacing: 1,
           },
           ...questComponents,
           {
-            type: 14,
-            divider: false,
-          },
-          {
-            type: 10,
-            content: `## <:68492gift:1276130500410605609>︲รับโบนัสเมื่อทำเควสครบ / ${POINT_ICON_STR} +${FULL_COMPLETION_BONUS_POINTS}`,
-          },
-          {
-            type: 14,
-            spacing: 2,
-          },
-          {
-            type: 1,
+            type: 9,
             components: [
               {
-                style: 1,
-                type: 2,
-                label: "︲ดูความคืบหน้า",
-                emoji: {
-                  name: "🗒️",
-                },
-                custom_id: CUSTOM_ID_PROGRESS,
+                type: 10,
+                content: `# > รับข้อความพิเศษเมื่อทำเควสครบทั้งหมด ${POINT_ICON_STR} +${FULL_COMPLETION_BONUS_POINTS}`,
               },
             ],
+            accessory: {
+              type: 11,
+              media: {
+                url: SPECIAL_REWARD_ICON_URL,
+              },
+            },
           },
         ],
       },
@@ -210,7 +217,11 @@ Deno.serve(async (req): Promise<Response> => {
     const nextResetTs = getNextMidnightTimestamp();
     const payload = buildAnnouncementPayload(questDate, orderedQuests, nextResetTs);
 
-    // 5. ส่งผ่าน Discord Bot Message Utility
+    // 5. ส่งข้อความแจ้งเตือนและแท็กบทบาทก่อน
+    const pingContent = `<a:3602exclamationmarkbubble:1372837492205555812> เควสประจำวัน ${formatThaiDate(questDate)} มาแล้ว! <@&${ANNOUNCE_PING_ROLE_ID}>`;
+    await sendDiscordBotMessage(channelId, { content: pingContent });
+
+    // 6. ส่งผ่าน Discord Bot Message Utility
     const result = await sendDiscordBotMessage(channelId, payload, {
       dedupKey: `daily-quest-announcement:${questDate}:${Date.now()}`,
     });

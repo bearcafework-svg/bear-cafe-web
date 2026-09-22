@@ -132,8 +132,8 @@ const TRIGGER_TYPES = [
 
 const KNOWN_CHANNELS: Record<string, string> = {
   '1524124012492619847': 'สุ่มคำถาม',
-  '1544088196332134491': 'ภารกิจประจำวัน',
-  '1551533172682919997': 'แจ้งเตือนเควส',
+  '1529885509260673034': 'ภารกิจประจำวัน',
+  '1524123147987714158': 'แจ้งเตือนเควส',
 };
 
 function renderDescriptionWithMentions(text: string) {
@@ -605,12 +605,20 @@ export function DailyQuestsManagement() {
     const year = parseInt(d.toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric' }), 10) + 543;
     const thaiDate = `${day} ${thaiMonths[monthIdx]} ${year}`;
 
-    const questComponents = currentSetTemplates.map((q) => ({
-      type: 10,
-      content: `### ${q.title} (<:strawberryv2:1520439075100688614> +${q.reward_points})\n> ${q.description}`,
-    }));
+    const questComponents: any[] = [];
+    currentSetTemplates.forEach((q) => {
+      questComponents.push({
+        type: 10,
+        content: `## ${q.title}\n- __\`วิธีทำเควส\`__ : ${q.description}\n- __\`รางวัล\`__ : <:strawberryv2:1520439075100688614> **+${q.reward_points}**`,
+      });
+      questComponents.push({
+        type: 14,
+        spacing: 2,
+      });
+    });
 
     return {
+      content: `<a:3602exclamationmarkbubble:1372837492205555812> เควสประจำวัน ${thaiDate} มาแล้ว! <@&1144700895020462200>`,
       flags: 32768,
       components: [
         {
@@ -621,35 +629,43 @@ export function DailyQuestsManagement() {
               items: [
                 {
                   media: {
-                    url: 'https://cdn.discordapp.com/attachments/1524704267015819274/1550771948592701500/ChatGPT_Image_19_.._2569_13_54_04.png?ex=6ab22f6c&is=6ab0ddec&hm=96c8ddf6e00c32e67ad20ae92c200c38dc3409e90d763061a102fe442458d17f&',
+                    url: 'https://cdn.discordapp.com/attachments/1524704267015819274/1550771948592701500/ChatGPT_Image_19_.._2569_13_54_04.png?ex=6ab380ec&is=6ab22f6c&hm=aa882b8c0feaf2104b4d078998ab385af499e9a24803e3a0d7b70f4541c55f1a&',
                   },
                 },
               ],
             },
-            { type: 14, divider: true, spacing: 1 },
             {
-              type: 10,
-              content: `## <a:60400daisy:1429009311178297388>︲__\` เควสประจำวันที่ ${thaiDate} 𓂃 \`__\n> (<a:3602exclamationmarkbubble:1372837492205555812>)⠀วันนี้มีเควสทั้งหมด **${currentSetTemplates.length} เควส** ยังไงก็สู้ ๆ นะคะ *!*\n> (<a:7596clock:1160230591892029510>)⠀รีเซ็ตเควสในอีก: <t:NEXT_MIDNIGHT:R>`,
-            },
-            { type: 14, divider: false, spacing: 1 },
-            ...questComponents,
-            { type: 14, divider: false },
-            {
-              type: 10,
-              content: `## <:68492gift:1276130500410605609>︲รับโบนัสเมื่อทำเควสครบ / <:strawberryv2:1520439075100688614> +50`,
-            },
-            { type: 14, spacing: 2 },
-            {
-              type: 1,
+              type: 9,
               components: [
                 {
-                  style: 1,
-                  type: 2,
-                  label: '︲ดูความคืบหน้า',
-                  emoji: { name: '🗒️' },
-                  custom_id: 'daily_quest_progress',
+                  type: 10,
+                  content: `## <:bee20000:1256669436350562355>︲__\` เควสประจำวันที่ ${thaiDate} 𓂃 \`__\n> (<a:7596clock:1160230591892029510>)⠀รีเซ็ตเควสในอีก: <t:NEXT_MIDNIGHT:R>`,
                 },
               ],
+              accessory: {
+                style: 3,
+                type: 2,
+                flow: { actions: [] },
+                custom_id: 'daily_quest_progress',
+                label: 'ดูความคืบหน้าเควส',
+              },
+            },
+            { type: 14, spacing: 1, divider: false },
+            ...questComponents,
+            {
+              type: 9,
+              components: [
+                {
+                  type: 10,
+                  content: '# > รับข้อความพิเศษเมื่อทำเควสครบทั้งหมด <:strawberryv2:1520439075100688614> +50',
+                },
+              ],
+              accessory: {
+                type: 11,
+                media: {
+                  url: 'https://cdn.discordapp.com/attachments/1524704267015819274/1551949346981806090/06b20e483bfac611d837c1db30d5fbad.png?ex=6ab3d4f6&is=6ab28376&hm=c9873c872cb823c9a7c41ff041eb4ff0ba44b8287f3a588acbeecda8c973551b&',
+                },
+              },
             },
           ],
         },
@@ -678,8 +694,8 @@ export function DailyQuestsManagement() {
       if (!data?.success) throw new Error(data?.error || 'ส่งการ์ดเควสไม่สำเร็จ');
 
       toast({
-        title: 'ส่งประกาศเควสลง Discord สำเร็จ! 🎉',
-        description: `ส่ง Component ไปยังห้อง 1544088196332134491 เรียบร้อยแล้ว (Message ID: ${data.messageId})`,
+        title: 'ส่งประกาศเข้า Discord สำเร็จ!',
+        description: `ส่ง Component ไปยังห้อง ${data.channelId || '1529885509260673034'} เรียบร้อยแล้ว (Message ID: ${data.messageId})`,
       });
 
       setSendDialogOpen(false);
@@ -1014,7 +1030,7 @@ export function DailyQuestsManagement() {
                       </Button>
                     )}
                   </div>
-                  <p className="text-sm font-medium font-mono">1544088196332134491</p>
+                  <p className="text-sm font-medium font-mono">1529885509260673034</p>
                   <p className="text-xs text-muted-foreground">
                     {currentSet?.announcement_message_id ? (
                       <span className="text-emerald-500 font-medium">✓ บอทประกาศแล้ว (Msg: {currentSet.announcement_message_id.slice(-6)})</span>
@@ -1465,7 +1481,7 @@ export function DailyQuestsManagement() {
                   <MessageSquare className="w-4 h-4" /> ห้องเป้าหมาย
                 </span>
                 <Badge variant="outline" className="font-mono text-xs">
-                  ID: 1544088196332134491
+                  ID: 1529885509260673034
                 </Badge>
               </div>
               <p className="text-sm font-semibold text-foreground">
