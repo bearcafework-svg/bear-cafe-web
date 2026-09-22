@@ -268,7 +268,7 @@ export function DailyQuestsManagement() {
       const { count: checksCount } = await supabase
         .from('daily_quest_analytics' as any)
         .select('*', { count: 'exact', head: true })
-        .eq('event_type', 'progress_check');
+        .in('event_type', ['click_progress', 'progress_check']);
 
       const { count: completionsCount } = await supabase
         .from('daily_quest_progress' as any)
@@ -758,12 +758,12 @@ export function DailyQuestsManagement() {
         </div>
       </div>
 
-      {/* Beta Whitelist Alert Callout */}
-      <div className="flex items-center justify-between p-3.5 bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/20 rounded-xl text-xs text-blue-800 dark:text-blue-300">
+      {/* Production Public Mode Alert Callout */}
+      <div className="flex items-center justify-between p-3.5 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-xs text-emerald-800 dark:text-emerald-300">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+          <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
           <span>
-            <strong>โหมด Beta Whitelist:</strong> ปัจจุบันระบบบอทคำนวณแต้มและตรวจจับความคืบหน้าสำหรับ Discord ID: <code className="bg-blue-500/10 px-1.5 py-0.5 rounded font-mono">944920660759707658</code> เพื่อทดสอบความเสถียรก่อนเปิดให้สมาชิกทั้งหมด
+            <strong>โหมด Public:</strong> ปัจจุบันระบบบอทเปิดให้สมาชิกทุกคนในเซิร์ฟเวอร์สามารถทำภารกิจและสะสมแต้มได้แบบเรียลไทม์แล้วค่ะ 🐻✨
           </span>
         </div>
       </div>
