@@ -38,6 +38,8 @@ import {
   GAME_13_PRESETS,
   validateGame13Sentence,
 } from './minigames/Game13SentenceBuilder';
+import { Game1LivePreview } from './minigames/Game1LivePreview';
+import { validateAndEvaluateGame1Word } from '@/lib/minigames/game1Masking';
 
 export interface MinigameConfig {
   id: number;
@@ -61,8 +63,8 @@ export const MINIGAME_CONFIGS: Record<number, MinigameConfig> = {
     icon: '🇹🇭',
     tag: 'คำศัพท์ไทย',
     categoryGroup: 'vocab_typing',
-    desc: 'เติมพยัญชนะ/สระในช่องว่าง (แชร์คลังคำศัพท์ไทยกับเกม 6)',
-    discordNote: 'บอทจะสุ่มซ่อน 2-3 ตัวอักษร เช่น กรอก "สวัสดี" บอทจะแสดง "ส _ _ ส ดี"',
+    desc: 'เติมคำ/ส่วนของคำในช่องว่าง พร้อมระบบเลือกตำแหน่ง Mask คุณภาพสูงอัตโนมัติ (Best Candidate Selection)',
+    discordNote: 'บอทจะเลือกซ่อนส่วนของคำที่ดีที่สุด เช่น กรอก "ความรัก" บอทจะแสดง "_ รัก" (LOW Ambiguity)',
   },
   2: {
     id: 2,
@@ -1510,6 +1512,18 @@ export function MinigamesManagement() {
       return;
     }
 
+    if (gId === 1) {
+      const vResult = validateAndEvaluateGame1Word(finalQuestion);
+      if (!vResult.isValid) {
+        toast({
+          title: 'คำศัพท์ไม่ผ่านเกณฑ์ Game 1 ⚠️',
+          description: vResult.reason || 'คำนี้ไม่สามารถสร้างโจทย์เติมคำที่มีคุณภาพและปลอดภัยได้',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     const isDiffGame = (gId === 4);
     const finalDiff = isDiffGame ? formDifficulty : null;
 
@@ -1643,6 +1657,18 @@ export function MinigamesManagement() {
     if (!finalQuestion || !finalAnswer) {
       toast({ title: 'กรุณากรอกข้อมูลโจทย์และเฉลย', variant: 'destructive' });
       return;
+    }
+
+    if (gId === 1) {
+      const vResult = validateAndEvaluateGame1Word(finalQuestion);
+      if (!vResult.isValid) {
+        toast({
+          title: 'คำศัพท์ไม่ผ่านเกณฑ์ Game 1 ⚠️',
+          description: vResult.reason || 'คำนี้ไม่สามารถสร้างโจทย์เติมคำที่มีคุณภาพและปลอดภัยได้',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     let hintsArray: string[] = [];
@@ -2489,6 +2515,9 @@ export function MinigamesManagement() {
                                     required
                                   />
                                   {selectedGId === 1 && (
+                                    <Game1LivePreview word={formQuestion} />
+                                  )}
+                                  {selectedGId === 1 && (
                                     <span className="text-[11px] text-muted-foreground block">
                                       💡 บอทจะนำคำนี้ไปใช้ทั้งในเกม 1 (สุ่มซ่อนขีดเส้นใต้) และเกม 6 (ประโยคพิมพ์เร็ว)
                                     </span>
@@ -2676,11 +2705,12 @@ export function MinigamesManagement() {
                             !!duplicateMatch ||
                             !!pendingDuplicateMatch ||
                             checkingDuplicate ||
+                            (selectedGId === 1 && !validateAndEvaluateGame1Word(formQuestion).isValid) ||
                             (selectedGId === 13 && !!validateGame13Sentence(formHint1, formAnswer))
                           }
                           className={cn(
                             "w-full rounded-2xl h-11 gap-2 text-white font-bold text-sm shadow-xs cursor-pointer mt-2 transition-all",
-                            duplicateMatch || pendingDuplicateMatch || (selectedGId === 13 && !!validateGame13Sentence(formHint1, formAnswer))
+                            duplicateMatch || pendingDuplicateMatch || (selectedGId === 1 && !validateAndEvaluateGame1Word(formQuestion).isValid) || (selectedGId === 13 && !!validateGame13Sentence(formHint1, formAnswer))
                               ? "bg-muted-foreground/50 cursor-not-allowed opacity-60"
                               : "bg-[#8C6239] hover:bg-[#74502D]"
                           )}
@@ -3969,6 +3999,9 @@ export function MinigamesManagement() {
                   value={editQuestion}
                   onChange={(e) => setEditQuestion(e.target.value)}
                 />
+                {editingQuestion.game_id === 1 && (
+                  <Game1LivePreview word={editQuestion} />
+                )}
               </div>
 
               {/* Answer Input or True/False Selector */}
@@ -4076,10 +4109,14 @@ export function MinigamesManagement() {
           <DialogFooter className="gap-2">
             <Button variant="outline" className="rounded-xl text-xs font-bold border-[#EAD8C8] dark:border-[#2D2520]" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
             <Button
-              disabled={editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer)}
+              disabled={
+                (editingQuestion?.game_id === 1 && !validateAndEvaluateGame1Word(editQuestion).isValid) ||
+                (editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer))
+              }
               className={cn(
                 "rounded-xl text-xs font-bold text-white cursor-pointer",
-                editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer)
+                (editingQuestion?.game_id === 1 && !validateAndEvaluateGame1Word(editQuestion).isValid) ||
+                (editingQuestion?.game_id === 13 && !!validateGame13Sentence(editHint1, editAnswer))
                   ? "bg-muted-foreground/50 cursor-not-allowed opacity-60"
                   : "bg-[#8C6239] hover:bg-[#74502D]"
               )}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Settings, RotateCcw, ChevronLeft } from 'lucide-react';
-import { CozySidebar, COZY_SIDEBAR_WIDTH } from '@/components/bear-cafe/CozySidebar';
+import { Settings, RotateCcw, ChevronLeft } from 'lucide-react';
+import { CozyAppShell } from '@/components/bear-cafe/CozyAppShell';
 import { CozyRightPanel } from '@/components/bear-cafe/CozyRightPanel';
 import { Footer } from '@/components/bear-cafe/Footer';
 
@@ -67,7 +67,6 @@ function playWin(ctx: AudioContext, isSSR: boolean) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function SpinPrizePage() {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
   const [prizes, setPrizes] = useState<Prize[]>(DEFAULT_PRIZES);
@@ -150,35 +149,10 @@ export default function SpinPrizePage() {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-[hsl(var(--background))] overflow-hidden">
-
-      {/* ── Mobile sidebar toggle (left) ── */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-[hsl(var(--card))] shadow-md border border-[hsl(var(--latte)/0.5)] flex items-center justify-center"
-        aria-label="เปิดเมนู"
-      >
-        {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-      </button>
-
-      {/* ── Desktop left sidebar ── */}
-      <div className="hidden lg:block shrink-0">
-        <CozySidebar />
-      </div>
-
-      {/* ── Mobile left sidebar overlay ── */}
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 h-full max-w-[85vw]" style={{ width: COZY_SIDEBAR_WIDTH }}>
-            <CozySidebar />
-          </div>
-        </div>
-      )}
-
+    <CozyAppShell contentClassName="flex flex-row overflow-hidden relative">
       {/* ── Center content ── */}
-      <main className="flex-1 min-w-0 overflow-y-auto h-[100dvh]">
-        <div className="relative max-w-2xl mx-auto px-5 pt-16 lg:pt-8 pb-12 space-y-6">
+      <main className="flex-1 min-w-0 overflow-y-auto min-h-screen">
+        <div className="relative max-w-2xl mx-auto px-5 pt-8 pb-12 space-y-6">
 
           {/* Page heading */}
           <motion.div
@@ -468,6 +442,6 @@ export default function SpinPrizePage() {
           100% { transform: translate(1px,-2px) rotate(-1deg); }
         }
       `}</style>
-    </div>
+    </CozyAppShell>
   );
 }

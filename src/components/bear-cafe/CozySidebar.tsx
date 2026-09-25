@@ -202,8 +202,6 @@ export function CozySidebar() {
 
   const serviceItems: NavItemConfig[] = [
     { label: 'หน้าหลัก', href: '/', matchPath: '/', icon: <CaffeLatteIcon size={20} /> },
-    { label: 'กาชา', href: '/gacha', matchPath: '/gacha', icon: <CardColorIcon size={20} /> },
-    { label: 'กรอกโค้ด', href: authHref('/points'), matchPath: '/points', requireAuth: true, icon: <HoneyDipperColorIcon size={20} /> },
   ];
 
   const usageItems: NavItemConfig[] = [

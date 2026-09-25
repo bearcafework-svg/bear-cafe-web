@@ -174,3 +174,54 @@ export function FullCheckInCalendarSkeleton(): JSX.Element {
     </div>
   );
 }
+
+export function DiscordServersSkeleton(): JSX.Element {
+  return (
+    <div role="status" aria-busy="true" aria-label="กำลังโหลดเซิร์ฟเวอร์ดิสคอร์ด" className="w-full flex-1">
+      <span className="sr-only">กำลังโหลดเซิร์ฟเวอร์ดิสคอร์ด</span>
+      <div className="container max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-10 flex-1 space-y-8">
+        {/* Hero Skeleton */}
+        <div className="text-center space-y-3 flex flex-col items-center">
+          <SkeletonBlock className="h-12 w-28 rounded-2xl" />
+          <SkeletonBlock className="h-10 w-72 rounded-full" />
+          <SkeletonBlock className="h-5 w-96 max-w-full rounded-full" />
+          <SkeletonBlock className="h-11 w-44 rounded-full mt-2" />
+        </div>
+
+        {/* Spotlight Skeleton */}
+        <div className="w-full h-44 sm:h-56 rounded-3xl bg-muted/40 animate-pulse" />
+
+        {/* Filter bar Skeleton */}
+        <div className="space-y-3">
+          <SkeletonBlock className="h-10 w-full rounded-2xl" />
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonBlock key={i} className="h-8 w-24 shrink-0 rounded-full" />
+            ))}
+          </div>
+        </div>
+
+        {/* Cards Grid Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-56 rounded-3xl bg-muted/30 border border-border/40 p-4 space-y-3 animate-pulse">
+              <div className="flex items-center gap-3">
+                <SkeletonBlock className="w-12 h-12 rounded-2xl" />
+                <div className="space-y-1.5 flex-1">
+                  <SkeletonBlock className="h-4 w-3/4 rounded-full" />
+                  <SkeletonBlock className="h-3 w-1/2 rounded-full" />
+                </div>
+              </div>
+              <SkeletonBlock className="h-14 w-full rounded-xl" />
+              <div className="flex justify-between pt-2">
+                <SkeletonBlock className="h-8 w-20 rounded-full" />
+                <SkeletonBlock className="h-8 w-24 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+

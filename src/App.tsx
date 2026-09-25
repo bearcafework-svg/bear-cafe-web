@@ -8,7 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { LoadingPage } from "@/components/bear-cafe/LoadingBear";
 import { CozyAppShell } from "@/components/bear-cafe/CozyAppShell";
 import { HomePageSkeleton } from "@/components/bear-cafe/HomePageSkeleton";
-import { GachaPageSkeleton, PointsPageSkeleton, FullCheckInCalendarSkeleton } from "@/components/bear-cafe/PageSkeletons";
+import { GachaPageSkeleton, PointsPageSkeleton, FullCheckInCalendarSkeleton, DiscordServersSkeleton } from "@/components/bear-cafe/PageSkeletons";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
@@ -64,7 +64,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // section is skeletonized — the real CozySidebar renders next to it via
 // CozyAppShell. Every other pathname keeps the generic LoadingPage.
 const GATE_CONTENT_SKELETONS: Record<string, () => JSX.Element> = {
-  '/': HomePageSkeleton,
+  '/': DiscordServersSkeleton,
   '/gacha': GachaPageSkeleton,
   '/points': PointsPageSkeleton,
   '/full-checkin-calendar': FullCheckInCalendarSkeleton,
@@ -148,15 +148,15 @@ export function AppRoutes() {
       <Route path="/banned-role" element={<RoleBannedPage />} />
 
       <Route element={<CozyGateLayout />}>
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={<DiscordServersPage />} />
         <Route path="/gacha" element={<GachaPage />} />
         <Route path="/full-checkin-calendar" element={<FullCheckInCalendar />} />
       </Route>
       <Route path="/points" element={<PointsGateRoute />} />
 
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-      <Route path="/discord-servers" element={<DiscordServersPage />} />
-      <Route path="/discord-server" element={<Navigate to="/discord-servers" replace />} />
+      <Route path="/discord-servers" element={<Navigate to="/" replace />} />
+      <Route path="/discord-server" element={<Navigate to="/" replace />} />
       <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/leaderboard" element={<LeaderboardPage />} />
