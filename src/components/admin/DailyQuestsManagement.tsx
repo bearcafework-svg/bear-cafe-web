@@ -49,6 +49,9 @@ import {
   Copy,
   Code,
   Check,
+  Terminal,
+  Hash,
+  Music,
 } from 'lucide-react';
 
 export interface QuestTemplate {
@@ -134,7 +137,18 @@ const KNOWN_CHANNELS: Record<string, string> = {
   '1524124012492619847': 'สุ่มคำถาม',
   '1529885509260673034': 'ภารกิจประจำวัน',
   '1524123147987714158': 'แจ้งเตือนเควส',
+  '1524123296466079884': 'แชร์เพลง',
+  '1524122867178930237': 'ห้องต้อนรับ',
+  '1524124172580814979': 'ส่งรูปถ่าย-irl',
 };
+
+const COMMON_SLASH_COMMANDS = [
+  { name: 'สุ่มคำถาม', desc: '💭 สุ่มการ์ดคำถามเพื่อกระชับความสัมพันธ์' },
+  { name: 'มอบดอกไม้', desc: '🌸 มอบดอกไม้ให้เพื่อนในเซิร์ฟเวอร์' },
+  { name: 'แต้มของฉัน', desc: '🪙 ตรวจสอบกระเป๋าแต้มและสิทธิพิเศษ' },
+  { name: 'ประวัติลงห้อง', desc: '🎧 ตรวจประวัติการเข้าใช้งานห้องเสียง' },
+  { name: 'gacha-bee', desc: '🐝 เปิดตู้สุ่มกาชาแต่งตัวผึ้งอ้วน' },
+];
 
 function renderDescriptionWithMentions(text: string) {
   if (!text) return null;
@@ -208,6 +222,14 @@ export function DailyQuestsManagement() {
   const [formTargetCount, setFormTargetCount] = useState(5);
   const [formRewardPoints, setFormRewardPoints] = useState(5);
   const [formActive, setFormActive] = useState(true);
+
+  // Dynamic Trigger Config State
+  const [cfgCommand, setCfgCommand] = useState('สุ่มคำถาม');
+  const [cfgMediaType, setCfgMediaType] = useState<'music_link' | 'sticker_or_gif'>('music_link');
+  const [cfgKeywords, setCfgKeywords] = useState('');
+  const [cfgMinMembers, setCfgMinMembers] = useState(1);
+  const [cfgChannelId, setCfgChannelId] = useState('');
+  const [cfgMessageUrl, setCfgMessageUrl] = useState('');
 
   // Delete Dialog State
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -366,6 +388,12 @@ export function DailyQuestsManagement() {
     setFormTargetCount(5);
     setFormRewardPoints(5);
     setFormActive(true);
+    setCfgCommand('สุ่มคำถาม');
+    setCfgMediaType('music_link');
+    setCfgKeywords('morning, gm, มอนิ่ง, อรุณสวัสดิ์');
+    setCfgMinMembers(1);
+    setCfgChannelId('');
+    setCfgMessageUrl('');
     setDialogOpen(true);
   };
 
@@ -380,6 +408,14 @@ export function DailyQuestsManagement() {
     setFormTargetCount(t.target_count);
     setFormRewardPoints(t.reward_points);
     setFormActive(t.active);
+
+    const cfg = t.trigger_config || {};
+    setCfgCommand(cfg.command || 'สุ่มคำถาม');
+    setCfgMediaType(cfg.media_type || 'music_link');
+    setCfgKeywords(Array.isArray(cfg.keywords) ? cfg.keywords.join(', ') : (cfg.keywords || ''));
+    setCfgMinMembers(Number(cfg.min_members) || 1);
+    setCfgChannelId(cfg.channel_id || '');
+    setCfgMessageUrl(cfg.message_url || '');
     setDialogOpen(true);
   };
 
@@ -396,6 +432,32 @@ export function DailyQuestsManagement() {
 
     try {
       setActionLoading(true);
+
+      const triggerConfig: Record<string, any> = {};
+
+      if (formTriggerType === 'command_usage') {
+        if (cfgCommand.trim()) triggerConfig.command = cfgCommand.trim();
+      } else if (formTriggerType === 'chat_media') {
+        triggerConfig.media_type = cfgMediaType;
+      } else if (formTriggerType === 'keyword') {
+        const kw = cfgKeywords
+          .split(/[,，\n]/)
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean);
+        triggerConfig.keywords = kw;
+      } else if (formTriggerType === 'voice_duration') {
+        if (Number(cfgMinMembers) > 1) {
+          triggerConfig.min_members = Number(cfgMinMembers);
+        }
+        triggerConfig.minutes = Number(formTargetCount) || 15;
+      } else if (formTriggerType === 'reaction_add') {
+        if (cfgMessageUrl.trim()) triggerConfig.message_url = cfgMessageUrl.trim();
+      }
+
+      if (cfgChannelId.trim()) {
+        triggerConfig.channel_id = cfgChannelId.trim();
+      }
+
       const payload = {
         code: formCode.trim(),
         category: formCategory,
@@ -404,6 +466,7 @@ export function DailyQuestsManagement() {
         trigger_type: formTriggerType,
         target_count: Number(formTargetCount) || 1,
         reward_points: Number(formRewardPoints) || 5,
+        trigger_config: triggerConfig,
         active: formActive,
         updated_at: new Date().toISOString(),
       };
@@ -895,6 +958,22 @@ export function DailyQuestsManagement() {
                               <Badge variant="secondary" className="text-[11px] font-mono font-normal">
                                 {t.trigger_type}
                               </Badge>
+                              {t.trigger_config?.command && (
+                                <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5 font-medium">
+                                  /{t.trigger_config.command}
+                                </div>
+                              )}
+                              {t.trigger_config?.media_type && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  {t.trigger_config.media_type === 'music_link' ? '🎵 ลิงก์เพลง' : '😂 สติกเกอร์/GIF'}
+                                </div>
+                              )}
+                              {t.trigger_config?.channel_id && (
+                                <div className="text-[10px] text-sky-600 dark:text-sky-400 font-medium flex items-center gap-0.5 mt-0.5">
+                                  <Hash className="w-2.5 h-2.5" />
+                                  {KNOWN_CHANNELS[t.trigger_config.channel_id] || t.trigger_config.channel_id.slice(-6)}
+                                </div>
+                              )}
                             </TableCell>
 
                             <TableCell className="text-center">
@@ -1296,7 +1375,7 @@ export function DailyQuestsManagement() {
           CREATE / EDIT TEMPLATE DIALOG
       ───────────────────────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="w-5 h-5 text-amber-500" />
@@ -1309,51 +1388,53 @@ export function DailyQuestsManagement() {
 
           <div className="space-y-4 py-2">
             {/* Category Select */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">หมวดหมู่เควส</label>
-              <Select
-                value={formCategory}
-                onValueChange={(val: any) => {
-                  setFormCategory(val);
-                  if (!editingTemplate) {
-                    if (val === 'voice') {
-                      setFormTriggerType('voice_duration');
-                      setFormTargetCount(15);
-                    } else if (val === 'community') {
-                      setFormTriggerType('reaction_add');
-                      setFormTargetCount(3);
-                    } else if (val === 'irl') {
-                      setFormTriggerType('irl_manual');
-                      setFormTargetCount(1);
-                    } else {
-                      setFormTriggerType('chat_any');
-                      setFormTargetCount(5);
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">หมวดหมู่เควส</label>
+                <Select
+                  value={formCategory}
+                  onValueChange={(val: any) => {
+                    setFormCategory(val);
+                    if (!editingTemplate) {
+                      if (val === 'voice') {
+                        setFormTriggerType('voice_duration');
+                        setFormTargetCount(15);
+                      } else if (val === 'community') {
+                        setFormTriggerType('command_usage');
+                        setFormTargetCount(1);
+                      } else if (val === 'irl') {
+                        setFormTriggerType('irl_manual');
+                        setFormTargetCount(1);
+                      } else {
+                        setFormTriggerType('chat_any');
+                        setFormTargetCount(5);
+                      }
                     }
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="chat">💬 แชท (Chat)</SelectItem>
-                  <SelectItem value="voice">🎙️ ห้องเสียง (Voice)</SelectItem>
-                  <SelectItem value="community">👥 ชุมชน (Community)</SelectItem>
-                  <SelectItem value="irl">📸 ชีวิตจริง (IRL)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="chat">💬 แชท (Chat)</SelectItem>
+                    <SelectItem value="voice">🎙️ ห้องเสียง (Voice)</SelectItem>
+                    <SelectItem value="community">👥 ชุมชน (Community)</SelectItem>
+                    <SelectItem value="irl">📸 ชีวิตจริง (IRL)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Code */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">รหัสเควส (Code)</label>
-              <Input
-                value={formCode}
-                onChange={(e) => setFormCode(e.target.value)}
-                placeholder="เช่น morning_bear หรือ chat_any_10"
-                disabled={!!editingTemplate}
-                className="font-mono text-xs"
-              />
+              {/* Code */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">รหัสเควส (Code)</label>
+                <Input
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value)}
+                  placeholder="เช่น morning_bear หรือ custom_cmd"
+                  disabled={!!editingTemplate}
+                  className="font-mono text-xs"
+                />
+              </div>
             </div>
 
             {/* Title */}
@@ -1362,7 +1443,7 @@ export function DailyQuestsManagement() {
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="เช่น 🌞 ︰ Morning Bear"
+                placeholder="เช่น 🌸 ︰ มอบดอกไม้ให้เพื่อน"
               />
             </div>
 
@@ -1372,7 +1453,7 @@ export function DailyQuestsManagement() {
               <Input
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="เช่น พิมพ์คำว่า อรุณสวัสดิ์ หรือ มอนิ่ง ในช่องแชท"
+                placeholder="เช่น ใช้คำสั่ง /มอบดอกไม้ ให้เพื่อนในเซิร์ฟเวอร์ 1 ครั้ง"
               />
             </div>
 
@@ -1393,10 +1474,242 @@ export function DailyQuestsManagement() {
               </Select>
             </div>
 
+            {/* ─────────────────────────────────────────────────────────────
+                DYNAMIC TRIGGER CONFIG SECTION
+            ───────────────────────────────────────────────────────────── */}
+            <div className="p-4 bg-muted/40 border border-border/80 rounded-xl space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  การตั้งค่าเงื่อนไขเฉพาะ ({formTriggerType})
+                </span>
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  trigger_config
+                </Badge>
+              </div>
+
+              {/* 1. command_usage */}
+              {formTriggerType === 'command_usage' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-indigo-500" />
+                    คำสั่ง Slash Command ของบอท
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {COMMON_SLASH_COMMANDS.map((cmd) => (
+                      <button
+                        key={cmd.name}
+                        type="button"
+                        onClick={() => setCfgCommand(cmd.name)}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-lg border font-mono transition-all",
+                          cfgCommand === cmd.name
+                            ? "bg-indigo-500/15 border-indigo-500/50 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm"
+                            : "bg-background hover:bg-muted text-muted-foreground"
+                        )}
+                        title={cmd.desc}
+                      >
+                        /{cmd.name}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    value={cfgCommand}
+                    onChange={(e) => setCfgCommand(e.target.value)}
+                    placeholder="เช่น สุ่มคำถาม หรือ มอบดอกไม้ (ไม่ต้องพิมพ์เครื่องหมาย /)"
+                    className="text-xs font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    บอทจะนับความคืบหน้าทันทีเมื่อสมาชิกพิมพ์เรียกใช้คำสั่งนี้ในเซิร์ฟเวอร์
+                  </p>
+                </div>
+              )}
+
+              {/* 2. chat_media */}
+              {formTriggerType === 'chat_media' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Music className="w-3.5 h-3.5 text-rose-500" />
+                    ประเภทมีเดียที่ต้องส่ง
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCfgMediaType('music_link')}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition-all text-xs flex flex-col gap-1",
+                        cfgMediaType === 'music_link'
+                          ? "bg-rose-500/10 border-rose-500/40 text-foreground font-semibold shadow-sm"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <span className="flex items-center gap-1 text-rose-500 font-bold">
+                        🎵 ลิงก์เพลง
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        YouTube, Spotify, SoundCloud, Apple Music
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCfgMediaType('sticker_or_gif')}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition-all text-xs flex flex-col gap-1",
+                        cfgMediaType === 'sticker_or_gif'
+                          ? "bg-amber-500/10 border-amber-500/40 text-foreground font-semibold shadow-sm"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <span className="flex items-center gap-1 text-amber-500 font-bold">
+                        😂 มีม / สติกเกอร์ / GIF
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        ส่งสติกเกอร์ หรือภาพเคลื่อนไหว GIF
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. keyword */}
+              {formTriggerType === 'keyword' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                    คำคีย์เวิร์ดที่ต้องพิมพ์
+                  </label>
+                  <Input
+                    value={cfgKeywords}
+                    onChange={(e) => setCfgKeywords(e.target.value)}
+                    placeholder="เช่น morning, มอนิ่ง, อรุณสวัสดิ์, gm"
+                    className="text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    ระบุได้หลายคำโดยคั่นด้วยเครื่องหมายจุลภาค (,) หากข้อความมีคำใดคำหนึ่งจะนับทันที
+                  </p>
+                </div>
+              )}
+
+              {/* 4. voice_duration */}
+              {formTriggerType === 'voice_duration' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Mic className="w-3.5 h-3.5 text-emerald-500" />
+                    เงื่อนไขสมาชิกในห้องเสียง
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCfgMinMembers(1)}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition-all text-xs flex flex-col gap-1",
+                        cfgMinMembers === 1
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-foreground font-semibold shadow-sm"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                        👤 นั่งคนเดียวได้
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        อยู่คนเดียวหรือมีเพื่อนก็นับเวลาปกติ
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCfgMinMembers(2)}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition-all text-xs flex flex-col gap-1",
+                        cfgMinMembers === 2
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-foreground font-semibold shadow-sm"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                        👥 ต้องมีเพื่อน 2 คนขึ้นไป
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        ต้องมีสมาชิกอย่างน้อย 2 คนในห้องเสียง
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. reaction_add */}
+              {formTriggerType === 'reaction_add' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                    ลิงก์ข้อความที่ต้องกด Reaction (ไม่บังคับ)
+                  </label>
+                  <Input
+                    value={cfgMessageUrl}
+                    onChange={(e) => setCfgMessageUrl(e.target.value)}
+                    placeholder="เช่น https://discord.com/channels/... (เว้นว่าง = กดข้อความไหนก็นับ)"
+                    className="text-xs font-mono"
+                  />
+                </div>
+              )}
+
+              {/* 6. Channel Lock (Available for ALL types) */}
+              <div className="pt-2 border-t border-border/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Hash className="w-3.5 h-3.5 text-sky-500" />
+                    จำกัดห้อง Discord (Channel ID)
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">เว้นว่าง = ทำห้องไหนก็ได้</span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {Object.entries(KNOWN_CHANNELS).map(([chId, chName]) => (
+                    <button
+                      key={chId}
+                      type="button"
+                      onClick={() => setCfgChannelId(cfgChannelId === chId ? '' : chId)}
+                      className={cn(
+                        "px-2 py-0.5 text-[10px] rounded-md border transition-all flex items-center gap-1",
+                        cfgChannelId === chId
+                          ? "bg-sky-500/15 border-sky-500/50 text-sky-600 dark:text-sky-400 font-bold"
+                          : "bg-background hover:bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <Hash className="w-2.5 h-2.5" />
+                      {chName}
+                    </button>
+                  ))}
+                  {cfgChannelId && (
+                    <button
+                      type="button"
+                      onClick={() => setCfgChannelId('')}
+                      className="px-2 py-0.5 text-[10px] rounded-md border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 font-medium"
+                    >
+                      ล้างห้อง
+                    </button>
+                  )}
+                </div>
+
+                <Input
+                  value={cfgChannelId}
+                  onChange={(e) => setCfgChannelId(e.target.value)}
+                  placeholder="ระบุ Channel ID หรือ Forum ID (เช่น 1524123296466079884)"
+                  className="text-xs font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  รองรับทั้งห้อง Text Channel ทั่วไป และห้อง Forum Channel (ระบบบอทตรวจจับทั้งโพสต์และกระทู้ย่อยให้อัตโนมัติ)
+                </p>
+              </div>
+            </div>
+
             {/* Target Count & Reward Points */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">จำนวนเป้าหมาย</label>
+                <label className="text-xs font-medium text-foreground">
+                  {formTriggerType === 'voice_duration' ? 'ระยะเวลาเป้าหมาย (นาที)' : 'จำนวนเป้าหมาย (ครั้ง)'}
+                </label>
                 <Input
                   type="number"
                   min="1"
