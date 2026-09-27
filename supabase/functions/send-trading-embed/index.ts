@@ -88,7 +88,7 @@ Deno.serve(async (req): Promise<Response> => {
               items: [
                 {
                   media: {
-                    url: "https://cdn.discordapp.com/attachments/1164188104182210670/1194160352099844097/20240109_130631_0000.png",
+                    url: "https://cdn.discordapp.com/attachments/1524742861223100416/1525096175315849318/NewsBoard_-_bearcafe_3.png?ex=6ab9a1bf&is=6ab8503f&hm=fd2e87804ee2ceeba764582e18fde72d792a5bb2a65a08444395e076cc33d4a3&",
                   },
                 },
               ],
@@ -104,7 +104,7 @@ Deno.serve(async (req): Promise<Response> => {
                   style: 5, // Link
                   label: "︲เช็กยอดโดเนทของคุณ",
                   emoji: { id: "1256669436350562355", name: "bee20000", animated: false },
-                  url: "https://discord.com/channels/1144251788493602848/1508608796967305216",
+                  url: "https://discord.com/channels/1144251788493602848/1524124513728598178",
                 },
               ],
             },

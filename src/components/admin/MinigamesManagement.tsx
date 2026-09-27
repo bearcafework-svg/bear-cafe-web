@@ -437,6 +437,7 @@ interface Question {
   options: string[];
   difficulty: 'easy' | 'medium' | 'hard' | null;
   category?: string | null;
+  pre_validated_mask?: string | null;
   is_active: boolean;
   status?: 'approved' | 'pending_create' | 'pending_update' | 'pending_delete' | 'deleted';
   created_by?: string | null;
@@ -872,6 +873,8 @@ export function MinigamesManagement() {
   const [editHint1, setEditHint1] = useState<string>('');
   const [editHint2, setEditHint2] = useState<string>('');
   const [editHint3, setEditHint3] = useState<string>('');
+  const [editPreValidatedMask, setEditPreValidatedMask] = useState<string | null>(null);
+  const [isSavingMask, setIsSavingMask] = useState<boolean>(false);
 
   // Leaderboard state
   const [lbTimeFilter, setLbTimeFilter] = useState<'30d' | 'all'>('30d');
@@ -961,6 +964,7 @@ export function MinigamesManagement() {
           category: q.category || 'คำทั่วไป',
           difficulty: q.difficulty || 'medium',
           is_active: q.is_active ?? true,
+          pre_validated_mask: q.pre_validated_mask || null,
         }));
 
         const { error: insErr } = await (akariClient as any)
@@ -1194,7 +1198,7 @@ export function MinigamesManagement() {
     try {
       let query = (supabase as any)
         .from('minigame_questions')
-        .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, is_active, status, created_by, created_by_name, updated_by, updated_by_name, deleted_by, deleted_by_name, pending_request_id, created_at, updated_at')
+        .select('id, game_id, word_or_question, answer, category, hints, options, difficulty, pre_validated_mask, is_active, status, created_by, created_by_name, updated_by, updated_by_name, deleted_by, deleted_by_name, pending_request_id, created_at, updated_at')
         .order('id', { ascending: false })
         .limit(2000);
 
@@ -1554,7 +1558,15 @@ export function MinigamesManagement() {
     const operatorName = user?.username || user?.discord_username || 'Staff';
 
     try {
-      if (!user?.is_owner) {
+        let game1Mask: string | null = null;
+        if (gId === 1) {
+          const vResult = validateAndEvaluateGame1Word(finalQuestion);
+          if (vResult.isValid && vResult.bestMask) {
+            game1Mask = vResult.bestMask;
+          }
+        }
+
+        if (!user?.is_owner) {
         // Staff mode: Submit change request to Reports
         const reqPayload = {
           action_type: 'create',
@@ -1566,6 +1578,7 @@ export function MinigamesManagement() {
             hints: hintsArray,
             options: optionsArray,
             difficulty: finalDiff,
+            pre_validated_mask: game1Mask,
             is_active: true,
           },
           requested_by: operatorId,
@@ -1591,6 +1604,7 @@ export function MinigamesManagement() {
           hints: hintsArray,
           options: optionsArray,
           difficulty: finalDiff,
+          pre_validated_mask: game1Mask,
           is_active: true,
           status: 'approved',
           created_by: operatorId,
@@ -1635,7 +1649,52 @@ export function MinigamesManagement() {
     setEditHint1(q.hints?.[0] || '');
     setEditHint2(q.hints?.[1] || '');
     setEditHint3(q.hints?.[2] || '');
+    setEditPreValidatedMask(q.pre_validated_mask || null);
     setEditDialogOpen(true);
+  };
+
+  const handleConfirmMask = async () => {
+    if (!editingQuestion || editingQuestion.game_id !== 1) return;
+    const vResult = validateAndEvaluateGame1Word(editQuestion.trim());
+    if (!vResult.isValid || !vResult.bestMask) {
+      toast({
+        title: 'ไม่สามารถยืนยัน Mask ได้ ⚠️',
+        description: vResult.reason || 'คำศัพท์ไม่ผ่านเกณฑ์คุณภาพ Game 1',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSavingMask(true);
+    try {
+      const confirmedMask = vResult.bestMask;
+      const { error } = await (supabase as any)
+        .from('minigame_questions')
+        .update({
+          pre_validated_mask: confirmedMask,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingQuestion.id);
+
+      if (error) throw error;
+
+      setEditPreValidatedMask(confirmedMask);
+      setEditingQuestion((prev) => prev ? { ...prev, pre_validated_mask: confirmedMask } : null);
+      setQuestions((prev) => prev.map((q) => q.id === editingQuestion.id ? { ...q, pre_validated_mask: confirmedMask } : q));
+
+      toast({
+        title: 'ยืนยัน Mask สำเร็จแล้ว! ✅',
+        description: `บันทึก Mask "${confirmedMask}" ลงฐานข้อมูลเรียบร้อยแล้วค่ะ`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'เกิดข้อผิดพลาดในการบันทึก Mask',
+        description: err.message || 'ไม่สามารถติดต่อฐานข้อมูลได้',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingMask(false);
+    }
   };
 
   const handleUpdateQuestion = async () => {
@@ -1659,6 +1718,7 @@ export function MinigamesManagement() {
       return;
     }
 
+    let preMaskForUpdate: string | null = null;
     if (gId === 1) {
       const vResult = validateAndEvaluateGame1Word(finalQuestion);
       if (!vResult.isValid) {
@@ -1669,6 +1729,7 @@ export function MinigamesManagement() {
         });
         return;
       }
+      preMaskForUpdate = editPreValidatedMask || vResult.bestMask;
     }
 
     let hintsArray: string[] = [];
@@ -1715,6 +1776,7 @@ export function MinigamesManagement() {
             hints: editingQuestion.hints || [],
             options: editingQuestion.options || [],
             difficulty: editingQuestion.difficulty,
+            pre_validated_mask: editingQuestion.pre_validated_mask || null,
             is_active: editingQuestion.is_active,
           },
           new_data: {
@@ -1724,6 +1786,7 @@ export function MinigamesManagement() {
             hints: hintsArray,
             options: optionsArray,
             difficulty: finalDiff,
+            pre_validated_mask: preMaskForUpdate,
             is_active: editingQuestion.is_active,
           },
           requested_by: operatorId,
@@ -1763,6 +1826,7 @@ export function MinigamesManagement() {
           hints: hintsArray,
           options: optionsArray,
           difficulty: finalDiff,
+          pre_validated_mask: preMaskForUpdate,
           status: 'approved',
           updated_by: operatorId,
           updated_by_name: operatorName,
@@ -3164,7 +3228,17 @@ export function MinigamesManagement() {
                               )}
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {q.game_id === 4 && q.hints?.length ? (
+                              {q.game_id === 1 ? (
+                                q.pre_validated_mask ? (
+                                  <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 font-mono font-bold gap-1" title="Mask ที่ยืนยันแล้ว">
+                                    🎭 {q.pre_validated_mask}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground italic">
+                                    (คำนวณสด)
+                                  </span>
+                                )
+                              ) : q.game_id === 4 && q.hints?.length ? (
                                 <span className="text-amber-600 dark:text-amber-400 font-medium">💡 คำใบ้ {q.hints.length} ข้อ</span>
                               ) : (q.game_id === 5 || q.game_id === 11) ? (
                                 <span className="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
@@ -4000,7 +4074,41 @@ export function MinigamesManagement() {
                   onChange={(e) => setEditQuestion(e.target.value)}
                 />
                 {editingQuestion.game_id === 1 && (
-                  <Game1LivePreview word={editQuestion} />
+                  <div className="space-y-3 pt-1">
+                    <Game1LivePreview word={editQuestion} />
+
+                    {/* Pre-validated Mask Confirmation Box */}
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                            บันทึก Mask สำเร็จรูป (Pre-validated Mask)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                          {editPreValidatedMask ? (
+                            <>
+                              Mask ที่บันทึกไว้ในระบบ: <code className="font-mono font-bold bg-amber-500/20 text-amber-900 dark:text-amber-200 px-1.5 py-0.5 rounded text-xs">{editPreValidatedMask}</code>
+                            </>
+                          ) : (
+                            'ยังไม่มีการบันทึก Mask ตายตัวสำหรับคำนี้ (ระบบบอทจะคำนวณสด)'
+                          )}
+                        </p>
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!validateAndEvaluateGame1Word(editQuestion).isValid || isSavingMask}
+                        onClick={handleConfirmMask}
+                        className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 cursor-pointer shadow-xs whitespace-nowrap self-end sm:self-center"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        {isSavingMask ? 'กำลังบันทึก...' : 'ยืนยัน Mask'}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
 

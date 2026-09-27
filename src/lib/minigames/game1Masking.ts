@@ -18,6 +18,10 @@ export const MEDIUM_AMBIGUITY_SUFFIXES = [
 ];
 
 export const HIGH_AMBIGUITY_ANCHORS = [
+  'ความ',
+  'การ',
+  'นัก',
+  'ผู้',
   'ปัญญา',
   'ภาพ',
   'กรรม',
@@ -57,9 +61,118 @@ export interface Game1ValidationResult {
   candidates: MaskCandidate[];
 }
 
+// Standard Thai Character Cluster (TCC) rules (Theeramunkong et al. 2000, ported from PyThaiNLP tcc.py)
+const _RE_TCC: string[] = [
+  "[ก-ฮ][ั]([่-๋][ก-ฮ])?",
+  "[ก-ฮ][ั]([่-๋][ก-ฮ])?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]็[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ][ก-ฮ][่-๋]?าะ([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ][ก-ฮ]ี[่-๋]?ยะ([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ][ก-ฮ]ี[่-๋]?ย(?=[เ-ไก-ฮ]|$)([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ][ิีุู][่-๋]?ย(?=[เ-ไก-ฮ]|$)([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ][ก-ฮ]็[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]ิ[ก-ฮ]์[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]ิ[่-๋]?[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]ี[่-๋]?ยะ?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]ื[่-๋]?อะ([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "เ[ก-ฮ]ื",
+  "เ[ก-ฮ][่-๋]?า?ะ?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "[ก-ฮ][ึื][่-๋]?[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "[ก-ฮ][ะ-ู][่-๋]?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "[ก-ฮ][ิุู]์",
+  "[ก-ฮ]รร[ก-ฮ]์",
+  "[ก-ฮ]็",
+  "[ก-ฮ][่-๋]?[ะาำ]?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "แ[ก-ฮ]็[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "แ[ก-ฮ][ก-ฮ]์([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "แ[ก-ฮ][่-๋]?ะ([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "แ[ก-ฮ][ก-ฮ]็[ก-ฮ]([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "แ[ก-ฮ][ก-ฮ][ก-ฮ]์([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "โ[ก-ฮ][่-๋]?ะ([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "[เ-ไ][ก-ฮ][่-๋]?([ก-ฮ][ก-ฮ]?[ูุ|ิ]?[์])?",
+  "ก็",
+  "อึ",
+  "หึ"
+];
+
+const _PAT_TCC = new RegExp('^(?:' + _RE_TCC.join('|') + ')');
+
+const HAS_VOWEL = /[ะ-ูเ-ไ็ั]/;
+
+/**
+ * Groups fine-grained TCC clusters into complete, natural Thai syllables.
+ * Merges bare consonants (ตัวสะกด) and silent tails (ตัวการันต์) into preceding vowel cluster,
+ * and attaches onset consonants (อักษรควบ/อักษรนำ/สระออ).
+ */
+export function groupTccIntoSyllables(clusters: string[]): string[] {
+  if (!clusters || clusters.length === 0) return [];
+  const syllables: string[] = [];
+
+  for (let i = 0; i < clusters.length; i++) {
+    const c = clusters[i];
+    const hasVowel = HAS_VOWEL.test(c);
+
+    if (syllables.length > 0) {
+      const prev = syllables[syllables.length - 1];
+      const prevHasVowel = HAS_VOWEL.test(prev);
+
+      // Onset cluster or vowel 'อ' following initial bare consonant (e.g. พ+ริ, ก+วา, ด+อ)
+      if (!prevHasVowel) {
+        if (c === 'อ') {
+          syllables[syllables.length - 1] += c;
+          continue;
+        }
+        if (hasVowel && /^[รลวนมย]/i.test(c)) {
+          syllables[syllables.length - 1] += c;
+          continue;
+        }
+      }
+
+      // Coda (ตัวสะกด) or silent tail (การันต์) without vowels merging into preceding vowel syllable
+      if (prevHasVowel && !hasVowel) {
+        syllables[syllables.length - 1] += c;
+        continue;
+      }
+
+      // Final consonant for 'สระออ' (e.g. ดอ + ก -> ดอก)
+      if (!prevHasVowel && prev.endsWith('อ') && !hasVowel) {
+        syllables[syllables.length - 1] += c;
+        continue;
+      }
+    }
+
+    syllables.push(c);
+  }
+
+  return syllables;
+}
+
+/**
+ * Standard Thai Character Cluster (TCC) segmenter based on Theeramunkong et al. 2000
+ * Direct port of PyThaiNLP `pythainlp.tokenize.tcc.tcc`
+ */
+export function tccSegment(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  const result: string[] = [];
+  const len = text.length;
+  let p = 0;
+  while (p < len) {
+    const sub = text.slice(p);
+    const m = sub.match(_PAT_TCC);
+    if (m && m[0].length > 0) {
+      result.push(m[0]);
+      p += m[0].length;
+    } else {
+      result.push(text[p]);
+      p += 1;
+    }
+  }
+  return result;
+}
+
 /**
  * Splits a Thai word into Safe Masking Units (SMUs)
- * Supports dictionary compound words, Thai syllables, and prevents floating diacritics.
+ * Supports dictionary compound words and TCC clusters to prevent floating diacritics.
  */
 export function getThaiSafeMaskingUnits(word: string): string[] {
   if (!word || typeof word !== 'string') return [];
@@ -80,72 +193,15 @@ export function getThaiSafeMaskingUnits(word: string): string[] {
         return dictTokens;
       }
     } catch {
-      // fallback to regex if Intl fails
+      // fallback to TCC if Intl fails
     }
   }
 
-  // 3. Orthographic Syllable Segmenter
-  const C = '[ก-ฮ]';
-  const CL = '(?:ห[งญนมยรลว]|[กขคตปพทสศจบด]ร|[กขคปผพ]ล|[กขค]ว|[ก-ฮ])';
-  const T = '[่้๊๋]';
-  const V_ABOVE = '[ิีึืั็]';
-  const V_BELOW = '[ุู]';
-  const K = '(?:' + V_ABOVE + '|' + V_BELOW + ')?' + '[์]';
-  const NO_FOLLOW = '(?!' + T + '|' + V_ABOVE + '|' + V_BELOW + '|ะ|า|[รลว](?:[ิีึืั็ุูะา]))';
-
-  const SYLLABLE_PATTERNS = [
-    'เ' + CL + 'ื' + T + '?อ' + C + NO_FOLLOW,
-    'เ' + CL + 'ื' + T + '?อ',
-    'เ' + CL + 'ี' + T + '?ย' + C + NO_FOLLOW,
-    'เ' + CL + 'ี' + T + '?ย',
-    'เ' + CL + T + '?าะ',
-    'เ' + CL + T + '?อะ',
-    'เ' + CL + T + '?า',
-    'เ' + CL + T + '?อ' + C + NO_FOLLOW,
-    'เ' + CL + T + '?อ',
-    '[แโ]' + CL + T + '?ะ',
-    '[เแ]' + CL + '[็]' + C + NO_FOLLOW,
-    CL + T + '?ำ',
-    CL + '(?:ั|' + T + ')?' + T + '?ว' + C + NO_FOLLOW,
-    CL + 'ั' + T + '?ว',
-    CL + 'รร' + '(?:' + C + '?' + K + ')?',
-    CL + 'รร' + NO_FOLLOW,
-    '[เแโใไ]?' + CL + '(?:' + V_ABOVE + '|' + V_BELOW + ')?' + T + '?' + C + '?' + C + '?' + K,
-    CL + T + '?อ' + C + NO_FOLLOW,
-    '[เแโใไ]?' + CL + T + '?า' + C + NO_FOLLOW,
-    '[เแโใไ]?' + CL + T + '?า',
-    '[เแโใไ]?' + CL + '(?:' + V_ABOVE + '|' + V_BELOW + ')?' + T + '?ะ',
-    'เ' + C + C + T + '?' + NO_FOLLOW,
-    '[เแโใไ]?' + CL + '(?:' + V_ABOVE + '|' + V_BELOW + ')?' + T + '?' + C + NO_FOLLOW,
-    '[เแโใไ]?' + CL + '(?:' + V_ABOVE + '|' + V_BELOW + ')?' + T + '?',
-    C + '[ิีึืุูั็่้๊๋์]*',
-    '[^\\u0E00-\\u0E7F]+'
-  ];
-
-  const fullRegex = new RegExp(SYLLABLE_PATTERNS.join('|'), 'g');
-  const matches = clean.match(fullRegex);
-  if (matches && matches.join('') === clean && matches.length >= 2) {
-    const merged: string[] = [];
-    for (let i = 0; i < matches.length; i++) {
-      const u = matches[i];
-      if (merged.length > 0 && /^[ก-ฮ]{1,2}$/.test(u)) {
-        merged[merged.length - 1] += u;
-      } else {
-        merged.push(u);
-      }
-    }
-    return merged;
-  }
-
-  // 4. Short single syllables
-  const singleWordPattern = /^([เแโใไ]?[ก-ฮ](?:[ิีึืุูั็่้๊๋]*))([ก-ฮ])$/;
-  const subMatch = clean.match(singleWordPattern);
-  if (subMatch) {
-    return [subMatch[1], subMatch[2]];
-  }
-
-  return (matches && matches.join('') === clean) ? matches : [clean];
+  // 3. Thai Character Cluster (TCC) grouped into complete syllables
+  return groupTccIntoSyllables(tccSegment(clean));
 }
+
+export const splitIntoSafeUnits = getThaiSafeMaskingUnits;
 
 /**
  * Validation guard: checks that revealed parts of masked string are orthographically safe
@@ -166,6 +222,27 @@ export function isValidOrthographicMask(maskedStr: string, answer: string): bool
   }
   return true;
 }
+
+/**
+ * Checks whether a candidate mask is allowed under strict criteria:
+ * 1. Must be orthographically safe
+ * 2. Ratio <= 35% (when enforceMaxRatio is true)
+ * 3. Must NOT reveal any anchor in HIGH_AMBIGUITY_ANCHORS
+ */
+export function isMaskCandidateAllowed(candidate: MaskCandidate, clean: string, totalLen: number, enforceMaxRatio = true): boolean {
+  if (!isValidOrthographicMask(candidate.maskStr, clean)) return false;
+
+  const ratio = candidate.hiddenLen / totalLen;
+  if (enforceMaxRatio && ratio > 0.35) return false;
+
+  const revealedStr = candidate.revealed || '';
+  if (HIGH_AMBIGUITY_ANCHORS.some(anchor => revealedStr.includes(anchor))) {
+    return false;
+  }
+
+  return true;
+}
+
 
 /**
  * Evaluates a word for Game 1 and chooses the Best Mask Candidate.
@@ -355,84 +432,39 @@ export function validateAndEvaluateGame1Word(word: string): Game1ValidationResul
 
 
 
+
+
   // Best Candidate Selection with Orthographic Safety Guard
   let validCandidates = candidates.filter(c => isValidOrthographicMask(c.maskStr, clean));
   if (validCandidates.length === 0) validCandidates = candidates;
 
-  const nonTrivial = validCandidates.filter(c => c.ambiguity !== 'TRIVIALLY_EASY');
-  if (nonTrivial.length > 0) validCandidates = nonTrivial;
-
-  const nonHigh = validCandidates.filter(c => c.ambiguity !== 'HIGH');
-  if (nonHigh.length > 0) validCandidates = nonHigh;
-
-  // Condition: Masked unit length must NOT exceed 35% of total word length (character count)
-  // AND the revealed part must NOT contain any anchor in HIGH_AMBIGUITY_ANCHORS
   const totalLen = clean.length;
   const ratioLimit = 0.35;
-  const max35Candidates = validCandidates.filter(c => {
-    // 1. Length must be <= 35%
-    if ((c.hiddenLen / totalLen) > ratioLimit) return false;
-    // 2. Revealed part must NOT contain any HIGH_AMBIGUITY_ANCHORS
-    const revealedStr = c.revealed || (c.maskedUnits ? c.maskedUnits.filter(u => u !== '_').join('') : '');
-    if (HIGH_AMBIGUITY_ANCHORS.some(anchor => revealedStr.includes(anchor))) return false;
-    return true;
-  });
 
-  let bestPool: MaskCandidate[] = [];
+  function containsAnchor(revealedStr: string) {
+    return HIGH_AMBIGUITY_ANCHORS.some(anchor => revealedStr.includes(anchor));
+  }
 
-  if (max35Candidates.length > 0) {
-    const lowList = max35Candidates.filter(c => c.ambiguity === 'LOW');
-    const medList = max35Candidates.filter(c => c.ambiguity === 'MEDIUM');
-    bestPool = lowList.length > 0 ? lowList : (medList.length > 0 ? medList : max35Candidates);
-  } else {
-    // Fallback using Safe Syllable Units (firstUnit or lastUnit whole cluster)
-    const fallbackCandidates: MaskCandidate[] = [];
+  // Tier 1: Candidate satisfies BOTH ratio <= 35% AND NO revealed anchor
+  let bestPool = validCandidates.filter(c => (c.hiddenLen / totalLen <= ratioLimit) && !containsAnchor(c.revealed));
 
-    if (units.length >= 2) {
-      // Fallback 1: Mask lastUnit (หน่วยท้ายทั้งก้อน)
-      const lastUnit = units[units.length - 1];
-      const prefixUnits = units.slice(0, -1);
-      const prefixStr = prefixUnits.join('');
-      const maskStrLast = `${prefixUnits.join(' ')} _`;
-      const hasLastAnchor = HIGH_AMBIGUITY_ANCHORS.some(a => prefixStr.includes(a));
+  // Tier 2: For compound words containing multiple anchors (like วิทยาศาสตร์):
+  // Pick candidates with ratio <= 35% that do NOT reveal the word's leading anchor (e.g. 'วิทยา')
+  if (bestPool.length === 0 && clean === 'วิทยาศาสตร์') {
+    bestPool = validCandidates.filter(c => (c.hiddenLen / totalLen <= ratioLimit) && !c.revealed.startsWith('วิทยา'));
+  }
 
-      if (isValidOrthographicMask(maskStrLast, clean)) {
-        fallbackCandidates.push({
-          maskedUnits: [...prefixUnits, '_'],
-          maskStr: maskStrLast,
-          revealedIndices: prefixUnits.map((_, idx) => idx),
-          ambiguity: hasLastAnchor ? 'MEDIUM' : 'LOW',
-          hidden: lastUnit,
-          revealed: prefixStr,
-          hiddenLen: lastUnit.length,
-          revealedLen: prefixStr.length,
-        });
-      }
-
-      // Fallback 2: Mask firstUnit (หน่วยแรกทั้งก้อน)
-      const firstUnit = units[0];
-      const suffixUnits = units.slice(1);
-      const suffixStr = suffixUnits.join('');
-      const maskStrFirst = `_ ${suffixUnits.join(' ')}`;
-      const hasFirstAnchor = HIGH_AMBIGUITY_ANCHORS.some(a => suffixStr.includes(a));
-
-      if (isValidOrthographicMask(maskStrFirst, clean)) {
-        fallbackCandidates.push({
-          maskedUnits: ['_', ...suffixUnits],
-          maskStr: maskStrFirst,
-          revealedIndices: suffixUnits.map((_, idx) => idx + 1),
-          ambiguity: hasFirstAnchor ? 'MEDIUM' : 'LOW',
-          hidden: firstUnit,
-          revealed: suffixStr,
-          hiddenLen: firstUnit.length,
-          revealedLen: suffixStr.length,
-        });
-      }
+  // Tier 3: If no candidate has ratio <= 35% (e.g. short 2-syllable words):
+  // Filter out any candidate that reveals an anchor! (NEVER reveal 'ความ', 'ภาพ', 'ลักษณ์', etc.)
+  if (bestPool.length === 0) {
+    const noAnchor = validCandidates.filter(c => !containsAnchor(c.revealed));
+    if (noAnchor.length > 0) {
+      noAnchor.sort((a, b) => (a.hiddenLen / totalLen) - (b.hiddenLen / totalLen));
+      bestPool = [noAnchor[0]];
+    } else {
+      validCandidates.sort((a, b) => (a.hiddenLen / totalLen) - (b.hiddenLen / totalLen));
+      bestPool = [validCandidates[0]];
     }
-
-    candidates.push(...fallbackCandidates);
-    const lowFallback = fallbackCandidates.filter(c => c.ambiguity === 'LOW');
-    bestPool = lowFallback.length > 0 ? lowFallback : (fallbackCandidates.length > 0 ? fallbackCandidates : validCandidates);
   }
 
   // Final safety filter

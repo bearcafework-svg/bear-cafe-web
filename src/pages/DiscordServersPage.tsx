@@ -914,22 +914,6 @@ function ServerCard({
                 isExpired={isExpired}
               />
             </div>
-
-            {/* Showcase Trigger Button (เฉพาะหมวดร้านค้า & บริการ) */}
-            {isShop && onOpenShopShowcase && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenShopShowcase(server);
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-transform active:scale-95 cursor-pointer shadow-2xs"
-                title="เปิดดูตู้โชว์สินค้าเด่นของร้าน"
-              >
-                <ShoppingBag className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                <span>ตู้โชว์สินค้า</span>
-              </button>
-            )}
           </div>
 
           {/* Name + Category Tag */}
@@ -1015,11 +999,6 @@ function ServerCard({
             {user && server.owner_id === user.discord_id && (
               <DropdownMenu
                 options={[
-                  ...(isShop && onOpenShopShowcase ? [{
-                    label: "จัดการตู้โชว์สินค้า",
-                    onClick: () => onOpenShopShowcase(server),
-                    Icon: <ShoppingBag className="w-3.5 h-3.5 text-amber-500" />,
-                  }] : []),
                   ...(onEditVibe ? [{
                     label: "ตั้งค่า Vibe & จุดเด่น",
                     onClick: () => onEditVibe(server),
