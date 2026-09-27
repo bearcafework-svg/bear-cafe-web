@@ -17,7 +17,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -1459,17 +1461,74 @@ export function DailyQuestsManagement() {
 
             {/* Trigger Type */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">เงื่อนไขการทำงาน (Trigger Type)</label>
-              <Select value={formTriggerType} onValueChange={setFormTriggerType}>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">เงื่อนไขการทำงาน (Trigger Type)</label>
+                <span className="text-[10px] text-muted-foreground">เลือกประเภทการตรวจจับของบอท</span>
+              </div>
+              <Select
+                value={formTriggerType}
+                onValueChange={(val: any) => {
+                  setFormTriggerType(val);
+                  if (val === 'voice_duration' || val === 'voice_join') {
+                    setFormCategory('voice');
+                  } else if (val === 'irl_manual') {
+                    setFormCategory('irl');
+                  } else if (val === 'reaction_add') {
+                    setFormCategory('community');
+                  } else if (val === 'command_usage') {
+                    if (formCategory === 'voice' || formCategory === 'irl') {
+                      setFormCategory('community');
+                    }
+                  } else {
+                    if (formCategory === 'voice' || formCategory === 'irl') {
+                      setFormCategory('chat');
+                    }
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  {TRIGGER_TYPES.filter((t) => t.category === formCategory).map((tt) => (
-                    <SelectItem key={tt.value} value={tt.value}>
-                      {tt.label}
+                <SelectContent className="max-h-[300px]">
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                      👥 ชุมชน & บอท (Community)
+                    </SelectLabel>
+                    <SelectItem value="command_usage">
+                      🤖 เรียกใช้คำสั่งบอท เช่น /สุ่มคำถาม, /มอบดอกไม้ (command_usage)
                     </SelectItem>
-                  ))}
+                    <SelectItem value="reaction_add">
+                      ❤️ กดรีแอ็กชันข้อความ (reaction_add)
+                    </SelectItem>
+                  </SelectGroup>
+
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                      💬 แชท & ข้อความ (Chat)
+                    </SelectLabel>
+                    <SelectItem value="chat_any">💬 ส่งข้อความทั่วไป (chat_any)</SelectItem>
+                    <SelectItem value="chat_count">🗨️ สะสมจำนวนข้อความ (chat_count)</SelectItem>
+                    <SelectItem value="keyword">🌞 ทักทาย / คีย์เวิร์ด (keyword)</SelectItem>
+                    <SelectItem value="chat_reply">↩️ ตอบกลับข้อความเพื่อน (chat_reply)</SelectItem>
+                    <SelectItem value="chat_mention">👋 แท็กพูดคุยกับเพื่อน (chat_mention)</SelectItem>
+                    <SelectItem value="chat_media">🎵 แชร์เพลง หรือ มีม/สติกเกอร์ (chat_media)</SelectItem>
+                    <SelectItem value="chat_emoji">🧸 ส่งอิโมจิในห้องแชท (chat_emoji)</SelectItem>
+                  </SelectGroup>
+
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      🎙️ ห้องเสียง (Voice)
+                    </SelectLabel>
+                    <SelectItem value="voice_duration">⏱️ สะสมเวลาในห้องเสียง (voice_duration)</SelectItem>
+                    <SelectItem value="voice_join">🎙️ เข้าใช้งานห้องเสียง (voice_join)</SelectItem>
+                  </SelectGroup>
+
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      📸 ชีวิตจริง (IRL)
+                    </SelectLabel>
+                    <SelectItem value="irl_manual">📷 ถ่ายรูปกิจกรรม IRL ส่งห้องที่กำหนด (irl_manual)</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
