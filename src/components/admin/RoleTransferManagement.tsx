@@ -321,7 +321,7 @@ export function RoleTransferManagement() {
   useEffect(() => { setLogPage(1); }, [logSearch, logDateFrom, logDateTo]);
 
   function ProfileCombobox({
-    value, onSelect, open, setOpen, search, setSearch, filteredProfiles, selectedProfile, placeholder, loading: comboLoading
+    value, onSelect, open, setOpen, search, setSearch, filteredProfiles, selectedProfile, memberPreview, placeholder, loading: comboLoading
   }: {
     value: string;
     onSelect: (discordId: string) => void;
@@ -331,9 +331,13 @@ export function RoleTransferManagement() {
     setSearch: (v: string) => void;
     filteredProfiles: Profile[];
     selectedProfile?: Profile;
+    memberPreview?: MemberPreview | null;
     placeholder: string;
     loading?: boolean;
   }) {
+    const isNumericId = /^\d{17,20}$/.test(search.trim());
+    const hasExactMatch = filteredProfiles.some(p => p.discord_id === search.trim());
+
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -346,8 +350,29 @@ export function RoleTransferManagement() {
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs shrink-0">👤</div>
                 )}
-                <span className="truncate">{selectedProfile.username}</span>
+                <span className="truncate font-medium">{selectedProfile.username}</span>
                 <span className="text-xs text-muted-foreground font-mono shrink-0">{selectedProfile.discord_id}</span>
+              </div>
+            ) : memberPreview && value === memberPreview.id ? (
+              <div className="flex items-center gap-2 min-w-0">
+                {memberPreview.avatar ? (
+                  <img src={memberPreview.avatar} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-honey/20 flex items-center justify-center text-xs shrink-0">🤖</div>
+                )}
+                <span className="truncate font-medium">{memberPreview.username}</span>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey shrink-0">
+                  ดึงจากบอท
+                </Badge>
+                <span className="text-xs text-muted-foreground font-mono shrink-0">{memberPreview.id}</span>
+              </div>
+            ) : value ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-full bg-honey/20 flex items-center justify-center text-xs shrink-0">🆔</div>
+                <span className="text-sm font-mono truncate">{value}</span>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey shrink-0">
+                  Discord ID
+                </Badge>
               </div>
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>
@@ -361,15 +386,65 @@ export function RoleTransferManagement() {
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
                 className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="ค้นหาชื่อหรือ Discord ID..."
+                placeholder="ค้นหาชื่อ หรือระบุ Discord ID (17-20 หลัก)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isNumericId) {
+                    onSelect(search.trim());
+                    setOpen(false);
+                    setSearch('');
+                  }
+                }}
                 autoFocus
               />
             </div>
+            {isNumericId && !hasExactMatch && (
+              <div className="p-2 border-b border-border bg-honey/5">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-normal text-honey hover:bg-honey/10 transition-colors text-left"
+                  onClick={() => {
+                    onSelect(search.trim());
+                    setOpen(false);
+                    setSearch('');
+                  }}
+                >
+                  <Search className="w-3.5 h-3.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">ดึงข้อมูลผ่าน Discord Bot ด้วย ID:</p>
+                    <p className="font-mono text-[11px] text-muted-foreground truncate">{search.trim()}</p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-honey/40 text-honey shrink-0">
+                    ดึงสด
+                  </Badge>
+                </button>
+              </div>
+            )}
             <CommandList>
               <CommandEmpty>
-                {loadingProfiles ? 'กำลังโหลด...' : 'ไม่พบผู้ใช้'}
+                {loadingProfiles ? (
+                  'กำลังโหลด...'
+                ) : isNumericId ? (
+                  <div className="p-3 text-center space-y-2">
+                    <p className="text-xs text-muted-foreground">ไม่พบในระบบล็อกอินเว็บ</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs border-honey/40 text-honey hover:bg-honey/10"
+                      onClick={() => {
+                        onSelect(search.trim());
+                        setOpen(false);
+                        setSearch('');
+                      }}
+                    >
+                      ดึงข้อมูลผ่าน Bot ด้วย ID: {search.trim()}
+                    </Button>
+                  </div>
+                ) : (
+                  'ไม่พบผู้ใช้ (ระบุชื่อ หรือพิมพ์ Discord ID 17-20 หลัก)'
+                )}
               </CommandEmpty>
               <CommandGroup>
                 {filteredProfiles.slice(0, 50).map(profile => (
@@ -426,10 +501,27 @@ export function RoleTransferManagement() {
         {/* Source */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" />
-              ผู้ทำเรื่องย้าย (ต้นทาง)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="w-4 h-4 text-primary" />
+                ผู้ทำเรื่องย้าย (ต้นทาง)
+              </CardTitle>
+              {sourceDiscordId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSourceDiscordId('');
+                    setSourceMember(null);
+                    setRoles([]);
+                    setSelectedRoles(new Set());
+                  }}
+                >
+                  ล้างค่า
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <ProfileCombobox
@@ -441,23 +533,33 @@ export function RoleTransferManagement() {
               setSearch={setSourceSearch}
               filteredProfiles={filteredSourceProfiles}
               selectedProfile={selectedSourceProfile}
-              placeholder="เลือกผู้ใช้ต้นทาง..."
+              memberPreview={sourceMember}
+              placeholder="เลือกผู้ใช้หรือระบุ Discord ID ต้นทาง..."
             />
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลยศ...
+                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลยศจาก Discord Bot...
               </div>
             )}
             {sourceMember && !loading && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-honey/10 border border-honey/20">
-                {sourceMember.avatar ? (
-                  <img src={sourceMember.avatar} alt="" className="w-10 h-10 rounded-full" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
-                )}
-                <div>
-                  <p className="font-medium">{sourceMember.username}</p>
-                  <p className="text-xs text-muted-foreground">{sourceMember.id}</p>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-honey/10 border border-honey/20">
+                <div className="flex items-center gap-3">
+                  {sourceMember.avatar ? (
+                    <img src={sourceMember.avatar} alt="" className="w-10 h-10 rounded-full" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{sourceMember.username}</p>
+                      {!selectedSourceProfile && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey">
+                          Discord Bot
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground font-mono">{sourceMember.id}</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -467,10 +569,25 @@ export function RoleTransferManagement() {
         {/* Target */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ArrowRight className="w-4 h-4 text-primary" />
-              ย้ายไปยัง (ปลายทาง)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ArrowRight className="w-4 h-4 text-primary" />
+                ย้ายไปยัง (ปลายทาง)
+              </CardTitle>
+              {targetDiscordId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setTargetDiscordId('');
+                    setTargetMember(null);
+                  }}
+                >
+                  ล้างค่า
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <ProfileCombobox
@@ -482,23 +599,33 @@ export function RoleTransferManagement() {
               setSearch={setTargetSearch}
               filteredProfiles={filteredTargetProfiles}
               selectedProfile={selectedTargetProfile}
-              placeholder="เลือกผู้ใช้ปลายทาง..."
+              memberPreview={targetMember}
+              placeholder="เลือกผู้ใช้หรือระบุ Discord ID ปลายทาง..."
             />
             {loadingTarget && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลด...
+                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลจาก Discord Bot...
               </div>
             )}
             {targetMember && !loadingTarget && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-honey/10 border border-honey/20">
-                {targetMember.avatar ? (
-                  <img src={targetMember.avatar} alt="" className="w-10 h-10 rounded-full" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
-                )}
-                <div>
-                  <p className="font-medium">{targetMember.username}</p>
-                  <p className="text-xs text-muted-foreground">{targetMember.id}</p>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-honey/10 border border-honey/20">
+                <div className="flex items-center gap-3">
+                  {targetMember.avatar ? (
+                    <img src={targetMember.avatar} alt="" className="w-10 h-10 rounded-full" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{targetMember.username}</p>
+                      {!selectedTargetProfile && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey">
+                          Discord Bot
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground font-mono">{targetMember.id}</p>
+                  </div>
                 </div>
               </div>
             )}

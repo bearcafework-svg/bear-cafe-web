@@ -33,7 +33,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'banned-name', label: 'ชื่อต้องห้าม', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'reports', label: 'รายงานปัญหา', group: 'community', groupLabel: 'ดูแลชุมชน', ownerOnly: true },
   { id: 'healing-messages', label: 'กระดานฮีลใจ', group: 'community', groupLabel: 'ดูแลชุมชน' },
-  { id: 'role-transfer', label: 'ย้ายบทบาท', group: 'community', groupLabel: 'ดูแลชุมชน' },
+  { id: 'role-transfer', label: 'โอนย้ายยศ', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'bulk-role-manage', label: 'จัดการยศกลุ่ม', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'daily-quests', label: 'เควสประจำวัน', group: 'community', groupLabel: 'ดูแลชุมชน', ownerOnly: true },
 
@@ -50,6 +50,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'manage-staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'roles-to-delete', label: 'ยศที่ต้องลบเมื่อย้าย', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
+  { id: 'role-migration', label: 'ปรับเปลี่ยนยศคลาส', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */

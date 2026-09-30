@@ -142,7 +142,7 @@ export function getAdminNavTree(
             },
             {
               id: 'role-transfer',
-              label: 'ย้ายบทบาท',
+              label: 'โอนย้ายยศ',
               description: 'โอนย้ายยศข้ามบัญชีดิสคอร์ด',
               icon: ArrowLeftRight,
             },
@@ -252,8 +252,8 @@ export function getAdminNavTree(
             },
             {
               id: 'role-migration',
-              label: 'โอนย้ายยศ',
-              description: 'ระบบย้ายยศเวอร์ชันก่อนหน้า',
+              label: 'ปรับเปลี่ยนยศคลาส',
+              description: 'ระบบอัปเกรดยศคลาส S/A/B/C/D/E',
               icon: Layers,
             },
           ],
