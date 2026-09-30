@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Search, Loader2, ShieldBan, CheckCircle2, XCircle, User, ArrowLeftRight, History, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, Trash2, ExternalLink, Calendar, AlertTriangle, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -22,6 +22,7 @@ interface Profile {
   discord_id: string;
   username: string;
   avatar_url: string | null;
+  discord_username?: string | null;
 }
 
 interface MemberPreview {
@@ -55,18 +56,26 @@ interface TransferLog {
   profiles?: { username: string; avatar_url: string | null } | null;
 }
 
+function cleanDiscordId(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+  const mentionMatch = trimmed.match(/<@!?(\d+)>/);
+  if (mentionMatch) return mentionMatch[1];
+  // If it contains only digits or looks like a snowflake
+  const digitsOnly = trimmed.replace(/\s+/g, '');
+  return digitsOnly;
+}
+
 export function RoleTransferManagement() {
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [sourceDiscordId, setSourceDiscordId] = useState('');
   const [targetDiscordId, setTargetDiscordId] = useState('');
-  const [sourceOpen, setSourceOpen] = useState(false);
-  const [targetOpen, setTargetOpen] = useState(false);
-  const [sourceSearch, setSourceSearch] = useState('');
-  const [targetSearch, setTargetSearch] = useState('');
   const [sourceMember, setSourceMember] = useState<MemberPreview | null>(null);
   const [targetMember, setTargetMember] = useState<MemberPreview | null>(null);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [targetError, setTargetError] = useState<string | null>(null);
   const [roles, setRoles] = useState<RolePreview[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -103,22 +112,6 @@ export function RoleTransferManagement() {
     }
     loadProfiles();
   }, []);
-
-  const filterProfiles = (query: string, excludeId?: string) => {
-    const q = query.toLowerCase().trim();
-    return profiles.filter(p => {
-      if (excludeId && p.discord_id === excludeId) return false;
-      if (!q) return true;
-      return (
-        p.username.toLowerCase().includes(q) ||
-        p.discord_id.includes(q) ||
-        ((p as any).discord_username ?? '').toLowerCase().includes(q)
-      );
-    });
-  };
-
-  const filteredSourceProfiles = useMemo(() => filterProfiles(sourceSearch, targetDiscordId), [sourceSearch, profiles, targetDiscordId]);
-  const filteredTargetProfiles = useMemo(() => filterProfiles(targetSearch, sourceDiscordId), [targetSearch, profiles, sourceDiscordId]);
 
   const selectedSourceProfile = profiles.find(p => p.discord_id === sourceDiscordId);
   const selectedTargetProfile = profiles.find(p => p.discord_id === targetDiscordId);
@@ -165,20 +158,35 @@ export function RoleTransferManagement() {
 
   // Auto-preview when source is selected
   useEffect(() => {
-    if (sourceDiscordId) previewSource(sourceDiscordId);
-    else { setSourceMember(null); setRoles([]); setSelectedRoles(new Set()); setTransferResult(null); }
+    if (sourceDiscordId) {
+      previewSource(sourceDiscordId);
+    } else {
+      setSourceMember(null);
+      setRoles([]);
+      setSelectedRoles(new Set());
+      setTransferResult(null);
+      setSourceError(null);
+    }
   }, [sourceDiscordId]);
 
   // Auto-preview target when selected
   useEffect(() => {
-    if (targetDiscordId) previewTarget(targetDiscordId);
-    else setTargetMember(null);
+    if (targetDiscordId) {
+      previewTarget(targetDiscordId);
+    } else {
+      setTargetMember(null);
+      setTargetError(null);
+    }
   }, [targetDiscordId]);
 
   async function previewSource(discordId: string) {
+    const cleanId = cleanDiscordId(discordId);
+    if (!cleanId) return;
+
     setLoading(true);
     setRoles([]);
     setSourceMember(null);
+    setSourceError(null);
     setSelectedRoles(new Set());
     setTransferResult(null);
     try {
@@ -186,7 +194,7 @@ export function RoleTransferManagement() {
       if (!session) { toast({ title: 'กรุณาเข้าสู่ระบบ', variant: 'destructive' }); return; }
 
       const { data, error } = await supabase.functions.invoke('transfer-roles', {
-        body: { action: 'preview', sourceDiscordId: discordId },
+        body: { action: 'preview', sourceDiscordId: cleanId },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
@@ -202,28 +210,36 @@ export function RoleTransferManagement() {
       }
     } catch (error: any) {
       console.error('Preview error:', error);
-      toast({ title: 'เกิดข้อผิดพลาด', description: error?.message || 'ไม่สามารถดึงข้อมูลได้', variant: 'destructive' });
+      const errMsg = error?.message || 'ไม่สามารถดึงข้อมูลจากบอทได้ (ตรวจสอบว่า Discord ID ถูกต้องและผู้ใช้อยู่ในเซิร์ฟเวอร์)';
+      setSourceError(errMsg);
+      toast({ title: 'เกิดข้อผิดพลาด', description: errMsg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }
 
   async function previewTarget(discordId: string) {
+    const cleanId = cleanDiscordId(discordId);
+    if (!cleanId) return;
+
     setLoadingTarget(true);
     setTargetMember(null);
+    setTargetError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
       const { data, error } = await supabase.functions.invoke('transfer-roles', {
-        body: { action: 'preview', sourceDiscordId: discordId },
+        body: { action: 'preview', sourceDiscordId: cleanId },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;
       if (data?.member) setTargetMember(data.member);
     } catch (error: any) {
-      toast({ title: 'ไม่พบผู้ใช้ปลายทาง', description: error?.message || '', variant: 'destructive' });
+      const errMsg = error?.message || 'ไม่พบผู้ใช้ปลายทางในเซิร์ฟเวอร์ Discord';
+      setTargetError(errMsg);
+      toast({ title: 'ไม่พบผู้ใช้ปลายทาง', description: errMsg, variant: 'destructive' });
     } finally {
       setLoadingTarget(false);
     }
@@ -263,8 +279,8 @@ export function RoleTransferManagement() {
       const { data, error } = await supabase.functions.invoke('transfer-roles', {
         body: {
           action: 'transfer',
-          sourceDiscordId: sourceDiscordId,
-          targetDiscordId: targetDiscordId,
+          sourceDiscordId: cleanDiscordId(sourceDiscordId),
+          targetDiscordId: cleanDiscordId(targetDiscordId),
           rolesToTransfer: Array.from(selectedRoles),
         },
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -284,196 +300,330 @@ export function RoleTransferManagement() {
     }
   }
 
-  const transferableCount = roles.filter(r => !r.blocked).length;
-  const blockedCount = roles.filter(r => r.blocked).length;
-  const deleteOnTransferCount = roles.filter(r => r.deleteOnTransfer).length;
-  const selectedCount = selectedRoles.size;
-  const progressPercent = transferableCount > 0 ? (selectedCount / transferableCount) * 100 : 0;
-
-  // Derived: filter logs by search query and date range, then paginate
-  const filteredLogs = useMemo(() => {
-    const q = logSearch.toLowerCase().trim();
-    const from = logDateFrom ? new Date(logDateFrom + 'T00:00:00') : null;
-    const to = logDateTo ? new Date(logDateTo + 'T23:59:59') : null;
-    return logs.filter(log => {
-      if (q) {
-        const match =
-          (log.source_username || '').toLowerCase().includes(q) ||
-          log.source_discord_id.includes(q) ||
-          (log.target_username || '').toLowerCase().includes(q) ||
-          log.target_discord_id.includes(q) ||
-          (log.profiles?.username || '').toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      if (from || to) {
-        const d = new Date(log.created_at);
-        if (from && d < from) return false;
-        if (to && d > to) return false;
-      }
-      return true;
-    });
-  }, [logs, logSearch, logDateFrom, logDateTo]);
-
-  const logTotalPages = Math.max(1, Math.ceil(filteredLogs.length / LOG_PAGE_SIZE));
-  const paginatedLogs = filteredLogs.slice((logPage - 1) * LOG_PAGE_SIZE, logPage * LOG_PAGE_SIZE);
-
-  // Reset to page 1 when filters change
-  useEffect(() => { setLogPage(1); }, [logSearch, logDateFrom, logDateTo]);
-
-  function ProfileCombobox({
-    value, onSelect, open, setOpen, search, setSearch, filteredProfiles, selectedProfile, memberPreview, placeholder, loading: comboLoading
+  /**
+   * Enhanced Member Input & Selector Component
+   * Supports:
+   * 1. Direct Discord ID input (for non-logged-in users via Bot fetch)
+   * 2. Searchable dropdown for registered web users
+   * 3. Instant clear / change / reload
+   */
+  function MemberInputCard({
+    title,
+    icon: Icon,
+    discordId,
+    onSelectId,
+    member,
+    profile,
+    loading,
+    error,
+    excludeDiscordId,
+    placeholder,
   }: {
-    value: string;
-    onSelect: (discordId: string) => void;
-    open: boolean;
-    setOpen: (v: boolean) => void;
-    search: string;
-    setSearch: (v: string) => void;
-    filteredProfiles: Profile[];
-    selectedProfile?: Profile;
-    memberPreview?: MemberPreview | null;
+    title: string;
+    icon: React.ElementType;
+    discordId: string;
+    onSelectId: (id: string) => void;
+    member: MemberPreview | null;
+    profile?: Profile;
+    loading: boolean;
+    error: string | null;
+    excludeDiscordId?: string;
     placeholder: string;
-    loading?: boolean;
   }) {
-    const isNumericId = /^\d{17,20}$/.test(search.trim());
-    const hasExactMatch = filteredProfiles.some(p => p.discord_id === search.trim());
+    const [mode, setMode] = useState<'search' | 'direct'>('search');
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [directInput, setDirectInput] = useState('');
+
+    const filtered = useMemo(() => {
+      const q = search.toLowerCase().trim();
+      return profiles.filter(p => {
+        if (excludeDiscordId && p.discord_id === excludeDiscordId) return false;
+        if (!q) return true;
+        return (
+          p.username.toLowerCase().includes(q) ||
+          p.discord_id.includes(q) ||
+          ((p as any).discord_username ?? '').toLowerCase().includes(q)
+        );
+      });
+    }, [search, excludeDiscordId]);
+
+    const cleanedSearch = cleanDiscordId(search);
+    const isSearchLooksLikeId = cleanedSearch.length >= 6;
+
+    const handleApplyDirectId = () => {
+      const cleaned = cleanDiscordId(directInput);
+      if (!cleaned) {
+        toast({ title: 'กรุณากรอก Discord ID', variant: 'destructive' });
+        return;
+      }
+      onSelectId(cleaned);
+    };
+
+    const handleClear = () => {
+      onSelectId('');
+      setDirectInput('');
+      setSearch('');
+    };
 
     return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" aria-expanded={open}
-            className="w-full justify-between h-auto min-h-10 font-normal">
-            {selectedProfile ? (
-              <div className="flex items-center gap-2 min-w-0">
-                {selectedProfile.avatar_url ? (
-                  <img src={selectedProfile.avatar_url} alt="" className="w-6 h-6 rounded-full shrink-0" />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs shrink-0">👤</div>
-                )}
-                <span className="truncate font-medium">{selectedProfile.username}</span>
-                <span className="text-xs text-muted-foreground font-mono shrink-0">{selectedProfile.discord_id}</span>
-              </div>
-            ) : memberPreview && value === memberPreview.id ? (
-              <div className="flex items-center gap-2 min-w-0">
-                {memberPreview.avatar ? (
-                  <img src={memberPreview.avatar} alt="" className="w-6 h-6 rounded-full shrink-0" />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-honey/20 flex items-center justify-center text-xs shrink-0">🤖</div>
-                )}
-                <span className="truncate font-medium">{memberPreview.username}</span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey shrink-0">
-                  ดึงจากบอท
-                </Badge>
-                <span className="text-xs text-muted-foreground font-mono shrink-0">{memberPreview.id}</span>
-              </div>
-            ) : value ? (
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-honey/20 flex items-center justify-center text-xs shrink-0">🆔</div>
-                <span className="text-sm font-mono truncate">{value}</span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey shrink-0">
-                  Discord ID
-                </Badge>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+      <Card className="border border-border/80 shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Icon className="w-4 h-4 text-primary" />
+              {title}
+            </CardTitle>
+            {discordId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClear}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                เปลี่ยนผู้ใช้
+              </Button>
             )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0" align="start">
-          <Command shouldFilter={false}>
-            <div className="flex items-center border-b px-3">
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              <input
-                className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="ค้นหาชื่อ หรือระบุ Discord ID (17-20 หลัก)..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && isNumericId) {
-                    onSelect(search.trim());
-                    setOpen(false);
-                    setSearch('');
-                  }
-                }}
-                autoFocus
-              />
-            </div>
-            {isNumericId && !hasExactMatch && (
-              <div className="p-2 border-b border-border bg-honey/5">
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-normal text-honey hover:bg-honey/10 transition-colors text-left"
-                  onClick={() => {
-                    onSelect(search.trim());
-                    setOpen(false);
-                    setSearch('');
-                  }}
-                >
-                  <Search className="w-3.5 h-3.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">ดึงข้อมูลผ่าน Discord Bot ด้วย ID:</p>
-                    <p className="font-mono text-[11px] text-muted-foreground truncate">{search.trim()}</p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* If user is selected & loaded */}
+          {discordId && (member || profile) ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-honey/10 border border-honey/20">
+                {member?.avatar || profile?.avatar_url ? (
+                  <img
+                    src={member?.avatar || profile?.avatar_url || ''}
+                    alt=""
+                    className="w-12 h-12 rounded-full border border-border/60 shadow-xs object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-honey/20 flex items-center justify-center text-xl shrink-0">👤</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-sm truncate">
+                      {member?.username || profile?.username}
+                    </p>
+                    {profile ? (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        สมาชิกในเว็บ
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-sky-500/10 text-sky-600 border-sky-500/30">
+                        Discord Bot Member
+                      </Badge>
+                    )}
                   </div>
-                  <Badge variant="outline" className="text-[10px] border-honey/40 text-honey shrink-0">
-                    ดึงสด
-                  </Badge>
-                </button>
-              </div>
-            )}
-            <CommandList>
-              <CommandEmpty>
-                {loadingProfiles ? (
-                  'กำลังโหลด...'
-                ) : isNumericId ? (
-                  <div className="p-3 text-center space-y-2">
-                    <p className="text-xs text-muted-foreground">ไม่พบในระบบล็อกอินเว็บ</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      ID: {discordId}
+                    </span>
                     <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="text-xs border-honey/40 text-honey hover:bg-honey/10"
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 text-muted-foreground hover:text-foreground"
                       onClick={() => {
-                        onSelect(search.trim());
-                        setOpen(false);
-                        setSearch('');
+                        navigator.clipboard.writeText(discordId);
+                        toast({ title: 'คัดลอก ID แล้ว' });
                       }}
+                      title="คัดลอก Discord ID"
                     >
-                      ดึงข้อมูลผ่าน Bot ด้วย ID: {search.trim()}
+                      <Copy className="w-3 h-3" />
                     </Button>
                   </div>
-                ) : (
-                  'ไม่พบผู้ใช้ (ระบุชื่อ หรือพิมพ์ Discord ID 17-20 หลัก)'
-                )}
-              </CommandEmpty>
-              <CommandGroup>
-                {filteredProfiles.slice(0, 50).map(profile => (
-                  <CommandItem
-                    key={profile.id}
-                    value={profile.discord_id}
-                    onSelect={() => { onSelect(profile.discord_id); setOpen(false); setSearch(''); }}
-                    className="flex items-center gap-2"
-                  >
-                    <Check className={cn("mr-1 h-4 w-4", value === profile.discord_id ? "opacity-100" : "opacity-0")} />
-                    {profile.avatar_url ? (
-                      <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs shrink-0">👤</div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{profile.username}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{profile.discord_id}</p>
-                      {(profile as any).discord_username && (
-                        <p className="text-xs text-muted-foreground">@{(profile as any).discord_username}</p>
+                  {profile?.discord_username && (
+                    <p className="text-[11px] text-muted-foreground">@{profile.discord_username}</p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-xl shrink-0"
+                  onClick={() => onSelectId(discordId)}
+                  title="รีเฟรชข้อมูล"
+                  disabled={loading}
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+                </Button>
+              </div>
+
+              {loading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pl-1">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  กำลังดึงข้อมูลยศจากบอท...
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Input / Selection Form */
+            <div className="space-y-2.5">
+              {/* Mode Toggle Tabs */}
+              <div className="flex items-center p-1 bg-muted/60 rounded-xl gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMode('search')}
+                  className={cn(
+                    "flex-1 py-1 px-2.5 rounded-lg font-medium transition-all text-center",
+                    mode === 'search'
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  เลือกจากสมาชิกเว็บ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('direct')}
+                  className={cn(
+                    "flex-1 py-1 px-2.5 rounded-lg font-medium transition-all text-center",
+                    mode === 'direct'
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  ระบุ Discord ID โดยตรง
+                </button>
+              </div>
+
+              {mode === 'search' ? (
+                /* Search Combobox */
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between h-10 font-normal rounded-xl border-border/80"
+                    >
+                      <span className="text-muted-foreground truncate">{placeholder}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[360px] sm:w-[420px] p-0 rounded-2xl" align="start">
+                    <Command shouldFilter={false}>
+                      <div className="flex items-center border-b px-3">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <input
+                          className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          placeholder="พิมพ์ชื่อ, Discord ID หรือ @mention..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <CommandList className="max-h-[300px]">
+                        {/* Option to use raw typed ID directly via bot */}
+                        {isSearchLooksLikeId && (
+                          <div className="p-1 border-b border-border/50 bg-primary/5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectId(cleanedSearch);
+                                setOpen(false);
+                                setSearch('');
+                              }}
+                              className="w-full flex items-center gap-2 p-2 rounded-xl text-left hover:bg-primary/10 transition-colors text-primary font-medium text-xs"
+                            >
+                              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">ใช้ Discord ID: <strong className="font-mono">{cleanedSearch}</strong> (ดึงข้อมูลผ่านบอท)</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {filtered.length === 0 && !isSearchLooksLikeId && (
+                          <CommandEmpty>
+                            {loadingProfiles ? 'กำลังโหลด...' : 'ไม่พบสมาชิกในเว็บ (สามารถพิมพ์ Discord ID เพื่อค้นหาผ่านบอทได้)'}
+                          </CommandEmpty>
+                        )}
+
+                        <CommandGroup heading="สมาชิกในเว็บ">
+                          {filtered.slice(0, 40).map(p => (
+                            <CommandItem
+                              key={p.id}
+                              value={p.discord_id}
+                              onSelect={() => {
+                                onSelectId(p.discord_id);
+                                setOpen(false);
+                                setSearch('');
+                              }}
+                              className="flex items-center gap-2.5 p-2 rounded-xl"
+                            >
+                              <Check className={cn("mr-1 h-3.5 w-3.5 shrink-0", discordId === p.discord_id ? "opacity-100" : "opacity-0")} />
+                              {p.avatar_url ? (
+                                <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full shrink-0 object-cover" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs shrink-0">👤</div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold truncate">{p.username}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{p.discord_id}</p>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                /* Direct Discord ID Input */
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="ใส่ Discord ID (เช่น 123456789012345678)"
+                      value={directInput}
+                      onChange={(e) => setDirectInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleApplyDirectId();
+                        }
+                      }}
+                      className="rounded-xl font-mono text-xs h-10"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleApplyDirectId}
+                      disabled={!directInput.trim() || loading}
+                      className="rounded-xl shrink-0 gap-1.5 text-xs h-10 px-3.5"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Search className="w-3.5 h-3.5" />
                       )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                      ดึงข้อมูล
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    💡 กรอก Discord Snowflake ID (17-20 หลัก) หรือแท็ก mention เพื่อให้บอทดึงข้อมูลแม้ผู้ใช้ยังไม่เคยเข้าสู่ระบบเว็บ
+                  </p>
+                </div>
+              )}
+
+              {/* Loading Indicator */}
+              {loading && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 text-xs text-muted-foreground animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  กำลังดึงข้อมูลสมาชิกและยศจากบอท Discord...
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold">{error}</p>
+                    <p className="text-[11px] opacity-80 mt-0.5">กรุณาตรวจสอบว่าผู้ใช้อยู่ในเซิร์ฟเวอร์ Bear Cafe และบอทมีสิทธิ์เข้าถึง</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   }
 
@@ -499,138 +649,32 @@ export function RoleTransferManagement() {
       {/* Source & Target Selection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Source */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <User className="w-4 h-4 text-primary" />
-                ผู้ทำเรื่องย้าย (ต้นทาง)
-              </CardTitle>
-              {sourceDiscordId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setSourceDiscordId('');
-                    setSourceMember(null);
-                    setRoles([]);
-                    setSelectedRoles(new Set());
-                  }}
-                >
-                  ล้างค่า
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <ProfileCombobox
-              value={sourceDiscordId}
-              onSelect={setSourceDiscordId}
-              open={sourceOpen}
-              setOpen={setSourceOpen}
-              search={sourceSearch}
-              setSearch={setSourceSearch}
-              filteredProfiles={filteredSourceProfiles}
-              selectedProfile={selectedSourceProfile}
-              memberPreview={sourceMember}
-              placeholder="เลือกผู้ใช้หรือระบุ Discord ID ต้นทาง..."
-            />
-            {loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลยศจาก Discord Bot...
-              </div>
-            )}
-            {sourceMember && !loading && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-honey/10 border border-honey/20">
-                <div className="flex items-center gap-3">
-                  {sourceMember.avatar ? (
-                    <img src={sourceMember.avatar} alt="" className="w-10 h-10 rounded-full" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
-                  )}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{sourceMember.username}</p>
-                      {!selectedSourceProfile && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey">
-                          Discord Bot
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono">{sourceMember.id}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MemberInputCard
+          title="ผู้ทำเรื่องย้าย (ต้นทาง)"
+          icon={User}
+          discordId={sourceDiscordId}
+          onSelectId={setSourceDiscordId}
+          member={sourceMember}
+          profile={selectedSourceProfile}
+          loading={loading}
+          error={sourceError}
+          excludeDiscordId={targetDiscordId}
+          placeholder="เลือกผู้ใช้ต้นทาง หรือระบุ Discord ID..."
+        />
 
         {/* Target */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ArrowRight className="w-4 h-4 text-primary" />
-                ย้ายไปยัง (ปลายทาง)
-              </CardTitle>
-              {targetDiscordId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setTargetDiscordId('');
-                    setTargetMember(null);
-                  }}
-                >
-                  ล้างค่า
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <ProfileCombobox
-              value={targetDiscordId}
-              onSelect={setTargetDiscordId}
-              open={targetOpen}
-              setOpen={setTargetOpen}
-              search={targetSearch}
-              setSearch={setTargetSearch}
-              filteredProfiles={filteredTargetProfiles}
-              selectedProfile={selectedTargetProfile}
-              memberPreview={targetMember}
-              placeholder="เลือกผู้ใช้หรือระบุ Discord ID ปลายทาง..."
-            />
-            {loadingTarget && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> กำลังโหลดข้อมูลจาก Discord Bot...
-              </div>
-            )}
-            {targetMember && !loadingTarget && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-honey/10 border border-honey/20">
-                <div className="flex items-center gap-3">
-                  {targetMember.avatar ? (
-                    <img src={targetMember.avatar} alt="" className="w-10 h-10 rounded-full" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-honey/20 flex items-center justify-center text-lg">👤</div>
-                  )}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{targetMember.username}</p>
-                      {!selectedTargetProfile && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-honey/40 text-honey">
-                          Discord Bot
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono">{targetMember.id}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MemberInputCard
+          title="ย้ายไปยัง (ปลายทาง)"
+          icon={ArrowRight}
+          discordId={targetDiscordId}
+          onSelectId={setTargetDiscordId}
+          member={targetMember}
+          profile={selectedTargetProfile}
+          loading={loadingTarget}
+          error={targetError}
+          excludeDiscordId={sourceDiscordId}
+          placeholder="เลือกผู้ใช้ปลายทาง หรือระบุ Discord ID..."
+        />
       </div>
 
       {/* Roles Selection */}

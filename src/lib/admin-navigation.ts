@@ -250,12 +250,6 @@ export function getAdminNavTree(
               description: 'ยศที่ถูกริบคืนอัตโนมัติเมื่อย้าย',
               icon: Trash2,
             },
-            {
-              id: 'role-migration',
-              label: 'ปรับเปลี่ยนยศคลาส',
-              description: 'ระบบอัปเกรดยศคลาส S/A/B/C/D/E',
-              icon: Layers,
-            },
           ],
         },
       ],

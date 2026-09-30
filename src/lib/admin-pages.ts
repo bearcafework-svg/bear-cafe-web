@@ -50,7 +50,6 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'manage-staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'roles-to-delete', label: 'ยศที่ต้องลบเมื่อย้าย', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
-  { id: 'role-migration', label: 'ปรับเปลี่ยนยศคลาส', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
 ];
 
 /** Pages that can be assigned via custom permissions (excludes 'permissions' itself) */
