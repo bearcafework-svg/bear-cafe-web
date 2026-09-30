@@ -300,6 +300,42 @@ export function RoleTransferManagement() {
     }
   }
 
+  const transferableCount = roles.filter(r => !r.blocked).length;
+  const blockedCount = roles.filter(r => r.blocked).length;
+  const deleteOnTransferCount = roles.filter(r => r.deleteOnTransfer).length;
+  const selectedCount = selectedRoles.size;
+  const progressPercent = transferableCount > 0 ? (selectedCount / transferableCount) * 100 : 0;
+
+  // Derived: filter logs by search query and date range, then paginate
+  const filteredLogs = useMemo(() => {
+    const q = logSearch.toLowerCase().trim();
+    const from = logDateFrom ? new Date(logDateFrom + 'T00:00:00') : null;
+    const to = logDateTo ? new Date(logDateTo + 'T23:59:59') : null;
+    return logs.filter(log => {
+      if (q) {
+        const match =
+          (log.source_username || '').toLowerCase().includes(q) ||
+          log.source_discord_id.includes(q) ||
+          (log.target_username || '').toLowerCase().includes(q) ||
+          log.target_discord_id.includes(q) ||
+          (log.profiles?.username || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (from || to) {
+        const d = new Date(log.created_at);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
+      return true;
+    });
+  }, [logs, logSearch, logDateFrom, logDateTo]);
+
+  const logTotalPages = Math.max(1, Math.ceil(filteredLogs.length / LOG_PAGE_SIZE));
+  const paginatedLogs = filteredLogs.slice((logPage - 1) * LOG_PAGE_SIZE, logPage * LOG_PAGE_SIZE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setLogPage(1); }, [logSearch, logDateFrom, logDateTo]);
+
   /**
    * Enhanced Member Input & Selector Component
    * Supports:
