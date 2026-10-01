@@ -1534,6 +1534,26 @@ export function ContractsManagement() {
     setContracts(list);
     const memberIds = [...new Set(list.map(c => c.member_id))];
     fetchMemberProfiles(memberIds);
+
+    // Auto-cleanup expired ad channels in background if any exist
+    const hasUncleanedExpiredAd = list.some(
+      c => c.type === 'ad' && c.channel_id && !c.channel_deleted_at && c.end_at && new Date(c.end_at).getTime() <= Date.now()
+    );
+    if (hasUncleanedExpiredAd) {
+      supabase.functions.invoke('cleanup-expired-ad-channels', {}).then(({ data: cleanupRes, error: cleanupErr }) => {
+        if (!cleanupErr && cleanupRes?.deletedCount > 0) {
+          (supabase as any)
+            .from('contracts')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .then(({ data: updatedData }: any) => {
+              if (updatedData) {
+                setContracts(updatedData.filter((c: any) => c.type !== 'role'));
+              }
+            });
+        }
+      }).catch(() => {});
+    }
   }, [toast]);
 
   async function handleCleanupExpiredAdChannels() {
