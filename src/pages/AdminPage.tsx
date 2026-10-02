@@ -33,7 +33,7 @@ import {
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
-  Copy, Target,
+  Copy, Target, Sparkles, Trash2, HeartHandshake,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -53,6 +53,7 @@ import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
 import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
 import { BannerManagement } from '@/components/admin/BannerManagement';
+import { HealJaiManagement } from '@/components/admin/HealJaiManagement';
 
 
 
@@ -75,6 +76,8 @@ import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOvervie
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
 import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
 import { DailyQuestsManagement } from '@/components/admin/DailyQuestsManagement';
+import { GachaponManagement } from '@/components/admin/GachaponManagement';
+import { AIAssistantManagement } from '@/components/admin/AIAssistantManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -133,6 +136,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'sticky-messages': Pin,
   'minigames': Gamepad2,
   'daily-quests': Target,
+  'gachapon': Sparkles,
+  'permissions': ShieldCheck,
+  'roles-to-delete': Trash2,
+  'heal-jai': HeartHandshake,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -298,6 +305,9 @@ function AdminPageContent() {
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
         case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;
         case 'daily-quests': return canAccessPage('daily-quests') ? <DailyQuestsManagement /> : null;
+        case 'gachapon': return canAccessPage('gachapon') ? <GachaponManagement /> : null;
+        case 'ai-assistant': return canAccessPage('ai-assistant') ? <AIAssistantManagement /> : null;
+        case 'heal-jai': return canAccessPage('heal-jai') ? <HealJaiManagement currentUser={user} isOwner={isOwner} /> : null;
 
         default: return null;
       }

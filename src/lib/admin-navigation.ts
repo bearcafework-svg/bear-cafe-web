@@ -28,6 +28,8 @@ import {
   Receipt,
   Gift,
   Target,
+  Bot,
+  HeartHandshake,
 } from 'lucide-react';
 import { NavItem } from '@/components/ui/dropdown-navigation';
 
@@ -70,6 +72,12 @@ export function getAdminNavTree(
         {
           title: 'ของขวัญและโปรโมชัน',
           items: [
+            {
+              id: 'gachapon',
+              label: 'ตู้กาชาปอง',
+              description: 'จัดการตู้สุ่ม เรทโอกาสดรอป และของรางวัล',
+              icon: Sparkles,
+            },
             {
               id: 'checkin-rewards',
               label: 'เช็กอินรายวัน',
@@ -196,13 +204,19 @@ export function getAdminNavTree(
           ],
         },
         {
-          title: 'มินิเกม',
+          title: 'มินิเกมและ AI',
           items: [
             {
               id: 'minigames',
               label: 'จัดการมินิเกม',
               description: 'คลังคำศัพท์และตั้งค่ามินิเกมทั้ง 13 เกม',
               icon: Gamepad2,
+            },
+            {
+              id: 'ai-assistant',
+              label: 'จัดการ AI พี่หมี',
+              description: 'คลังความรู้ กฎร้าน และ Sticker Triggers',
+              icon: Bot,
             },
           ],
         },
@@ -220,6 +234,12 @@ export function getAdminNavTree(
               label: 'ภาพรวมระบบ',
               description: 'แดชบอร์ดสถิติและการทำงานรวม',
               icon: LayoutDashboard,
+            },
+            {
+              id: 'heal-jai',
+              label: 'จัดการโปรเจกต์ฮีลใจ',
+              description: 'บัตรพนักงาน บันทึก Log และสรุปรายได้',
+              icon: HeartHandshake,
             },
             {
               id: 'permissions',

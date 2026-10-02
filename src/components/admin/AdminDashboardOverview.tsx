@@ -38,6 +38,7 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'non-transferable-roles': 'กำหนดบทบาทยศ Discord ที่ห้ามไม่ให้โอนย้าย',
   'roles-to-delete': 'ยศ Discord ที่จะถูกนำออกโดยอัตโนมัติเมื่อทำการย้าย',
   'permissions': 'ควบคุมสิทธิ์การเข้าถึงหน้าต่างต่าง ๆ ของทีมงาน',
+  'ai-assistant': 'จัดการคลังความรู้ กฎระเบียบร้าน และ Sticker Triggers ของ AI พี่หมี',
 };
 
 const GROUP_LABELS: Record<string, string> = {

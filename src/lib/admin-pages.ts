@@ -25,6 +25,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'checkin-rewards', label: 'เช็กอินรายวัน', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'redeem-codes', label: 'โค้ดแลกรางวัล', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'campaigns', label: 'จัดการโฆษณา', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
+  { id: 'gachapon', label: 'ตู้กาชาปอง', group: 'products', groupLabel: 'สินค้าและบริการ' },
 
   // ─── ดูแลชุมชน ───
   { id: 'users', label: 'จัดการผู้ใช้', group: 'community', groupLabel: 'ดูแลชุมชน' },
@@ -43,9 +44,11 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'sticky-messages', label: 'ข้อความติดหนึบ', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
   { id: 'dm-broadcast', label: 'ส่งข่าวสารบอท DM', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
   { id: 'minigames', label: 'จัดการมินิเกม', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
+  { id: 'ai-assistant', label: 'จัดการ AI พี่หมี', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
 
   // ─── ระบบและการตั้งค่า ───
   { id: 'overview', label: 'ภาพรวมระบบ', group: 'system', groupLabel: 'ระบบและการตั้งค่า' },
+  { id: 'heal-jai', label: 'จัดการโปรเจกต์ฮีลใจ', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'permissions', label: 'จัดการสิทธิ์', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'manage-staff', label: 'จัดการทีมงาน', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
   { id: 'non-transferable-roles', label: 'บทบาทห้ามย้าย', group: 'system', groupLabel: 'ระบบและการตั้งค่า', ownerOnly: true },
