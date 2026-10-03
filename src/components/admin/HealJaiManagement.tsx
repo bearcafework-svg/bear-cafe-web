@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import imageCompression from 'browser-image-compression';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ import {
   RefreshCw, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign, Calendar,
   ChevronLeft, ChevronRight, Copy, Check, MessageSquare, PhoneCall,
   VolumeX, Image as ImageIcon, Sparkles, X, UserCheck, ShieldAlert,
-  ArrowRight, FileText, Download, CheckCheck, Loader2
+  ArrowRight, FileText, Download, CheckCheck, Loader2, RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +98,40 @@ const ALL_SPECIALTIES = [
   'ไม่เจาะจง ขอแค่เป็นพื้นที่ปลอดภัยให้ระบายความในใจ',
 ];
 
+const SESSION_STATUS_MAP: Record<
+  string,
+  { label: string; className: string }
+> = {
+  COMPLETED: {
+    label: 'เสร็จสิ้น',
+    className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  },
+  IN_SESSION: {
+    label: 'กำลังสนทนา',
+    className: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+  },
+  DISPATCHING: {
+    label: 'กำลังจับคู่',
+    className: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  },
+  WAITING: {
+    label: 'รอรับเคส',
+    className: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
+  },
+  WAITING_FOR_PROVIDER: {
+    label: 'รอนัดหมาย',
+    className: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
+  },
+  IN_PROGRESS: {
+    label: 'กำลังดำเนินการ',
+    className: 'bg-sky-500/10 text-sky-600 border-sky-500/30',
+  },
+  CANCELLED: {
+    label: 'ยกเลิกแล้ว',
+    className: 'bg-red-500/10 text-red-600 border-red-500/30',
+  },
+};
+
 interface HealJaiManagementProps {
   currentUser?: { id: string; username?: string; is_owner?: boolean } | null;
   isOwner?: boolean;
@@ -127,6 +162,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
     payout_account: string;
     payout_name: string;
     specialty_tags: string[];
+    total_sessions: number;
   }>({
     user_id: '',
     display_name: '',
@@ -139,6 +175,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
     payout_account: '',
     payout_name: '',
     specialty_tags: ['ไม่เจาะจง ขอแค่เป็นพื้นที่ปลอดภัยให้ระบายความในใจ'],
+    total_sessions: 0,
   });
   const [savingCounselor, setSavingCounselor] = useState(false);
 
@@ -168,6 +205,131 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
   const [payoutAmount, setPayoutAmount] = useState<number>(0);
   const [payoutNotes, setPayoutNotes] = useState('');
   const [creatingPayout, setCreatingPayout] = useState(false);
+  const [resetEarningsOnPayout, setResetEarningsOnPayout] = useState(true);
+
+  // Reset Earnings Dialogs State
+  const [resetTargetCounselor, setResetTargetCounselor] = useState<Counselor | null>(null);
+  const [isResetSingleDialogOpen, setIsResetSingleDialogOpen] = useState(false);
+  const [isResetAllDialogOpen, setIsResetAllDialogOpen] = useState(false);
+  const [resetAllConfirmationText, setResetAllConfirmationText] = useState('');
+  const [isResettingEarnings, setIsResettingEarnings] = useState(false);
+
+  // Attach Slip State
+  const [attachingOrderId, setAttachingOrderId] = useState<number | null>(null);
+  const [isAttachingSlip, setIsAttachingSlip] = useState(false);
+  const attachSlipInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const triggerAttachSlip = (orderId: number) => {
+    setAttachingOrderId(orderId);
+    if (attachSlipInputRef.current) {
+      attachSlipInputRef.current.value = '';
+      attachSlipInputRef.current.click();
+    }
+  };
+
+  const handleAttachSlipFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !attachingOrderId) return;
+
+    setIsAttachingSlip(true);
+    try {
+      const options = {
+        maxSizeMB: 0.3,
+        maxWidthOrHeight: 1200,
+        useWebWorker: true,
+        fileType: 'image/webp',
+      };
+      const compressedFile = await imageCompression(file, options);
+      const fileName = `slip_${attachingOrderId}_${Date.now()}.webp`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('order-slips')
+        .upload(fileName, compressedFile, {
+          contentType: 'image/webp',
+          upsert: true,
+        });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage
+        .from('order-slips')
+        .getPublicUrl(fileName);
+
+      const slipUrl = urlData.publicUrl;
+
+      const { error: updateErr } = await supabase
+        .from('heal_jai_orders_sessions' as any)
+        .update({ slip_url: slipUrl })
+        .eq('id', attachingOrderId);
+
+      if (updateErr) throw updateErr;
+
+      toast({
+        title: 'แนบสลิปเรียบร้อยแล้ว',
+        description: `อัปเดตสลิปสำหรับออเดอร์ #${attachingOrderId} สำเร็จ`,
+      });
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === attachingOrderId ? { ...o, slip_url: slipUrl } : o))
+      );
+    } catch (err: any) {
+      console.error('[HealJai] Error attaching slip:', err);
+      toast({
+        title: 'แนบสลิปไม่สำเร็จ',
+        description: err.message || 'เกิดข้อผิดพลาดในการอัปโหลด',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAttachingSlip(false);
+      setAttachingOrderId(null);
+    }
+  };
+
+  const [deletingSlipOrderId, setDeletingSlipOrderId] = useState<number | null>(null);
+
+  const handleDeleteSlip = async (orderId: number, slipUrl: string) => {
+    if (!window.confirm(`ต้องการลบภาพสลิปของออเดอร์ #${orderId} ใช่หรือไม่?`)) return;
+
+    setDeletingSlipOrderId(orderId);
+    try {
+      if (slipUrl.includes('/order-slips/')) {
+        try {
+          const parts = slipUrl.split('/order-slips/');
+          if (parts[1]) {
+            const fileName = decodeURIComponent(parts[1].split('?')[0]);
+            await supabase.storage.from('order-slips').remove([fileName]);
+          }
+        } catch (storageErr) {
+          console.warn('[HealJai] Could not remove file from storage:', storageErr);
+        }
+      }
+
+      const { error: updateErr } = await supabase
+        .from('heal_jai_orders_sessions' as any)
+        .update({ slip_url: null })
+        .eq('id', orderId);
+
+      if (updateErr) throw updateErr;
+
+      toast({
+        title: 'ลบสลิปเรียบร้อยแล้ว',
+        description: `ลบภาพสลิปของออเดอร์ #${orderId} สำเร็จ`,
+      });
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, slip_url: null } : o))
+      );
+    } catch (err: any) {
+      console.error('[HealJai] Error deleting slip:', err);
+      toast({
+        title: 'ลบสลิปไม่สำเร็จ',
+        description: err.message || 'เกิดข้อผิดพลาดในการลบสลิป',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingSlipOrderId(null);
+    }
+  };
 
   // ── Fetch Functions ──
   const fetchCounselors = useCallback(async () => {
@@ -270,6 +432,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
       payout_account: '',
       payout_name: '',
       specialty_tags: ['ไม่เจาะจง ขอแค่เป็นพื้นที่ปลอดภัยให้ระบายความในใจ'],
+      total_sessions: 0,
     });
     setIsCounselorDialogOpen(true);
   };
@@ -307,6 +470,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
         : (typeof c.specialty_tags === 'string'
             ? (c.specialty_tags as string).split(',').map((s) => s.trim()).filter(Boolean)
             : []),
+      total_sessions: c.total_sessions ?? 0,
     });
     setIsCounselorDialogOpen(true);
   };
@@ -348,6 +512,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
         payout_account: formattedAccount || null,
         payout_name: recipientName || null,
         specialty_tags: tagsArray,
+        total_sessions: Math.max(0, parseInt(String(counselorForm.total_sessions)) || 0),
         updated_at: new Date().toISOString(),
       };
 
@@ -589,6 +754,23 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
       });
 
       if (error) throw error;
+
+      // หากเลือกรียอดสะสมตอนตัดรอบ
+      if (resetEarningsOnPayout) {
+        await supabase
+          .from('heal_jai_counselors' as any)
+          .update({ accumulated_earnings: 0 })
+          .eq('user_id', payoutTargetCounselor.user_id);
+
+        setCounselors((prev) =>
+          prev.map((c) =>
+            c.user_id === payoutTargetCounselor.user_id
+              ? { ...c, accumulated_earnings: 0 }
+              : c
+          )
+        );
+      }
+
       toast({ title: 'สร้างรอบโอนเงินสำเร็จแล้วค่ะ (สถานะ: กำลังรอ)' });
       setIsCreatePayoutOpen(false);
       fetchPayouts();
@@ -596,6 +778,71 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
       toast({ title: 'สร้างรอบโอนเงินไม่สำเร็จ', description: err.message, variant: 'destructive' });
     } finally {
       setCreatingPayout(false);
+    }
+  };
+
+  // ── Reset Earnings Handlers ──
+  const handleConfirmResetSingleEarnings = async () => {
+    if (!resetTargetCounselor) return;
+    setIsResettingEarnings(true);
+    try {
+      const { error } = await supabase
+        .from('heal_jai_counselors' as any)
+        .update({ accumulated_earnings: 0 })
+        .eq('id', resetTargetCounselor.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'รียอดสะสมสำเร็จ',
+        description: `รียอดสะสมของ ${resetTargetCounselor.display_name || resetTargetCounselor.user_id} เป็น ฿0 เรียบร้อยแล้ว`,
+      });
+
+      setCounselors((prev) =>
+        prev.map((c) => (c.id === resetTargetCounselor.id ? { ...c, accumulated_earnings: 0 } : c))
+      );
+      setIsResetSingleDialogOpen(false);
+      setResetTargetCounselor(null);
+    } catch (err: any) {
+      console.error('[HealJai] Error resetting earnings:', err);
+      toast({
+        title: 'รียอดสะสมไม่สำเร็จ',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResettingEarnings(false);
+    }
+  };
+
+  const handleConfirmResetAllEarnings = async () => {
+    if (resetAllConfirmationText !== 'RESET') return;
+    setIsResettingEarnings(true);
+    try {
+      const { error } = await supabase
+        .from('heal_jai_counselors' as any)
+        .update({ accumulated_earnings: 0 })
+        .neq('id', 0);
+
+      if (error) throw error;
+
+      toast({
+        title: 'รียอดสะสมทุกคนสำเร็จ',
+        description: 'ปรับยอดเงินสะสมของพนักงานทุกคนเป็น ฿0 เรียบร้อยแล้ว',
+      });
+
+      setCounselors((prev) => prev.map((c) => ({ ...c, accumulated_earnings: 0 })));
+      setIsResetAllDialogOpen(false);
+      setResetAllConfirmationText('');
+    } catch (err: any) {
+      console.error('[HealJai] Error resetting all earnings:', err);
+      toast({
+        title: 'รียอดสะสมทุกคนไม่สำเร็จ',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResettingEarnings(false);
     }
   };
 
@@ -739,6 +986,21 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                   <SelectItem value="OFFLINE">⚫ ออฟไลน์</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* ปุ่มรียอดสะสมทุกคน */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setResetAllConfirmationText('');
+                  setIsResetAllDialogOpen(true);
+                }}
+                className="rounded-xl h-10 text-xs sm:text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 border-amber-500/30 gap-1.5 font-medium px-3.5"
+                title="รีเซ็ตยอดรายได้สะสมของพนักงานทุกคนเป็น ฿0"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                รียอดสะสมทุกคน
+              </Button>
             </div>
           </div>
 
@@ -899,7 +1161,20 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground font-medium">รายได้สะสม</p>
+                          <div className="flex items-center justify-center gap-1">
+                            <p className="text-xs text-muted-foreground font-medium">รายได้สะสม</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResetTargetCounselor(c);
+                                setIsResetSingleDialogOpen(true);
+                              }}
+                              className="text-muted-foreground/60 hover:text-amber-600 transition-colors p-0.5 rounded"
+                              title="รียอดสะสมเป็น ฿0"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </button>
+                          </div>
                           <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                             ฿{(Number(c.accumulated_earnings) || 0).toLocaleString()}
                           </p>
@@ -1082,17 +1357,62 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                           </TableCell>
                           <TableCell className="text-sm py-3">
                             {o.slip_url ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewingSlipUrl(o.slip_url)}
-                                className="h-8 px-2.5 text-xs font-medium gap-1.5 text-primary hover:bg-primary/10 rounded-lg"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                ดูสลิป
-                              </Button>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setViewingSlipUrl(o.slip_url)}
+                                  className="h-8 px-2.5 text-xs font-medium gap-1 text-primary hover:bg-primary/10 rounded-lg"
+                                  title="ดูสลิป"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  ดูสลิป
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isAttachingSlip && attachingOrderId === o.id}
+                                  onClick={() => triggerAttachSlip(o.id)}
+                                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg gap-1 border-border/60"
+                                  title="เปลี่ยนภาพสลิป"
+                                >
+                                  {isAttachingSlip && attachingOrderId === o.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  )}
+                                  แก้ไข
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={deletingSlipOrderId === o.id}
+                                  onClick={() => handleDeleteSlip(o.id, o.slip_url!)}
+                                  className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 rounded-lg"
+                                  title="ลบสลิป"
+                                >
+                                  {deletingSlipOrderId === o.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                              </div>
                             ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isAttachingSlip && attachingOrderId === o.id}
+                                onClick={() => triggerAttachSlip(o.id)}
+                                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-lg gap-1.5 border-dashed border-border/80 hover:border-primary/50 hover:bg-primary/5 font-medium transition-colors"
+                              >
+                                {isAttachingSlip && attachingOrderId === o.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                                )}
+                                เพิ่มภาพ
+                              </Button>
                             )}
                           </TableCell>
                           <TableCell className="text-sm py-3">
@@ -1100,14 +1420,10 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                               variant="outline"
                               className={cn(
                                 'text-xs font-semibold px-2.5 py-0.5',
-                                o.session_status === 'COMPLETED' && 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
-                                o.session_status === 'IN_SESSION' && 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-                                o.session_status === 'DISPATCHING' && 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-                                o.session_status === 'WAITING' && 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-                                o.session_status === 'CANCELLED' && 'bg-red-500/10 text-red-600 border-red-500/30'
+                                SESSION_STATUS_MAP[o.session_status]?.className || 'bg-muted/40 text-muted-foreground border-border'
                               )}
                             >
-                              {o.session_status}
+                              {SESSION_STATUS_MAP[o.session_status]?.label || o.session_status}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono py-3">
@@ -1250,14 +1566,32 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                           ฿{item.earnings70.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right py-3.5">
-                          <Button
-                            size="sm"
-                            onClick={() => openCreatePayoutModal(item)}
-                            className="rounded-xl h-9 text-xs sm:text-sm gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 px-3.5 font-medium"
-                          >
-                            <DollarSign className="w-4 h-4" />
-                            ตัดรอบ / ทำรายการโอน
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              onClick={() => openCreatePayoutModal(item)}
+                              className="rounded-xl h-9 text-xs sm:text-sm gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 px-3 font-medium"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                              ตัดรอบ / ทำรายการโอน
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const found = counselors.find((c) => c.user_id === item.counselorId);
+                                if (found) {
+                                  setResetTargetCounselor(found);
+                                  setIsResetSingleDialogOpen(true);
+                                }
+                              }}
+                              className="rounded-xl h-9 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 border-amber-500/30 px-2.5 font-medium gap-1"
+                              title="รียอดสะสมของพนักงานคนนี้"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              รียอด
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1435,7 +1769,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="space-y-1.5">
                 <Label className="text-sm font-semibold">สถานะการทำงาน</Label>
                 <Select
@@ -1455,7 +1789,24 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">ลิงก์รูปภาพประจำตัว (Image URL)</Label>
+                <Label className="text-sm font-semibold">จำนวนบริการสำเร็จ (เคส)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={counselorForm.total_sessions}
+                  onChange={(e) =>
+                    setCounselorForm({
+                      ...counselorForm,
+                      total_sessions: Math.max(0, parseInt(e.target.value) || 0),
+                    })
+                  }
+                  className="rounded-xl h-10 text-sm font-mono font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold">ลิงก์รูปโปรไฟล์ (Image URL)</Label>
                 <Input
                   placeholder="https://cdn.discordapp.com/..."
                   value={counselorForm.image_url}
@@ -1769,6 +2120,17 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
                 className="rounded-xl h-10 text-sm"
               />
             </div>
+
+            <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 cursor-pointer mt-2">
+              <Checkbox
+                checked={resetEarningsOnPayout}
+                onCheckedChange={(checked) => setResetEarningsOnPayout(Boolean(checked))}
+              />
+              <div className="text-xs">
+                <span className="font-bold text-amber-700 dark:text-amber-400">รียอดสะสมของพนักงานท่านนี้เป็น ฿0 ทันที</span>
+                <p className="text-muted-foreground mt-0.5">ระบบจะหักล้างยอดสะสมปัจจุบันเพื่อเริ่มนับรอบบัญชีใหม่</p>
+              </div>
+            </label>
           </div>
 
           <DialogFooter className="pt-3 gap-2">
@@ -1790,6 +2152,100 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════
+          DIALOG 6: ยืนยันการรียอดสะสมรายคน (Reset Single Counselor)
+         ═══════════════════════════════════════════════════════════ */}
+      <Dialog open={isResetSingleDialogOpen} onOpenChange={setIsResetSingleDialogOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg font-bold text-amber-600 flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" />
+              ยืนยันการรียอดสะสม
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-1.5 text-muted-foreground leading-relaxed">
+              คุณต้องการรีเซ็ตยอดรายได้สะสมของ{' '}
+              <strong className="text-foreground">
+                {resetTargetCounselor?.display_name || resetTargetCounselor?.user_id}
+              </strong>{' '}
+              (ยอดปัจจุบัน: ฿{(Number(resetTargetCounselor?.accumulated_earnings) || 0).toLocaleString()}) ให้กลับเป็น <strong className="text-amber-600">฿0</strong> ใช่หรือไม่?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-4 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsResetSingleDialogOpen(false)}
+              className="rounded-xl h-10 text-sm px-4"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={handleConfirmResetSingleEarnings}
+              disabled={isResettingEarnings}
+              className="rounded-xl h-10 text-sm bg-amber-600 text-white hover:bg-amber-700 px-4 font-semibold"
+            >
+              {isResettingEarnings && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              ยืนยันรียอดเป็น ฿0
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════
+          DIALOG 7: ยืนยันการรียอดสะสมทุกคน (Reset All Counselors)
+         ═══════════════════════════════════════════════════════════ */}
+      <Dialog open={isResetAllDialogOpen} onOpenChange={setIsResetAllDialogOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg font-bold text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              ยืนยันการรียอดสะสมพนักงานทุกคน
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-1.5 text-muted-foreground leading-relaxed">
+              คำเตือน: การดำเนินการนี้จะปรับค่า <strong className="text-foreground">รายได้สะสม</strong> ของพนักงานทั้งหมด{' '}
+              <strong className="text-foreground">({counselors.length} คน)</strong> ให้เป็น <strong className="text-destructive">฿0</strong> ทันที
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              พิมพ์คำว่า <code className="bg-muted px-1.5 py-0.5 rounded text-destructive font-bold font-mono">RESET</code> ในช่องด้านล่างเพื่อยืนยัน:
+            </p>
+            <Input
+              value={resetAllConfirmationText}
+              onChange={(e) => setResetAllConfirmationText(e.target.value)}
+              placeholder="พิมพ์คำว่า RESET"
+              className="rounded-xl font-mono text-center tracking-widest text-destructive font-bold h-10"
+            />
+          </div>
+
+          <DialogFooter className="pt-4 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsResetAllDialogOpen(false)}
+              className="rounded-xl h-10 text-sm px-4"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmResetAllEarnings}
+              disabled={resetAllConfirmationText !== 'RESET' || isResettingEarnings}
+              className="rounded-xl h-10 text-sm px-4 font-semibold"
+            >
+              {isResettingEarnings && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              ยืนยันรียอดทุกคนเป็น ฿0
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <input
+        ref={attachSlipInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAttachSlipFile}
+      />
     </div>
   );
 }

@@ -185,6 +185,22 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+async function compressSlipImage(file: File): Promise<File> {
+  try {
+    const compressed = await imageCompression(file, {
+      maxSizeMB: 0.1, // Target ~100KB or lower
+      maxWidthOrHeight: 1200,
+      useWebWorker: true,
+      fileType: 'image/webp',
+      initialQuality: 0.75,
+    });
+    return compressed;
+  } catch (err) {
+    console.warn('browser-image-compression fallback to original:', err);
+    return file;
+  }
+}
+
 function formatCurrency(val: number): string {
   return (val || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
@@ -325,6 +341,66 @@ export function TradingHistoryManagement() {
       });
     };
   }, [previewUrls]);
+
+  // ── Attach Slip to existing record (when slip is pending) ──
+  const [attachingRecord, setAttachingRecord] = useState<UnifiedRecord | null>(null);
+  const [isAttachingSlip, setIsAttachingSlip] = useState(false);
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
+
+  const triggerAttachSlip = (record: UnifiedRecord) => {
+    setAttachingRecord(record);
+    attachFileInputRef.current?.click();
+  };
+
+  const handleAttachSlipFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !attachingRecord) return;
+    const file = e.target.files[0];
+    e.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'ไฟล์ไม่ถูกต้อง', description: 'กรุณาเลือกไฟล์รูปภาพเท่านั้น', variant: 'destructive' });
+      return;
+    }
+
+    setIsAttachingSlip(true);
+    try {
+      const compressed = await compressSlipImage(file);
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+      const { error: uploadError } = await supabase.storage
+        .from('order-slips')
+        .upload(fileName, compressed, { contentType: 'image/webp', cacheControl: '31536000' });
+      if (uploadError) throw uploadError;
+
+      const publicUrl = supabase.storage.from('order-slips').getPublicUrl(fileName).data.publicUrl;
+
+      if (attachingRecord.source === 'legacy') {
+        const { error: updateError } = await supabase
+          .from('trading_history')
+          .update({ slip_url: publicUrl })
+          .eq('id', attachingRecord.id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: updateError } = await (supabase as any)
+          .from('orders')
+          .update({ slip_url: publicUrl })
+          .eq('id', attachingRecord.id);
+        if (updateError) throw updateError;
+      }
+
+      toast({
+        title: 'เพิ่มรูปภาพสลิปสำเร็จ',
+        description: 'รูปภาพสลิปถูกบีบอัดเป็น WebP และบันทึกเรียบร้อยแล้ว',
+        className: 'bg-success text-success-foreground'
+      });
+      fetchData();
+    } catch (err: any) {
+      console.error('Failed to attach slip:', err);
+      toast({ title: 'ไม่สามารถอัปโหลดรูปภาพได้', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsAttachingSlip(false);
+      setAttachingRecord(null);
+    }
+  };
 
   // ── Filters ──
   const [serviceQuery, setServiceQuery] = useState('');
@@ -663,8 +739,8 @@ export function TradingHistoryManagement() {
 
   // ── Create bill (new system → orders + purchase_items) ──
   const handleAddBill = async () => {
-    if (!newBill.memberId || !newBill.transactionDate || allSelectedItems.length === 0 || selectedFiles.length === 0) {
-      toast({ title: 'กรุณากรอกข้อมูลให้ครบ', description: 'ต้องมีสินค้าอย่างน้อย 1 รายการ และรูปภาพอย่างน้อย 1 รูป', variant: 'destructive' });
+    if (!newBill.memberId || !newBill.transactionDate || allSelectedItems.length === 0) {
+      toast({ title: 'กรุณากรอกข้อมูลให้ครบ', description: 'ต้องมีสินค้าอย่างน้อย 1 รายการ', variant: 'destructive' });
       return;
     }
     if (newBill.purchaseType === 'gift' && !newBill.recipientId.trim()) {
@@ -685,16 +761,16 @@ export function TradingHistoryManagement() {
 
     setAddLoading(true);
     try {
-      // 1. Upload slip images
+      // 1. Upload slip images (if provided)
       const imageUrls: string[] = [];
       for (const file of selectedFiles) {
-        const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true });
-        const rawExt = compressed.type ? compressed.type.split('/')[1] : 'jpg';
-        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt || 'jpg';
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('slip-images').upload(fileName, compressed, { cacheControl: '86400' });
+        const compressed = await compressSlipImage(file);
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+        const { error: uploadError } = await supabase.storage
+          .from('order-slips')
+          .upload(fileName, compressed, { contentType: 'image/webp', cacheControl: '31536000' });
         if (uploadError) throw uploadError;
-        imageUrls.push(supabase.storage.from('slip-images').getPublicUrl(fileName).data.publicUrl);
+        imageUrls.push(supabase.storage.from('order-slips').getPublicUrl(fileName).data.publicUrl);
       }
 
       const recipientIdToInsert = newBill.purchaseType === 'gift' ? newBill.recipientId.trim() : null;
@@ -771,14 +847,19 @@ export function TradingHistoryManagement() {
     setIsDeleting(true);
     try {
       const imagesToDelete = [deleteTarget.slip_url, deleteTarget.slip_url_2].filter(Boolean) as string[];
-      const paths: string[] = [];
+      const slipImagesPaths: string[] = [];
+      const orderSlipsPaths: string[] = [];
       for (const url of imagesToDelete) {
         if (url.includes('/storage/v1/object/public/slip-images/')) {
           const parts = url.split('/slip-images/');
-          if (parts.length > 1) paths.push(decodeURIComponent(parts[1]));
+          if (parts.length > 1) slipImagesPaths.push(decodeURIComponent(parts[1]));
+        } else if (url.includes('/storage/v1/object/public/order-slips/')) {
+          const parts = url.split('/order-slips/');
+          if (parts.length > 1) orderSlipsPaths.push(decodeURIComponent(parts[1]));
         }
       }
-      if (paths.length > 0) await supabase.storage.from('slip-images').remove(paths);
+      if (slipImagesPaths.length > 0) await supabase.storage.from('slip-images').remove(slipImagesPaths);
+      if (orderSlipsPaths.length > 0) await supabase.storage.from('order-slips').remove(orderSlipsPaths);
 
       if (deleteTarget.source === 'legacy') {
         const { error } = await supabase.from('trading_history').delete().eq('id', deleteTarget.id);
@@ -1583,7 +1664,7 @@ export function TradingHistoryManagement() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs font-semibold text-foreground">
-                        หลักฐานการโอน (สลิป) *
+                        หลักฐานการโอน (สลิป)
                       </Label>
                       <Badge
                         variant="secondary"
@@ -1591,10 +1672,10 @@ export function TradingHistoryManagement() {
                           'text-[10px] px-2 py-0.5 rounded-full font-normal',
                           selectedFiles.length > 0
                             ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                            : 'bg-muted text-muted-foreground'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                         )}
                       >
-                        {selectedFiles.length}/2 รูป
+                        {selectedFiles.length > 0 ? `${selectedFiles.length}/2 รูป` : '⏳ รอการเพิ่ม'}
                       </Badge>
                     </div>
                   </div>
@@ -1630,7 +1711,7 @@ export function TradingHistoryManagement() {
                           คลิกเพื่อเลือกรูปสลิป หรือลากไฟล์สลิปมาวางที่นี่
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          รองรับ JPG, PNG, WEBP (อย่างน้อย 1 รูป, สูงสุด 2 รูป พร้อมสแกน QR อัตโนมัติ)
+                          รองรับ JPG, PNG, WEBP (ไม่บังคับ สามารถเพิ่มภาพทีหลังได้, สูงสุด 2 รูป พร้อมสแกน QR อัตโนมัติ)
                         </p>
                       </div>
                     </div>
@@ -2391,7 +2472,7 @@ export function TradingHistoryManagement() {
                         </div>
 
                         {/* Slips */}
-                        {(r.slip_url || r.slip_url_2) && (
+                        {(r.slip_url || r.slip_url_2) ? (
                           <div className="space-y-1.5 pt-1">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
@@ -2433,6 +2514,27 @@ export function TradingHistoryManagement() {
                                 );
                               })}
                             </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between pt-2 border-t border-border/20">
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              ⏳ รอการเพิ่มสลิป
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-[10px] gap-1 px-2 border-dashed border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                              onClick={() => triggerAttachSlip(r)}
+                              disabled={isAttachingSlip}
+                            >
+                              {isAttachingSlip && attachingRecord?.id === r.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Plus className="w-3 h-3" />
+                              )}
+                              เพิ่มภาพ
+                            </Button>
                           </div>
                         )}
                       </CardContent>
@@ -2510,13 +2612,35 @@ export function TradingHistoryManagement() {
 
                           {/* Right: Slip previews and actions */}
                           <div className="flex items-center gap-3 self-end md:self-center shrink-0">
-                            {slips.length > 0 && (
+                            {slips.length > 0 ? (
                               <div className="flex gap-1 shrink-0">
                                 {slips.map((url, i) => (
                                   <button key={i} onClick={() => setPreviewImage(url)} className="w-10 h-7 rounded border bg-muted/20 overflow-hidden hover:border-primary/40 transition-all shrink-0">
                                     <img src={url} alt="" className="w-full h-full object-cover" />
                                   </button>
                                 ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-normal">
+                                  ⏳ รอการเพิ่ม
+                                </Badge>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-[10px] gap-1 px-2 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                                  onClick={() => triggerAttachSlip(r)}
+                                  disabled={isAttachingSlip}
+                                  title="เพิ่มภาพสลิป"
+                                >
+                                  {isAttachingSlip && attachingRecord?.id === r.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Plus className="w-3 h-3" />
+                                  )}
+                                  เพิ่มภาพ
+                                </Button>
                               </div>
                             )}
                             
@@ -2602,7 +2726,27 @@ export function TradingHistoryManagement() {
                                       </button>
                                     ))}
                                   </div>
-                                ) : '-'}
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
+                                      ⏳ รอการเพิ่ม
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerAttachSlip(r)}
+                                      disabled={isAttachingSlip}
+                                      className="text-[10px] text-primary hover:underline font-medium flex items-center gap-0.5 whitespace-nowrap disabled:opacity-50"
+                                      title="เพิ่มภาพสลิป"
+                                    >
+                                      {isAttachingSlip && attachingRecord?.id === r.id ? (
+                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                      ) : (
+                                        '+'
+                                      )}
+                                      เพิ่มภาพ
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                               <td className="py-2.5 px-4 text-right">
                                 <div className="flex items-center justify-end gap-0.5">
@@ -2723,6 +2867,39 @@ export function TradingHistoryManagement() {
                   triggerClassName="h-9 text-xs rounded-xl bg-background border-border/50"
                 />
               </div>
+            </div>
+
+            {/* Slips in Edit Dialog */}
+            <div className="space-y-2 pt-2 border-t border-border/40">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">หลักฐานการโอน (สลิป)</Label>
+                {editTarget && !editTarget.slip_url && !editTarget.slip_url_2 && (
+                  <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-normal">
+                    ⏳ รอการเพิ่ม
+                  </Badge>
+                )}
+              </div>
+              {editTarget && (editTarget.slip_url || editTarget.slip_url_2) ? (
+                <div className="flex gap-2">
+                  {[editTarget.slip_url, editTarget.slip_url_2].filter(Boolean).map((url, i) => (
+                    <div key={i} className="relative group rounded-lg overflow-hidden border border-border w-24 h-16 bg-muted/20">
+                      <img src={url!} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(url!)} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-9 border-dashed text-xs gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  onClick={() => editTarget && triggerAttachSlip(editTarget)}
+                  disabled={isAttachingSlip}
+                >
+                  {isAttachingSlip ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  แนบรูปภาพสลิป
+                </Button>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -2855,6 +3032,15 @@ export function TradingHistoryManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden file input for attaching slip to pending bill */}
+      <input
+        ref={attachFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        onChange={handleAttachSlipFileChange}
+        className="hidden"
+      />
     </div>
   );
 }
