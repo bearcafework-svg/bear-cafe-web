@@ -24,9 +24,10 @@ import {
   Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
-  MoreHorizontal, Check, ShoppingBag,
+  MoreHorizontal, Check, ShoppingBag, Headphones,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -342,11 +343,13 @@ function ServerSpotlight({
   onClickJoin,
   carouselConfig,
   categories,
+  onOpenActiveVoiceRooms,
 }: {
   servers: DiscordServer[];
   onClickJoin: (s: DiscordServer) => void;
   carouselConfig?: { mode: 'manual' | 'auto_top7'; window_days: number; limit: number };
   categories?: { id: string; name: string; icon: string }[];
+  onOpenActiveVoiceRooms?: (s: DiscordServer) => void;
 }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -585,15 +588,38 @@ function ServerSpotlight({
             <div className="flex-1 min-w-0">
               {/* Activity Signal + Trust Badges */}
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-md border shadow-xs',
-                    signal.className
-                  )}
-                >
-                  {signal.icon && <span>{signal.icon}</span>}
-                  <span>{signal.text}</span>
-                </span>
+                {server.discord_id === '1144251788493602848' && (server.live_voice_count || 0) > 0 ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenActiveVoiceRooms?.(server);
+                    }}
+                    className="
+                      inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                      text-[10px] sm:text-xs font-bold
+                      bg-emerald-500/20 hover:bg-emerald-500/30
+                      text-emerald-800 dark:text-emerald-300
+                      border border-emerald-500/40 shadow-xs
+                      transition-all cursor-pointer active:scale-95
+                    "
+                    title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span>{server.live_voice_count} คนกำลังคุยไมค์ • ดูห้องเสียง</span>
+                    <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
+                  </button>
+                ) : (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-md border shadow-xs',
+                      signal.className
+                    )}
+                  >
+                    {signal.icon && <span>{signal.icon}</span>}
+                    <span>{signal.text}</span>
+                  </span>
+                )}
 
                 {server.is_partner && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-200 border border-purple-300 dark:border-purple-400/40 backdrop-blur-md">
@@ -784,13 +810,14 @@ interface ServerCardProps {
   onDelete?: (server: DiscordServer) => void;
   onToggleSave?: (serverId: string) => void;
   onOpenShopShowcase?: (server: DiscordServer) => void;
+  onOpenActiveVoiceRooms?: (server: DiscordServer) => void;
 }
 
 function ServerCard({
   server, user, userId, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
   onRefresh, refreshingId, onEditLink, onEditVibe, onDelete, onToggleSave,
-  onOpenShopShowcase,
+  onOpenShopShowcase, onOpenActiveVoiceRooms,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
@@ -977,11 +1004,35 @@ function ServerCard({
                 <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span>{server.member_count ? server.member_count.toLocaleString() : 0}</span>
               </span>
-              {(server.live_voice_count || 0) > 0 && (
-                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+              {server.discord_id === '1144251788493602848' ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOpenActiveVoiceRooms?.(server);
+                  }}
+                  className="
+                    flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                    bg-emerald-500/15 hover:bg-emerald-500/25
+                    text-emerald-700 dark:text-emerald-300
+                    border border-emerald-500/30 dark:border-emerald-500/40
+                    shadow-xs text-[10px] sm:text-xs font-bold
+                    transition-all cursor-pointer active:scale-95
+                  "
+                  title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
+                >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
-                </span>
+                  <span>ดูคนกำลังลงห้อง ({server.live_voice_count || 0} คน)</span>
+                  <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
+                </button>
+              ) : (
+                (server.live_voice_count || 0) > 0 && (
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
+                  </span>
+                )
               )}
               {getTimeSince(server.bumped_at) && (
                 <span className="text-muted-foreground/60 hidden sm:inline text-[11px]">
@@ -1117,6 +1168,32 @@ export default function DiscordServersPage() {
   // ── Shop Showcase state (Demo) ───────────────────────────────────────────
   const [shopShowcaseServer, setShopShowcaseServer] = useState<DiscordServer | null>(null);
   const [isShopShowcaseOpen, setIsShopShowcaseOpen] = useState(false);
+
+  // ── Bear Cafe Live Voice Rooms Modal state (Exclusive for GUILDID 1144251788493602848) ───
+  const [activeVoiceModalOpen, setActiveVoiceModalOpen] = useState(false);
+  const [activeVoiceData, setActiveVoiceData] = useState<{
+    serverName: string;
+    inviteUrl: string;
+    rooms: ActiveVoiceRoom[];
+    voiceCount: number;
+  }>({
+    serverName: '',
+    inviteUrl: '',
+    rooms: [],
+    voiceCount: 0,
+  });
+
+  const handleOpenActiveVoiceRooms = (targetServer: DiscordServer) => {
+    const profile = targetServer.server_profile || {};
+    const rooms = Array.isArray(profile.active_voice_rooms) ? profile.active_voice_rooms : [];
+    setActiveVoiceData({
+      serverName: targetServer.name,
+      inviteUrl: targetServer.invite_url,
+      rooms,
+      voiceCount: targetServer.live_voice_count || 0,
+    });
+    setActiveVoiceModalOpen(true);
+  };
 
   const userId = user?.discord_id || null;
 
@@ -1873,6 +1950,7 @@ export default function DiscordServersPage() {
           onClickJoin={handleClickJoin}
           carouselConfig={carouselConfig}
           categories={categories}
+          onOpenActiveVoiceRooms={handleOpenActiveVoiceRooms}
         />
 
         {/* Owner Expired Alert Banner */}
@@ -2154,6 +2232,7 @@ export default function DiscordServersPage() {
                         setShopShowcaseServer(s);
                         setIsShopShowcaseOpen(true);
                       }}
+                      onOpenActiveVoiceRooms={handleOpenActiveVoiceRooms}
                     />
                   </motion.div>
                 ))}
@@ -2198,6 +2277,16 @@ export default function DiscordServersPage() {
       </div>
 
       <Footer />
+
+      {/* Active Voice Rooms Modal — Exclusive for Bear Cafe (1144251788493602848) */}
+      <ActiveVoiceRoomsModal
+        open={activeVoiceModalOpen}
+        onOpenChange={setActiveVoiceModalOpen}
+        serverName={activeVoiceData.serverName}
+        inviteUrl={activeVoiceData.inviteUrl}
+        initialRooms={activeVoiceData.rooms}
+        initialVoiceCount={activeVoiceData.voiceCount}
+      />
 
       {/* EditLinkDialog — for owner to update expired invite links (Req 5.3–5.6, 6.1–6.9) */}
       <EditLinkDialog

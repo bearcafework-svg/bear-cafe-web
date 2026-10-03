@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Plus, Headphones } from 'lucide-react';
 import { CakeColorIcon } from '@/icon/outline';
+import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
 
 interface ServerCategory {
   id: string;
@@ -13,6 +14,7 @@ interface ServerCategory {
 
 interface DiscordServer {
   id: string;
+  discord_id?: string;
   name: string;
   description: string | null;
   icon_url: string | null;
@@ -21,6 +23,8 @@ interface DiscordServer {
   category_id: string | null;
   is_verified: boolean;
   is_partner: boolean;
+  live_voice_count?: number | null;
+  server_profile?: any;
 }
 
 const TAG_PALETTES = [
@@ -48,6 +52,31 @@ export function CommunityCarousel() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceModalData, setVoiceModalData] = useState<{
+    serverName: string;
+    inviteUrl: string;
+    rooms: ActiveVoiceRoom[];
+    voiceCount: number;
+  }>({
+    serverName: '',
+    inviteUrl: '',
+    rooms: [],
+    voiceCount: 0,
+  });
+
+  const handleOpenVoiceModal = (server: DiscordServer) => {
+    const profile = server.server_profile || {};
+    const rooms = Array.isArray(profile.active_voice_rooms) ? profile.active_voice_rooms : [];
+    setVoiceModalData({
+      serverName: server.name,
+      inviteUrl: server.invite_url,
+      rooms,
+      voiceCount: server.live_voice_count || 0,
+    });
+    setVoiceModalOpen(true);
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       const [catRes, serverRes, countRes] = await Promise.all([
@@ -57,7 +86,7 @@ export function CommunityCarousel() {
           .order('sort_order', { ascending: true }),
         supabase
           .from('discord_servers')
-          .select('id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status')
+          .select('id, discord_id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status, live_voice_count, server_profile')
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
@@ -284,6 +313,29 @@ export function CommunityCarousel() {
                           </span>
                         </div>
                       )}
+                      {/* อภิสิทธิ์เฉพาะ GUILDID=1144251788493602848 ดูคนกำลังลงห้องเสียง */}
+                      {server.discord_id === '1144251788493602848' && (server.live_voice_count || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleOpenVoiceModal(server);
+                          }}
+                          className="
+                            mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                            bg-emerald-500/15 hover:bg-emerald-500/25
+                            text-emerald-700 dark:text-emerald-300
+                            border border-emerald-500/30 text-[10px] font-bold
+                            transition-all cursor-pointer shadow-xs active:scale-95
+                          "
+                          title="ดูคนกำลังลงห้องเสียงใน Bear Cafe"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          <span>{server.live_voice_count} คนคุยไมค์</span>
+                          <Headphones className="w-2.5 h-2.5 ml-0.5 opacity-80" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -310,6 +362,17 @@ export function CommunityCarousel() {
           </div>
         )}
       </div>
+
+      {/* Active Voice Rooms Modal สำหรับ Bear Cafe */}
+      <ActiveVoiceRoomsModal
+        open={voiceModalOpen}
+        onOpenChange={setVoiceModalOpen}
+        serverName={voiceModalData.serverName}
+        inviteUrl={voiceModalData.inviteUrl}
+        initialRooms={voiceModalData.rooms}
+        initialVoiceCount={voiceModalData.voiceCount}
+      />
     </section>
   );
 }
+
