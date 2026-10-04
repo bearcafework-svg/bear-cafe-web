@@ -15,6 +15,7 @@ interface User {
   is_banned: boolean;
   ban_reason: string | null;
   allowed_pages: string[];
+  is_bear_member: boolean;
 }
 
 interface AuthContextType {
@@ -25,6 +26,7 @@ interface AuthContextType {
   login: (turnstileToken: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  checkBearMembership: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +62,7 @@ type ProfileRow = {
   discord_id: string;
   is_banned: boolean | null;
   ban_reason: string | null;
+  is_bear_member?: boolean | null;
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -87,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       is_banned: false,
       ban_reason: null,
       allowed_pages: [],
+      is_bear_member: true,
     };
   }, []);
 
@@ -96,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [profileResult, rolesResult, permIdsResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason, role')
+        .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason, role, is_bear_member')
         .eq('id', sessionUser.id)
         .maybeSingle(),
       supabase
@@ -155,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       is_banned: profile.is_banned || false,
       ban_reason: profile.ban_reason,
       allowed_pages: Array.from(allPages),
+      is_bear_member: true,
     };
   }, []);
 
@@ -429,6 +434,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchUserProfileWithTimeout, session?.user]);
 
+  const checkBearMembership = useCallback(async (): Promise<boolean> => {
+    return true;
+  }, []);
+
   const location = useLocation();
   const devBypassActive = import.meta.env.DEV && location.pathname.startsWith('/admin') && !session?.user;
 
@@ -446,6 +455,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_banned: false,
         ban_reason: null,
         allowed_pages: ['users', 'banned-roles', 'banned-name', 'tag-warn', 'contracts', 'healing-messages', 'trading-history', 'role-transfer', 'bulk-role-manage', 'reports', 'banners', 'checkin-rewards', 'campaigns', 'product-catalog', 'discord-servers', 'redeem-codes', 'non-transferable-roles', 'roles-to-delete', 'permissions'],
+        is_bear_member: true,
       };
       return {
         user: mockAdminUser,
@@ -462,6 +472,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login: async () => { },
         logout: () => { window.location.href = '/'; },
         refreshUser: async () => { },
+        checkBearMembership: async () => true,
       };
     }
 
@@ -473,8 +484,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refreshUser,
+      checkBearMembership,
     };
-  }, [isLoading, login, logout, refreshUser, session, user, devBypassActive]);
+  }, [isLoading, login, logout, refreshUser, checkBearMembership, session, user, devBypassActive]);
 
   return (
     <AuthContext.Provider value={value}>

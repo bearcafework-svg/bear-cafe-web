@@ -188,7 +188,7 @@ export function EditLinkDialog({ server, open, onOpenChange, onSuccess }: EditLi
                   ลิงก์เชิญใหม่ <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
                   <Input
                     id="new-invite-url"
                     placeholder="discord.gg/..."

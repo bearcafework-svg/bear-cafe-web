@@ -1,24 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
-import { FileTextIcon, LogIn, Settings, Sun, Moon } from 'lucide-react';
+import { FileTextIcon, LogIn, Settings, Sun, Moon, ExternalLink } from 'lucide-react';
 import { useAnimatedThemeToggle } from '@/components/ui/animated-theme-toggler';
 import { BearLogo } from './BearLogo';
-import { useUserBalances } from '@/hooks/useUserBalances';
 import {
   CaffeLatteIcon,
-  StrawberryColorIcon,
-  TicketColorIcon,
-  TearTicketColorIcon,
-  CardColorIcon,
-  HoneyDipperColorIcon,
-  GreenTeaCupColorIcon,
-  TeaBagColorIcon,
-  TeaBagPackagingColorIcon,
-  SugarCubesColorIcon,
-  TeaInfuserColorIcon,
   GreenTeaCupArtIcon,
+  TeaInfuserColorIcon,
 } from '@/icon/outline';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const NOTION_RULES_URL =
   'https://www.notion.so/2f4fa9ff914e80b29e13e5225887e07d';
@@ -39,14 +29,16 @@ interface NavItemProps extends NavItemConfig {
   isActive?: boolean;
   icon?: React.ReactNode;
   rightElement?: React.ReactNode;
+  className?: string;
 }
 
-function NavItem({ label, href, external, onClick, isActive, icon, rightElement }: NavItemProps) {
+function NavItem({ label, href, external, onClick, isActive, icon, rightElement, className }: NavItemProps) {
   const base = cn(
     'group flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
     isActive
       ? 'bg-[hsl(var(--honey)/0.18)] text-[hsl(var(--bear-brown))] dark:bg-[hsl(var(--honey)/0.12)] dark:text-[hsl(var(--honey))]'
       : 'text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]',
+    className,
   );
 
   const iconEl = (
@@ -125,63 +117,6 @@ function SidebarProfile() {
   );
 }
 
-function SidebarBalances() {
-  const { user, isAuthenticated } = useAuth();
-  const { points, maxCap, ticketPoint, ticketPiecePoint, loading } = useUserBalances(
-    isAuthenticated ? user?.discord_id : null,
-  );
-
-  if (!isAuthenticated) return null;
-
-  const pct = maxCap > 0 ? Math.min((points / maxCap) * 100, 100) : 0;
-
-  return (
-    <div className="px-3 pb-2 space-y-2 shrink-0">
-      <div className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-3 shadow-sm">
-        <div className="flex items-center gap-2 mb-2">
-          <StrawberryColorIcon size={18} />
-          <span className="text-[11px] font-medium text-muted-foreground leading-tight">
-            แต้มสตรอว์เบอร์รี่สะสม
-          </span>
-        </div>
-        <p className="text-base font-bold text-foreground tabular-nums">
-          {loading ? '—' : formatNumber(points)}
-          <span className="text-xs font-normal text-muted-foreground">
-            {' '}/ {loading ? '—' : formatNumber(maxCap)}
-          </span>
-        </p>
-        <div className="mt-2.5 h-1.5 rounded-full bg-[hsl(var(--latte)/0.5)] dark:bg-[hsl(var(--coffee)/0.4)] overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-honey to-peach transition-all duration-500"
-            style={{ width: loading ? '0%' : `${pct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-2">
-        <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-2.5 shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <TearTicketColorIcon size={20} />
-            <span className="text-sm font-medium text-foreground">เศษตั๋ว</span>
-          </div>
-          <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
-            {loading ? '—' : formatNumber(ticketPiecePoint)}
-          </span>
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--sidebar-border))] bg-card px-3 py-2.5 shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <TicketColorIcon size={20} />
-            <span className="text-sm font-medium text-foreground">ตั๋ว</span>
-          </div>
-          <span className="text-sm font-bold text-foreground tabular-nums shrink-0">
-            {loading ? '—' : formatNumber(ticketPoint)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function CozySidebar() {
   const { user, logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme } = useAnimatedThemeToggle({ variant: 'circle' });
@@ -205,7 +140,6 @@ export function CozySidebar() {
   ];
 
   const usageItems: NavItemConfig[] = [
-    { label: 'กระเป๋าเก็บของ', href: authHref('/inventory'), matchPath: '/inventory', requireAuth: true, icon: <TeaBagPackagingColorIcon size={20} /> },
     { label: 'ข้อตกลง', href: '/terms', matchPath: '/terms', icon: <GreenTeaCupArtIcon size={20} /> },
   ];
 
@@ -224,7 +158,6 @@ export function CozySidebar() {
       </div>
 
       <SidebarProfile />
-      <SidebarBalances />
 
       <nav className="flex-1 overflow-y-auto px-2 py-1 min-h-0 space-y-1">
         <NavSection title="บริการของเรา">
@@ -281,6 +214,7 @@ export function CozySidebar() {
             label="ออกจากระบบ"
             onClick={logout}
             icon={<TeaInfuserColorIcon size={20} />}
+            className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
           />
         ) : (
           <Link

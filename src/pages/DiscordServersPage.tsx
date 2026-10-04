@@ -24,10 +24,12 @@ import {
   Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
-  MoreHorizontal, Check, ShoppingBag, Headphones,
+  MoreHorizontal, Check, ShoppingBag, Headphones, Rocket, ArrowUpDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
+import { StarIcon, FireIcon } from '@/icon/inline';
+import { CaffeLatteIcon } from '@/icon/outline';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -252,7 +254,7 @@ function BumpButton({ server, user, onBump, bumpingId }: {
   return (
     <Button
       size="sm" variant="outline"
-      className={`rounded-full px-3 text-xs border-border/50 ${!canBump ? 'opacity-70' : ''}`}
+      className={cn("rounded-full px-3 text-xs font-medium border-border/50 h-8", !canBump && "opacity-70")}
       onClick={() => canBump && onBump(server.id)}
       disabled={bumpingId === server.id || !canBump}
     >
@@ -329,7 +331,7 @@ function StarRating({
         ))}
       </div>
       {ratingCount > 0 && (
-        <span className="text-[11px] sm:text-[10px] text-muted-foreground font-medium">
+        <span className="text-xs text-muted-foreground font-normal">
           {avgRating.toFixed(1)} <span className="opacity-70">({ratingCount})</span>
         </span>
       )}
@@ -482,8 +484,8 @@ function ServerSpotlight({
       {/* Header Bar */}
       <div className="flex items-center justify-between mb-2.5 sm:mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 fill-amber-400" />
-          <h2 className="text-sm sm:text-lg font-bold text-foreground tracking-tight">
+          <CaffeLatteIcon size={20} className="text-amber-500 shrink-0" />
+          <h2 className="text-sm sm:text-base font-semibold text-foreground">
             เซิร์ฟเวอร์น่าสนใจ
           </h2>
         </div>
@@ -493,18 +495,18 @@ function ServerSpotlight({
             <button
               type="button"
               onClick={prev}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
               aria-label="เซิร์ฟเวอร์ก่อนหน้า"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-[11px] sm:text-xs font-mono font-medium text-muted-foreground px-1 select-none">
+            <span className="text-xs font-mono font-medium text-muted-foreground px-1 select-none">
               {active + 1}/{len}
             </span>
             <button
               type="button"
               onClick={next}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border/60 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
               aria-label="เซิร์ฟเวอร์ถัดไป"
             >
               <ChevronRight className="w-4 h-4" />
@@ -546,7 +548,7 @@ function ServerSpotlight({
           }
           setIsInteracting(false);
         }}
-        className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-latte/40 dark:border-[#2A221E] shadow-md bg-cream/90 dark:bg-[#14100E] min-h-[170px] sm:min-h-[210px] md:min-h-[230px] flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+        className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-latte/40 dark:border-[#2A221E] shadow-sm bg-cream/90 dark:bg-[#14100E] min-h-[170px] sm:min-h-[210px] md:min-h-[230px] flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -597,10 +599,10 @@ function ServerSpotlight({
                     }}
                     className="
                       inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
-                      text-[10px] sm:text-xs font-bold
+                      text-xs font-medium
                       bg-emerald-500/20 hover:bg-emerald-500/30
                       text-emerald-800 dark:text-emerald-300
-                      border border-emerald-500/40 shadow-xs
+                      border border-emerald-500/40 shadow-2xs
                       transition-all cursor-pointer active:scale-95
                     "
                     title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
@@ -612,7 +614,7 @@ function ServerSpotlight({
                 ) : (
                   <span
                     className={cn(
-                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-md border shadow-xs',
+                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium backdrop-blur-md border shadow-2xs',
                       signal.className
                     )}
                   >
@@ -622,27 +624,27 @@ function ServerSpotlight({
                 )}
 
                 {server.is_partner && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-200 border border-purple-300 dark:border-purple-400/40 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-200 border border-purple-300 dark:border-purple-400/40 backdrop-blur-md">
                     <Handshake className="w-3 h-3 text-purple-600 dark:text-purple-300" />
                     Partner
                   </span>
                 )}
 
                 {server.is_verified && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border border-sky-300 dark:border-sky-400/40 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border border-sky-300 dark:border-sky-400/40 backdrop-blur-md">
                     <ShieldCheck className="w-3 h-3 text-sky-600 dark:text-sky-300" />
                     ยืนยันแล้ว
                   </span>
                 )}
               </div>
 
-              {/* Server Name */}
-              <h3 className="text-foreground dark:text-white font-bold text-base sm:text-lg md:text-xl truncate tracking-tight drop-shadow-xs">
+              {/* Server Name (Heading - Weight 600) */}
+              <h3 className="text-foreground dark:text-white font-semibold text-lg sm:text-xl md:text-2xl truncate drop-shadow-xs">
                 {server.name}
               </h3>
 
-              {/* Description */}
-              <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300/90 line-clamp-1 sm:line-clamp-2 leading-relaxed mt-1 max-w-2xl">
+              {/* Description (Body - Weight 400) */}
+              <p className="text-xs sm:text-sm font-normal text-stone-600 dark:text-stone-300/90 line-clamp-1 sm:line-clamp-2 leading-relaxed mt-1 max-w-2xl">
                 {server.description || 'ยินดีต้อนรับสู่คอมมูนิตี้ของเรา'}
               </p>
 
@@ -655,7 +657,7 @@ function ServerSpotlight({
                     return (
                       <span
                         key={tId}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/5 dark:bg-white/10 text-stone-700 dark:text-stone-300 border border-black/10 dark:border-white/15 backdrop-blur-xs"
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-black/5 dark:bg-white/10 text-stone-700 dark:text-stone-300 border border-black/10 dark:border-white/15 backdrop-blur-xs"
                       >
                         <span>{trait.icon}</span>
                         <span>{trait.label}</span>
@@ -695,7 +697,7 @@ function ServerSpotlight({
             ) : (
               <Button
                 size="sm"
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all border-0 px-4 sm:px-6 h-8 sm:h-9 text-xs sm:text-sm cursor-pointer"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all border-0 px-4 sm:px-6 h-8 sm:h-9 text-xs sm:text-sm cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   onClickJoin(server);
@@ -807,6 +809,7 @@ interface ServerCardProps {
   refreshingId: string | null;
   onEditLink?: (server: DiscordServer) => void;
   onEditVibe?: (server: DiscordServer) => void;
+  sortMode?: string;
   onDelete?: (server: DiscordServer) => void;
   onToggleSave?: (serverId: string) => void;
   onOpenShopShowcase?: (server: DiscordServer) => void;
@@ -814,7 +817,7 @@ interface ServerCardProps {
 }
 
 function ServerCard({
-  server, user, userId, getCategoryName, getTimeSince,
+  server, user, userId, sortMode, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
   onRefresh, refreshingId, onEditLink, onEditVibe, onDelete, onToggleSave,
   onOpenShopShowcase, onOpenActiveVoiceRooms,
@@ -900,7 +903,7 @@ function ServerCard({
                 )}
               />
               {(server.save_count ?? 0) > 0 && (
-                <span className="text-[10px] font-bold font-mono px-0.5">
+                <span className="text-xs font-medium font-mono px-0.5">
                   {server.save_count}
                 </span>
               )}
@@ -910,18 +913,18 @@ function ServerCard({
           {/* Top-Right Badges */}
           <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex items-center gap-1.5 z-10 flex-wrap justify-end">
             {isExpired ? (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
+              <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-red-500/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> ลิงก์หมดอายุ
               </span>
             ) : (
               <>
                 {server.is_featured && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 shadow-xs flex items-center gap-1">
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-500 text-stone-950 shadow-xs flex items-center gap-1">
                     <Star className="w-3 h-3 fill-stone-950" /> แนะนำ
                   </span>
                 )}
                 {server.is_partner && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-600/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-purple-600/90 text-white backdrop-blur-md shadow-xs flex items-center gap-1">
                     <Handshake className="w-3 h-3" /> Partner
                   </span>
                 )}
@@ -947,7 +950,7 @@ function ServerCard({
           <div className="flex items-center gap-1 sm:gap-1.5 mb-1 flex-wrap min-w-0">
             <h3
               className={cn(
-                "font-bold text-sm sm:text-base truncate text-foreground group-hover:text-amber-500 transition-colors",
+                "font-semibold text-sm sm:text-base truncate text-foreground group-hover:text-amber-500 transition-colors",
                 getNameHighlightClass(server.highlight_color)
               )}
               style={getNameHighlightStyle(server.highlight_color)}
@@ -958,7 +961,7 @@ function ServerCard({
               <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 shrink-0" aria-label="Verified" />
             )}
             {getCategoryName(server.category_id) && (
-              <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground border border-border/40">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground border border-border/40">
                 {getCategoryName(server.category_id)}
               </span>
             )}
@@ -979,7 +982,7 @@ function ServerCard({
                   <span
                     key={traitId}
                     className={cn(
-                      "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium border",
+                      "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border",
                       trait.color
                     )}
                     title={trait.description}
@@ -990,7 +993,7 @@ function ServerCard({
                 );
               })}
               {server.traits.length > 2 && (
-                <span className="text-[10px] text-muted-foreground self-center px-1 font-mono">
+                <span className="text-xs text-muted-foreground self-center px-1 font-mono font-medium">
                   +{server.traits.length - 2}
                 </span>
               )}
@@ -1000,7 +1003,7 @@ function ServerCard({
           {/* Footer Stats */}
           <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2 sm:pt-2.5 mt-auto gap-1">
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
-              <span className="flex items-center gap-1 font-semibold text-foreground/80">
+              <span className="flex items-center gap-1 font-medium text-foreground/80">
                 <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span>{server.member_count ? server.member_count.toLocaleString() : 0}</span>
               </span>
@@ -1013,11 +1016,11 @@ function ServerCard({
                     onOpenActiveVoiceRooms?.(server);
                   }}
                   className="
-                    flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                    flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
                     bg-emerald-500/15 hover:bg-emerald-500/25
                     text-emerald-700 dark:text-emerald-300
                     border border-emerald-500/30 dark:border-emerald-500/40
-                    shadow-xs text-[10px] sm:text-xs font-bold
+                    shadow-xs text-xs font-medium
                     transition-all cursor-pointer active:scale-95
                   "
                   title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
@@ -1028,16 +1031,29 @@ function ServerCard({
                 </button>
               ) : (
                 (server.live_voice_count || 0) > 0 && (
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full text-xs">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                     <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
                   </span>
                 )
               )}
-              {getTimeSince(server.bumped_at) && (
-                <span className="text-muted-foreground/60 hidden sm:inline text-[11px]">
-                  ดันเมื่อ {getTimeSince(server.bumped_at)}
-                </span>
+              {/* Context-aware time / stats display */}
+              {sortMode === 'new' ? (
+                server.created_at ? (
+                  <span className="text-muted-foreground/80 inline-flex items-center gap-1 text-xs bg-primary/10 px-2 py-0.5 rounded-full font-normal">
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>มาใหม่ {getTimeSince(server.created_at)}</span>
+                  </span>
+                ) : null
+              ) : (
+                (server.bumped_at || server.created_at) && (
+                  <span className="text-muted-foreground/70 inline-flex items-center gap-1 text-xs font-normal">
+                    <Clock className="w-3 h-3 opacity-60" />
+                    <span>
+                      {server.bumped_at ? `ดันเมื่อ ${getTimeSince(server.bumped_at)}` : `สร้างเมื่อ ${getTimeSince(server.created_at)}`}
+                    </span>
+                  </span>
+                )
               )}
             </div>
           </div>
@@ -1085,7 +1101,7 @@ function ServerCard({
               user && server.owner_id === user.discord_id && onEditLink ? (
                 <Button
                   size="sm"
-                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shadow-primary/20 px-3 sm:px-4 w-full sm:w-auto ml-auto text-xs font-medium shrink-0 gap-1"
+                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-md shadow-primary/20 px-3 sm:px-4 w-full sm:w-auto ml-auto text-xs shrink-0 gap-1"
                   onClick={() => onEditLink(server)}
                   title="แก้ไขลิงก์เชิญใหม่"
                 >
@@ -1106,7 +1122,7 @@ function ServerCard({
             ) : (
               <Button
                 size="sm"
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 px-3 sm:px-5 w-full sm:w-auto ml-auto text-xs sm:text-sm h-8 shrink-0 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm shadow-primary/20 px-3 sm:px-5 w-full sm:w-auto ml-auto text-xs sm:text-sm h-8 shrink-0 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 onClick={() => handleClickJoin(server)}
               >
                 เข้าดิสคอร์ด
@@ -1135,7 +1151,7 @@ export default function DiscordServersPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [bumpingId, setBumpingId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<'recommendation' | 'trending' | 'rising' | 'new' | 'recent' | 'popular' | 'live_voice'>('recommendation');
+  const [sortMode, setSortMode] = useState<'bumped' | 'new' | 'live_voice' | 'popular' | 'recommendation'>('bumped');
   const [userState, setUserState] = useState<UserStateType>('NEW');
   const [showMyOnly, setShowMyOnly] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
@@ -1173,11 +1189,17 @@ export default function DiscordServersPage() {
   const [activeVoiceModalOpen, setActiveVoiceModalOpen] = useState(false);
   const [activeVoiceData, setActiveVoiceData] = useState<{
     serverName: string;
+    serverBanner?: string | null;
+    serverIcon?: string | null;
+    guildId?: string;
     inviteUrl: string;
     rooms: ActiveVoiceRoom[];
     voiceCount: number;
   }>({
     serverName: '',
+    serverBanner: null,
+    serverIcon: null,
+    guildId: '1144251788493602848',
     inviteUrl: '',
     rooms: [],
     voiceCount: 0,
@@ -1188,6 +1210,9 @@ export default function DiscordServersPage() {
     const rooms = Array.isArray(profile.active_voice_rooms) ? profile.active_voice_rooms : [];
     setActiveVoiceData({
       serverName: targetServer.name,
+      serverBanner: targetServer.banner_url || null,
+      serverIcon: targetServer.icon_url || null,
+      guildId: targetServer.discord_id || '1144251788493602848',
       inviteUrl: targetServer.invite_url,
       rooms,
       voiceCount: targetServer.live_voice_count || 0,
@@ -1838,41 +1863,59 @@ export default function DiscordServersPage() {
       const matchCat = selectedCategory === 'all' || server.category_id === selectedCategory;
       const matchMine = !showMyOnly || (user && server.owner_id === user.discord_id);
       const matchSaved = !showSavedOnly || server.is_saved === true;
-      return matchSearch && matchCat && matchMine && matchSaved;
+      const voiceCount =
+        Number(server.live_voice_count || 0) ||
+        (Array.isArray((server.server_profile as any)?.active_voice_rooms)
+          ? (server.server_profile as any).active_voice_rooms.reduce(
+              (acc: number, r: any) => acc + (r.count || r.members?.length || 0),
+              0
+            )
+          : 0);
+      const matchLiveVoice = sortMode !== 'live_voice' || voiceCount > 0;
+      return matchSearch && matchCat && matchMine && matchSaved && matchLiveVoice;
     })
     .sort((a, b) => {
-      // Partners always float to top
-      if (a.is_partner !== b.is_partner) return a.is_partner ? -1 : 1;
-
+      // 1. In 'recommendation' mode: Partners & Featured float to top to showcase curated servers
       if (sortMode === 'recommendation') {
+        if (a.is_partner !== b.is_partner) return a.is_partner ? -1 : 1;
+        if (a.is_featured !== b.is_featured) return a.is_featured ? -1 : 1;
         const recDiff = (b.recommendation_score || 0) - (a.recommendation_score || 0);
         if (recDiff !== 0) return recDiff;
         return (b.discovery_score || 0) - (a.discovery_score || 0);
       }
+
+      // 2. In 'bumped' mode (default): Strictly sort by bumped_at DESC (fallback to created_at)
+      if (sortMode === 'bumped' || (sortMode as any) === 'recent') {
+        const timeB = new Date(b.bumped_at || b.created_at || 0).getTime();
+        const timeA = new Date(a.bumped_at || a.created_at || 0).getTime();
+        return timeB - timeA;
+      }
+
+      // 3. In 'new' mode: Strictly sort by created_at DESC (newest servers first)
+      if (sortMode === 'new') {
+        const timeB = new Date(b.created_at || 0).getTime();
+        const timeA = new Date(a.created_at || 0).getTime();
+        return timeB - timeA;
+      }
+
+      // 4. In 'live_voice' mode: Sort by active live voice participants DESC
       if (sortMode === 'live_voice') {
         const voiceDiff = (b.live_voice_count || 0) - (a.live_voice_count || 0);
         if (voiceDiff !== 0) return voiceDiff;
         return (b.member_count || 0) - (a.member_count || 0);
       }
-      if (sortMode === 'trending') {
-        const scoreDiff = (b.discovery_score || 0) - (a.discovery_score || 0);
-        if (scoreDiff !== 0) return scoreDiff;
-        return new Date(b.bumped_at ?? b.created_at ?? 0).getTime() - new Date(a.bumped_at ?? a.created_at ?? 0).getTime();
-      }
-      if (sortMode === 'rising') {
-        if (a.is_rising !== b.is_rising) return a.is_rising ? -1 : 1;
-        const rateB = b.growth_rate ?? (b.is_new_breakout ? 1.0 : 0);
-        const rateA = a.growth_rate ?? (a.is_new_breakout ? 1.0 : 0);
-        if (rateB !== rateA) return rateB - rateA;
-        return (b.discovery_score || 0) - (a.discovery_score || 0);
-      }
-      if (sortMode === 'new') {
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      }
+
+      // 5. In 'popular' mode: Sort by total member count DESC, then impression count
       if (sortMode === 'popular') {
+        const memDiff = (b.member_count || 0) - (a.member_count || 0);
+        if (memDiff !== 0) return memDiff;
         return (b.impression_count || 0) - (a.impression_count || 0);
       }
-      return new Date(b.bumped_at ?? 0).getTime() - new Date(a.bumped_at ?? 0).getTime();
+
+      // Fallback: Bumped timestamp
+      const fallbackB = new Date(b.bumped_at || b.created_at || 0).getTime();
+      const fallbackA = new Date(a.bumped_at || a.created_at || 0).getTime();
+      return fallbackB - fallbackA;
     });
 
   // ── Track Search Intent (Debounced via discovery tracker) ───────────────────
@@ -1904,44 +1947,37 @@ export default function DiscordServersPage() {
               decoding="async"
             />
           </motion.div>
-          <motion.h1 initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="text-2xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight">
-            หาเพื่อนใหม่ <span className="text-primary">เข้าดิสคอร์ด</span>
+          <motion.h1
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl sm:text-4xl md:text-5xl font-bold text-foreground tracking-tight font-athiti"
+            style={{ fontFamily: "'Athiti', sans-serif" }}
+          >
+            หาเพื่อนใหม่ <span className="text-primary font-bold">เข้าดิสคอร์ด</span>
           </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-muted-foreground text-xs sm:text-base max-w-xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-muted-foreground text-xs sm:text-base font-normal max-w-xl mx-auto leading-relaxed"
+          >
             ศูนย์รวมเซิร์ฟเวอร์ดิสคอร์ดคุณภาพจากชุมชน Bear Cafe แปะฟรี ปลอดภัย ไม่มีค่าใช้จ่าย
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="flex items-center justify-center pt-2"
+            className="pt-2 flex items-center justify-center gap-3"
           >
             <Button
               onClick={handleOpenAdd}
               size="lg"
-              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 font-bold text-xs sm:text-sm px-6 h-10 sm:h-11 transition-transform hover:scale-105 active:scale-95"
+              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/25 font-medium text-sm px-6 h-11 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-4 h-4 mr-2" />
               <span>แปะเซิร์ฟเวอร์ฟรี</span>
             </Button>
           </motion.div>
-          {/* Quiz Button (ซ่อนไว้ชั่วคราวตามคำขอ)
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="flex items-center justify-center pt-1"
-          >
-            <button
-              type="button"
-              onClick={() => setIsVibeOpen(true)}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs sm:text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xs group max-w-full flex-wrap justify-center text-center"
-            >
-              <span>🎯 หาเซิร์ฟเวอร์ที่ใช่</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold ml-0.5">Quiz 7 ข้อ</span>
-            </button>
-          </motion.div>
-          */}
         </div>
 
         {/* Server Spotlight */}
@@ -1965,10 +2001,10 @@ export default function DiscordServersPage() {
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="space-y-0.5">
-                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
                   คุณมี {ownerExpiredServers.length} เซิร์ฟเวอร์ที่ลิงก์เชิญหมดอายุและถูกซ่อนอยู่
                 </p>
-                <p className="text-xs text-amber-700/80 dark:text-amber-300/70">
+                <p className="text-xs font-normal text-amber-700/80 dark:text-amber-300/70">
                   ระบบจะไม่แสดงเซิร์ฟเวอร์เหล่านี้ต่อสาธารณะ จนกว่าคุณจะกดแก้ไขลิงก์เชิญใหม่
                 </p>
               </div>
@@ -1985,116 +2021,118 @@ export default function DiscordServersPage() {
                   setIsEditLinkOpen(true);
                 }
               }}
-              className="rounded-full border-amber-500/40 hover:bg-amber-500/15 text-amber-800 dark:text-amber-200 shrink-0 h-8 text-xs font-semibold self-end sm:self-center"
+              className="rounded-full border-amber-500/40 hover:bg-amber-500/15 text-amber-800 dark:text-amber-200 shrink-0 h-8 text-xs font-medium self-end sm:self-center"
             >
               แก้ไขลิงก์ ({ownerExpiredServers.length})
             </Button>
           </motion.div>
         )}
 
-        {/* Filters & Discovery Hub */}
+        {/* Filters & Discovery Hub (Option 1: Sleek Dual-Bar) */}
         <div className="flex flex-col gap-3 mb-6 sm:mb-8">
-          {/* Row 1: Search Input */}
-          <div className="relative w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="ค้นหาชื่อเซิร์ฟเวอร์ คำค้น หรือเจ้าของ..."
-              className="pl-10 pr-4 rounded-2xl bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] h-10 text-xs sm:text-sm focus-visible:ring-amber-500/30 w-full shadow-2xs"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          {/* Row 2: Sort Pills & Category Filters */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            {/* Sort pills */}
-            <div className="flex gap-1.5 items-center overflow-x-auto pb-1 no-scrollbar touch-pan-x">
-              <Button
-                variant={sortMode === 'recommendation' ? 'default' : 'outline'}
-                onClick={() => setSortMode('recommendation')}
-                className={cn(
-                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1.5 shrink-0 transition-all font-semibold',
-                  sortMode === 'recommendation' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border/60 hover:bg-muted/30'
-                )}
-                size="sm"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>
-                  {userState === 'ESTABLISHED' || userState === 'EARLY' ? 'แนะนำสำหรับคุณ' : 'น่าสนใจตอนนี้'}
-                </span>
-              </Button>
-              <Button
-                variant={sortMode === 'live_voice' ? 'default' : 'outline'}
-                onClick={() => setSortMode('live_voice')}
-                className={cn(
-                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1.5 shrink-0 transition-all font-medium',
-                  sortMode === 'live_voice'
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                    : 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10'
-                )}
-                size="sm"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span>กำลังคุยสด</span>
-              </Button>
-              <Button
-                variant={sortMode === 'trending' ? 'default' : 'outline'}
-                onClick={() => setSortMode('trending')}
-                className={cn(
-                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
-                  sortMode === 'trending' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
-                )}
-                size="sm"
-              >
-                <Flame className="w-3.5 h-3.5" />
-                <span>กำลังมาแรง</span>
-              </Button>
-              <Button
-                variant={sortMode === 'new' ? 'default' : 'outline'}
-                onClick={() => setSortMode('new')}
-                className={cn(
-                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
-                  sortMode === 'new' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
-                )}
-                size="sm"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>ใหม่</span>
-              </Button>
-              <Button
-                variant={sortMode === 'recent' ? 'default' : 'outline'}
-                onClick={() => setSortMode('recent')}
-                className={cn(
-                  'rounded-full h-8 sm:h-9 px-3 text-xs gap-1 shrink-0 transition-all',
-                  sortMode === 'recent' ? 'bg-primary text-primary-foreground hover:bg-primary/90 font-semibold' : 'border-border/60 hover:bg-muted/30'
-                )}
-                size="sm"
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>ล่าสุด</span>
-              </Button>
+          {/* Row 1: Search Input + Sort Dropdown + My Servers Switch */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
+            {/* Search Input (Flex-1) */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+              <Input
+                placeholder="ค้นหาชื่อเซิร์ฟเวอร์ คำค้น หรือเจ้าของ..."
+                className="!pl-10 pr-9 rounded-2xl bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] h-10 text-xs sm:text-sm focus-visible:ring-amber-500/30 w-full shadow-2xs font-normal"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full transition-colors cursor-pointer"
+                  title="ล้างคำค้นหา"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Right: My Only switch */}
-            {user && (
-              <label
-                htmlFor="show-my-switch"
-                className="flex items-center gap-2 shrink-0 bg-card/60 hover:bg-card/90 transition-colors rounded-full px-3 py-1 border border-border/50 cursor-pointer shadow-2xs select-none h-8 self-end sm:self-auto"
-                title="แสดงเฉพาะเซิร์ฟเวอร์ที่คุณเป็นเจ้าของ"
-              >
-                <Switch
-                  id="show-my-switch"
-                  checked={showMyOnly}
-                  onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }}
-                />
-                <span className="text-xs text-foreground font-medium whitespace-nowrap">ของฉัน</span>
-              </label>
-            )}
+            {/* Controls Right (Sort Dropdown + Switch) */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Sort Dropdown */}
+              <Select value={sortMode} onValueChange={(val: any) => setSortMode(val)}>
+                <SelectTrigger className="h-10 w-auto min-w-[130px] sm:min-w-[155px] rounded-2xl bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] px-3.5 text-xs sm:text-sm font-medium gap-2 shadow-2xs shrink-0 focus:ring-amber-500/20 cursor-pointer">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground hidden lg:inline font-normal">เรียง:</span>
+                    <span className="font-semibold text-foreground truncate inline-flex items-center gap-1.5">
+                      {sortMode === 'bumped' && '🚀 ดันล่าสุด'}
+                      {sortMode === 'new' && '✨ มาใหม่'}
+                      {sortMode === 'live_voice' && (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          <span>กำลังคุยสด</span>
+                        </>
+                      )}
+                      {sortMode === 'popular' && '🔥 ยอดนิยม'}
+                      {sortMode === 'recommendation' && (userState === 'ESTABLISHED' || userState === 'EARLY' ? '⭐ แนะนำ' : '⭐ คัดสรร')}
+                    </span>
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border/60 bg-card/95 dark:bg-[#181412]/95 backdrop-blur-md shadow-xl p-1 z-50">
+                  <SelectItem value="bumped" className="rounded-xl text-xs sm:text-sm font-medium py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Rocket className="w-3.5 h-3.5 text-amber-500" />
+                      <span>ดันล่าสุด (ค่าเริ่มต้น)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="new" className="rounded-xl text-xs sm:text-sm font-medium py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>มาใหม่</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="live_voice" className="rounded-xl text-xs sm:text-sm font-medium py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span>กำลังคุยสด</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="popular" className="rounded-xl text-xs sm:text-sm font-medium py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <FireIcon size={14} className="text-orange-500" />
+                      <span>ยอดนิยม</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="recommendation" className="rounded-xl text-xs sm:text-sm font-medium py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <StarIcon size={14} className="text-amber-400 fill-amber-400" />
+                      <span>{userState === 'ESTABLISHED' || userState === 'EARLY' ? 'แนะนำสำหรับคุณ' : 'คัดสรร'}</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* My Only switch */}
+              {user && (
+                <label
+                  htmlFor="show-my-switch"
+                  className={cn(
+                    "flex items-center gap-2 shrink-0 rounded-2xl px-3 h-10 border transition-all cursor-pointer shadow-2xs select-none",
+                    showMyOnly
+                      ? "bg-amber-500/10 border-amber-500/40 text-amber-800 dark:text-amber-300"
+                      : "bg-card/80 dark:bg-[#181412] border-border/60 dark:border-[#2A221E] hover:bg-muted/40 text-muted-foreground"
+                  )}
+                  title="แสดงเฉพาะเซิร์ฟเวอร์ที่คุณเป็นเจ้าของ"
+                >
+                  <Switch
+                    id="show-my-switch"
+                    checked={showMyOnly}
+                    onCheckedChange={(val) => { setShowMyOnly(val); if (val) setShowSavedOnly(false); }}
+                  />
+                  <span className="text-xs font-medium whitespace-nowrap">ของฉัน</span>
+                </label>
+              )}
+            </div>
           </div>
 
-          {/* Row 3: Horizontal Cafe Category Chips */}
+          {/* Row 2: Horizontal Cafe Category Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar touch-pan-x">
             {/* Chip: All */}
             <button
@@ -2104,9 +2142,9 @@ export default function DiscordServersPage() {
                 setShowSavedOnly(false);
               }}
               className={cn(
-                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer active:scale-95',
                 selectedCategory === 'all' && !showSavedOnly
-                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  ? 'bg-[#8C6239] text-white shadow-xs font-semibold'
                   : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
               )}
             >
@@ -2132,9 +2170,9 @@ export default function DiscordServersPage() {
                 }
               }}
               className={cn(
-                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer active:scale-95',
                 showSavedOnly
-                  ? 'bg-rose-500 text-white shadow-xs'
+                  ? 'bg-rose-500 text-white shadow-xs font-semibold'
                   : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
               )}
             >
@@ -2154,9 +2192,9 @@ export default function DiscordServersPage() {
                     setShowSavedOnly(false);
                   }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer active:scale-95',
                     isSelected
-                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      ? 'bg-[#8C6239] text-white shadow-xs font-semibold'
                       : 'bg-card/70 dark:bg-[#181412] border border-border/60 dark:border-[#2A221E] text-muted-foreground hover:text-foreground hover:bg-muted/30'
                   )}
                 >
@@ -2181,7 +2219,7 @@ export default function DiscordServersPage() {
                     <Heart className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-base sm:text-lg font-bold text-foreground">❤️ เซิร์ฟเวอร์ที่บันทึกไว้</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-foreground">❤️ เซิร์ฟเวอร์ที่บันทึกไว้</h3>
                     <p className="text-muted-foreground text-xs sm:text-sm max-w-sm mx-auto">
                       ยังไม่มีเซิร์ฟเวอร์ที่บันทึกไว้ ลองค้นหาเซิร์ฟเวอร์ที่น่าสนใจดูสิคะ
                     </p>
@@ -2189,17 +2227,36 @@ export default function DiscordServersPage() {
                   <Button
                     size="sm"
                     onClick={() => setShowSavedOnly(false)}
-                    className="rounded-full px-4 text-xs sm:text-sm bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="rounded-full px-4 text-xs sm:text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground"
                   >
                     ค้นหาเซิร์ฟเวอร์
+                  </Button>
+                </div>
+              ) : sortMode === 'live_voice' ? (
+                <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30 space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-500">
+                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-semibold text-foreground">ขณะนี้ยังไม่มีเซิร์ฟเวอร์ที่กำลังคุยไมค์สด</h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm max-w-sm mx-auto">
+                      ลองแวะเข้าเซิร์ฟเวอร์หลัก หรือสลับการจัดเรียงเพื่อดูเซิร์ฟเวอร์น่าสนใจอื่น ๆ ดูนะคะ
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setSortMode('bumped')}
+                    className="rounded-full px-4 text-xs sm:text-sm font-medium"
+                  >
+                    ดูเซิร์ฟเวอร์ทั้งหมด
                   </Button>
                 </div>
               ) : (
                 <div className="text-center py-12 sm:py-20 bg-white/30 dark:bg-card/20 rounded-3xl border-2 border-dashed border-latte/30 dark:border-coffee/30">
                   <Search className="w-10 h-10 text-muted-foreground opacity-30 mx-auto mb-3" />
-                  <h3 className="text-lg sm:text-xl font-bold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">ไม่พบเซิร์ฟเวอร์ที่ต้องการ</h3>
                   <p className="text-muted-foreground text-sm mb-4">ลองเปลี่ยนคำค้นหา หรือหมวดหมู่ดูนะคะ</p>
-                  <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); setShowSavedOnly(false); }}>ล้างตัวกรองทั้งหมด</Button>
+                  <Button size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setShowMyOnly(false); setShowSavedOnly(false); setSortMode('bumped'); }} className="font-medium">ล้างตัวกรองทั้งหมด</Button>
                 </div>
               )
             ) : (
@@ -2210,6 +2267,7 @@ export default function DiscordServersPage() {
                       server={server}
                       user={user}
                       userId={userId}
+                      sortMode={sortMode}
                       getCategoryName={getCategoryName}
                       getTimeSince={getTimeSince}
                       handleClickJoin={handleClickJoin}
@@ -2244,7 +2302,7 @@ export default function DiscordServersPage() {
           <div id="owner-expired-section" className="mt-8 sm:mt-12 scroll-mt-24">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="w-5 h-5 text-orange-500" aria-hidden="true" />
-              <h3 className="text-base sm:text-lg font-bold text-foreground">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground">
                 เซิร์ฟเวอร์ของคุณที่ลิงก์หมดอายุ <span className="text-xs sm:text-sm font-normal text-muted-foreground">(ถูกซ่อนอยู่จนกว่าจะแก้ไขลิงก์)</span>
               </h3>
             </div>
@@ -2270,7 +2328,7 @@ export default function DiscordServersPage() {
             <div className="inline-flex flex-col items-center gap-3 bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-2xl p-6 border border-border/30">
               <LogIn className="w-8 h-8 text-primary" />
               <p className="text-sm text-muted-foreground">เข้าสู่ระบบเพื่อแปะเซิร์ฟเวอร์และให้คะแนน</p>
-              <Button onClick={() => navigate('/login')} className="rounded-full" size="sm">เข้าสู่ระบบ Discord</Button>
+              <Button onClick={() => navigate('/login')} className="rounded-full font-medium" size="sm">เข้าสู่ระบบ Discord</Button>
             </div>
           </motion.div>
         )}
@@ -2283,6 +2341,9 @@ export default function DiscordServersPage() {
         open={activeVoiceModalOpen}
         onOpenChange={setActiveVoiceModalOpen}
         serverName={activeVoiceData.serverName}
+        serverBanner={activeVoiceData.serverBanner}
+        serverIcon={activeVoiceData.serverIcon}
+        guildId={activeVoiceData.guildId}
         inviteUrl={activeVoiceData.inviteUrl}
         initialRooms={activeVoiceData.rooms}
         initialVoiceCount={activeVoiceData.voiceCount}
@@ -2381,20 +2442,20 @@ export default function DiscordServersPage() {
       <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl mx-2">
           <DialogHeader>
-            <DialogTitle className="text-xl sm:text-2xl font-bold">แปะเซิร์ฟเวอร์ของคุณ</DialogTitle>
+            <DialogTitle className="text-xl sm:text-2xl font-semibold">แปะเซิร์ฟเวอร์ของคุณ</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">วางลิงก์เชิญ Discord แล้วระบบจะดึงข้อมูลให้อัตโนมัติ ทีมงานจะตรวจสอบภายใน 24-48 ชม.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 sm:space-y-5 py-2">
             <div className="space-y-2">
-              <Label className="font-semibold text-sm">ลิงก์เชิญ (Invite Link) <span className="text-destructive">*</span></Label>
+              <Label className="font-medium text-sm">ลิงก์เชิญ (Invite Link) <span className="text-destructive">*</span></Label>
               <div className="relative">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input placeholder="discord.gg/..." className="pl-10 rounded-xl text-sm" value={inviteUrl} onChange={(e) => setInviteUrl(e.target.value)} />
               </div>
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1 italic"><Info className="w-3 h-3" /> แนะนำให้ใช้ลิงก์ที่ไม่มีวันหมดอายุ</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 italic"><Info className="w-3 h-3" /> แนะนำให้ใช้ลิงก์ที่ไม่มีวันหมดอายุ</p>
             </div>
             <div className="space-y-2">
-              <Label className="font-semibold text-sm">หมวดหมู่ <span className="text-destructive">*</span></Label>
+              <Label className="font-medium text-sm">หมวดหมู่ <span className="text-destructive">*</span></Label>
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {categories.map((cat) => {
                   const isSelected = categoryId === cat.id;
@@ -2404,7 +2465,7 @@ export default function DiscordServersPage() {
                       type="button"
                       onClick={() => setCategoryId(cat.id)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all',
                         isSelected
                           ? 'border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-200 ring-2 ring-amber-500/25 shadow-xs'
                           : 'border-border/60 bg-muted/20 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
@@ -2421,10 +2482,10 @@ export default function DiscordServersPage() {
             {/* Vibe Profile: Primary Goal */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="font-semibold text-sm">
+                <Label className="font-medium text-sm">
                   1. เป้าหมาย / จุดเด่นหลักของเซิร์ฟเวอร์
                 </Label>
-                <span className="text-[10px] text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
+                <span className="text-xs text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 {VIBE_GOALS.map((goal) => {
@@ -2442,7 +2503,7 @@ export default function DiscordServersPage() {
                       )}
                     >
                       <span className="text-base shrink-0">{goal.icon}</span>
-                      <span className="text-xs font-semibold text-foreground truncate flex-1">{goal.label}</span>
+                      <span className="text-xs font-medium text-foreground truncate flex-1">{goal.label}</span>
                       {isSelected && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
                     </button>
                   );
@@ -2453,10 +2514,10 @@ export default function DiscordServersPage() {
             {/* Vibe Profile: Atmosphere */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="font-semibold text-sm">
+                <Label className="font-medium text-sm">
                   2. บรรยากาศ & มู้ดในเซิร์ฟเวอร์
                 </Label>
-                <span className="text-[10px] text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
+                <span className="text-xs text-muted-foreground">เลือก 1 ข้อ (ไม่บังคับ)</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 {VIBE_ATMOSPHERES.map((vibe) => {
@@ -2474,7 +2535,7 @@ export default function DiscordServersPage() {
                       )}
                     >
                       <span className="text-base shrink-0">{vibe.icon}</span>
-                      <span className="text-xs font-semibold text-foreground truncate flex-1">{vibe.label}</span>
+                      <span className="text-xs font-medium text-foreground truncate flex-1">{vibe.label}</span>
                       {isSelected && <Check className="w-3 h-3 text-amber-500 shrink-0 ml-auto" />}
                     </button>
                   );
@@ -2485,14 +2546,14 @@ export default function DiscordServersPage() {
             {/* Vibe & Trait Tags Selector */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="font-semibold text-sm">
+                <Label className="font-medium text-sm">
                   3. แท็ก Vibe & กิจกรรม
                 </Label>
-                <span className="text-[11px] text-muted-foreground font-mono">
+                <span className="text-xs text-muted-foreground font-mono">
                   {selectedTraits.length}/7 แท็ก
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 เลือกแท็กที่ตรงกับกิจกรรมและสไตล์ของสมาชิก เพื่อให้ระบบ Find Your Vibe แนะนำได้แม่นยำ
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -2520,7 +2581,7 @@ export default function DiscordServersPage() {
                       className={cn(
                         'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
                         isSelected
-                          ? 'border-primary/50 bg-primary/20 text-primary shadow-sm font-semibold'
+                          ? 'border-primary/50 bg-primary/20 text-primary shadow-sm font-medium'
                           : 'border-border/60 bg-background/50 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                       )}
                     >
@@ -2537,19 +2598,19 @@ export default function DiscordServersPage() {
             </div>
             <div className="bg-amber-50/80 dark:bg-amber-950/20 rounded-xl p-3 sm:p-4 border border-amber-200/50 dark:border-amber-800/30 space-y-2.5">
               <p className="font-semibold text-xs sm:text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />เงื่อนไขการแปะเซิร์ฟเวอร์</p>
-              <div className="space-y-2 text-[10px] sm:text-xs text-amber-700 dark:text-amber-300/80">
+              <div className="space-y-2 text-xs text-amber-700 dark:text-amber-300/80">
                 <div className="flex items-start gap-2"><LinkIcon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /><span><strong>ลิงก์เชิญหมดอายุ / พัง</strong> — เซิร์ฟเวอร์จะถูกซ่อนทันที</span></div>
                 <div className="flex items-start gap-2"><Timer className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /><span><strong>ไม่ดันเซิร์ฟภายใน 30 วัน</strong> — เซิร์ฟเวอร์จะถูกซ่อนอัตโนมัติ</span></div>
                 <div className="flex items-start gap-2"><Trash2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /><span><strong>เนื้อหาไม่เหมาะสม</strong> — ถูกลบถาวรโดยไม่แจ้งล่วงหน้า</span></div>
               </div>
             </div>
             <div className="bg-blue-50/80 dark:bg-blue-950/20 rounded-xl p-3 border border-blue-200/50 dark:border-blue-800/30">
-              <p className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-300/80 flex items-start gap-2"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" /><span>สามารถแปะได้เฉพาะเซิร์ฟเวอร์ที่คุณเป็น <strong>เจ้าของ (Owner)</strong> เท่านั้น</span></p>
+              <p className="text-xs text-blue-700 dark:text-blue-300/80 flex items-start gap-2"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" /><span>สามารถแปะได้เฉพาะเซิร์ฟเวอร์ที่คุณเป็น <strong>เจ้าของ (Owner)</strong> เท่านั้น</span></p>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setIsAddOpen(false); resetForm(); }} className="rounded-full" size="sm">ยกเลิก</Button>
-            <Button onClick={handleAddByInvite} disabled={isSubmitting || !categoryId || !inviteUrl} className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground" size="sm">
+            <Button variant="outline" onClick={() => { setIsAddOpen(false); resetForm(); }} className="rounded-full font-medium" size="sm">ยกเลิก</Button>
+            <Button onClick={handleAddByInvite} disabled={isSubmitting || !categoryId || !inviteUrl} className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium" size="sm">
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isSubmitting ? 'กำลังดึงข้อมูล...' : 'ส่งให้ตรวจสอบ'}
             </Button>

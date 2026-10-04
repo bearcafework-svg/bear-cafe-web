@@ -18,6 +18,7 @@ interface DiscordServer {
   name: string;
   description: string | null;
   icon_url: string | null;
+  banner_url?: string | null;
   invite_url: string;
   member_count: number | null;
   category_id: string | null;
@@ -55,11 +56,17 @@ export function CommunityCarousel() {
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceModalData, setVoiceModalData] = useState<{
     serverName: string;
+    serverBanner?: string | null;
+    serverIcon?: string | null;
+    guildId?: string;
     inviteUrl: string;
     rooms: ActiveVoiceRoom[];
     voiceCount: number;
   }>({
     serverName: '',
+    serverBanner: null,
+    serverIcon: null,
+    guildId: '1144251788493602848',
     inviteUrl: '',
     rooms: [],
     voiceCount: 0,
@@ -70,6 +77,9 @@ export function CommunityCarousel() {
     const rooms = Array.isArray(profile.active_voice_rooms) ? profile.active_voice_rooms : [];
     setVoiceModalData({
       serverName: server.name,
+      serverBanner: server.banner_url || null,
+      serverIcon: server.icon_url || null,
+      guildId: server.discord_id || '1144251788493602848',
       inviteUrl: server.invite_url,
       rooms,
       voiceCount: server.live_voice_count || 0,
@@ -86,7 +96,7 @@ export function CommunityCarousel() {
           .order('sort_order', { ascending: true }),
         supabase
           .from('discord_servers')
-          .select('id, discord_id, name, description, icon_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status, live_voice_count, server_profile')
+          .select('id, discord_id, name, description, icon_url, banner_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status, live_voice_count, server_profile')
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
@@ -368,6 +378,9 @@ export function CommunityCarousel() {
         open={voiceModalOpen}
         onOpenChange={setVoiceModalOpen}
         serverName={voiceModalData.serverName}
+        serverBanner={voiceModalData.serverBanner}
+        serverIcon={voiceModalData.serverIcon}
+        guildId={voiceModalData.guildId}
         inviteUrl={voiceModalData.inviteUrl}
         initialRooms={voiceModalData.rooms}
         initialVoiceCount={voiceModalData.voiceCount}

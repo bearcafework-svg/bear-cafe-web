@@ -411,6 +411,14 @@ serve(async (req: Request): Promise<Response> => {
       }, 403);
     }
 
+    // ─── ACTION: Check guild membership on demand ───────────────────────────
+    if (body?.action === "check_membership") {
+      return jsonResponse({
+        ok: true,
+        is_bear_member: true,
+      });
+    }
+
     // ─── MODE 1: Generate authUrl (frontend calls with turnstileToken) ───────
     if (!code && (turnstileToken !== null || !body?.code)) {
       // Verify Turnstile if token provided
@@ -458,43 +466,7 @@ serve(async (req: Request): Promise<Response> => {
     // 2) Fetch Discord profile
     const discordUser = await fetchDiscordUser(tokenData.access_token);
 
-    // 3) Must be in guild
-    const member = await fetchGuildMember({
-      guildId: DISCORD_GUILD_ID,
-      botToken: DISCORD_BOT_TOKEN,
-      discordUserId: discordUser.id,
-    });
-
-    if (!member) {
-      return jsonResponse({
-        ok: false,
-        error_type: "not_member",
-        message: "User is not in Discord server",
-        debug_id: debugId,
-      }, 403);
-    }
-
-    const memberRoles = member.roles ?? [];
-
-    // 4) Role-ban check
-    const roleBan = await isRoleBanned({
-      guildId: DISCORD_GUILD_ID,
-      botToken: DISCORD_BOT_TOKEN,
-      memberRoles,
-    });
-
-    if (roleBan.banned) {
-      return jsonResponse({
-        ok: false,
-        error_type: "banned_role",
-        message: roleBan.bannedRoleName
-          ? `Blocked by banned role: ${roleBan.bannedRoleName}`
-          : "Blocked by banned role",
-        debug_id: debugId,
-      }, 403);
-    }
-
-    // 5) Create real Supabase auth session
+    // 3) Create real Supabase auth session
     const { session, userId: authUserId } = await getOrCreateSupabaseSession({
       supabaseUrl: SUPABASE_URL,
       supabaseAnonKey: SUPABASE_ANON_KEY,
@@ -502,7 +474,7 @@ serve(async (req: Request): Promise<Response> => {
       discordUser,
     });
 
-    // 6) Upsert profiles using auth UUID as id (matches profiles.id = auth.uid() constraint)
+    // 4) Upsert profiles using auth UUID as id (matches profiles.id = auth.uid() constraint)
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -511,23 +483,33 @@ serve(async (req: Request): Promise<Response> => {
       ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
       : null;
 
-    const nickname = discordUser.global_name || discordUser.username;
-
-    // Check if profile already exists by discord_id (for existing 800 members)
+    // Check if profile already exists by discord_id and verify Web Blacklist
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
-      .select("id")
+      .select("id, is_banned, ban_reason")
       .eq("discord_id", discordUser.id)
       .maybeSingle();
 
+    if (existingProfile?.is_banned) {
+      return jsonResponse({
+        ok: false,
+        error_type: "banned_admin",
+        message: existingProfile.ban_reason
+          ? `บัญชีถูกระงับ: ${existingProfile.ban_reason}`
+          : "บัญชีของคุณถูกระงับการใช้งานโดยผู้ดูแลระบบ",
+        debug_id: debugId,
+      }, 403);
+    }
+
     let profile;
     if (existingProfile) {
-      // Update existing profile — keep id intact, just refresh data
+      // Update existing profile — keep id intact, refresh basic info
       const { data: updated, error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({
           username: discordUser.username,
           avatar_url: avatarUrl,
+          is_bear_member: true,
           updated_at: new Date().toISOString(),
         })
         .eq("discord_id", discordUser.id)
@@ -544,6 +526,7 @@ serve(async (req: Request): Promise<Response> => {
           discord_id: discordUser.id,
           username: discordUser.username,
           avatar_url: avatarUrl,
+          is_bear_member: true,
         })
         .select("*")
         .single();

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
-import { GreenTeaWarningPopup } from "@/components/bear-cafe/GreenTeaWarningPopup";
 import { CozyPageFooter } from "@/components/bear-cafe/CozyPageFooter";
 import {
   CheckInDayCard,
@@ -105,8 +104,6 @@ export default function FullCheckInCalendar() {
   // does not remount between skeleton and content.
   return (
     <>
-      <GreenTeaWarningPopup userId={user?.id} />
-
       <main className="mx-auto flex w-full min-w-0 flex-col gap-5 px-4 py-6 pt-16 sm:gap-8 sm:px-6 sm:py-8 lg:pt-8 lg:gap-10 min-h-svh">
         <div>
           <button

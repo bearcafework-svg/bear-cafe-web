@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
-import { useUserBalances } from '@/hooks/useUserBalances';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { BearLogo } from './BearLogo';
 import { Button } from '@/components/ui/button';
@@ -13,9 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   CaffeLatteIcon,
-  TicketColorIcon,
-  TearTicketColorIcon,
-  TeaBagPackagingColorIcon,
   GreenTeaCupArtIcon,
 } from '@/icon/outline';
 import {
@@ -26,7 +22,7 @@ import {
   ShieldCheck,
   Crown,
 } from 'lucide-react';
-import { cn, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface NavLinkItem {
   label: string;
@@ -40,29 +36,14 @@ export function CozyNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { points, maxCap, ticketPoint, ticketPiecePoint, loading: balancesLoading } = useUserBalances(
-    isAuthenticated ? user?.discord_id : null,
-  );
-
   const hasAdminAccess =
     Boolean(user?.is_admin ||
     user?.is_owner ||
     (user?.allowed_pages?.length ?? 0) > 0);
 
-  const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
-  };
-
-  const navLinks: NavLinkItem[] = [
-    { label: 'หน้าแรก', href: '/', icon: <CaffeLatteIcon size={18} /> },
-  ];
-
-  const pct = maxCap > 0 ? Math.min((points / maxCap) * 100, 100) : 0;
-
   return (
     <header className="sticky top-0 z-50 w-full bg-background/85 dark:bg-[#14100E]/85 backdrop-blur-md border-b border-latte/30 dark:border-[#2A221E] transition-colors">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Logo & Brand */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0 group focus-visible:outline-none">
           <BearLogo size="sm" noFloat />
@@ -70,28 +51,6 @@ export function CozyNavbar() {
             Bear Cafe
           </span>
         </Link>
-
-        {/* Center: Desktop Quick Nav Tabs */}
-        <nav className="hidden md:flex items-center gap-1.5 bg-latte/15 dark:bg-card/40 p-1 rounded-full border border-latte/30 dark:border-[#2A221E] shadow-2xs">
-          {navLinks.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.label}
-                to={item.href}
-                className={cn(
-                  'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200',
-                  active
-                    ? 'bg-primary text-primary-foreground shadow-xs shadow-primary/30'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
-                )}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
 
         {/* Right: Theme Toggler & User Profile Menu */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -182,68 +141,10 @@ export function CozyNavbar() {
                   </div>
                 </div>
 
-                {/* Balances Card */}
-                <div className="p-2.5 rounded-xl border border-latte/30 dark:border-[#2A221E] bg-white/60 dark:bg-[#120F0D]/60 space-y-2">
-                  <div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground font-medium">แต้มสะสม</span>
-                      <span className="font-bold tabular-nums text-foreground">
-                        {balancesLoading ? '—' : formatNumber(points)}{' '}
-                        <span className="text-muted-foreground font-normal">
-                          / {balancesLoading ? '—' : formatNumber(maxCap)}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-latte/30 dark:bg-black/40 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-honey to-peach transition-all duration-500"
-                        style={{ width: balancesLoading ? '0%' : `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-latte/20 dark:border-[#2A221E]">
-                    <div className="flex items-center justify-between rounded-lg bg-background/50 px-2 py-1.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <TearTicketColorIcon size={16} />
-                        <span className="text-xs text-muted-foreground">เศษตั๋ว</span>
-                      </div>
-                      <span className="text-xs font-bold tabular-nums text-foreground">
-                        {balancesLoading ? '—' : formatNumber(ticketPiecePoint)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg bg-background/50 px-2 py-1.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <TicketColorIcon size={16} />
-                        <span className="text-xs text-muted-foreground">ตั๋ว</span>
-                      </div>
-                      <span className="text-xs font-bold tabular-nums text-foreground">
-                        {balancesLoading ? '—' : formatNumber(ticketPoint)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
                 <DropdownMenuSeparator className="bg-latte/20 dark:bg-[#2A221E]" />
 
                 {/* Navigation Links */}
                 <div className="space-y-0.5">
-                  <DropdownMenuItem
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium cursor-pointer"
-                  >
-                    <CaffeLatteIcon size={18} />
-                    <span className="flex-1">หน้าหลัก</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    onClick={() => navigate('/inventory')}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium cursor-pointer"
-                  >
-                    <TeaBagPackagingColorIcon size={18} />
-                    <span className="flex-1">กระเป๋าเก็บของ</span>
-                  </DropdownMenuItem>
 
                   <DropdownMenuItem
                     onClick={() => navigate('/terms')}
@@ -268,10 +169,11 @@ export function CozyNavbar() {
 
                 {/* Logout Button */}
                 <DropdownMenuItem
+                  variant="destructive"
                   onClick={logout}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400 cursor-pointer transition-colors"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 text-red-600 dark:text-red-400" />
                   <span>ออกจากระบบ</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

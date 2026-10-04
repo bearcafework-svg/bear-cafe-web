@@ -46,7 +46,7 @@ export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServe
         {/* Warning badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            className="text-[11px] font-bold bg-orange-500/90 text-white border-none backdrop-blur-md shadow-sm px-2 flex items-center gap-1"
+            className="text-xs font-medium bg-orange-500/90 text-white border-none backdrop-blur-md shadow-xs px-2.5 py-0.5 flex items-center gap-1"
             aria-label="ลิงก์หมดอายุ"
           >
             <AlertTriangle className="w-3 h-3" aria-hidden="true" />
@@ -67,17 +67,17 @@ export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServe
               decoding="async"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-orange-200/40 to-red-200/40 flex items-center justify-center text-base font-bold text-orange-400">
+            <div className="w-full h-full bg-gradient-to-br from-orange-200/40 to-red-200/40 flex items-center justify-center text-base font-semibold text-orange-400">
               {server.name[0]}
             </div>
           )}
         </div>
 
         {/* Name */}
-        <h3 className="font-bold text-sm sm:text-base truncate text-muted-foreground mb-1">{server.name}</h3>
+        <h3 className="font-semibold text-sm sm:text-base truncate text-muted-foreground mb-1">{server.name}</h3>
 
         {/* Description */}
-        <p className="text-xs sm:text-sm text-muted-foreground/70 leading-relaxed line-clamp-2 mb-3">
+        <p className="text-xs sm:text-sm font-normal text-muted-foreground/70 leading-relaxed line-clamp-2 mb-3">
           {server.description || 'ไม่มีคำอธิบาย'}
         </p>
 
@@ -85,7 +85,7 @@ export function ExpiredServerCard({ server, onEditLink, onDelete }: ExpiredServe
         <div className="flex gap-1.5 sm:gap-2 items-center">
           <Button
             size="sm"
-            className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md text-xs h-8 px-2"
+            className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-sm text-xs h-8 px-2"
             onClick={() => onEditLink(server)}
             aria-label={`แก้ไขลิงก์สำหรับ ${server.name}`}
           >

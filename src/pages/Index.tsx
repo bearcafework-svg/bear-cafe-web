@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { GreenTeaWarningPopup } from '@/components/bear-cafe/GreenTeaWarningPopup';
 import { CozyPageFooter } from '@/components/bear-cafe/CozyPageFooter';
 import { CozyFeatureCards } from '@/components/bear-cafe/CozyFeatureCards';
 import { CommunityCarousel } from '@/components/bear-cafe/CommunityCarousel';
@@ -93,8 +92,6 @@ export default function Index() {
   // Shell is provided by CozyGateLayout so auth-skeleton → content does not remount it.
   return (
     <>
-      <GreenTeaWarningPopup userId={user?.id} />
-
       <main className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 px-4 py-6 pt-16 sm:gap-8 sm:px-6 sm:py-8 lg:pt-8 lg:gap-10 min-h-svh">
         <motion.div
           initial={{ opacity: 0.92, y: 8 }}

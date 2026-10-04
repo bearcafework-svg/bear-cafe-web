@@ -16,8 +16,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Athiti", "sans-serif"],
-        display: ["Athiti", "sans-serif"],
+        sans: ["Anuphan", "Plus Jakarta Sans", "system-ui", "-apple-system", "sans-serif"],
+        display: ["Anuphan", "Plus Jakarta Sans", "system-ui", "-apple-system", "sans-serif"],
+        athiti: ["Athiti", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -162,112 +163,112 @@ export default {
       const bearTextStyles = {
         // Header styles
         ".bear-h1": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "32px",
           letterSpacing: "0",
         },
         ".bear-h1-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "32px",
           letterSpacing: "0",
         },
         ".bear-h1-bold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "700",
           fontSize: "32px",
           letterSpacing: "0",
         },
         ".bear-h2": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "24px",
           letterSpacing: "0",
         },
         ".bear-h2-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "24px",
           letterSpacing: "0",
         },
         ".bear-h2-bold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "700",
           fontSize: "24px",
           letterSpacing: "0",
         },
         ".bear-h3": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "20px",
           letterSpacing: "0",
         },
         ".bear-h3-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "20px",
           letterSpacing: "0",
         },
         ".bear-h3-bold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "700",
           fontSize: "20px",
           letterSpacing: "0",
         },
         // Body Large styles
         ".bear-body-large-regular": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "18px",
           letterSpacing: "0",
         },
         ".bear-body-large-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "18px",
           letterSpacing: "0",
         },
         ".bear-body-large-bold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "700",
           fontSize: "18px",
           letterSpacing: "0",
         },
         // Body Regular styles
         ".bear-body-regular": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "16px",
           letterSpacing: "0",
         },
         ".bear-body-regular-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "16px",
           letterSpacing: "0",
         },
         ".bear-body-regular-semibold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "600",
           fontSize: "16px",
           letterSpacing: "0",
         },
         ".bear-body-regular-bold": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "700",
           fontSize: "16px",
           letterSpacing: "0",
         },
         // Body Small styles (12px)
         ".bear-body-small-regular": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "400",
           fontSize: "12px",
           letterSpacing: "0",
         },
         ".bear-body-small-medium": {
-          fontFamily: "Athiti, sans-serif",
+          fontFamily: "Anuphan, sans-serif",
           fontWeight: "500",
           fontSize: "12px",
           letterSpacing: "0",

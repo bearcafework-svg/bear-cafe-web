@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Athiti:wght@200;300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Athiti:wght@200;300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -321,7 +321,7 @@
 
   /* Cozy Form Inputs, Dropdowns, and Textareas */
   input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], textarea, select {
-    @apply rounded-xl border border-border/80 bg-background/50 px-3 py-2 text-sm focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all !important;
+    @apply rounded-xl border border-border/80 bg-background/50 px-3 py-2 text-sm focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all;
   }
 
   /* Cozy select dropdown overrides */

@@ -171,7 +171,7 @@ export function HomeSidebar({ onlineCount, memberCount }: HomeSidebarProps) {
         {isAuthenticated ? (
           <button
             onClick={logout}
-            className="group w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-colors [@media(max-height:820px)]:py-2 [@media(max-height:820px)]:text-sm"
+            className="group w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors [@media(max-height:820px)]:py-2 [@media(max-height:820px)]:text-sm"
           >
             <LogOut className="w-5 h-5 shrink-0 transition-all duration-300 group-hover:scale-125 group-hover:-translate-y-1" />
             <span className="font-medium">ออกจากระบบ</span>
