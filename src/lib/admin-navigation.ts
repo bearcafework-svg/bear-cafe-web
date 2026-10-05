@@ -120,12 +120,6 @@ export function getAdminNavTree(
               icon: ClipboardList,
             },
             {
-              id: 'banned-roles',
-              label: 'ยศที่ถูกแบน',
-              description: 'กำหนดยศที่ห้ามใช้งานในเซิร์ฟ',
-              icon: Ban,
-            },
-            {
               id: 'banned-name',
               label: 'ชื่อต้องห้าม',
               description: 'คัดกรองชื่อและคำที่ไม่เหมาะสม',

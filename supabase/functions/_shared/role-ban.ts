@@ -11,11 +11,6 @@ type CachedGuildRoles = {
   roles: { id: string; name: string }[];
 };
 
-type CachedBannedRoles = {
-  expiresAt: number;
-  bannedRoleIds: Set<string>;
-  bannedRoleNames: Map<string, string>; // roleId -> roleName
-};
 
 type RoleBanDecision = {
   banned: boolean;
@@ -25,12 +20,10 @@ type RoleBanDecision = {
 
 const DEFAULT_CACHE_TTL_SECONDS = 120;
 const DEFAULT_ROLE_LIST_TTL_SECONDS = 600;
-const DEFAULT_DB_BANNED_ROLES_TTL_SECONDS = 60;
 const DEFAULT_DISCORD_TIMEOUT_MS = 4500;
 
 const memberRolesCache = new Map<string, CachedRoles>();
 const guildRolesCache = new Map<string, CachedGuildRoles>();
-const dbBannedRolesCache = new Map<string, CachedBannedRoles>();
 
 const parseList = (value?: string | null) =>
   (value ?? "")
@@ -103,64 +96,7 @@ const loadGuildRoles = async (
 };
 
 /**
- * Load banned roles from the database table `banned_discord_roles`
- * This is cached to reduce database load
- */
-const loadDbBannedRoles = async (): Promise<CachedBannedRoles> => {
-  const cacheKey = "db_banned_roles";
-  const cached = dbBannedRolesCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached;
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.warn("[role-ban] Supabase config missing, skipping DB banned roles check");
-    return {
-      expiresAt: Date.now() + 30000, // Short TTL on error
-      bannedRoleIds: new Set(),
-      bannedRoleNames: new Map(),
-    };
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const { data, error } = await supabase
-    .from("banned_discord_roles")
-    .select("discord_role_id, role_name");
-
-  if (error) {
-    console.error("[role-ban] Failed to fetch banned roles from DB:", error.message);
-    return {
-      expiresAt: Date.now() + 30000, // Short TTL on error
-      bannedRoleIds: new Set(),
-      bannedRoleNames: new Map(),
-    };
-  }
-
-  const bannedRoleIds = new Set<string>();
-  const bannedRoleNames = new Map<string, string>();
-  
-  for (const row of data || []) {
-    bannedRoleIds.add(row.discord_role_id);
-    bannedRoleNames.set(row.discord_role_id, row.role_name);
-  }
-
-  const ttlSeconds = getEnvNumber("DB_BANNED_ROLES_TTL_SECONDS", DEFAULT_DB_BANNED_ROLES_TTL_SECONDS);
-  const entry = {
-    bannedRoleIds,
-    bannedRoleNames,
-    expiresAt: Date.now() + ttlSeconds * 1000,
-  };
-  
-  dbBannedRolesCache.set(cacheKey, entry);
-  console.log(`[role-ban] Loaded ${bannedRoleIds.size} banned roles from database`);
-  return entry;
-};
-
-/**
- * Resolve all banned role IDs from both environment variables and database
+ * Resolve all banned role IDs from environment variables
  */
 const resolveBannedRoleIds = async (
   guildId: string,
@@ -171,7 +107,7 @@ const resolveBannedRoleIds = async (
   // Start with env-based banned role IDs
   const ids = new Set(parseList(Deno.env.get("DISCORD_BANNED_ROLE_IDS")));
   const names = new Map<string, string>();
-  
+
   // Resolve env-based banned role names to IDs
   const envNames = parseList(Deno.env.get("DISCORD_BANNED_ROLE_NAMES")).map((name) =>
     name.toLowerCase(),
@@ -185,21 +121,6 @@ const resolveBannedRoleIds = async (
         names.set(role.id, role.name);
       }
     }
-  }
-
-  // Add database-based banned roles
-  try {
-    const dbBanned = await loadDbBannedRoles();
-    for (const roleId of dbBanned.bannedRoleIds) {
-      ids.add(roleId);
-      const roleName = dbBanned.bannedRoleNames.get(roleId);
-      if (roleName) {
-        names.set(roleId, roleName);
-      }
-    }
-  } catch (err) {
-    console.error("[role-ban] Error loading DB banned roles:", err);
-    // Continue with env-based roles only
   }
 
   return { ids, names };

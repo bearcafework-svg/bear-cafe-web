@@ -18,7 +18,6 @@ interface AdminDashboardOverviewProps {
 
 const PAGE_DESCRIPTIONS: Record<string, string> = {
   'users': 'จัดการสมาชิก กำหนดสิทธิ์ และควบคุมสถานะการแบน',
-  'banned-roles': 'ตั้งค่าและควบคุมบทบาทยศ Discord ที่ห้ามใช้งาน',
   'banned-name': 'จัดการชื่อต้องห้าม คัดกรองความปลอดภัยของระบบ',
   'tag-warn': 'ตรวจสอบและจัดการประวัติการแท็กเตือนสมาชิก',
   'contracts': 'สัญญาเช่าและข้อตกลงการให้บริการของคาเฟ่',

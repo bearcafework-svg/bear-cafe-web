@@ -30,7 +30,6 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   // ─── ดูแลชุมชน ───
   { id: 'users', label: 'จัดการผู้ใช้', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'tag-warn', label: 'ประวัติแท็กเตือน', group: 'community', groupLabel: 'ดูแลชุมชน' },
-  { id: 'banned-roles', label: 'ยศที่ถูกแบน', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'banned-name', label: 'ชื่อต้องห้าม', group: 'community', groupLabel: 'ดูแลชุมชน' },
   { id: 'reports', label: 'รายงานปัญหา', group: 'community', groupLabel: 'ดูแลชุมชน', ownerOnly: true },
   { id: 'healing-messages', label: 'กระดานฮีลใจ', group: 'community', groupLabel: 'ดูแลชุมชน' },

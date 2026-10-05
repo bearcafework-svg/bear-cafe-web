@@ -5,6 +5,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
+import { getGuildRoles } from "../_shared/guild-roles-cache.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,14 +47,29 @@ function formatThaiDate(dateStr: string): string {
   return `${day} ${thaiMonths[monthIdx]} ${year}`;
 }
 
-export function buildAnnouncementPayload(questDate: string, quests: any[], nextResetTs: number) {
+export function buildAnnouncementPayload(
+  questDate: string,
+  quests: any[],
+  nextResetTs: number,
+  roleMap?: Record<string, string>
+) {
   const thaiDate = formatThaiDate(questDate);
 
   const questComponents: any[] = [];
   for (const q of quests) {
+    const parts: string[] = [];
+    const pts = Number(q.reward_points) || 0;
+    const roleId = q.reward_role_id || q.trigger_config?.reward_role_id;
+    if (pts > 0) parts.push(`${POINT_ICON_STR} **+${pts}**`);
+    if (roleId) {
+      const roleName = q.trigger_config?.reward_role_name || roleMap?.[roleId] || "บทบาทพิเศษ";
+      parts.push(`🎖️ **ยศ** \`@${roleName}\``);
+    }
+    const rewardStr = parts.length > 0 ? parts.join(" • ") : "ไม่มีรางวัล";
+
     questComponents.push({
       type: 10,
-      content: `## ${q.title}\n- __\`วิธีทำเควส\`__ : ${q.description}\n- __\`รางวัล\`__ : ${POINT_ICON_STR} **+${q.reward_points}**`,
+      content: `## ${q.title}\n- __\`วิธีทำเควส\`__ : ${q.description}\n- __\`รางวัล\`__ : ${rewardStr}`,
     });
     questComponents.push({
       type: 14,
@@ -215,7 +231,75 @@ Deno.serve(async (req): Promise<Response> => {
 
     // 4. สร้าง Payload Component V2
     const nextResetTs = getNextMidnightTimestamp();
-    const payload = buildAnnouncementPayload(questDate, orderedQuests, nextResetTs);
+    const roleMap: Record<string, string> = {};
+    const hasRoleReward = orderedQuests.some(
+      (q: any) => (q.reward_role_id || q.trigger_config?.reward_role_id) && !q.trigger_config?.reward_role_name
+    );
+    if (hasRoleReward) {
+      try {
+        const guildId = Deno.env.get("DISCORD_GUILD_ID") || "1144251788493602848";
+        const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
+        if (botToken) {
+          const roles = await getGuildRoles(guildId, botToken);
+          for (const r of roles) {
+            roleMap[r.id] = r.name;
+          }
+        }
+      } catch (err) {
+        console.warn("[send-daily-quest-announcement] Could not fetch guild roles for names:", err);
+      }
+    }
+    const payload = buildAnnouncementPayload(questDate, orderedQuests, nextResetTs, roleMap);
+
+    // 4.5 ลบข้อความเดิมทั้งหมดในห้องก่อนส่งเควสใหม่
+    try {
+      const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
+      if (botToken) {
+        // ดึงข้อความล่าสุดในห้องสูงสุด 100 ข้อความ
+        const fetchRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=100`, {
+          headers: { Authorization: `Bot ${botToken}` },
+        });
+        if (fetchRes.ok) {
+          const msgs = (await fetchRes.json()) as Array<{ id: string; timestamp: string }>;
+          if (Array.isArray(msgs) && msgs.length > 0) {
+            const nowMs = Date.now();
+            const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+            const youngMessageIds = msgs
+              .filter((m) => nowMs - new Date(m.timestamp).getTime() < fourteenDaysMs)
+              .map((m) => m.id);
+
+            // ใช้ Bulk Delete สำหรับข้อความที่มีอายุไม่เกิน 14 วัน
+            if (youngMessageIds.length > 1) {
+              await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/bulk-delete`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bot ${botToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ messages: youngMessageIds.slice(0, 100) }),
+              }).catch(() => {});
+            } else if (youngMessageIds.length === 1) {
+              await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${youngMessageIds[0]}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bot ${botToken}` },
+              }).catch(() => {});
+            }
+
+            // ลบข้อความที่เกิน 14 วันแบบรายข้อความ
+            const oldMessages = msgs.filter((m) => nowMs - new Date(m.timestamp).getTime() >= fourteenDaysMs);
+            for (const oldMsg of oldMessages) {
+              await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${oldMsg.id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bot ${botToken}` },
+              }).catch(() => {});
+            }
+            console.log(`[send-daily-quest-announcement] 🧹 Cleaned ${msgs.length} messages in channel ${channelId}`);
+          }
+        }
+      }
+    } catch (clearErr: any) {
+      console.warn("[send-daily-quest-announcement] Warning during channel message cleanup:", clearErr?.message);
+    }
 
     // 5. ส่งข้อความแจ้งเตือนและแท็กบทบาทก่อน
     const pingContent = `<a:3602exclamationmarkbubble:1372837492205555812> เควสประจำวัน ${formatThaiDate(questDate)} มาแล้ว! <@&${ANNOUNCE_PING_ROLE_ID}>`;

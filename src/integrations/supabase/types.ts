@@ -73,33 +73,6 @@ export type Database = {
         }
         Relationships: []
       }
-      banned_discord_roles: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          discord_role_id: string
-          id: string
-          reason: string | null
-          role_name: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          discord_role_id: string
-          id?: string
-          reason?: string | null
-          role_name: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          discord_role_id?: string
-          id?: string
-          reason?: string | null
-          role_name?: string
-        }
-        Relationships: []
-      }
       banned_name: {
         Row: {
           created_at: string

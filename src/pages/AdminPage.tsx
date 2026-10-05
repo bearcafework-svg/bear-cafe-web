@@ -39,7 +39,6 @@ import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
-import { BannedRolesManagement } from '@/components/admin/BannedRolesManagement';
 import { BannedWordsManagement } from '@/components/admin/BannedWordsManagement';
 import { DMBroadcastManagement } from '@/components/admin/DMBroadcastManagement';
 import { RedeemCodesManagement } from '@/components/admin/RedeemCodesManagement';
@@ -114,7 +113,6 @@ interface NavItem {
 const ICON_MAP: Record<string, React.ElementType> = {
   'overview': LayoutDashboard,
   'users': Users,
-  'banned-roles': Ban,
   'banned-name': AlertTriangle,
   'tag-warn': ClipboardList,
   'contracts': Home,
@@ -281,7 +279,6 @@ function AdminPageContent() {
       switch (activeTab) {
         case 'overview': return <AdminDashboardOverview onNavigate={handleNavClick} visibleItems={visibleItems} username={user?.username} />;
         case 'users': return canAccessPage('users') ? <UsersManagement currentUser={user} isOwner={isOwner} /> : null;
-        case 'banned-roles': return canAccessPage('banned-roles') ? <BannedRolesManagement /> : null;
         case 'banned-name': return canAccessPage('banned-name') ? <BannedWordsManagement /> : null;
         case 'tag-warn': return canAccessPage('tag-warn') ? <TagWarnLogsManagement /> : null;
         case 'contracts': return canAccessPage('contracts') ? <ContractsManagement /> : null;
