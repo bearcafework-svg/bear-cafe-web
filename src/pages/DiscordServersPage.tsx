@@ -24,7 +24,7 @@ import {
   Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
-  MoreHorizontal, Check, ShoppingBag, Headphones, Rocket, ArrowUpDown,
+  MoreHorizontal, Check, ShoppingBag, Headphones, Rocket, ArrowUpDown, XCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
@@ -1173,6 +1173,7 @@ export default function DiscordServersPage() {
 
   // ── Invite status state ───────────────────────────────────────────────────
   const [ownerExpiredServers, setOwnerExpiredServers] = useState<DiscordServer[]>([]);
+  const [ownerRejectedServers, setOwnerRejectedServers] = useState<DiscordServer[]>([]);
   const [editLinkServer, setEditLinkServer] = useState<DiscordServer | null>(null);
   const [isEditLinkOpen, setIsEditLinkOpen] = useState(false);
   const [isUpdatingLink, setIsUpdatingLink] = useState(false);
@@ -1383,17 +1384,26 @@ export default function DiscordServersPage() {
 
       setServers(enriched);
 
-      // Owner expired query — only when authenticated (Req 2.3, 4.3)
+      // Owner expired & rejected query — only when authenticated (Req 2.3, 4.3)
       if (isAuthenticated && user?.discord_id) {
-        const { data: expiredData } = await (supabase
-          .from('discord_servers' as any)
-          .select('*')
-          .eq('status', 'approved')
-          .eq('invite_status', 'expired')
-          .eq('owner_id', user.discord_id)) as any;
-        setOwnerExpiredServers((expiredData || []) as DiscordServer[]);
+        const [expiredRes, rejectedRes] = await Promise.all([
+          (supabase
+            .from('discord_servers' as any)
+            .select('*')
+            .eq('status', 'approved')
+            .eq('invite_status', 'expired')
+            .eq('owner_id', user.discord_id)) as any,
+          (supabase
+            .from('discord_servers' as any)
+            .select('*')
+            .eq('status', 'rejected')
+            .eq('owner_id', user.discord_id)) as any,
+        ]);
+        setOwnerExpiredServers((expiredRes.data || []) as DiscordServer[]);
+        setOwnerRejectedServers((rejectedRes.data || []) as DiscordServer[]);
       } else {
         setOwnerExpiredServers([]);
+        setOwnerRejectedServers([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -1786,6 +1796,7 @@ export default function DiscordServersPage() {
       // Remove from local states
       setServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
       setOwnerExpiredServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setOwnerRejectedServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err: any) {
       toast({
@@ -2296,6 +2307,56 @@ export default function DiscordServersPage() {
                 ))}
               </div>
             )}
+
+        {/* Owner rejected servers section — visible only to the server owner, placed at bottom to keep top hero clean */}
+        {isAuthenticated && ownerRejectedServers.length > 0 && (
+          <div id="owner-rejected-section" className="mt-8 sm:mt-12 scroll-mt-24">
+            <div className="flex items-center gap-2 mb-4">
+              <XCircle className="w-5 h-5 text-red-500" aria-hidden="true" />
+              <h3 className="text-base sm:text-lg font-semibold text-foreground">
+                เซิร์ฟเวอร์ของคุณที่ไม่ผ่านการอนุมัติ <span className="text-xs sm:text-sm font-normal text-muted-foreground">({ownerRejectedServers.length} รายการ - สามารถแก้ไขเพื่อส่งตรวจสอบใหม่ได้)</span>
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {ownerRejectedServers.map((srv) => (
+                <div key={srv.id} className="p-4 rounded-2xl bg-card/80 dark:bg-[#181412] border border-red-500/30 text-xs space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between font-semibold text-foreground">
+                    <span className="text-sm font-medium">{srv.name}</span>
+                    <Badge variant="destructive" className="text-[10px]">ไม่ผ่านการอนุมัติ</Badge>
+                  </div>
+                  {srv.qc_comment && (
+                    <p className="text-muted-foreground whitespace-pre-line bg-red-500/5 dark:bg-red-950/20 p-2.5 rounded-xl border border-red-500/20">
+                      <span className="font-semibold text-destructive">เหตุผลจากทีมงาน:</span> {srv.qc_comment}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/40">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+                      onClick={() => setDeleteTarget(srv)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>ลบรายการนี้</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                      onClick={() => {
+                        setInviteUrl(srv.invite_url || '');
+                        setCategoryId(srv.category_id || '');
+                        setIsAddOpen(true);
+                      }}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>แก้ไข & ส่งใหม่</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Owner expired servers section — visible only to the server owner (Req 2.3, 4.3, 4.4, 5.1, 5.2, 5.6) */}
         {isAuthenticated && ownerExpiredServers.length > 0 && (

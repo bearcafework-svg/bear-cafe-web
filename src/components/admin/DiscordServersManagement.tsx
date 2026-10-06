@@ -230,6 +230,7 @@ export function DiscordServersManagement() {
   // Confirm status dialog
   const [confirmTarget, setConfirmTarget] = useState<{ server: DiscordServer; status: 'approved' | 'rejected' } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -349,18 +350,51 @@ export function DiscordServersManagement() {
   // ── Confirm status change ──────────────────────────────────────────────────
   const handleConfirmStatus = async () => {
     if (!confirmTarget) return;
-    setConfirmLoading(true);
     const { server, status } = confirmTarget;
+
+    if (status === 'rejected' && !rejectReason.trim()) {
+      toast({ title: 'กรุณากรอกข้อความเหตุผลที่จะแจ้งเตือน', variant: 'destructive' });
+      return;
+    }
+
+    setConfirmLoading(true);
     // Optimistic update
-    setServers((prev) => prev.map((s) => s.id === server.id ? { ...s, status } : s));
+    setServers((prev) => prev.map((s) => s.id === server.id ? { ...s, status, qc_comment: status === 'rejected' ? rejectReason.trim() : s.qc_comment } : s));
     try {
-      const { error } = await (supabase.from('discord_servers' as any).update({ status }).eq('id', server.id)) as any;
+      const updateData: any = { status };
+      if (status === 'rejected') {
+        updateData.qc_comment = rejectReason.trim();
+      }
+
+      const { error } = await (supabase.from('discord_servers' as any).update(updateData).eq('id', server.id)) as any;
       if (error) throw error;
+
+      // ส่ง Notification เข้า web_notifications ไปยังเจ้าของเซิร์ฟเวอร์
+      if (server.owner_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('discord_id', server.owner_id)
+          .maybeSingle();
+
+        if (profile?.id) {
+          if (status === 'rejected') {
+            await supabase.from('web_notifications').insert({
+              user_id: profile.id,
+              title: `เซิร์ฟเวอร์ "${server.name}" ไม่ผ่านการอนุมัติ ✖`,
+              message: `คำขอโปรโมทเซิร์ฟเวอร์ Discord ไม่ผ่านการอนุมัติ\nเหตุผล: ${rejectReason.trim()}`,
+              type: 'error'
+            });
+          }
+        }
+      }
+
       toast({
         title: status === 'approved' ? 'อนุมัติเรียบร้อย' : 'ปฏิเสธเรียบร้อย',
         className: status === 'approved' ? 'bg-success text-success-foreground' : 'bg-destructive text-destructive-foreground',
       });
       setConfirmTarget(null);
+      setRejectReason('');
       // Switch to the tab matching the new status
       setActiveTab(status);
     } catch (error: any) {
@@ -859,7 +893,7 @@ export function DiscordServersManagement() {
                           size="sm"
                           variant="destructive"
                           className="flex-1 text-xs h-7"
-                          onClick={() => setConfirmTarget({ server, status: 'rejected' })}
+                          onClick={() => { setRejectReason(''); setConfirmTarget({ server, status: 'rejected' }); }}
                         >
                           <X className="w-3 h-3 mr-1" />ปฏิเสธ
                         </Button>
@@ -871,7 +905,7 @@ export function DiscordServersManagement() {
                         size="sm"
                         variant="outline"
                         className="flex-1 text-xs h-7 text-warning border-warning/30 hover:bg-warning/10"
-                        onClick={() => setConfirmTarget({ server, status: 'rejected' })}
+                        onClick={() => { setRejectReason(''); setConfirmTarget({ server, status: 'rejected' }); }}
                       >
                         <XCircle className="w-3 h-3 mr-1" />ถอนการอนุมัติ
                       </Button>
@@ -1564,6 +1598,71 @@ export function DiscordServersManagement() {
                   <span>เริ่มตรวจสอบ ({servers.length} รายการ)</span>
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirm Status Dialog (Approve / Reject with Reason) ── */}
+      <Dialog open={!!confirmTarget} onOpenChange={(open) => { if (!open && !confirmLoading) { setConfirmTarget(null); setRejectReason(''); } }}>
+        <DialogContent className="max-w-md rounded-2xl bg-card border-latte/40 dark:border-[#2A221E]">
+          <DialogHeader>
+            <DialogTitle className={cn(
+              "flex items-center gap-2 text-base font-bold",
+              confirmTarget?.status === 'rejected' ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+            )}>
+              {confirmTarget?.status === 'rejected' ? (
+                <>
+                  <XCircle className="w-5 h-5" />
+                  <span>ปฏิเสธการโปรโมทเซิร์ฟเวอร์</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>อนุมัติการโปรโมทเซิร์ฟเวอร์</span>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {confirmTarget?.status === 'rejected'
+                ? `ระบุข้อความเหตุผลการปฏิเสธเซิร์ฟเวอร์ "${confirmTarget?.server.name}" (จะแสดงในการแจ้งเตือน Notice หน้าเว็บของผู้ใช้)`
+                : `ยืนยันการอนุมัติเซิร์ฟเวอร์ "${confirmTarget?.server.name}" ให้โปรโมทบนเว็บไซต์?`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmTarget?.status === 'rejected' && (
+            <div className="space-y-2 py-2">
+              <Label className="text-xs font-semibold">ข้อความเหตุผลที่จะแจ้งผู้ใช้ <span className="text-destructive">*</span></Label>
+              <Textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="ระบุข้อความเหตุผล เช่น ลิงก์เชิญหมดอายุ หรือ ข้อมูลเซิร์ฟเวอร์ไม่ครบถ้วน เพื่อให้ผู้ใช้ทราบ..."
+                className="min-h-[100px] rounded-xl text-xs resize-none"
+              />
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              variant="outline"
+              disabled={confirmLoading}
+              onClick={() => { setConfirmTarget(null); setRejectReason(''); }}
+              className="rounded-xl"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              disabled={confirmLoading || (confirmTarget?.status === 'rejected' && !rejectReason.trim())}
+              onClick={handleConfirmStatus}
+              className={cn(
+                "rounded-xl gap-1.5",
+                confirmTarget?.status === 'rejected'
+                  ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
+              )}
+            >
+              {confirmLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>{confirmTarget?.status === 'rejected' ? 'ยืนยันปฏิเสธ' : 'ยืนยันอนุมัติ'}</span>
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -177,13 +177,54 @@ Deno.serve(async (req): Promise<Response> => {
     // ── Step 3: Check duplicate ───────────────────────────────────────────────
     const { data: existing } = await adminClient
       .from("discord_servers")
-      .select("id")
+      .select("id, status, owner_id")
       .eq("discord_id", guildId)
       .maybeSingle();
 
     if (existing) {
+      if (existing.status === "rejected") {
+        // หากเซิร์ฟเวอร์เดิมเคยถูกปฏิเสธ ให้อนุญาตอัปเดตและเปลี่ยนสถานะกลับเป็น pending เพื่อส่งตรวจสอบใหม่
+        const { error: updateError } = await adminClient
+          .from("discord_servers")
+          .update({
+            name: guild.name,
+            description: guild.description ?? null,
+            member_count: inviteData.approximate_member_count ?? null,
+            icon_url: buildIconUrl(guildId, guild.icon ?? null),
+            banner_url:
+              buildBannerUrl(guildId, guild.banner ?? null) ||
+              buildSplashUrl(guildId, guild.splash ?? null),
+            invite_url: `https://discord.gg/${inviteCode}`,
+            owner_id: userDiscordId || existing.owner_id,
+            category_id,
+            server_type,
+            traits,
+            server_profile,
+            status: "pending",
+            qc_comment: null,
+          })
+          .eq("id", existing.id);
+
+        if (updateError) {
+          console.error("Update resubmit error:", updateError.message);
+          return new Response(
+            JSON.stringify({ error: "ไม่สามารถส่งข้อมูลเพื่อขอตรวจสอบใหม่ได้", details: updateError.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, id: existing.id, server: { name: guild.name }, resubmitted: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: "เซิร์ฟเวอร์นี้ถูกเพิ่มในระบบแล้ว" }),
+        JSON.stringify({
+          error: existing.status === "pending"
+            ? "เซิร์ฟเวอร์นี้กำลังอยู่ระหว่างรอทีมงานตรวจสอบ"
+            : "เซิร์ฟเวอร์นี้ถูกเพิ่มในระบบแล้ว"
+        }),
         { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -568,7 +568,7 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
             await supabase.from('web_notifications').insert({
                 user_id: selectedSubmission.user_id,
                 title: 'งานโปรโมทไม่ผ่านการอนุมัติ ✖',
-                message: `งานสัปดาห์ที่ ${selectedSubmission.week_number} ถูกปฏิเสธ: ${rejectionReason.trim()}`,
+                message: `งานโปรโมทสัปดาห์ที่ ${selectedSubmission.week_number} (${selectedSubmission.month}/${selectedSubmission.year}) ไม่ผ่านการอนุมัติ\nเหตุผล: ${rejectionReason.trim()}`,
                 type: 'error'
             });
 
@@ -1427,18 +1427,23 @@ export function SubmitPromotion({ currentUser, isOwner }: { currentUser: any; is
 
             {/* DIALOG: REJECTION REASON */}
             <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                <DialogContent className="max-w-sm bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-2xl">
+                <DialogContent className="max-w-md bg-[#FDFBF7] dark:bg-[hsl(var(--card))] border-[#EAD8C8] rounded-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-sm font-bold">เหตุผลการปฏิเสธงาน</DialogTitle>
-                        <DialogDescription className="sr-only">ระบุเหตุผลในการปฏิเสธการส่งงานของสตาฟ</DialogDescription>
+                        <DialogTitle className="text-sm font-bold flex items-center gap-2 text-destructive">
+                            <XCircle className="w-4 h-4" />
+                            ระบุเหตุผลการปฏิเสธงานโปรโมท
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground">
+                            ข้อความนี้จะแสดงใน Notice บนหน้าเว็บของผู้ใช้ และส่งแจ้งเตือนทาง Discord DM
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 my-2 text-xs">
-                        <Label className="text-xs">เหตุผล</Label>
-                        <Input
+                    <div className="space-y-2 my-2 text-xs">
+                        <Label className="text-xs font-semibold">ข้อความเหตุผลที่จะแจ้งผู้ใช้ <span className="text-destructive">*</span></Label>
+                        <Textarea
                             value={rejectionReason}
                             onChange={e => setRejectionReason(e.target.value)}
-                            placeholder="ระบุเหตุผล เช่น รูปไม่ครบ / หลักฐานไม่ตรงกับสัปดาห์"
-                            className="h-9 border-latte/40 rounded-xl"
+                            placeholder="ระบุข้อความเหตุผล เช่น รูปภาพหลักฐานไม่ครบ 5 รูป หรือ ลิงก์โพสต์ไม่ถูกต้อง เพื่อให้ผู้ใช้ทราบและนำไปแก้ไข..."
+                            className="min-h-[100px] border-latte/40 rounded-xl resize-none text-xs"
                         />
                     </div>
                     <DialogFooter>

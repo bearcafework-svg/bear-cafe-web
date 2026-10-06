@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { NoticeBellButton } from './NoticeBellButton';
 import { BearLogo } from './BearLogo';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,8 +53,10 @@ export function CozyNavbar() {
           </span>
         </Link>
 
-        {/* Right: Theme Toggler & User Profile Menu */}
+        {/* Right: Notice Bell, Theme Toggler & User Profile Menu */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <NoticeBellButton />
+
           <AnimatedThemeToggler
             className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-latte/40 dark:border-border/60 bg-white/80 dark:bg-card/80 hover:bg-white dark:hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs shrink-0"
             title="สลับธีม (โหมดมืด / สว่าง)"
