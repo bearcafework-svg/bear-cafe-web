@@ -30,6 +30,7 @@ import {
   Target,
   Bot,
   HeartHandshake,
+  Crown,
 } from 'lucide-react';
 import { NavItem } from '@/components/ui/dropdown-navigation';
 
@@ -205,6 +206,12 @@ export function getAdminNavTree(
               label: 'จัดการมินิเกม',
               description: 'คลังคำศัพท์และตั้งค่ามินิเกมทั้ง 13 เกม',
               icon: Gamepad2,
+            },
+            {
+              id: 'kuma-tenants',
+              label: 'จัดการบอท Kuma',
+              description: 'ระบบสมาชิก Premium และเซิร์ฟเวอร์ภายนอก',
+              icon: Crown,
             },
             {
               id: 'ai-assistant',

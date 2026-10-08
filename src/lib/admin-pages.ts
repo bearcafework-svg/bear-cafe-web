@@ -44,6 +44,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'dm-broadcast', label: 'ส่งข่าวสารบอท DM', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
   { id: 'minigames', label: 'จัดการมินิเกม', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
   { id: 'ai-assistant', label: 'จัดการ AI พี่หมี', group: 'content', groupLabel: 'สื่อและคอนเทนต์', ownerOnly: true },
+  { id: 'kuma-tenants', label: 'จัดการบอท Kuma (Tenants)', group: 'content', groupLabel: 'สื่อและคอนเทนต์' },
 
   // ─── ระบบและการตั้งค่า ───
   { id: 'overview', label: 'ภาพรวมระบบ', group: 'system', groupLabel: 'ระบบและการตั้งค่า' },

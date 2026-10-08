@@ -33,7 +33,7 @@ import {
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
-  Copy, Target, Sparkles, Trash2, HeartHandshake,
+  Copy, Target, Sparkles, Trash2, HeartHandshake, Bot,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -77,6 +77,7 @@ import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManag
 import { DailyQuestsManagement } from '@/components/admin/DailyQuestsManagement';
 import { GachaponManagement } from '@/components/admin/GachaponManagement';
 import { AIAssistantManagement } from '@/components/admin/AIAssistantManagement';
+import { KumaTenantsManagement } from '@/components/admin/KumaTenantsManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -138,6 +139,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'permissions': ShieldCheck,
   'roles-to-delete': Trash2,
   'heal-jai': HeartHandshake,
+  'kuma-tenants': Bot,
 };
 
 const NAV_ITEMS: NavItem[] = ADMIN_PAGES.map(p => ({
@@ -305,6 +307,7 @@ function AdminPageContent() {
         case 'gachapon': return canAccessPage('gachapon') ? <GachaponManagement /> : null;
         case 'ai-assistant': return canAccessPage('ai-assistant') ? <AIAssistantManagement /> : null;
         case 'heal-jai': return canAccessPage('heal-jai') ? <HealJaiManagement currentUser={user} isOwner={isOwner} /> : null;
+        case 'kuma-tenants': return canAccessPage('kuma-tenants') ? <KumaTenantsManagement /> : null;
 
         default: return null;
       }
