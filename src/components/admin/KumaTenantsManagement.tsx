@@ -600,7 +600,7 @@ export function KumaTenantsManagement() {
                       {/* Updated At */}
                       <TableCell className="text-xs text-muted-foreground">
                         {tenant.updated_at
-                          ? new Date(tenant.updated_at).toLocaleDateString('th-TH', {
+                          ? new Date(tenant.updated_at).toLocaleString('th-TH', {
                               dateStyle: 'short',
                               timeStyle: 'short',
                             })
@@ -719,7 +719,7 @@ export function KumaTenantsManagement() {
                     วันหมดอายุใหม่หลังจากบันทึก:
                   </div>
                   <div className="text-foreground text-sm font-medium">
-                    {calculatedExpiryDate.toLocaleDateString('th-TH', {
+                    {calculatedExpiryDate.toLocaleString('th-TH', {
                       dateStyle: 'full',
                       timeStyle: 'short',
                     })}
