@@ -111,44 +111,58 @@ BEGIN
     v_confidence := 1.0;
   END IF;
 
-  -- 5. สร้าง User Category Interest Profile Table (ชั่วคราวใน Memory)
-  CREATE TEMP TABLE IF NOT EXISTS temp_user_category_interest (
-    category_id uuid PRIMARY KEY,
-    interest_score numeric,
-    category_name text
-  ) ON COMMIT DROP;
+  -- คำนวณ v_max_interest โดยตรงจาก Subquery (ไม่มี Temp Table / ไม่ติดข้อจำกัด STABLE)
+  SELECT COALESCE(NULLIF(MAX(cat_interest), 0), 1.0)
+  INTO v_max_interest
+  FROM (
+    SELECT 
+      COALESCE(SUM(
+        CASE 
+          WHEN sde.event_type = 'save' THEN 5.0
+          WHEN sde.event_type = 'click' THEN 4.0
+          WHEN sde.event_type = 'view' THEN 2.0
+          WHEN sde.event_type = 'rating' THEN 3.0
+          WHEN sde.event_type = 'search' THEN 1.5
+          ELSE 0.0
+        END * POWER(2.0, -EXTRACT(EPOCH FROM (now() - sde.created_at)) / (7.0 * 86400))
+      ), 0) AS cat_interest
+    FROM public.server_discovery_events sde
+    JOIN public.discord_servers ds ON ds.id = sde.server_id
+    WHERE sde.user_id = v_user_discord_id
+      AND sde.created_at >= now() - interval '30 days'
+      AND ds.category_id IS NOT NULL
+    GROUP BY ds.category_id
+  ) cat_scores;
 
-  TRUNCATE temp_user_category_interest;
+  IF v_max_interest IS NULL OR v_max_interest <= 0 THEN
+    v_max_interest := 1.0;
+  END IF;
 
-  INSERT INTO temp_user_category_interest (category_id, interest_score, category_name)
-  SELECT 
-    ds.category_id,
-    COALESCE(SUM(
-      CASE 
-        WHEN sde.event_type = 'save' THEN 5.0
-        WHEN sde.event_type = 'click' THEN 4.0
-        WHEN sde.event_type = 'view' THEN 2.0
-        WHEN sde.event_type = 'rating' THEN 3.0
-        WHEN sde.event_type = 'search' THEN 1.5
-        ELSE 0.0
-      END * POWER(2.0, -EXTRACT(EPOCH FROM (now() - sde.created_at)) / (7.0 * 86400))
-    ), 0) AS cat_interest,
-    MAX(dsc.name) AS cat_name
-  FROM public.server_discovery_events sde
-  JOIN public.discord_servers ds ON ds.id = sde.server_id
-  LEFT JOIN public.discord_server_categories dsc ON dsc.id = ds.category_id
-  WHERE sde.user_id = v_user_discord_id
-    AND sde.created_at >= now() - interval '30 days'
-    AND ds.category_id IS NOT NULL
-  GROUP BY ds.category_id;
-
-  SELECT COALESCE(MAX(interest_score), 1.0) INTO v_max_interest 
-  FROM temp_user_category_interest;
-  IF v_max_interest <= 0 THEN v_max_interest := 1.0; END IF;
-
-  -- 6. Main Recommendation Candidates Query
+  -- 5. Main Recommendation Candidates Query (CTE ล้วน ปลอดภัย รวดเร็ว ไม่ใช้ Temp Table)
   RETURN QUERY
-  WITH server_penalties AS (
+  WITH user_cat_interest AS (
+    SELECT 
+      ds.category_id,
+      COALESCE(SUM(
+        CASE 
+          WHEN sde.event_type = 'save' THEN 5.0
+          WHEN sde.event_type = 'click' THEN 4.0
+          WHEN sde.event_type = 'view' THEN 2.0
+          WHEN sde.event_type = 'rating' THEN 3.0
+          WHEN sde.event_type = 'search' THEN 1.5
+          ELSE 0.0
+        END * POWER(2.0, -EXTRACT(EPOCH FROM (now() - sde.created_at)) / (7.0 * 86400))
+      ), 0) AS interest_score,
+      MAX(dsc.name) AS category_name
+    FROM public.server_discovery_events sde
+    JOIN public.discord_servers ds ON ds.id = sde.server_id
+    LEFT JOIN public.discord_server_categories dsc ON dsc.id = ds.category_id
+    WHERE sde.user_id = v_user_discord_id
+      AND sde.created_at >= now() - interval '30 days'
+      AND ds.category_id IS NOT NULL
+    GROUP BY ds.category_id
+  ),
+  server_penalties AS (
     -- คำนวณ Exposure Penalty พร้อม Time Decay (Half-life 3 วัน)
     SELECT 
       sde.server_id AS p_server_id,
@@ -180,7 +194,7 @@ BEGIN
       (uci.interest_score IS NOT NULL AND uci.interest_score > 0) AS has_category_affinity
     FROM public.discord_servers ds
     LEFT JOIN public.discord_server_categories dsc ON dsc.id = ds.category_id
-    LEFT JOIN temp_user_category_interest uci ON uci.category_id = ds.category_id
+    LEFT JOIN user_cat_interest uci ON uci.category_id = ds.category_id
     LEFT JOIN public.get_discovery_trending_scores(7) ts ON ts.server_id = ds.id
     LEFT JOIN server_penalties sp ON sp.p_server_id = ds.id
     WHERE ds.status = 'approved' AND ds.invite_status != 'expired'
