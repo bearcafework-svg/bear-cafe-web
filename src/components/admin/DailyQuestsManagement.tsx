@@ -260,13 +260,29 @@ const KNOWN_CHANNELS: Record<string, string> = {
   '1534458749782200390': '🎮 เกม 4: ทายคำจากคำใบ้',
   '1544201307894587472': '🎮 เกม 5: ฟังเสียงแล้วพิมพ์ตอบ (อังกฤษ)',
   '1534469630234726431': '🎮 เกม 6: พิมพ์คำต่อไปนี้ (ไทย)',
-  '1534471900112486410': '🎮 เกม 7: พิมพ์คำต่อไปนี้ (อังกฤษ)',
-  '1534472719603994784': '🎮 เกม 8: ไวยากรณ์ภาษาไทย',
-  '1534473855660593172': '🎮 เกม 9: ไวยากรณ์ภาษาอังกฤษ',
-  '1534474757305925743': '🎮 เกม 10: ทายธงชาติ',
-  '1534475484803764355': '🎮 เกม 11: ทายเสียงสัตว์',
-  '1534477382499696773': '🎮 เกม 12: ทายหมวดหมู่อาหาร',
-  '1534478149889556531': '🎮 เกม 13: เรียงคำสร้างประโยค',
+  '1534469708517085315': '🎮 เกม 7: พิมพ์คำต่อไปนี้ (อังกฤษ)',
+  '1534647461262393435': '🎮 เกม 8: ทายคำแปลภาษาอังกฤษ',
+  '1534647589121818795': '🎮 เกม 9: ทายคำแปลภาษาไทย',
+  '1536934025187295232': '🎮 เกม 10: เกมต่อคำ',
+  '1544201245974073405': '🎮 เกม 11: ฟังเสียงแล้วพิมพ์ตอบ (ไทย)',
+  '1536934867256868885': '🎮 เกม 12: จริงหรือเท็จ',
+  '1548969167825408021': '🎮 เกม 13: เรียงประโยคภาษาอังกฤษ',
+};
+
+export const DEFAULT_GAME_CHANNEL_MAP: Record<string, string> = {
+  '1': '1534437994327572510',
+  '2': '1534453700188176506',
+  '3': '1534454001532272730',
+  '4': '1534458749782200390',
+  '5': '1544201307894587472',
+  '6': '1534469630234726431',
+  '7': '1534469708517085315',
+  '8': '1534647461262393435',
+  '9': '1534647589121818795',
+  '10': '1536934025187295232',
+  '11': '1544201245974073405',
+  '12': '1536934867256868885',
+  '13': '1548969167825408021',
 };
 
 export const TAROT_COMMANDS = [
@@ -288,12 +304,12 @@ export const MINIGAME_OPTIONS = [
   { value: '5', label: 'เกม 5: ฟังเสียงแล้วพิมพ์ตอบ (อังกฤษ) — ฟังเสียง' },
   { value: '6', label: 'เกม 6: พิมพ์คำต่อไปนี้ (ไทย) — แข่งความเร็ว' },
   { value: '7', label: 'เกม 7: พิมพ์คำต่อไปนี้ (อังกฤษ) — แข่งความเร็ว' },
-  { value: '8', label: 'เกม 8: ไวยากรณ์ภาษาไทย — ปุ่มกด 4 ตัวเลือก' },
-  { value: '9', label: 'เกม 9: ไวยากรณ์ภาษาอังกฤษ — ปุ่มกด 4 ตัวเลือก' },
-  { value: '10', label: 'เกม 10: ทายธงชาติ — ปุ่มกด 4 ตัวเลือก' },
-  { value: '11', label: 'เกม 11: ทายเสียงสัตว์ — ฟังเสียง' },
-  { value: '12', label: 'เกม 12: ทายหมวดหมู่อาหาร — ปุ่มกด 4 ตัวเลือก' },
-  { value: '13', label: 'เกม 13: เรียงคำสร้างประโยค — ปุ่มกดเรียงคำ' },
+  { value: '8', label: 'เกม 8: ทายคำแปลภาษาอังกฤษ — ปุ่มกด 4 ตัวเลือก' },
+  { value: '9', label: 'เกม 9: ทายคำแปลภาษาไทย — ปุ่มกด 4 ตัวเลือก' },
+  { value: '10', label: 'เกม 10: เกมต่อคำ — ปุ่มกดตัวเลือก' },
+  { value: '11', label: 'เกม 11: ฟังเสียงแล้วพิมพ์ตอบ (ไทย) — ฟังเสียง' },
+  { value: '12', label: 'เกม 12: จริงหรือเท็จ — ปุ่มกดจริง/เท็จ' },
+  { value: '13', label: 'เกม 13: เรียงประโยคภาษาอังกฤษ — ปุ่มกดเรียงคำ' },
 ];
 
 export const KNOWN_VOICE_CATEGORIES: Record<string, string> = {
@@ -462,6 +478,23 @@ export function DailyQuestsManagement() {
     },
     [discordRolesMap]
   );
+
+  // Minigame settings cache from DB (Single Source of Truth)
+  const [minigameSettings, setMinigameSettings] = useState<{ game_id: number; game_name: string; channel_id: string }[]>([]);
+
+  const fetchMinigameSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('minigame_settings' as any)
+        .select('game_id, game_name, channel_id')
+        .order('game_id', { ascending: true });
+      if (!error && Array.isArray(data)) {
+        setMinigameSettings(data as any);
+      }
+    } catch (err: any) {
+      console.warn('Could not load minigame settings:', err);
+    }
+  }, []);
 
   // Fetch all templates
   const fetchTemplates = useCallback(async () => {
@@ -676,7 +709,30 @@ export function DailyQuestsManagement() {
     fetchPastSets();
     fetchScheduleSettings();
     fetchDiscordRoles();
-  }, [fetchTemplates, fetchPastSets, fetchScheduleSettings, fetchDiscordRoles]);
+    fetchMinigameSettings();
+  }, [fetchTemplates, fetchPastSets, fetchScheduleSettings, fetchDiscordRoles, fetchMinigameSettings]);
+
+  // Dynamic Minigame Mapping & Options (synced from DB minigame_settings)
+  const dynamicGameChannelMap = useMemo(() => {
+    const map: Record<string, string> = { ...DEFAULT_GAME_CHANNEL_MAP };
+    minigameSettings.forEach((m) => {
+      if (m.game_id && m.channel_id) {
+        map[String(m.game_id)] = String(m.channel_id).trim();
+      }
+    });
+    return map;
+  }, [minigameSettings]);
+
+  const dynamicMinigameOptions = useMemo(() => {
+    if (minigameSettings.length === 0) return MINIGAME_OPTIONS;
+    return [
+      { value: 'any', label: '🎮 ทุกมินิเกม (ชนะเกมใดก็ได้)' },
+      ...minigameSettings.map((m) => ({
+        value: String(m.game_id),
+        label: `เกม ${m.game_id}: ${m.game_name || ''}`,
+      })),
+    ];
+  }, [minigameSettings]);
 
   useEffect(() => {
     if (activeTab === 'sets') {
@@ -1855,7 +1911,7 @@ export function DailyQuestsManagement() {
                             <span className="font-bold font-mono text-[11px]">
                               {activeSelectedTemplate.trigger_config.game_id === 'any'
                                 ? 'ทุกมินิเกม'
-                                : (MINIGAME_OPTIONS.find(m => m.value === String(activeSelectedTemplate.trigger_config.game_id))?.label.split('—')[0] || `เกม ${activeSelectedTemplate.trigger_config.game_id}`)}
+                                : (dynamicMinigameOptions.find(m => m.value === String(activeSelectedTemplate.trigger_config.game_id))?.label.split('—')[0] || `เกม ${activeSelectedTemplate.trigger_config.game_id}`)}
                             </span>
                           </div>
                         )}
@@ -2625,22 +2681,7 @@ export function DailyQuestsManagement() {
                       value={cfgGameId}
                       onValueChange={(val) => {
                         setCfgGameId(val);
-                        const gameChannelMap: Record<string, string> = {
-                          '1': '1534437994327572510',
-                          '2': '1534453700188176506',
-                          '3': '1534454001532272730',
-                          '4': '1534458749782200390',
-                          '5': '1544201307894587472',
-                          '6': '1534469630234726431',
-                          '7': '1534471900112486410',
-                          '8': '1534472719603994784',
-                          '9': '1534473855660593172',
-                          '10': '1534474757305925743',
-                          '11': '1534475484803764355',
-                          '12': '1534477382499696773',
-                          '13': '1534478149889556531',
-                        };
-                        if (val in gameChannelMap) setCfgChannelId(gameChannelMap[val]);
+                        if (val in dynamicGameChannelMap) setCfgChannelId(dynamicGameChannelMap[val]);
                         else if (val === 'any') setCfgChannelId('');
                       }}
                     >
@@ -2648,7 +2689,7 @@ export function DailyQuestsManagement() {
                         <SelectValue placeholder="เลือกมินิเกม" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[250px]">
-                        {MINIGAME_OPTIONS.map((mo) => (
+                        {dynamicMinigameOptions.map((mo) => (
                           <SelectItem key={mo.value} value={mo.value} className="text-xs">
                             {mo.label}
                           </SelectItem>
