@@ -29,7 +29,7 @@ import {
   VolumeX, Image as ImageIcon, Sparkles, X, UserCheck, ShieldAlert,
   ArrowRight, FileText, Download, CheckCheck, Loader2, RotateCcw
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImageUrl } from '@/lib/utils';
 
 interface Counselor {
   id: number;
@@ -1968,7 +1968,7 @@ export function HealJaiManagement({ currentUser, isOwner }: HealJaiManagementPro
           <div className="py-2 flex items-center justify-center">
             {viewingSlipUrl && (
               <img
-                src={viewingSlipUrl}
+                src={getOptimizedImageUrl(viewingSlipUrl, { width: 800, quality: 80 })}
                 alt="สลิปโอนเงิน"
                 className="max-h-[500px] w-auto rounded-2xl border border-border shadow-sm object-contain"
               />

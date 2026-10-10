@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { IconDisplay } from '@/components/bear-cafe/IconDisplay';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImageUrl } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -2493,7 +2493,7 @@ export function TradingHistoryManagement() {
                                 return (
                                   <div key={i} className="relative group rounded-xl overflow-hidden border border-border bg-muted/20">
                                     <img
-                                      src={url!}
+                                      src={getOptimizedImageUrl(url, { width: 450, quality: 75 })}
                                       alt={`บิล ${i+1}`}
                                       className={cn(
                                         "w-full transition-all duration-200 cursor-pointer",
@@ -2616,7 +2616,7 @@ export function TradingHistoryManagement() {
                               <div className="flex gap-1 shrink-0">
                                 {slips.map((url, i) => (
                                   <button key={i} onClick={() => setPreviewImage(url)} className="w-10 h-7 rounded border bg-muted/20 overflow-hidden hover:border-primary/40 transition-all shrink-0">
-                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                    <img src={getOptimizedImageUrl(url, { width: 100, quality: 70 })} alt="" className="w-full h-full object-cover" />
                                   </button>
                                 ))}
                               </div>
@@ -2809,7 +2809,7 @@ export function TradingHistoryManagement() {
         <DialogContent className="max-w-4xl w-full p-0 bg-black/80 border-none overflow-hidden flex items-center justify-center focus:outline-none">
           <div className="relative w-full h-[80vh] flex items-center justify-center">
             <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><X className="w-5 h-5" /></button>
-            {previewImage && <img src={previewImage} alt="ภาพบิล" className="max-w-full max-h-full object-contain" />}
+            {previewImage && <img src={getOptimizedImageUrl(previewImage, { width: 1200, quality: 85 })} alt="ภาพบิล" className="max-w-full max-h-full object-contain" />}
           </div>
         </DialogContent>
       </Dialog>
@@ -2883,7 +2883,7 @@ export function TradingHistoryManagement() {
                 <div className="flex gap-2">
                   {[editTarget.slip_url, editTarget.slip_url_2].filter(Boolean).map((url, i) => (
                     <div key={i} className="relative group rounded-lg overflow-hidden border border-border w-24 h-16 bg-muted/20">
-                      <img src={url!} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(url!)} />
+                      <img src={getOptimizedImageUrl(url, { width: 200, quality: 75 })} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(url!)} />
                     </div>
                   ))}
                 </div>
