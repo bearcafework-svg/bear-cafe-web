@@ -30,10 +30,10 @@ import {
   MessageSquare, Gavel, X, ChevronLeft, ChevronRight,
   EyeOff, Eye, Loader2, Plus, UploadCloud, Upload, Trash2,
   Bell, BellOff, Mail, Pencil, Check, ImagePlus, Send, Search,
-  LayoutGrid, List, Menu, History,
+  LayoutGrid, List, Menu, History, ImageIcon,
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImageUrl } from '@/lib/utils';
 import { DatePicker } from '@/components/ui/date-picker';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -266,6 +266,16 @@ export function TagWarnLogsManagement() {
   const handleSetLayoutView = (view: 'cozy' | 'list' | 'compact') => {
     setLayoutView(view);
     localStorage.setItem('tag_layout_view', view);
+  };
+
+  const [revealedCardImages, setRevealedCardImages] = useState<Set<string>>(new Set());
+  const toggleRevealCardImages = (recordId: string) => {
+    setRevealedCardImages(prev => {
+      const next = new Set(prev);
+      if (next.has(recordId)) next.delete(recordId);
+      else next.add(recordId);
+      return next;
+    });
   };
 
   // template manager
@@ -1420,16 +1430,56 @@ export function TagWarnLogsManagement() {
                         )}
 
                         {allImages.length > 0 && (
-                          <div className={cn('grid gap-2', allImages.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
-                            {allImages.map((imgUrl, imgIdx) => (
-                              <div
-                                key={imgIdx}
-                                className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
-                                onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                          <div className="space-y-1.5 pt-1">
+                            {revealedCardImages.has(r.id) ? (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                                    <ImageIcon className="w-3 h-3 text-primary" /> ภาพหลักฐาน ({allImages.length})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleRevealCardImages(r.id)}
+                                    className="text-[10px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                  >
+                                    <EyeOff className="w-3 h-3" /> ซ่อนภาพ
+                                  </button>
+                                </div>
+                                <div className={cn('grid gap-2', allImages.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+                                  {allImages.map((imgUrl, imgIdx) => (
+                                    <div
+                                      key={imgIdx}
+                                      className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
+                                      onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                                    >
+                                      <img
+                                        src={getOptimizedImageUrl(imgUrl, { width: 450, quality: 75 })}
+                                        alt={`หลักฐาน ${imgIdx + 1}`}
+                                        className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-8 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-medium text-xs flex items-center justify-between px-3 rounded-xl transition-all"
+                                onClick={() => toggleRevealCardImages(r.id)}
                               >
-                                <img src={imgUrl} alt={`หลักฐาน ${imgIdx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                              </div>
-                            ))}
+                                <span className="flex items-center gap-1.5">
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>กดเพื่อดูหลักฐาน ({allImages.length} ภาพ)</span>
+                                </span>
+                                <span className="text-[9px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border/40">
+                                  Click to view
+                                </span>
+                              </Button>
+                            )}
                           </div>
                         )}
 
@@ -1537,17 +1587,17 @@ export function TagWarnLogsManagement() {
                       {/* Right: Images and Actions */}
                       <div className="flex items-center gap-3 self-end md:self-center shrink-0">
                         {allImages.length > 0 && (
-                          <div className="flex gap-1 shrink-0">
-                            {allImages.map((imgUrl, imgIdx) => (
-                              <div
-                                key={imgIdx}
-                                className="relative cursor-pointer overflow-hidden rounded-md border border-border w-12 h-8 hover:ring-2 hover:ring-primary/40 transition-all bg-muted/20 shrink-0"
-                                onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
-                              >
-                                <img src={imgUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              </div>
-                            ))}
-                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2.5 text-xs font-medium gap-1.5 text-primary hover:bg-primary/10 border-border/60 rounded-lg shrink-0"
+                            onClick={() => { setPreviewImages(allImages); setPreviewIndex(0); }}
+                            title="คลิกเพื่อดูภาพหลักฐาน"
+                          >
+                            <Eye className="w-3 h-3" />
+                            ดูหลักฐาน ({allImages.length})
+                          </Button>
                         )}
 
                         <div className="flex items-center gap-1 border-l border-latte/20 pl-3">
@@ -1717,7 +1767,12 @@ export function TagWarnLogsManagement() {
           {previewImages.length > 0 && (
             <div className="space-y-3">
               <div className="relative flex items-center justify-center min-h-[200px] bg-muted/20 rounded-lg">
-                <img src={previewImages[previewIndex]} alt={`หลักฐาน ${previewIndex + 1}`} className="max-w-full max-h-[70vh] rounded-lg object-contain" referrerPolicy="no-referrer" />
+                <img
+                  src={getOptimizedImageUrl(previewImages[previewIndex], { width: 1200, quality: 85 })}
+                  alt={`หลักฐาน ${previewIndex + 1}`}
+                  className="max-w-full max-h-[70vh] rounded-lg object-contain"
+                  referrerPolicy="no-referrer"
+                />
                 {previewImages.length > 1 && (
                   <>
                     <Button variant="secondary" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100" onClick={() => setPreviewIndex((i) => (i - 1 + previewImages.length) % previewImages.length)}>
@@ -1733,7 +1788,7 @@ export function TagWarnLogsManagement() {
                 <div className="flex items-center justify-center gap-2">
                   {previewImages.map((url, i) => (
                     <button key={i} type="button" onClick={() => setPreviewIndex(i)} className={cn('w-12 h-12 rounded-md overflow-hidden border-2 transition-all', i === previewIndex ? 'border-primary ring-1 ring-primary/30' : 'border-border/40 opacity-60 hover:opacity-100')}>
-                      <img src={url} alt={`${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={getOptimizedImageUrl(url, { width: 100, quality: 70 })} alt={`${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </button>
                   ))}
                   <span className="text-xs text-muted-foreground ml-2">{previewIndex + 1} / {previewImages.length}</span>
