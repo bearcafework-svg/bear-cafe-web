@@ -280,15 +280,24 @@ export default function TagWarnLogsPage() {
                       <span className="font-medium">{r.punishment || "-"}</span>
                     </div>
 
-                    {/* Images */}
+                    {/* Images (Click to View on demand to save bandwidth) */}
                     {images.length > 0 && (
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {images.map((img, i) => (
-                          <div key={i} className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border cursor-pointer hover:opacity-80"
-                               onClick={() => { setPreviewImages(images); setPreviewIndex(i); }}>
-                            <img src={img} className="h-full w-full object-cover" alt="หลักฐาน" referrerPolicy="no-referrer" />
-                          </div>
-                        ))}
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs gap-1.5 border-border/80 bg-muted/30 hover:bg-primary/10 text-foreground hover:text-primary transition-all w-full justify-between font-medium rounded-lg"
+                          onClick={() => { setPreviewImages(images); setPreviewIndex(0); }}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                            <span>ดูภาพหลักฐาน ({images.length} ภาพ)</span>
+                          </span>
+                          <span className="text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border/50">
+                            คลิกเพื่อดู
+                          </span>
+                        </Button>
                       </div>
                     )}
 

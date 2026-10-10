@@ -323,6 +323,15 @@ export function TradingHistoryManagement() {
       return next;
     });
   };
+  const [revealedCardSlips, setRevealedCardSlips] = useState<Set<string>>(new Set());
+  const toggleRevealCardSlip = (recordId: string) => {
+    setRevealedCardSlips(prev => {
+      const next = new Set(prev);
+      if (next.has(recordId)) next.delete(recordId);
+      else next.add(recordId);
+      return next;
+    });
+  };
   // 2 separate item lists: class_role (max 1) and others (multi)
   const [selectedClassItem, setSelectedClassItem] = useState<SelectedItem | null>(null);
   const [selectedOtherItems, setSelectedOtherItems] = useState<SelectedItem[]>([]);
@@ -2471,49 +2480,80 @@ export function TradingHistoryManagement() {
                           <span>เวลาที่ทำรายการ: {formatThaiDate(r.log_timestamp)}</span>
                         </div>
 
-                        {/* Slips */}
+                        {/* Slips (Click to View on demand to save bandwidth & Supabase egress) */}
                         {(r.slip_url || r.slip_url_2) ? (
                           <div className="space-y-1.5 pt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                                <UploadCloud className="w-3 h-3 text-primary" /> สลิปการโอน
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => toggleCardSlip(r.id)}
-                                className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
-                              >
-                                {expandedCardSlips.has(r.id) ? <EyeOff className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                                {expandedCardSlips.has(r.id) ? 'ย่อภาพ' : 'ขยายภาพเต็ม'}
-                              </button>
-                            </div>
-                            <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                              {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => {
-                                const isFull = fullSlipMode || expandedCardSlips.has(r.id);
-                                return (
-                                  <div key={i} className="relative group rounded-xl overflow-hidden border border-border bg-muted/20">
-                                    <img
-                                      src={getOptimizedImageUrl(url, { width: 450, quality: 75 })}
-                                      alt={`บิล ${i+1}`}
-                                      className={cn(
-                                        "w-full transition-all duration-200 cursor-pointer",
-                                        isFull ? "max-h-[500px] object-contain bg-black/10 p-1" : "h-32 object-cover"
-                                      )}
-                                      onClick={() => setPreviewImage(url!)}
-                                      loading="lazy"
-                                    />
+                            {revealedCardSlips.has(r.id) || fullSlipMode ? (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                                    <UploadCloud className="w-3 h-3 text-primary" /> สลิปการโอน
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {!fullSlipMode && (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleRevealCardSlip(r.id)}
+                                        className="text-[10px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                      >
+                                        <EyeOff className="w-3 h-3" /> ซ่อนภาพ
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
-                                      onClick={() => setPreviewImage(url!)}
-                                      className="absolute top-1.5 right-1.5 p-1 bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 shadow-sm"
-                                      title="ดูรูปภาพขนาดเต็ม"
+                                      onClick={() => toggleCardSlip(r.id)}
+                                      className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
                                     >
-                                      <Maximize2 className="w-3 h-3" />
+                                      {expandedCardSlips.has(r.id) ? <EyeOff className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                                      {expandedCardSlips.has(r.id) ? 'ย่อภาพ' : 'ขยายภาพเต็ม'}
                                     </button>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+                                <div className={`grid gap-2 ${r.slip_url && r.slip_url_2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                  {[r.slip_url, r.slip_url_2].filter(Boolean).map((url, i) => {
+                                    const isFull = fullSlipMode || expandedCardSlips.has(r.id);
+                                    return (
+                                      <div key={i} className="relative group rounded-xl overflow-hidden border border-border bg-muted/20">
+                                        <img
+                                          src={getOptimizedImageUrl(url, { width: 450, quality: 75 })}
+                                          alt={`บิล ${i+1}`}
+                                          className={cn(
+                                            "w-full transition-all duration-200 cursor-pointer",
+                                            isFull ? "max-h-[500px] object-contain bg-black/10 p-1" : "h-32 object-cover"
+                                          )}
+                                          onClick={() => setPreviewImage(url!)}
+                                          loading="lazy"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewImage(url!)}
+                                          className="absolute top-1.5 right-1.5 p-1 bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 shadow-sm"
+                                          title="ดูรูปภาพขนาดเต็ม"
+                                        >
+                                          <Maximize2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-8 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-medium text-xs flex items-center justify-between px-3 rounded-xl transition-all"
+                                onClick={() => toggleRevealCardSlip(r.id)}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>กดเพื่อดูสลิป ({[r.slip_url, r.slip_url_2].filter(Boolean).length} รูป)</span>
+                                </span>
+                                <span className="text-[9px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border/40">
+                                  Click to view
+                                </span>
+                              </Button>
+                            )}
                           </div>
                         ) : (
                           <div className="flex items-center justify-between pt-2 border-t border-border/20">
@@ -2613,13 +2653,17 @@ export function TradingHistoryManagement() {
                           {/* Right: Slip previews and actions */}
                           <div className="flex items-center gap-3 self-end md:self-center shrink-0">
                             {slips.length > 0 ? (
-                              <div className="flex gap-1 shrink-0">
-                                {slips.map((url, i) => (
-                                  <button key={i} onClick={() => setPreviewImage(url)} className="w-10 h-7 rounded border bg-muted/20 overflow-hidden hover:border-primary/40 transition-all shrink-0">
-                                    <img src={getOptimizedImageUrl(url, { width: 100, quality: 70 })} alt="" className="w-full h-full object-cover" />
-                                  </button>
-                                ))}
-                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs font-medium gap-1.5 text-primary hover:bg-primary/10 border-border/60 rounded-lg shrink-0"
+                                onClick={() => setPreviewImage(slips[0])}
+                                title="คลิกเพื่อดูสลิป"
+                              >
+                                <Eye className="w-3 h-3" />
+                                ดูสลิป ({slips.length})
+                              </Button>
                             ) : (
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-normal">
