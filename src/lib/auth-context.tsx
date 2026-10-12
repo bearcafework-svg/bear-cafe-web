@@ -341,13 +341,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.auth.refreshSession({ refresh_token: newSession.refresh_token }).then(({ data, error }) => {
             if (error || !data.session) {
               console.warn('[Auth] Refresh session failed during init:', error?.message);
-              authOpVersionRef.current += 1;
-              loadedUserIdRef.current = null;
-              setUser(null);
-              setSession(null);
-              setIsLoading(false);
+              // Only sign out if the refresh token is genuinely invalid or revoked by the server
+              // Do NOT sign out if it's a temporary network hiccup, 5xx server error, or timeout
+              const errStr = (error?.message || '').toLowerCase();
+              const isPermanentAuthFailure =
+                errStr.includes('invalid_grant') ||
+                errStr.includes('invalid refresh token') ||
+                errStr.includes('token expired') ||
+                errStr.includes('revoked') ||
+                errStr.includes('user not found');
+
+              if (isPermanentAuthFailure) {
+                console.warn('[Auth] Permanent auth failure detected — signing out.');
+                authOpVersionRef.current += 1;
+                loadedUserIdRef.current = null;
+                setUser(null);
+                setSession(null);
+                setIsLoading(false);
+              } else {
+                console.warn('[Auth] Transient refresh failure (network/timeout) — keeping session to prevent unexpected logout.');
+                setIsLoading(false);
+              }
             }
-          }).catch(err => console.warn('[Auth] Refresh session exception:', err));
+          }).catch(err => {
+            console.warn('[Auth] Refresh session exception — keeping session:', err);
+            setIsLoading(false);
+          });
         }
         return;
       }

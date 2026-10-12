@@ -4,11 +4,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Users, Flag, ShieldAlert, Settings, ChevronRight, RefreshCw, Coffee, Sparkles
+  Users, Flag, ShieldAlert, Settings, ChevronRight, RefreshCw, Coffee, Sparkles, AlertCircle
 } from 'lucide-react';
 import { AdminPageDef } from '@/lib/admin-pages';
 import { cn } from '@/lib/utils';
 import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
+import { fetchWithOfflineCache } from '@/lib/offline-cache';
 
 interface AdminDashboardOverviewProps {
   onNavigate: (tabId: string) => void;
@@ -56,28 +57,40 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [cachedTime, setCachedTime] = useState<string | null>(null);
 
   const fetchStats = async () => {
     try {
-      const [
-        { count: usersCount },
-        { count: reportsCount },
-        { count: warningsCount },
-        { count: serversCount }
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('tag_warn_cancel_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        supabase.from('discord_servers' as any).select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      ]);
+      const result = await fetchWithOfflineCache('admin_overview_stats', async () => {
+        const [
+          { count: usersCount },
+          { count: reportsCount },
+          { count: warningsCount },
+          { count: serversCount }
+        ] = await Promise.all([
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+          supabase.from('tag_warn_cancel_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          supabase.from('discord_servers' as any).select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        ]);
 
-      setStats({
-        totalUsers: usersCount || 0,
-        activeReports: reportsCount || 0,
-        pendingWarnings: warningsCount || 0,
-        pendingServers: serversCount || 0,
+        return {
+          totalUsers: usersCount || 0,
+          activeReports: reportsCount || 0,
+          pendingWarnings: warningsCount || 0,
+          pendingServers: serversCount || 0,
+        };
       });
+
+      if (result.data) {
+        setStats(result.data);
+      }
+      setIsOffline(result.isOffline);
+      if (result.cachedAt) {
+        setCachedTime(new Date(result.cachedAt).toLocaleTimeString('th-TH'));
+      }
     } catch (err) {
       console.error('Error fetching admin dashboard stats:', err);
     } finally {
@@ -110,6 +123,25 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
 
   return (
     <div className="space-y-6">
+      {isOffline && (
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              <strong>โหมดสำรองออฟไลน์ (Offline Snapshot):</strong> กำลังแสดงข้อมูลล่าสุดที่บันทึกไว้ในแคช {cachedTime ? `(อัปเดตล่าสุด ${cachedTime})` : ''} เนื่องจากฐานข้อมูล Supabase กำลังมีโหลดสูงหรือจำกัดการเชื่อมต่อ
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            className="h-7 px-2.5 text-xs text-amber-700 hover:text-amber-900 dark:text-amber-300 hover:bg-amber-500/20 rounded-lg shrink-0"
+          >
+            ลองเชื่อมต่อใหม่
+          </Button>
+        </div>
+      )}
+
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-accent/5 to-peach/10 border border-primary/10 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
         <div className="space-y-2 z-10">
