@@ -108,7 +108,7 @@ export function DropdownNavigation({
                   }
                 }}
                 className={cn(
-                  'flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 select-none',
+                  'flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 select-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40',
                   isOpen
                     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold'
                     : isItemActive
@@ -182,7 +182,7 @@ export function DropdownNavigation({
                             }
                           }}
                           className={cn(
-                            'w-full flex items-start gap-3 p-2.5 rounded-2xl text-left transition-all group',
+                            'w-full flex items-start gap-3 p-2.5 rounded-2xl text-left transition-all group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 focus-visible:bg-amber-500/10',
                             isSubActive
                               ? 'bg-amber-500/15 border border-amber-500/30 text-stone-900 dark:text-white'
                               : 'hover:bg-amber-500/10 dark:hover:bg-amber-500/10 border border-transparent'

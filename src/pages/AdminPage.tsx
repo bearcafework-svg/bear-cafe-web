@@ -539,20 +539,37 @@ function AdminPageContent() {
 
       {/* ─── Main content layout (Full width, No sidebar) ─── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Page title hierarchy */}
-        <div className="flex items-center gap-3 pb-4 border-b border-border/40">
+        {/* Page title hierarchy & Breadcrumb */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/40">
           {activeItem && (
-            <>
-              <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
-                <activeItem.icon className="w-5 h-5 text-primary admin-icon" />
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 dark:bg-amber-950/25 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
+                <activeItem.icon className="w-5 h-5 admin-icon" />
               </div>
-              <div>
-                <h1 className="text-xl font-semibold text-foreground leading-tight">{activeItem.label}</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {activeItem.groupLabel || GROUP_LABELS[activeItem.group]?.label}
-                </p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleNavClick('overview')}
+                    className="hover:text-primary transition-colors cursor-pointer"
+                  >
+                    แดชบอร์ด
+                  </button>
+                  <ChevronRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
+                  <span className="truncate">
+                    {activeItem.groupLabel || GROUP_LABELS[activeItem.group]?.label}
+                  </span>
+                </div>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight tracking-tight flex items-center gap-2">
+                  <span className="truncate">{activeItem.label}</span>
+                  {activeItem.ownerOnly && (
+                    <Badge variant="outline" className="text-[10px] px-2 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5 font-semibold shrink-0">
+                      เฉพาะ Owner
+                    </Badge>
+                  )}
+                </h1>
               </div>
-            </>
+            </div>
           )}
         </div>
 

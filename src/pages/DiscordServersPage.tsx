@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
+import { VoicePremiumUpsellModal } from '@/components/discord/VoicePremiumUpsellModal';
 import { StarIcon, FireIcon } from '@/icon/inline';
 import { CaffeLatteIcon } from '@/icon/outline';
 import {
@@ -346,12 +347,16 @@ function ServerSpotlight({
   carouselConfig,
   categories,
   onOpenActiveVoiceRooms,
+  onOpenVoiceUpsell,
+  user,
 }: {
   servers: DiscordServer[];
   onClickJoin: (s: DiscordServer) => void;
   carouselConfig?: { mode: 'manual' | 'auto_top7'; window_days: number; limit: number };
   categories?: { id: string; name: string; icon: string }[];
   onOpenActiveVoiceRooms?: (s: DiscordServer) => void;
+  onOpenVoiceUpsell?: (s: DiscordServer) => void;
+  user?: any;
 }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -590,38 +595,93 @@ function ServerSpotlight({
             <div className="flex-1 min-w-0">
               {/* Activity Signal + Trust Badges */}
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
-                {server.discord_id === '1144251788493602848' && (server.live_voice_count || 0) > 0 ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenActiveVoiceRooms?.(server);
-                    }}
-                    className="
-                      inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
-                      text-xs font-medium
-                      bg-emerald-500/20 hover:bg-emerald-500/30
-                      text-emerald-800 dark:text-emerald-300
-                      border border-emerald-500/40 shadow-2xs
-                      transition-all cursor-pointer active:scale-95
-                    "
-                    title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span>{server.live_voice_count} คนกำลังคุยไมค์ • ดูห้องเสียง</span>
-                    <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
-                  </button>
-                ) : (
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium backdrop-blur-md border shadow-2xs',
-                      signal.className
-                    )}
-                  >
-                    {signal.icon && <span>{signal.icon}</span>}
-                    <span>{signal.text}</span>
-                  </span>
-                )}
+                {(() => {
+                  const hasActiveVoiceRooms = Array.isArray(server.server_profile?.active_voice_rooms) && server.server_profile.active_voice_rooms.length > 0;
+                  if ((hasActiveVoiceRooms || server.discord_id === '1144251788493602848') && (server.live_voice_count || 0) > 0) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenActiveVoiceRooms?.(server);
+                        }}
+                        className="
+                          inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                          text-xs font-medium
+                          bg-emerald-500/20 hover:bg-emerald-500/30
+                          text-emerald-800 dark:text-emerald-300
+                          border border-emerald-500/40 shadow-2xs
+                          transition-all cursor-pointer active:scale-95
+                        "
+                        title={`คลิกเพื่อดูคนกำลังลงห้องเสียงใน ${server.name}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span>{server.live_voice_count} คนกำลังคุยไมค์ • ดูห้องเสียง</span>
+                        <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
+                      </button>
+                    );
+                  }
+                  if (server.has_akari_bot && (server.live_voice_count || 0) > 0) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenVoiceUpsell?.(server);
+                        }}
+                        className="
+                          inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                          text-xs font-medium
+                          bg-emerald-500/15 hover:bg-emerald-500/25
+                          text-emerald-800 dark:text-emerald-300
+                          border border-emerald-500/30 shadow-2xs
+                          transition-all cursor-pointer active:scale-95 group/voice
+                        "
+                        title="คลิกเพื่อดูการแสดงห้องเสียงสด และสมัคร Premium (59฿/ด.)"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span>{server.live_voice_count} ในห้องเสียง</span>
+                        <Sparkles className="w-3 h-3 ml-0.5 text-amber-500 opacity-85 group-hover/voice:scale-110 transition-transform" />
+                      </button>
+                    );
+                  }
+                  const isOwner = Boolean(user?.discord_id && server.owner_id && user.discord_id === server.owner_id);
+                  if (!server.has_akari_bot && server.discord_id !== '1144251788493602848' && isOwner) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const inviteUrl = `https://discord.com/oauth2/authorize?client_id=1538896195253178409&permissions=8&scope=bot%20applications.commands${server.discord_id ? `&guild_id=${server.discord_id}` : ''}`;
+                          window.open(inviteUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="
+                          inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                          text-xs font-medium
+                          bg-amber-500/20 hover:bg-amber-500/30
+                          text-amber-900 dark:text-amber-200
+                          border border-amber-500/40 shadow-2xs
+                          transition-all cursor-pointer active:scale-95
+                        "
+                        title="เพิ่มบอทคุมะเพื่อเปิดการเอคทีฟให้มากขึ้น (เฉพาะเจ้าของเซิร์ฟเวอร์)"
+                      >
+                        <Rocket className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>เปิดการเอคทีฟให้มากขึ้น</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium backdrop-blur-md border shadow-2xs',
+                        signal.className
+                      )}
+                    >
+                      {signal.icon && <span>{signal.icon}</span>}
+                      <span>{signal.text}</span>
+                    </span>
+                  );
+                })()}
 
                 {server.is_partner && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-200 border border-purple-300 dark:border-purple-400/40 backdrop-blur-md">
@@ -814,13 +874,14 @@ interface ServerCardProps {
   onToggleSave?: (serverId: string) => void;
   onOpenShopShowcase?: (server: DiscordServer) => void;
   onOpenActiveVoiceRooms?: (server: DiscordServer) => void;
+  onOpenVoiceUpsell?: (server: DiscordServer) => void;
 }
 
 function ServerCard({
   server, user, userId, sortMode, getCategoryName, getTimeSince,
   handleClickJoin, handleBump, bumpingId, handleRated,
   onRefresh, refreshingId, onEditLink, onEditVibe, onDelete, onToggleSave,
-  onOpenShopShowcase, onOpenActiveVoiceRooms,
+  onOpenShopShowcase, onOpenActiveVoiceRooms, onOpenVoiceUpsell,
 }: ServerCardProps) {
   const cardRef = useImpressionObserver(server.id);
   const bannerRef = useRef<HTMLImageElement>(null);
@@ -1007,36 +1068,109 @@ function ServerCard({
                 <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span>{server.member_count ? server.member_count.toLocaleString() : 0}</span>
               </span>
-              {server.discord_id === '1144251788493602848' ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onOpenActiveVoiceRooms?.(server);
-                  }}
-                  className="
-                    flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
-                    bg-emerald-500/15 hover:bg-emerald-500/25
-                    text-emerald-700 dark:text-emerald-300
-                    border border-emerald-500/30 dark:border-emerald-500/40
-                    shadow-xs text-xs font-medium
-                    transition-all cursor-pointer active:scale-95
-                  "
-                  title="คลิกเพื่อดูคนกำลังลงห้องเสียงใน Bear Cafe"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>ดูคนกำลังลงห้อง ({server.live_voice_count || 0} คน)</span>
-                  <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
-                </button>
-              ) : (
-                (server.live_voice_count || 0) > 0 && (
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
-                  </span>
-                )
-              )}
+              {(() => {
+                const hasActiveVoiceRooms = Array.isArray(server.server_profile?.active_voice_rooms) && server.server_profile.active_voice_rooms.length > 0;
+                if ((hasActiveVoiceRooms || server.discord_id === '1144251788493602848') && (server.live_voice_count || 0) > 0) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenActiveVoiceRooms?.(server);
+                      }}
+                      className="
+                        flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                        bg-emerald-500/15 hover:bg-emerald-500/25
+                        text-emerald-700 dark:text-emerald-300
+                        border border-emerald-500/30 dark:border-emerald-500/40
+                        shadow-xs text-xs font-medium
+                        transition-all cursor-pointer active:scale-95
+                      "
+                      title={`คลิกเพื่อดูคนกำลังลงห้องเสียงใน ${server.name}`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span>ดูคนกำลังลงห้อง ({server.live_voice_count || 0} คน)</span>
+                      <Headphones className="w-3 h-3 ml-0.5 opacity-80" />
+                    </button>
+                  );
+                }
+                if (server.has_akari_bot) {
+                  if ((server.live_voice_count || 0) > 0) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenVoiceUpsell?.(server);
+                        }}
+                        className="
+                          flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                          bg-emerald-500/10 hover:bg-emerald-500/20
+                          text-emerald-700 dark:text-emerald-300
+                          border border-emerald-500/25 hover:border-emerald-500/40
+                          shadow-2xs text-xs font-medium
+                          transition-all cursor-pointer active:scale-95 group/voice
+                        "
+                        title="คลิกเพื่อดูการแสดงห้องเสียงสด และสมัคร Premium (59฿/ด.)"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="truncate">{server.live_voice_count} ในห้องเสียง</span>
+                        <Sparkles className="w-3 h-3 ml-0.5 text-amber-500 opacity-85 group-hover/voice:scale-110 transition-transform" />
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenVoiceUpsell?.(server);
+                      }}
+                      className="
+                        flex items-center gap-1 px-2 py-0.5 rounded-full
+                        bg-stone-500/10 hover:bg-amber-500/15
+                        text-muted-foreground hover:text-amber-800 dark:hover:text-amber-300
+                        border border-stone-200/80 dark:border-stone-800 hover:border-amber-500/30
+                        text-[11px] font-medium transition-all cursor-pointer active:scale-95
+                      "
+                      title="บอทคุมะพร้อมทำงาน • คลิกเพื่อดูระบบแสดงห้องเสียงสด (59฿/ด.)"
+                    >
+                      <Headphones className="w-3 h-3 opacity-70" />
+                      <span>เปิดห้องเสียงสด</span>
+                    </button>
+                  );
+                }
+                const isOwner = Boolean(user?.discord_id && server.owner_id && user.discord_id === server.owner_id);
+                if (!server.has_akari_bot && server.discord_id !== '1144251788493602848' && isOwner) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const inviteUrl = `https://discord.com/oauth2/authorize?client_id=1538896195253178409&permissions=8&scope=bot%20applications.commands${server.discord_id ? `&guild_id=${server.discord_id}` : ''}`;
+                        window.open(inviteUrl, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="
+                        flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+                        bg-amber-500/15 hover:bg-amber-500/25
+                        text-amber-800 dark:text-amber-300
+                        border border-amber-500/30 hover:border-amber-500/50
+                        shadow-2xs text-xs font-medium
+                        transition-all cursor-pointer active:scale-95
+                      "
+                      title="เพิ่มบอทคุมะเพื่อเปิดการเอคทีฟให้มากขึ้น (เฉพาะเจ้าของเซิร์ฟเวอร์)"
+                    >
+                      <Rocket className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>เปิดการเอคทีฟให้มากขึ้น</span>
+                    </button>
+                  );
+                }
+                return null;
+              })()}
               {/* Context-aware time / stats display */}
               {sortMode === 'new' ? (
                 server.created_at ? (
@@ -1219,6 +1353,15 @@ export default function DiscordServersPage() {
       voiceCount: targetServer.live_voice_count || 0,
     });
     setActiveVoiceModalOpen(true);
+  };
+
+  // ── Voice Premium Upsell Modal state ───
+  const [isVoiceUpsellOpen, setIsVoiceUpsellOpen] = useState(false);
+  const [voiceUpsellServer, setVoiceUpsellServer] = useState<DiscordServer | null>(null);
+
+  const handleOpenVoiceUpsell = (targetServer: DiscordServer) => {
+    setVoiceUpsellServer(targetServer);
+    setIsVoiceUpsellOpen(true);
   };
 
   const userId = user?.discord_id || null;
@@ -1998,6 +2141,8 @@ export default function DiscordServersPage() {
           carouselConfig={carouselConfig}
           categories={categories}
           onOpenActiveVoiceRooms={handleOpenActiveVoiceRooms}
+          onOpenVoiceUpsell={handleOpenVoiceUpsell}
+          user={user}
         />
 
         {/* Owner Expired Alert Banner */}
@@ -2302,6 +2447,7 @@ export default function DiscordServersPage() {
                         setIsShopShowcaseOpen(true);
                       }}
                       onOpenActiveVoiceRooms={handleOpenActiveVoiceRooms}
+                      onOpenVoiceUpsell={handleOpenVoiceUpsell}
                     />
                   </motion.div>
                 ))}
@@ -2408,6 +2554,16 @@ export default function DiscordServersPage() {
         inviteUrl={activeVoiceData.inviteUrl}
         initialRooms={activeVoiceData.rooms}
         initialVoiceCount={activeVoiceData.voiceCount}
+      />
+
+      {/* Voice Premium Upsell Modal (59 THB / Month Promotion) */}
+      <VoicePremiumUpsellModal
+        open={isVoiceUpsellOpen}
+        onOpenChange={setIsVoiceUpsellOpen}
+        serverName={voiceUpsellServer?.name}
+        serverIcon={voiceUpsellServer?.icon_url}
+        serverBanner={voiceUpsellServer?.banner_url}
+        voiceCount={voiceUpsellServer?.live_voice_count || 0}
       />
 
       {/* EditLinkDialog — for owner to update expired invite links (Req 5.3–5.6, 6.1–6.9) */}

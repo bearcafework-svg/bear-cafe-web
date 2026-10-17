@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, ChevronLeft, ChevronRight, Plus, Headphones } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Plus, Headphones, Sparkles, Rocket } from 'lucide-react';
 import { CakeColorIcon } from '@/icon/outline';
 import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
+import { VoicePremiumUpsellModal } from '@/components/discord/VoicePremiumUpsellModal';
+import { useAuth } from '@/lib/auth-context';
 
 interface ServerCategory {
   id: string;
@@ -24,6 +26,8 @@ interface DiscordServer {
   category_id: string | null;
   is_verified: boolean;
   is_partner: boolean;
+  has_akari_bot?: boolean;
+  owner_id?: string | null;
   live_voice_count?: number | null;
   server_profile?: any;
 }
@@ -40,6 +44,7 @@ const TAG_PALETTES = [
 const AUTO_SCROLL_PPS = 40; // 40px/s — gentle drift
 
 export function CommunityCarousel() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -87,6 +92,15 @@ export function CommunityCarousel() {
     setVoiceModalOpen(true);
   };
 
+  // ── Voice Premium Upsell Modal state ───
+  const [isVoiceUpsellOpen, setIsVoiceUpsellOpen] = useState(false);
+  const [voiceUpsellServer, setVoiceUpsellServer] = useState<DiscordServer | null>(null);
+
+  const handleOpenVoiceUpsell = (server: DiscordServer) => {
+    setVoiceUpsellServer(server);
+    setIsVoiceUpsellOpen(true);
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       const [catRes, serverRes, countRes] = await Promise.all([
@@ -96,7 +110,7 @@ export function CommunityCarousel() {
           .order('sort_order', { ascending: true }),
         supabase
           .from('discord_servers')
-          .select('id, discord_id, name, description, icon_url, banner_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status, live_voice_count, server_profile')
+          .select('id, discord_id, name, description, icon_url, banner_url, invite_url, member_count, category_id, is_verified, is_partner, invite_status, has_akari_bot, owner_id, live_voice_count, server_profile')
           .eq('status', 'approved')
           .order('bumped_at', { ascending: false })
           .limit(24),
@@ -323,29 +337,84 @@ export function CommunityCarousel() {
                           </span>
                         </div>
                       )}
-                      {/* อภิสิทธิ์เฉพาะ GUILDID=1144251788493602848 ดูคนกำลังลงห้องเสียง */}
-                      {server.discord_id === '1144251788493602848' && (server.live_voice_count || 0) > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleOpenVoiceModal(server);
-                          }}
-                          className="
-                            mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
-                            bg-emerald-500/15 hover:bg-emerald-500/25
-                            text-emerald-700 dark:text-emerald-300
-                            border border-emerald-500/30 text-[10px] font-bold
-                            transition-all cursor-pointer shadow-xs active:scale-95
-                          "
-                          title="ดูคนกำลังลงห้องเสียงใน Bear Cafe"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                          <span>{server.live_voice_count} คนคุยไมค์</span>
-                          <Headphones className="w-2.5 h-2.5 ml-0.5 opacity-80" />
-                        </button>
-                      )}
+                      {/* 3-Stage Voice Funnel: Active Rooms (Premium/Bear Cafe) -> Free Voice Count -> Invite Bot */}
+                      {(() => {
+                        const hasActiveVoiceRooms = Array.isArray(server.server_profile?.active_voice_rooms) && server.server_profile.active_voice_rooms.length > 0;
+                        if ((hasActiveVoiceRooms || server.discord_id === '1144251788493602848') && (server.live_voice_count || 0) > 0) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleOpenVoiceModal(server);
+                              }}
+                              className="
+                                mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                                bg-emerald-500/15 hover:bg-emerald-500/25
+                                text-emerald-700 dark:text-emerald-300
+                                border border-emerald-500/30 text-[10px] font-bold
+                                transition-all cursor-pointer shadow-xs active:scale-95
+                              "
+                              title={`ดูคนกำลังลงห้องเสียงใน ${server.name}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span>{server.live_voice_count} คนคุยไมค์</span>
+                              <Headphones className="w-2.5 h-2.5 ml-0.5 opacity-80" />
+                            </button>
+                          );
+                        }
+                        if (server.has_akari_bot && (server.live_voice_count || 0) > 0) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleOpenVoiceUpsell(server);
+                              }}
+                              className="
+                                mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                                bg-emerald-500/10 hover:bg-emerald-500/20
+                                text-emerald-700 dark:text-emerald-300
+                                border border-emerald-500/20 text-[10px] font-medium
+                                transition-all cursor-pointer shadow-2xs active:scale-95 group/voice
+                              "
+                              title="คลิกเพื่อดูการแสดงห้องเสียงสด และสมัคร Premium (59฿/ด.)"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span>{server.live_voice_count} ในห้องเสียง</span>
+                              <Sparkles className="w-2.5 h-2.5 ml-0.5 text-amber-500 opacity-80 group-hover/voice:scale-110 transition-transform" />
+                            </button>
+                          );
+                        }
+                        const isOwner = Boolean(user?.discord_id && server.owner_id && user.discord_id === server.owner_id);
+                        if (!server.has_akari_bot && server.discord_id !== '1144251788493602848' && isOwner) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=1538896195253178409&permissions=8&scope=bot%20applications.commands${server.discord_id ? `&guild_id=${server.discord_id}` : ''}`;
+                                window.open(inviteUrl, '_blank', 'noopener,noreferrer');
+                              }}
+                              className="
+                                mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                                bg-amber-500/15 hover:bg-amber-500/25
+                                text-amber-800 dark:text-amber-300
+                                border border-amber-500/30 text-[10px] font-medium
+                                transition-all cursor-pointer shadow-2xs active:scale-95
+                              "
+                              title="เพิ่มบอทคุมะเพื่อเปิดการเอคทีฟให้มากขึ้น (เฉพาะเจ้าของเซิร์ฟเวอร์)"
+                            >
+                              <Rocket className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>เปิดการเอคทีฟให้มากขึ้น</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
 
@@ -373,7 +442,7 @@ export function CommunityCarousel() {
         )}
       </div>
 
-      {/* Active Voice Rooms Modal สำหรับ Bear Cafe */}
+      {/* Active Voice Rooms Modal สำหรับ Bear Cafe & Premium */}
       <ActiveVoiceRoomsModal
         open={voiceModalOpen}
         onOpenChange={setVoiceModalOpen}
@@ -384,6 +453,16 @@ export function CommunityCarousel() {
         inviteUrl={voiceModalData.inviteUrl}
         initialRooms={voiceModalData.rooms}
         initialVoiceCount={voiceModalData.voiceCount}
+      />
+
+      {/* Voice Premium Upsell Modal (59 THB / Month Promotion) */}
+      <VoicePremiumUpsellModal
+        open={isVoiceUpsellOpen}
+        onOpenChange={setIsVoiceUpsellOpen}
+        serverName={voiceUpsellServer?.name}
+        serverIcon={voiceUpsellServer?.icon_url}
+        serverBanner={voiceUpsellServer?.banner_url}
+        voiceCount={voiceUpsellServer?.live_voice_count || 0}
       />
     </section>
   );

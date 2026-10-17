@@ -581,17 +581,19 @@ export function ProductCatalogManagement() {
                           </TableCell>
                           <TableCell>
                             <button
+                              type="button"
                               onClick={() => toggleActive(product)}
-                              className="focus:outline-none"
+                              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md cursor-pointer transition-transform active:scale-95"
                               title="คลิกเพื่อสลับสถานะ"
+                              aria-label={`สลับสถานะสินค้า ${product.display_name}`}
                             >
                               {product.is_active ? (
-                                <Badge variant="outline" className="text-success border-success gap-1 text-xs cursor-pointer hover:opacity-80">
+                                <Badge variant="outline" className="text-success border-success gap-1 text-xs hover:opacity-80">
                                   <CheckCircle className="w-3 h-3" />
                                   ใช้งาน
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary" className="gap-1 text-xs cursor-pointer hover:opacity-80">
+                                <Badge variant="secondary" className="gap-1 text-xs hover:opacity-80">
                                   <XCircle className="w-3 h-3" />
                                   ปิด
                                 </Badge>

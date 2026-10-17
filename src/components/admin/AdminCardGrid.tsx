@@ -15,7 +15,7 @@ export function AdminCardGrid({ children, className, minWidth = 260 }: AdminCard
   return (
     <div
       className={cn('grid gap-4', className)}
-      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))` }}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${minWidth}px), 1fr))` }}
     >
       {children}
     </div>

@@ -13,38 +13,53 @@ import { fetchWithOfflineCache } from '@/lib/offline-cache';
 
 interface AdminDashboardOverviewProps {
   onNavigate: (tabId: string) => void;
-  visibleItems: AdminPageDef[];
+  visibleItems: (AdminPageDef & { icon?: React.ElementType })[];
   username?: string | null;
 }
 
 const PAGE_DESCRIPTIONS: Record<string, string> = {
-  'users': 'จัดการสมาชิก กำหนดสิทธิ์ และควบคุมสถานะการแบน',
-  'banned-name': 'จัดการชื่อต้องห้าม คัดกรองความปลอดภัยของระบบ',
-  'tag-warn': 'ตรวจสอบและจัดการประวัติการแท็กเตือนสมาชิก',
-  'contracts': 'สัญญาเช่าและข้อตกลงการให้บริการของคาเฟ่',
-  'healing-messages': 'ตรวจสอบและอนุมัติข้อความบนกระดานให้กำลังใจ',
+  // สินค้าและบริการ
+  'product-catalog': 'จัดการสินค้า ไอเทม และราคาในคลังสินค้าคาเฟ่',
+  'contracts': 'สัญญาเช่าห้องแชทและข้อตกลงการให้บริการของคาเฟ่',
   'trading-history': 'ประวัติการซื้อขาย แลกเปลี่ยนไอเทม และเหรียญรางวัล',
+  'checkin-rewards': 'ตั้งค่าไอเทมและแต้มรางวัลสำหรับการเช็กอินประจำวัน',
+  'redeem-codes': 'สร้างโค้ดของรางวัลสำหรับสมาชิกนำไปแลกรับของ',
+  'campaigns': 'โปรโมชัน จัดการโฆษณา และสิทธิพิเศษของร้าน',
+  'gachapon': 'จัดการตู้กาชาปอง รางวัล และเรทการสุ่ม',
+
+  // ดูแลชุมชน
+  'users': 'จัดการสมาชิก กำหนดสิทธิ์ และควบคุมสถานะการแบน',
+  'tag-warn': 'ตรวจสอบและจัดการประวัติการแท็กเตือนสมาชิก',
+  'banned-name': 'จัดการชื่อต้องห้าม คัดกรองความปลอดภัยของระบบ',
+  'reports': 'รายงานความประพฤติและคำขอปลดแบนประวัติเตือน',
+  'healing-messages': 'ตรวจสอบและอนุมัติข้อความบนกระดานให้กำลังใจ',
   'role-transfer': 'โอนย้ายสิทธิ์ยศบทบาทของสมาชิก',
   'bulk-role-manage': 'จัดการกลุ่มยศของสมาชิกจำนวนมากพร้อมกัน',
-  'reports': 'รายงานความประพฤติและคำขอปลดแบนประวัติเตือน',
-  'categories': 'จัดการหมวดหมู่ของระบบและข้อมูลต่างๆ',
-  'banners': 'อัปโหลดและอัปเดตภาพแบนเนอร์โฆษณาในคาเฟ่',
-  'roles': 'ตั้งค่ายศเชื่อมต่อและประสานงานกับ Discord',
-  'checkin-rewards': 'ตั้งค่าไอเทมและแต้มรางวัลสำหรับการเช็กอินประจำวัน',
-  'campaigns': 'โปรโมชัน จัดการโฆษณา และสิทธิพิเศษของร้าน',
-  'product-catalog': 'จัดการสินค้าและไอเทมในคลังสินค้าคาเฟ่',
+  'daily-quests': 'จัดการภารกิจและเควสประจำวันของสมาชิก',
+
+  // สื่อและคอนเทนต์
   'discord-servers': 'จัดการ ตรวจสอบ และอนุมัติเซิร์ฟเวอร์พาร์ทเนอร์',
-  'redeem-codes': 'สร้างโค้ดของรางวัลสำหรับสมาชิกนำไปแลกรับของ',
+  'banners': 'อัปโหลดและอัปเดตภาพแบนเนอร์โฆษณาในคาเฟ่',
+  'sticky-messages': 'จัดการข้อความปักหมุดติดหนึบในช่องแชท',
+  'dm-broadcast': 'ส่งข้อความบรอดแคสต์ตรงเข้า DM ผ่านบอท',
+  'minigames': 'จัดการมินิเกม ทายคำ และคำร้องขอแก้คลังเกม',
+  'ai-assistant': 'จัดการคลังความรู้ กฎระเบียบร้าน และ Sticker Triggers ของ AI พี่หมี',
+  'kuma-tenants': 'จัดการระบบบอท Kuma สำหรับเซิร์ฟเวอร์ลูกค้า',
+
+  // ระบบและการตั้งค่า
+  'overview': 'ภาพรวมแดชบอร์ด สถิติ และการเข้าถึงระบบ',
+  'heal-jai': 'จัดการโปรเจกต์และแคมเปญฮีลใจของร้าน',
+  'permissions': 'ควบคุมสิทธิ์การเข้าถึงหน้าต่างต่าง ๆ ของทีมงาน',
+  'manage-staff': 'จัดการรายชื่อ บทบาท และสถานะของทีมงาน',
   'non-transferable-roles': 'กำหนดบทบาทยศ Discord ที่ห้ามไม่ให้โอนย้าย',
   'roles-to-delete': 'ยศ Discord ที่จะถูกนำออกโดยอัตโนมัติเมื่อทำการย้าย',
-  'permissions': 'ควบคุมสิทธิ์การเข้าถึงหน้าต่างต่าง ๆ ของทีมงาน',
-  'ai-assistant': 'จัดการคลังความรู้ กฎระเบียบร้าน และ Sticker Triggers ของ AI พี่หมี',
 };
 
 const GROUP_LABELS: Record<string, string> = {
-  moderation: 'การดูแลความสงบเรียบร้อย (Moderation)',
-  content: 'การจัดการเนื้อหาและกิจกรรม (Content)',
-  system: 'การตั้งค่าและระบบหลังบ้าน (System)',
+  products: 'สินค้าและบริการ (Products & Services)',
+  community: 'ดูแลชุมชนและความสงบเรียบร้อย (Community & Moderation)',
+  content: 'สื่อ คอนเทนต์ และกิจกรรม (Content & Activities)',
+  system: 'ระบบและการตั้งค่า (System & Settings)',
 };
 
 export function AdminDashboardOverview({ onNavigate, visibleItems, username }: AdminDashboardOverviewProps) {
@@ -267,29 +282,43 @@ export function AdminDashboardOverview({ onNavigate, visibleItems, username }: A
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {items.map((item) => {
                   const desc = PAGE_DESCRIPTIONS[item.id] || 'ระบบบริการส่วนข้อมูลร้านกาแฟ';
+                  const ItemIcon = item.icon || Settings;
                   return (
                     <button
                       key={item.id}
+                      type="button"
                       onClick={() => onNavigate(item.id)}
-                      className="group text-left border border-border/50 rounded-2xl bg-card/60 p-4 hover:bg-card hover:-translate-y-1 hover:shadow-md hover:border-primary/20 transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-primary/20 flex flex-col justify-between h-32"
+                      className="group text-left border border-border/60 rounded-2xl bg-card/75 p-4 hover:bg-card hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/5 hover:border-amber-500/40 dark:hover:border-amber-500/30 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                            {item.label}
-                          </span>
-                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-1 group-hover:text-primary transition-all" />
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-amber-500/10 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-amber-500 group-hover:text-stone-950 transition-all duration-200">
+                              <ItemIcon className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                              {item.label}
+                            </span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-1 group-hover:text-primary transition-all shrink-0 mt-2" />
                         </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-0.5">
                           {desc}
                         </p>
                       </div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground/60 mt-2 bg-muted/65 group-hover:bg-primary/10 group-hover:text-primary rounded-md px-1.5 py-0.5 w-max transition-colors">
-                        {item.id}
-                      </span>
+                      <div className="flex items-center justify-between pt-2 border-t border-border/30 mt-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70 bg-muted/60 group-hover:bg-primary/10 group-hover:text-primary rounded-md px-1.5 py-0.5 transition-colors">
+                          {item.id}
+                        </span>
+                        {item.ownerOnly && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5">
+                            Owner
+                          </Badge>
+                        )}
+                      </div>
                     </button>
                   );
                 })}

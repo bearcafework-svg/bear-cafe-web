@@ -33,3 +33,7 @@ CLAUDE.md
 docs/*.md
 docs
 src/icon/temp/*
+
+# Python cache
+__pycache__/
+*.py[cod]

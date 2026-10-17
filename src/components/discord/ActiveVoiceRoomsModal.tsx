@@ -329,7 +329,7 @@ export function ActiveVoiceRoomsModal({
             className="text-xs rounded-xl border-[#8C6239]/40 text-[#8C6239] dark:text-[#EAD8C8] hover:bg-[#8C6239]/10"
           >
             <a href={inviteUrl} target="_blank" rel="noopener noreferrer">
-              เข้าสู่เซิร์ฟเวอร์หลัก 🐻
+              {guildId === '1144251788493602848' ? 'เข้าสู่เซิร์ฟเวอร์หลัก 🐻' : `เข้าสู่ ${serverName} 🐻`}
             </a>
           </Button>
         </div>
