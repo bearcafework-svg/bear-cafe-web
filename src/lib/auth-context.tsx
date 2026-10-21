@@ -97,21 +97,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = useCallback(async (sessionUser: SupabaseUser): Promise<User | null> => {
     console.log('[Auth] Fetching profile for user:', sessionUser.id);
 
-    const [profileResult, rolesResult, permIdsResult] = await Promise.all([
-      supabase
+    let profileResult = await supabase
+      .from('profiles')
+      .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason, role, is_bear_member')
+      .eq('id', sessionUser.id)
+      .maybeSingle();
+
+    const discordId = sessionUser.user_metadata?.discord_id;
+    if (!profileResult.data && discordId) {
+      console.warn('[Auth] Profile not found by session id, trying discord_id:', discordId);
+      profileResult = await supabase
         .from('profiles')
         .select('id, username, discord_username, avatar_url, banner_url, discord_id, is_banned, ban_reason, role, is_bear_member')
-        .eq('id', sessionUser.id)
-        .maybeSingle(),
-      supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', sessionUser.id),
-      supabase
-        .from('user_custom_permissions')
-        .select('permission_id')
-        .eq('user_id', sessionUser.id),
-    ]);
+        .eq('discord_id', discordId)
+        .maybeSingle();
+    }
 
     if (profileResult.error) {
       console.error('[Auth] Profile fetch error:', profileResult.error);
@@ -123,6 +123,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('[Auth] Profile not found for user:', sessionUser.id);
       return null;
     }
+
+    const targetUserIds = Array.from(new Set([sessionUser.id, profile.id]));
+    const [rolesResult, permIdsResult] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('role')
+        .in('user_id', targetUserIds),
+      supabase
+        .from('user_custom_permissions')
+        .select('permission_id')
+        .in('user_id', targetUserIds),
+    ]);
 
     const roleRows = (rolesResult.data ?? []) as UserRoleRow[];
     const roleSet = new Set(roleRows.map((r) => r.role).filter(Boolean));

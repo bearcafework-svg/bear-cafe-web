@@ -87,6 +87,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
     const widgetIdRef = useRef<string | null>(null);
     const resolveRef = useRef<((token: string) => void) | null>(null);
     const rejectRef = useRef<((error: Error) => void) | null>(null);
+    const tokenRef = useRef<string | null>(null);
     const [isWidgetReady, setIsWidgetReady] = useState(false);
     const initAttemptedRef = useRef(false);
     const errorCountRef = useRef(0);
@@ -127,6 +128,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
             size: 'invisible',
             action,
             callback: (token: string) => {
+              tokenRef.current = token;
               errorCountRef.current = 0;
               resolveRef.current?.(token);
               resolveRef.current = null;
@@ -135,6 +137,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
             'error-callback': (errorCode?: string) => {
               console.warn('[Turnstile] Widget error:', errorCode);
               errorCountRef.current++;
+              tokenRef.current = null;
               
               // Error 110200 is common in iframe/preview environments
               // After 1 error, we'll allow bypass immediately for faster login
@@ -151,6 +154,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
               rejectRef.current = null;
             },
             'expired-callback': () => {
+              tokenRef.current = null;
               rejectRef.current?.(new Error('Turnstile expired'));
               resolveRef.current = null;
               rejectRef.current = null;
@@ -188,6 +192,12 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
             return;
           }
 
+          // If token was already obtained from initial invisible render, return immediately
+          if (tokenRef.current) {
+            resolve(tokenRef.current);
+            return;
+          }
+
           // If widget had errors, use a development bypass token immediately
           if (errorCountRef.current >= FALLBACK_THRESHOLD) {
             console.log('[Turnstile] Using bypass token due to widget errors');
@@ -218,7 +228,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
             resolve('TURNSTILE_BYPASS_DEV');
           }
 
-          // Timeout after 5 seconds (reduced from 15 for faster fallback)
+          // Fast timeout after 2 seconds for smooth UX
           setTimeout(() => {
             if (resolveRef.current) {
               console.log('[Turnstile] Execution timeout, using bypass');
@@ -226,9 +236,10 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
               resolveRef.current = null;
               rejectRef.current = null;
             }
-          }, 5000);
+          }, 2000);
         }),
       reset: () => {
+        tokenRef.current = null;
         if (window.turnstile && widgetIdRef.current) {
           try {
             window.turnstile.reset(widgetIdRef.current);

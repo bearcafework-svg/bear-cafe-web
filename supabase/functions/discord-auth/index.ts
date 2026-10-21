@@ -88,6 +88,11 @@ function buildAllowedRedirectUris(params: {
 
   add("http://localhost:8080/auth/callback");
   add("http://127.0.0.1:8080/auth/callback");
+  add("http://localhost:5173/auth/callback");
+  add("http://127.0.0.1:5173/auth/callback");
+  add("http://localhost:3000/auth/callback");
+  add("http://localhost:4173/auth/callback");
+  add("https://bearcafe4commu.vercel.app/auth/callback");
 
   return allowed;
 }
@@ -247,6 +252,15 @@ async function getOrCreateSupabaseSession(params: {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Check if profile already exists in profiles table for this discord_id (for existing 800 members)
+  const { data: existingProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("discord_id", params.discordUser.id)
+    .maybeSingle();
+
+  const targetUserId = existingProfile?.id;
+
   // Use bear-cafe.internal domain — consistent with discord-callback
   const email = `discord_${params.discordUser.id}@bear-cafe.internal`;
   const password = `discord_auth_${params.discordUser.id}_bear`;
@@ -258,11 +272,17 @@ async function getOrCreateSupabaseSession(params: {
   });
 
   if (!signInError && signInData.session) {
-    return { session: signInData.session, userId: signInData.user!.id };
+    // If target profile exists, verify that auth.users.id matches profiles.id
+    if (!targetUserId || signInData.user?.id === targetUserId) {
+      return { session: signInData.session, userId: signInData.user!.id };
+    }
+    // Mismatch detected: auth.users.id != profiles.id (legacy or unaligned)
+    // Delete the mismatched auth user so we can recreate it with targetUserId
+    await supabaseAdmin.auth.admin.deleteUser(signInData.user!.id);
   }
 
-  // Step 2: Try to create new user
-  const createResult = await supabaseAdmin.auth.admin.createUser({
+  // Step 2: Try to create user (specifying targetUserId to match profiles.id)
+  const createPayload: Record<string, unknown> = {
     email,
     password,
     email_confirm: true,
@@ -270,7 +290,12 @@ async function getOrCreateSupabaseSession(params: {
       discord_id: params.discordUser.id,
       discord_username: params.discordUser.username,
     },
-  });
+  };
+  if (targetUserId) {
+    createPayload.id = targetUserId;
+  }
+
+  const createResult = await supabaseAdmin.auth.admin.createUser(createPayload as any);
 
   if (!createResult.error && createResult.data.user) {
     // Sign in with the newly created user
@@ -292,7 +317,7 @@ async function getOrCreateSupabaseSession(params: {
     throw new Error(`auth_create_user_failed:${createMsg}`);
   }
 
-  // Step 3: User exists but password may be wrong — find and reset
+  // Step 3: User exists but password may be wrong or ID mismatched — find and handle
   let foundUserId: string | null = null;
   let page = 1;
   while (!foundUserId) {
@@ -309,8 +334,17 @@ async function getOrCreateSupabaseSession(params: {
 
   if (!foundUserId) throw new Error("auth_existing_user_not_found");
 
-  const updateResult = await supabaseAdmin.auth.admin.updateUserById(foundUserId, { password });
-  if (updateResult.error) throw new Error(`auth_update_user_failed:${updateResult.error.message}`);
+  // If found user has mismatched ID from profiles table, delete and recreate with targetUserId
+  if (targetUserId && foundUserId !== targetUserId) {
+    await supabaseAdmin.auth.admin.deleteUser(foundUserId);
+    const retryCreate = await supabaseAdmin.auth.admin.createUser(createPayload as any);
+    if (!retryCreate.error && retryCreate.data.user) {
+      foundUserId = retryCreate.data.user.id;
+    }
+  } else {
+    const updateResult = await supabaseAdmin.auth.admin.updateUserById(foundUserId, { password });
+    if (updateResult.error) throw new Error(`auth_update_user_failed:${updateResult.error.message}`);
+  }
 
   const { data: retrySignIn, error: retryError } = await supabaseAnon.auth.signInWithPassword({
     email,
@@ -372,9 +406,20 @@ serve(async (req: Request): Promise<Response> => {
       }, 500);
     }
 
-    // Validate request Origin against ALLOWED_ORIGINS whitelist
+    // Validate request Origin against ALLOWED_ORIGINS whitelist (with default fallbacks)
+    const defaultAllowedOrigins = [
+      "https://bearcafe4commu.vercel.app",
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:3000",
+      "http://localhost:4173",
+    ];
+    const allAllowedOrigins = Array.from(new Set([...ALLOWED_ORIGINS, ...defaultAllowedOrigins]));
+
     const requestOrigin = req.headers.get("origin") ?? "";
-    if (ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(requestOrigin)) {
+    if (requestOrigin && !allAllowedOrigins.includes(requestOrigin)) {
       console.warn(`[discord-auth] Blocked origin: ${requestOrigin}`);
       return jsonResponse({
         ok: false,
