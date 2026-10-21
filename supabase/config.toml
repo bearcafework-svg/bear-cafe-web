@@ -1,4 +1,4 @@
-project_id = "orbxyyjpvpbqwfssnyeq"
+project_id = "fqzhcpzxdlnvhvlqspgc"
 
 [functions.discord-auth]
 verify_jwt = false

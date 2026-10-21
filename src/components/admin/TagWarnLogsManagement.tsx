@@ -227,6 +227,13 @@ export function TagWarnLogsManagement() {
   // image preview
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewError, setPreviewError] = useState(false);
+
+  const openPreview = (images: string[], index: number = 0) => {
+    setPreviewError(false);
+    setPreviewImages(images);
+    setPreviewIndex(index);
+  };
 
   // cancel
   const [cancelTarget, setCancelTarget] = useState<WarnRecord | null>(null);
@@ -1449,15 +1456,25 @@ export function TagWarnLogsManagement() {
                                   {allImages.map((imgUrl, imgIdx) => (
                                     <div
                                       key={imgIdx}
-                                      className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20"
-                                      onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                                      className="relative cursor-pointer overflow-hidden rounded-lg border border-border/60 hover:ring-2 hover:ring-primary/40 transition-all aspect-video bg-muted/20 flex items-center justify-center"
+                                      onClick={() => openPreview(allImages, imgIdx)}
                                     >
                                       <img
                                         src={getOptimizedImageUrl(imgUrl, { width: 450, quality: 75 })}
                                         alt={`หลักฐาน ${imgIdx + 1}`}
                                         className="w-full h-full object-cover"
                                         referrerPolicy="no-referrer"
-                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = 'none';
+                                          const parent = target.parentElement;
+                                          if (parent && !parent.querySelector('.img-fallback')) {
+                                            const fallback = document.createElement('div');
+                                            fallback.className = 'img-fallback flex flex-col items-center justify-center p-2 text-center text-muted-foreground/60 text-[10px] gap-1';
+                                            fallback.innerHTML = '<span class="font-medium text-amber-600/80">⚠️ ไม่พบไฟล์ภาพ</span><span class="text-[9px] text-muted-foreground/50">(เคสเก่าก่อนย้ายระบบ)</span>';
+                                            parent.appendChild(fallback);
+                                          }
+                                        }}
                                       />
                                     </div>
                                   ))}
@@ -1592,7 +1609,7 @@ export function TagWarnLogsManagement() {
                             variant="outline"
                             size="sm"
                             className="h-7 px-2.5 text-xs font-medium gap-1.5 text-primary hover:bg-primary/10 border-border/60 rounded-lg shrink-0"
-                            onClick={() => { setPreviewImages(allImages); setPreviewIndex(0); }}
+                            onClick={() => openPreview(allImages, 0)}
                             title="คลิกเพื่อดูภาพหลักฐาน"
                           >
                             <Eye className="w-3 h-3" />
@@ -1694,7 +1711,7 @@ export function TagWarnLogsManagement() {
                                   <button
                                     key={imgIdx}
                                     className="w-8 h-6 border border-border/85 rounded bg-muted/20 overflow-hidden text-[9px] font-mono hover:border-primary transition-all shrink-0"
-                                    onClick={() => { setPreviewImages(allImages); setPreviewIndex(imgIdx); }}
+                                    onClick={() => openPreview(allImages, imgIdx)}
                                   >
                                     รูป {imgIdx + 1}
                                   </button>
@@ -1761,24 +1778,40 @@ export function TagWarnLogsManagement() {
       )}
 
       {/* Image Preview Dialog */}
-      <Dialog open={previewImages.length > 0} onOpenChange={(o) => !o && setPreviewImages([])}>
+      <Dialog open={previewImages.length > 0} onOpenChange={(o) => { if (!o) { setPreviewImages([]); setPreviewError(false); } }}>
         <DialogContent className="max-w-3xl p-2 sm:p-4">
           <DialogHeader className="sr-only"><DialogTitle>ภาพหลักฐาน</DialogTitle></DialogHeader>
           {previewImages.length > 0 && (
             <div className="space-y-3">
-              <div className="relative flex items-center justify-center min-h-[200px] bg-muted/20 rounded-lg">
-                <img
-                  src={getOptimizedImageUrl(previewImages[previewIndex], { width: 1200, quality: 85 })}
-                  alt={`หลักฐาน ${previewIndex + 1}`}
-                  className="max-w-full max-h-[70vh] rounded-lg object-contain"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="relative flex items-center justify-center min-h-[220px] bg-muted/20 rounded-lg overflow-hidden">
+                {!previewError ? (
+                  <img
+                    src={getOptimizedImageUrl(previewImages[previewIndex], { width: 1200, quality: 85 })}
+                    alt={`หลักฐาน ${previewIndex + 1}`}
+                    className="max-w-full max-h-[70vh] rounded-lg object-contain"
+                    referrerPolicy="no-referrer"
+                    onError={() => setPreviewError(true)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground my-2">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-bold text-foreground mb-1">ไม่พบไฟล์รูปภาพหลักฐาน</h4>
+                    <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                      เคสนี้เป็นข้อมูลเก่าที่ไม่ได้ย้ายไฟล์รูปภาพมาจากฐานข้อมูลเดิม (Supabase 1) จึงไม่มีไฟล์อยู่ในระบบคลัง (Storage) ของระบบปัจจุบัน
+                    </p>
+                    <span className="text-[10px] text-muted-foreground/60 mt-3 font-mono bg-muted/40 px-2.5 py-1 rounded">
+                      ภาพที่ {previewIndex + 1} จาก {previewImages.length}
+                    </span>
+                  </div>
+                )}
                 {previewImages.length > 1 && (
                   <>
-                    <Button variant="secondary" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100" onClick={() => setPreviewIndex((i) => (i - 1 + previewImages.length) % previewImages.length)}>
+                    <Button variant="secondary" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100" onClick={() => { setPreviewError(false); setPreviewIndex((i) => (i - 1 + previewImages.length) % previewImages.length); }}>
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Button variant="secondary" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100" onClick={() => setPreviewIndex((i) => (i + 1) % previewImages.length)}>
+                    <Button variant="secondary" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full opacity-80 hover:opacity-100" onClick={() => { setPreviewError(false); setPreviewIndex((i) => (i + 1) % previewImages.length); }}>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </>
@@ -1787,7 +1820,7 @@ export function TagWarnLogsManagement() {
               {previewImages.length > 1 && (
                 <div className="flex items-center justify-center gap-2">
                   {previewImages.map((url, i) => (
-                    <button key={i} type="button" onClick={() => setPreviewIndex(i)} className={cn('w-12 h-12 rounded-md overflow-hidden border-2 transition-all', i === previewIndex ? 'border-primary ring-1 ring-primary/30' : 'border-border/40 opacity-60 hover:opacity-100')}>
+                    <button key={i} type="button" onClick={() => { setPreviewError(false); setPreviewIndex(i); }} className={cn('w-12 h-12 rounded-md overflow-hidden border-2 transition-all', i === previewIndex ? 'border-primary ring-1 ring-primary/30' : 'border-border/40 opacity-60 hover:opacity-100')}>
                       <img src={getOptimizedImageUrl(url, { width: 100, quality: 70 })} alt={`${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </button>
                   ))}
