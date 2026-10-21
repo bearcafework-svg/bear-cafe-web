@@ -522,7 +522,8 @@ export function TradingHistoryManagement() {
         .from('trading_history')
         .select('*')
         .order('transaction', { ascending: false, nullsFirst: false })
-        .order('log_timestamp', { ascending: false });
+        .order('log_timestamp', { ascending: false })
+        .range(0, 9999);
       if (legacyErr) throw new Error(legacyErr.message);
 
       const legacyRecords: UnifiedRecord[] = (legacyData ?? []).map(r => ({
@@ -531,7 +532,7 @@ export function TradingHistoryManagement() {
         member_id: r.member_id,
         staff_id: r.service_id ?? null,
         transaction_date: r.transaction ?? null,
-        total_amount: r.amount ?? 0,
+        total_amount: Number(r.amount) || 0,
         type_bill: r.type_bill ?? null,
         slip_url: r.slip_url ?? null,
         slip_url_2: r.slip_url_2 ?? null,
@@ -545,7 +546,8 @@ export function TradingHistoryManagement() {
         .from('orders')
         .select('*')
         .order('transaction_date', { ascending: false, nullsFirst: false })
-        .order('log_timestamp', { ascending: false });
+        .order('log_timestamp', { ascending: false })
+        .range(0, 9999);
       if (ordersErr) throw new Error(ordersErr.message);
 
       const newOrders: UnifiedRecord[] = (ordersData ?? []).map((r: any) => ({
@@ -555,7 +557,7 @@ export function TradingHistoryManagement() {
         recipient_id: r.recipient_id ?? null,
         staff_id: r.staff_id ?? null,
         transaction_date: r.transaction_date ?? null,
-        total_amount: r.total_amount ?? 0,
+        total_amount: Number(r.total_amount) || 0,
         type_bill: r.type_bill ?? null,
         slip_url: r.slip_url ?? null,
         slip_url_2: r.slip_url_2 ?? null,
