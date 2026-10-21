@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCheckinToday } from "../_shared/checkin-date.ts";
 import {
   CHECKIN_MAX_MAKEUP_DAYS_KEY,

@@ -1,8 +1,3 @@
-/**
- * send-daily-quest-announcement
- * ส่ง Discord Component V2 การ์ดประกาศภารกิจประจำวัน (Daily Quests)
- * รับ: { quest_date?: string, channel_id?: string }
- */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
 import { getGuildRoles } from "../_shared/guild-roles-cache.ts";

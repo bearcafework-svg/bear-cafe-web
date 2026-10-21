@@ -94,8 +94,13 @@ Deno.serve(async (req): Promise<Response> => {
                 {
                   type: 2, // Button
                   style: 5, // Link
-                  label: "วิธีปลดถ้วยความผิด",
-                  url: GUIDE_CHANNEL_URL,
+                  label: "︲คลิกปลดถ้วยความผิด",
+                  emoji: {
+                    id: "1256669436350562355",
+                    name: "bee20000",
+                    animated: false
+                  },
+                  url: "https://discord.com/channels/1144251788493602848/1524123185325543587",
                 },
               ],
             },
