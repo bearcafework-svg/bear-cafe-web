@@ -21,7 +21,6 @@ import MaintenancePage from "./pages/MaintenancePage";
 import NotFound from "./pages/NotFound";
 import PointsPage from "./pages/PointsPage";
 import DiscordServersPage from "./pages/DiscordServersPage";
-import HealingMessagePage from "./pages/HealingMessagePage";
 import SpinPrizePage from "./pages/SpinPrizePage";
 import FullCheckInCalendar from "./pages/FullCheckInCalendar";
 import InventoryPage from "./pages/InventoryPage";
@@ -157,7 +156,6 @@ export function AppRoutes() {
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/discord-servers" element={<Navigate to="/" replace />} />
       <Route path="/discord-server" element={<Navigate to="/" replace />} />
-      <Route path="/healing-message" element={<ProtectedRoute><HealingMessagePage /></ProtectedRoute>} />
       <Route path="/spin-prize" element={<SpinPrizePage />} />
       <Route path="/leaderboard" element={<LeaderboardPage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/overview" replace /></ProtectedRoute>} />

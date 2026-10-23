@@ -48,6 +48,7 @@ import { DiscordServersManagement } from '@/components/admin/DiscordServersManag
 import { MaintenanceToggle } from '@/components/admin/MaintenanceToggle';
 import { PermissionsManagement } from '@/components/admin/PermissionsManagement';
 import { HealingMessagesManagement } from '@/components/admin/HealingMessagesManagement';
+import { HealingBatchFloatingWidget } from '@/components/admin/HealingBatchFloatingWidget';
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
 import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
@@ -577,6 +578,9 @@ function AdminPageContent() {
           {renderContent()}
         </div>
       </main>
+
+      {/* Floating Background Task Progress Widget */}
+      <HealingBatchFloatingWidget />
     </div>
   );
 }
