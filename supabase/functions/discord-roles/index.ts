@@ -93,22 +93,62 @@ Deno.serve(async (req): Promise<Response> => {
     let hasAccess = isOwnerOrAdmin;
     if (!hasAccess) {
       const allowedPages = ['roles', 'contracts', 'non-transferable-roles', 'roles-to-delete'];
-      const [{ data: accessByProfile }, { data: accessByAuth }] = await Promise.all([
-        adminClient.rpc('has_any_page_access', {
-          _user_id: profile.id,
-          _pages: allowedPages,
-        }),
-        adminClient.rpc('has_any_page_access', {
-          _user_id: user.id,
-          _pages: allowedPages,
-        }),
-      ]);
-      hasAccess = Boolean(accessByProfile || accessByAuth);
+
+      // Strategy 1: Direct database check via user_custom_permissions (Most reliable across Supabase 1 & 2)
+      try {
+        const { data: ucpList } = await adminClient
+          .from('user_custom_permissions')
+          .select('custom_permissions(allowed_pages)')
+          .or(`user_id.eq.${profile.id},user_id.eq.${user.id}`);
+
+        if (ucpList && ucpList.length > 0) {
+          for (const item of ucpList) {
+            const pages = (item.custom_permissions as any)?.allowed_pages;
+            if (Array.isArray(pages) && pages.some((p: string) => allowedPages.includes(p))) {
+              hasAccess = true;
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Direct custom permissions check failed, trying RPC:', err);
+      }
+
+      // Strategy 2: Fallback to single-page RPC has_page_access (Present on Supabase 2)
+      if (!hasAccess) {
+        try {
+          const checks = await Promise.all(
+            allowedPages.map(page =>
+              adminClient.rpc('has_page_access', { _user_id: profile.id, _page: page })
+            )
+          );
+          if (checks.some(c => c.data === true)) {
+            hasAccess = true;
+          }
+        } catch {}
+      }
+
+      // Strategy 3: Fallback to has_any_page_access (Legacy Supabase 1)
+      if (!hasAccess) {
+        try {
+          const [{ data: accessByProfile }, { data: accessByAuth }] = await Promise.all([
+            adminClient.rpc('has_any_page_access', {
+              _user_id: profile.id,
+              _pages: allowedPages,
+            }),
+            adminClient.rpc('has_any_page_access', {
+              _user_id: user.id,
+              _pages: allowedPages,
+            }),
+          ]);
+          hasAccess = Boolean(accessByProfile || accessByAuth);
+        } catch {}
+      }
     }
 
     if (!hasAccess) {
       return new Response(
-        JSON.stringify({ error: 'Access denied' }),
+        JSON.stringify({ error: 'Access denied - Insufficient page permission' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -138,6 +138,7 @@ interface DiscordRole { id: string; name: string; color: string | null; }
 
 function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDialogProps) {
   const { toast } = useToast();
+  const { user: authUser, session: authSession } = useAuth();
   const [type, setType] = useState<ContractType>('house');
   const [saving, setSaving] = useState(false);
 
@@ -186,11 +187,14 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   async function fetchDiscordRoles() {
     setRolesLoading(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // 1. In local dev with mock session, use dev fallback roles without firing unauthorized network requests
+      const isMockDev = import.meta.env.DEV && (
+        !authSession ||
+        authSession.access_token === 'mock-token' ||
+        authUser?.id === 'mock-admin-id'
+      );
 
-      // In local dev with mock session, use dev fallback roles
-      if (import.meta.env.DEV && (!token || token === 'mock-token' || sessionError)) {
+      if (isMockDev) {
         setDiscordRoles([
           { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Mock)', color: '#F47FFF' },
           { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Mock)', color: '#FF73FA' },
@@ -201,7 +205,29 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
         return;
       }
 
-      if (!token) {
+      // 2. Fetch active session and auto-refresh if token is expired or expiring soon (< 60s)
+      let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60000) {
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshData?.session) {
+          session = refreshData.session;
+          sessionError = null;
+        } else if (refreshError) {
+          console.warn('[ContractsManagement] Token refresh failed:', refreshError);
+        }
+      }
+
+      const token = session?.access_token || authSession?.access_token;
+      if (!token || token === 'mock-token') {
+        if (import.meta.env.DEV) {
+          setDiscordRoles([
+            { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
+            { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
+            { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
+            { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
+          ]);
+          return;
+        }
         throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
       }
 
@@ -212,7 +238,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       if (error) {
         // If in DEV and Cloud Edge Function rejected with 403 (token mismatch or unauthenticated)
         if (import.meta.env.DEV) {
-          console.warn('[ContractsManagement] discord-roles returned 403/error in dev. Using dev fallback roles:', error);
+          console.warn('[ContractsManagement] discord-roles returned error in dev. Using dev fallback roles:', error);
           setDiscordRoles([
             { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
             { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
@@ -220,7 +246,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
             { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
           ]);
           toast({
-            title: 'เชื่อมต่อ Discord Roles บนคลาวด์ไม่สำเร็จ (403)',
+            title: 'เชื่อมต่อ Discord Roles บนคลาวด์ไม่สำเร็จ',
             description: 'โหลดรายการยศจำลองในโหมด Dev ให้เรียบร้อยเพื่อทดสอบต่อได้',
           });
           return;
@@ -237,7 +263,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
         ]);
         toast({ title: 'เปิดใช้งานยศจำลอง (Dev Fallback)', description: 'เนื่องจาก Token ในโหมด Dev ไม่สามารถเรียก Edge Function บน Cloud ได้' });
       } else {
-        toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message, variant: 'destructive' });
+        toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message || 'โปรดตรวจสอบสิทธิ์บัญชีผู้ใช้หรือเข้าสู่ระบบใหม่', variant: 'destructive' });
       }
     } finally {
       setRolesLoading(false);
