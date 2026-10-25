@@ -51,16 +51,6 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Run role ban guard (non-blocking — if it fails, continue)
-    try {
-      const guardResult = await requireRoleBanGuard(req, corsHeaders);
-      if ("response" in guardResult) {
-        return guardResult.response as Response;
-      }
-    } catch (guardErr) {
-      console.warn('Role ban guard error (non-fatal):', guardErr);
-    }
-
     // Get user's discord_id from metadata
     const discordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
     if (!discordId) {
@@ -70,10 +60,10 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Get profile ID
+    // Get profile ID and role
     const { data: profile } = await adminClient
       .from('profiles')
-      .select('id')
+      .select('id, role')
       .eq('discord_id', discordId)
       .single();
 
@@ -84,12 +74,37 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
+    const isOwnerOrAdmin = profile.role === 'owner' || profile.role === 'admin';
+
+    // Run role ban guard for non-owners/non-admins (non-blocking if it errors)
+    if (!isOwnerOrAdmin) {
+      try {
+        const guardResult = await requireRoleBanGuard(req, corsHeaders);
+        if ("response" in guardResult) {
+          return guardResult.response as Response;
+        }
+      } catch (guardErr) {
+        console.warn('Role ban guard error (non-fatal):', guardErr);
+      }
+    }
+
     // Check if user has page access
     // Allow: owner, admin, anyone with 'roles', 'contracts', 'non-transferable-roles' OR 'roles-to-delete' page permission
-    const { data: hasAccess } = await adminClient.rpc('has_any_page_access', {
-      _user_id: profile.id,
-      _pages: ['roles', 'contracts', 'non-transferable-roles', 'roles-to-delete'],
-    });
+    let hasAccess = isOwnerOrAdmin;
+    if (!hasAccess) {
+      const allowedPages = ['roles', 'contracts', 'non-transferable-roles', 'roles-to-delete'];
+      const [{ data: accessByProfile }, { data: accessByAuth }] = await Promise.all([
+        adminClient.rpc('has_any_page_access', {
+          _user_id: profile.id,
+          _pages: allowedPages,
+        }),
+        adminClient.rpc('has_any_page_access', {
+          _user_id: user.id,
+          _pages: allowedPages,
+        }),
+      ]);
+      hasAccess = Boolean(accessByProfile || accessByAuth);
+    }
 
     if (!hasAccess) {
       return new Response(

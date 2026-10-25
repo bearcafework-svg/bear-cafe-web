@@ -125,16 +125,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const targetUserIds = Array.from(new Set([sessionUser.id, profile.id]));
-    const [rolesResult, permIdsResult] = await Promise.all([
+    const [rolesResult, permResult] = await Promise.all([
       supabase
         .from('user_roles')
         .select('role')
         .in('user_id', targetUserIds),
       supabase
         .from('user_custom_permissions')
-        .select('permission_id')
+        .select('permission_id, custom_permissions(allowed_pages)')
         .in('user_id', targetUserIds),
     ]);
+
+    if (permResult.error) {
+      console.warn('[Auth] user_custom_permissions fetch error:', permResult.error);
+      const isAuthError =
+        permResult.error.code === 'PGRST303' ||
+        permResult.error.message?.includes('JWT expired') ||
+        (permResult.error as any)?.status === 401;
+      if (isAuthError) {
+        throw permResult.error;
+      }
+    }
 
     const roleRows = (rolesResult.data ?? []) as UserRoleRow[];
     const roleSet = new Set(roleRows.map((r) => r.role).filter(Boolean));
@@ -142,22 +153,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const is_admin = roleSet.has('admin');
 
     const allPages = new Set<string>();
-    const permissionRows = (permIdsResult.data ?? []) as PermissionIdRow[];
-    const permIds = permissionRows.map((r) => r.permission_id).filter((id): id is string => Boolean(id));
-    if (permIds.length > 0) {
-      const { data: cpData } = await supabase
-        .from('custom_permissions')
-        .select('allowed_pages')
-        .in('id', permIds);
-      const customPermissions = (cpData ?? []) as CustomPermissionRow[];
-      customPermissions.forEach((cp) => {
-        if (Array.isArray(cp.allowed_pages)) {
-          cp.allowed_pages.forEach((p: string) => allPages.add(p));
+    const permRows = (permResult.data ?? []) as any[];
+    permRows.forEach((row) => {
+      const cp = row.custom_permissions;
+      if (cp && Array.isArray(cp.allowed_pages)) {
+        cp.allowed_pages.forEach((p: string) => allPages.add(p));
+      }
+    });
+
+    // Fallback: If joined query returned permission_ids but custom_permissions wasn't embedded
+    if (allPages.size === 0 && permRows.length > 0) {
+      const permIds = permRows.map((r) => r.permission_id).filter((id): id is string => Boolean(id));
+      if (permIds.length > 0) {
+        const { data: cpData, error: cpError } = await supabase
+          .from('custom_permissions')
+          .select('allowed_pages')
+          .in('id', permIds);
+        if (cpError) {
+          console.warn('[Auth] custom_permissions fallback error:', cpError);
+        } else if (cpData) {
+          const customPermissions = cpData as CustomPermissionRow[];
+          customPermissions.forEach((cp) => {
+            if (Array.isArray(cp.allowed_pages)) {
+              cp.allowed_pages.forEach((p: string) => allPages.add(p));
+            }
+          });
         }
-      });
+      }
     }
 
-    console.log('[Auth] Profile loaded:', profile.username);
+    console.log('[Auth] Profile loaded:', profile.username, 'Allowed pages:', Array.from(allPages));
 
     return {
       id: profile.id,
@@ -255,11 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    console.log('[Auth] Setting up real-time profile watch for user:', user.id);
+    console.log('[Auth] Setting up real-time profile & permissions watch for user:', user.id);
     syncDiscordProfile(currentOpVersion, user.id);
 
+    const targetUserIds = Array.from(new Set([session.user.id, user.id]));
     const channel = supabase
-      .channel(`profile-watch-${user.id}`)
+      .channel(`profile-and-perms-watch-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, (payload) => {
         if (currentOpVersion !== authOpVersionRef.current) return;
         const p = payload.new as { is_banned: boolean; ban_reason: string | null; username: string; avatar_url: string | null; banner_url: string | null; role?: string | null };
@@ -273,11 +299,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           banner_url: p.banner_url,
           is_owner: p.role === 'owner',
         } : null);
-      })
-      .subscribe((status) => { console.log('[Auth] Realtime subscription status:', status); });
+      });
+
+    // Instant Realtime sync when permissions are granted/revoked in /admin/permissions
+    targetUserIds.forEach((uid) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_custom_permissions', filter: `user_id=eq.${uid}` }, async () => {
+        console.log('[Auth] user_custom_permissions change detected via Realtime. Re-fetching profile...');
+        if (currentOpVersion !== authOpVersionRef.current || !session?.user) return;
+        try {
+          const updatedProfile = await fetchUserProfile(session.user);
+          if (updatedProfile && currentOpVersion === authOpVersionRef.current) {
+            setUser(updatedProfile);
+          }
+        } catch (e) {
+          console.warn('[Auth] Failed to reload profile on permission change:', e);
+        }
+      });
+    });
+
+    channel.subscribe((status) => { console.log('[Auth] Realtime subscription status:', status); });
 
     return () => {
-      console.log('[Auth] Cleaning up real-time profile subscription');
+      console.log('[Auth] Cleaning up real-time profile & permissions subscription');
       supabase.removeChannel(channel);
     };
   }, [session, syncDiscordProfile, user?.id]);

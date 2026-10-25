@@ -20,6 +20,7 @@ import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
+import { UserClickMenu } from '@/components/admin/UserClickMenu';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminNotification } from '@/components/admin/AdminNotificationToast';
 import { useAuth } from '@/lib/auth-context';
@@ -145,6 +146,7 @@ interface DiscordProfile {
   discord_id: string;
   username: string;
   discord_username: string | null;
+  nickname: string | null;
   avatar_url: string | null;
 }
 
@@ -265,15 +267,8 @@ export function TagWarnLogsManagement() {
   // webhook toggle
   const [webhookEnabled, setWebhookEnabled] = useState(true);
 
-  // layout settings
-  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>(() => {
-    return (localStorage.getItem('tag_layout_view') as 'cozy' | 'list' | 'compact') || 'cozy';
-  });
-
-  const handleSetLayoutView = (view: 'cozy' | 'list' | 'compact') => {
-    setLayoutView(view);
-    localStorage.setItem('tag_layout_view', view);
-  };
+  // layout settings: card view only
+  const layoutView: 'cozy' = 'cozy';
 
   const [revealedCardImages, setRevealedCardImages] = useState<Set<string>>(new Set());
   const toggleRevealCardImages = (recordId: string) => {
@@ -486,12 +481,12 @@ export function TagWarnLogsManagement() {
   }, []);
 
   const resolveDisplayName = useCallback(
-    (id: string | null): { name: string; discord_username: string | null; avatar: string | null } => {
-      if (!id) return { name: '-', discord_username: null, avatar: null };
+    (id: string | null): { name: string; discord_username: string | null; nickname: string | null; avatar: string | null; discord_id: string | null; hasRealProfile: boolean } => {
+      if (!id) return { name: '-', discord_username: null, nickname: null, avatar: null, discord_id: null, hasRealProfile: false };
       const p = profileMap.get(id);
-      if (p) return { name: p.username, discord_username: p.discord_username ?? null, avatar: p.avatar_url ?? null };
-      if (id.length > 8) return { name: `User-${id.slice(-4)}`, discord_username: null, avatar: null };
-      return { name: id, discord_username: null, avatar: null };
+      if (p) return { name: p.username, discord_username: p.discord_username ?? null, nickname: p.nickname ?? null, avatar: p.avatar_url ?? null, discord_id: id, hasRealProfile: true };
+      if (id.length > 8) return { name: `User-${id.slice(-4)}`, discord_username: null, nickname: null, avatar: null, discord_id: id, hasRealProfile: false };
+      return { name: id, discord_username: null, nickname: null, avatar: null, discord_id: id, hasRealProfile: false };
     },
     [profileMap],
   );
@@ -558,7 +553,7 @@ export function TagWarnLogsManagement() {
     if (uniqueIds.length === 0) return;
     const { data } = await supabase
       .from('profiles')
-      .select('discord_id, username, discord_username, avatar_url')
+      .select('discord_id, username, discord_username, nickname, avatar_url')
       .in('discord_id', uniqueIds);
     if (data) {
       const map = new Map<string, DiscordProfile>();
@@ -892,51 +887,6 @@ export function TagWarnLogsManagement() {
           </p>
         </div>
         <div className="flex items-center flex-wrap gap-2">
-          {/* Layout Setting Selectors */}
-          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-latte/15 mr-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                layoutView === 'cozy'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-              onClick={() => handleSetLayoutView('cozy')}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              แบบการ์ด
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                layoutView === 'list'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-              onClick={() => handleSetLayoutView('list')}
-            >
-              <List className="h-3.5 w-3.5" />
-              แบบรายการ
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                layoutView === 'compact'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-              onClick={() => handleSetLayoutView('compact')}
-            >
-              <Menu className="h-3.5 w-3.5" />
-              แบบกระชับ
-            </Button>
-          </div>
 
           <Button
             size="sm"
@@ -1288,13 +1238,12 @@ export function TagWarnLogsManagement() {
         </div>
       </div>
 
-      {/* Records Layout Views */}
+      {/* Records Layout Views - Card only */}
       {filteredRecords.length === 0 ? (
         <div className="py-16 text-center text-muted-foreground">ไม่พบรายการ</div>
       ) : (
         <>
-          {layoutView === 'cozy' && (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {paginatedRecords.map((r, idx) => {
                 const cancelled = isCancelled(r);
                 const pendingApproval = r._cancelStatus === 'pending';
@@ -1399,24 +1348,44 @@ export function TagWarnLogsManagement() {
                               {barista.avatar && <AvatarImage src={barista.avatar} />}
                               <AvatarFallback className="text-xs bg-primary/10 text-primary"><Shield className="h-3.5 w-3.5" /></AvatarFallback>
                             </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Barista</p>
-                              {barista.discord_username
-                                ? <><p className="text-xs font-semibold truncate">{barista.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{barista.name}</p></>
-                                : <p className="text-xs font-medium truncate">{barista.name}</p>}
-                            </div>
+                            <UserClickMenu
+                              user={{
+                                discord_id: barista.discord_id || r.barista_id,
+                                username: barista.hasRealProfile ? barista.name : null,
+                                discord_username: barista.discord_username,
+                                nickname: barista.nickname,
+                              }}
+                              className="min-w-0 flex-1 hover:underline underline-offset-2 decoration-dotted"
+                            >
+                              <div className="min-w-0 text-left">
+                                <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Barista</p>
+                                {barista.discord_username
+                                  ? <><p className="text-xs font-semibold truncate">{barista.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{barista.name}</p></>
+                                  : <p className="text-xs font-medium truncate">{barista.name}</p>}
+                              </div>
+                            </UserClickMenu>
                           </div>
                           <div className="flex items-center gap-2 rounded-md bg-muted/50 p-2">
                             <Avatar className="h-7 w-7 shrink-0">
                               {member.avatar && <AvatarImage src={member.avatar} />}
                               <AvatarFallback className="text-xs bg-destructive/10 text-destructive"><User className="h-3.5 w-3.5" /></AvatarFallback>
                             </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Member</p>
-                              {member.discord_username
-                                ? <><p className="text-xs font-semibold truncate">{member.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{memberName}</p></>
-                                : <p className="text-xs font-medium break-all">{memberName}</p>}
-                            </div>
+                            <UserClickMenu
+                              user={{
+                                discord_id: member.discord_id || r.member_id,
+                                username: member.hasRealProfile ? member.name : null,
+                                discord_username: member.discord_username,
+                                nickname: member.nickname,
+                              }}
+                              className="min-w-0 flex-1 hover:underline underline-offset-2 decoration-dotted"
+                            >
+                              <div className="min-w-0 text-left">
+                                <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Member</p>
+                                {member.discord_username
+                                  ? <><p className="text-xs font-semibold truncate">{member.discord_username}</p><p className="text-[10px] text-muted-foreground truncate">{memberName}</p></>
+                                  : <p className="text-xs font-medium break-all">{memberName}</p>}
+                              </div>
+                            </UserClickMenu>
                           </div>
                         </div>
 
@@ -1513,7 +1482,6 @@ export function TagWarnLogsManagement() {
                 );
               })}
             </div>
-          )}
 
           {layoutView === 'list' && (
             <div className="space-y-3">

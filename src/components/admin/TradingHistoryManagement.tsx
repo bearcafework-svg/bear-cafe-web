@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
+import { UserClickMenu } from '@/components/admin/UserClickMenu';
 import imageCompression from 'browser-image-compression';
 import jsQR from 'jsqr';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -164,6 +165,7 @@ interface DiscordProfile {
   discord_id: string;
   username: string;
   discord_username: string | null;
+  nickname: string | null;
   avatar_url: string | null;
 }
 
@@ -276,15 +278,8 @@ export function TradingHistoryManagement() {
   const [embedTarget, setEmbedTarget] = useState<UnifiedRecord | null>(null);
   const [isSendingEmbed, setIsSendingEmbed] = useState(false);
 
-  // Layout view settings
-  const [layoutView, setLayoutView] = useState<'cozy' | 'list' | 'compact'>(() => {
-    return (localStorage.getItem('trading_layout_view') as 'cozy' | 'list' | 'compact') || 'cozy';
-  });
-
-  const handleSetLayoutView = (view: 'cozy' | 'list' | 'compact') => {
-    setLayoutView(view);
-    localStorage.setItem('trading_layout_view', view);
-  };
+  // Layout view settings: card view only
+  const layoutView: 'cozy' = 'cozy';
 
   // Case edit logs states
   const [isCaseLogsOpen, setIsCaseLogsOpen] = useState(false);
@@ -455,7 +450,7 @@ export function TradingHistoryManagement() {
     const chunkSize = 150;
     for (let i = 0; i < uniqueIds.length; i += chunkSize) {
       const chunk = uniqueIds.slice(i, i + chunkSize);
-      const { data } = await supabase.from('profiles').select('discord_id, username, discord_username, avatar_url').in('discord_id', chunk);
+      const { data } = await supabase.from('profiles').select('discord_id, username, discord_username, nickname, avatar_url').in('discord_id', chunk);
       if (data) {
         data.forEach(p => map.set(p.discord_id, p));
       }
@@ -985,9 +980,11 @@ export function TradingHistoryManagement() {
 
   // ── Display helpers ──
   const resolveDisplayName = useCallback((id: string) => {
-    if (!id) return { name: '-', discord_username: null, avatar: null };
+    if (!id) return { name: '-', discord_username: null, nickname: null, avatar: null, discord_id: null, hasRealProfile: false };
     const p = profileMap.get(id);
-    return p ? { name: p.username, discord_username: p.discord_username ?? null, avatar: p.avatar_url } : { name: id, discord_username: null, avatar: null };
+    return p
+      ? { name: p.username, discord_username: p.discord_username ?? null, nickname: p.nickname ?? null, avatar: p.avatar_url, discord_id: id, hasRealProfile: true }
+      : { name: id, discord_username: null, nickname: null, avatar: null, discord_id: id, hasRealProfile: false };
   }, [profileMap]);
 
   const formatCurrency = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -1283,17 +1280,34 @@ export function TradingHistoryManagement() {
   };
 
   const UserBadge = ({ id }: { id: string }) => {
-    const { name, discord_username, avatar } = resolveDisplayName(id);
+    const { name, discord_username, nickname, avatar, discord_id, hasRealProfile } = resolveDisplayName(id);
     return (
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Avatar className="w-5 h-5 shrink-0">
-          <AvatarImage src={avatar ?? undefined} />
-          <AvatarFallback className="text-[10px] bg-muted"><User className="w-3 h-3" /></AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          {discord_username ? (<><span className="text-xs font-semibold truncate block">{discord_username}</span><span className="text-[10px] text-muted-foreground truncate block">{name}</span></>) : <span className="text-xs font-medium truncate block">{name}</span>}
+      <UserClickMenu
+        user={{
+          discord_id: discord_id || id,
+          username: hasRealProfile ? name : null,
+          discord_username,
+          nickname,
+        }}
+        className="hover:underline underline-offset-2 decoration-dotted"
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Avatar className="w-5 h-5 shrink-0">
+            <AvatarImage src={avatar ?? undefined} />
+            <AvatarFallback className="text-[10px] bg-muted"><User className="w-3 h-3" /></AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 text-left">
+            {discord_username ? (
+              <>
+                <span className="text-xs font-semibold truncate block">{discord_username}</span>
+                <span className="text-[10px] text-muted-foreground truncate block">{name}</span>
+              </>
+            ) : (
+              <span className="text-xs font-medium truncate block">{name}</span>
+            )}
+          </div>
         </div>
-      </div>
+      </UserClickMenu>
     );
   };
 
@@ -2189,51 +2203,6 @@ export function TradingHistoryManagement() {
         <TabsContent value="data" className="space-y-4 mt-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-semibold">แสดงผล:</span>
-              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-latte/15">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                    layoutView === 'cozy'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => handleSetLayoutView('cozy')}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  แบบการ์ด
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                    layoutView === 'list'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => handleSetLayoutView('list')}
-                >
-                  <List className="h-3.5 w-3.5" />
-                  แบบรายการ
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'h-7 px-2.5 rounded-lg text-xs font-semibold gap-1 transition-all',
-                    layoutView === 'compact'
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => handleSetLayoutView('compact')}
-                >
-                  <Menu className="h-3.5 w-3.5" />
-                  แบบกระชับ
-                </Button>
-              </div>
 
               {/* Toggle image mode button */}
               <Button

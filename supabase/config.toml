@@ -3,10 +3,10 @@ project_id = "fqzhcpzxdlnvhvlqspgc"
 [functions.discord-auth]
 verify_jwt = false
 
-[functions.discord-callback]
+[functions.sync-contract-roles]
 verify_jwt = false
 
-[functions.discord-voice-state]
+[functions.session-cancel]
 verify_jwt = false
 
 [functions.discord-voice-webhook]
@@ -16,19 +16,13 @@ verify_jwt = false
 [functions.discord-webhook]
 verify_jwt = true
 
-
 [functions.discord-roles]
 verify_jwt = false
 
 [functions.discord-member-count]
 verify_jwt = false
 
-
 [functions.cleanup-voice-states]
-verify_jwt = false
-
-
-[functions.tag-warn-logs]
 verify_jwt = false
 
 [functions.tag-warn-ingest]
@@ -43,13 +37,7 @@ verify_jwt = false
 [functions.bdfd-api]
 verify_jwt = false
 
-[functions.migrate-drive-images]
-verify_jwt = false
-
 [functions.trading-history-ingest]
-verify_jwt = false
-
-[functions.migrate-slip-images]
 verify_jwt = false
 
 [functions.trading-history-slip-update]
@@ -62,9 +50,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.check-user-warn-role]
-verify_jwt = false
-
-[functions.get-user-discord-roles]
 verify_jwt = false
 
 [functions.discord-users]

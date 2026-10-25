@@ -32,8 +32,8 @@ import {
 import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import {
   Plus, Home, User, Clock, Bell, Edit2, Search, RefreshCw,
-  Loader2, CheckCircle2, X, Upload, Star, Link, Hash, Users, Calendar,
-  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone, Rocket, Trash2
+  Loader2, CheckCircle2, X, Star, Link, Hash, Users, Calendar,
+  AlertTriangle, Copy, History, HelpCircle, ArrowRight, Megaphone, Rocket, Trash2, Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
@@ -59,18 +59,11 @@ interface Contract {
   edit_log: Array<{ editor: string; avatar: string | null; timestamp: string; action?: string; tag?: string; note?: string }> | null;
 }
 
-interface TypeIcons {
-  house: string | null;
-  personal_role: string | null;
-  boost_role: string | null;
-  ad: string | null;
-}
-
-const typeIconsMap: Record<ContractType, React.ComponentType<any>> = {
-  house: Home,
-  personal_role: Star,
-  boost_role: Rocket,
-  ad: Megaphone,
+const CONTRACT_EMOJIS: Record<ContractType, string> = {
+  house: '🏡',
+  personal_role: '🏅',
+  boost_role: '🌸',
+  ad: '📢',
 };
 
 function formatRemaining(endAt: string) {
@@ -129,116 +122,7 @@ function formatDateThai(isoString: string, includeTime = false) {
   return formattedDate;
 }
 
-// ─── IconUpload Component (Owner only) ───────────────────────────────────────
 
-interface IconUploadProps {
-  typeIcons: TypeIcons;
-  onUploaded: (type: ContractType, url: string) => void;
-}
-
-function IconUpload({ typeIcons, onUploaded }: IconUploadProps) {
-  const { toast } = useToast();
-  const [uploading, setUploading] = useState<ContractType | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pendingType = useRef<ContractType | null>(null);
-
-  const typeLabel: Record<ContractType, string> = {
-    house: 'บ้าน',
-    personal_role: 'ยศส่วนตัว',
-    boost_role: 'ยศบูสต์',
-    ad: 'โฆษณา',
-  };
-
-  function handleClick(type: ContractType) {
-    pendingType.current = type;
-    inputRef.current?.click();
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    const type = pendingType.current;
-    if (!file || !type) return;
-    e.target.value = '';
-
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
-    setUploading(type);
-    try {
-      const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
-      await Promise.allSettled(
-        exts.map(oldExt =>
-          supabase.storage.from('contract-icons').remove([`type-icons/${type}.${oldExt}`])
-        )
-      );
-
-      const { error: upErr } = await supabase.storage
-        .from('contract-icons')
-        .upload(`type-icons/${type}.${ext}`, file, { upsert: true, cacheControl: '31536000' });
-      if (upErr) throw upErr;
-
-      const { data } = supabase.storage
-        .from('contract-icons')
-        .getPublicUrl(`type-icons/${type}.${ext}`);
-
-      onUploaded(type, `${data.publicUrl}?t=${Date.now()}`);
-      toast({ title: `อัปโหลดไอคอน ${typeLabel[type]} สำเร็จ` });
-    } catch (err: any) {
-      toast({ title: 'อัปโหลดไม่สำเร็จ', description: err.message, variant: 'destructive' });
-    } finally {
-      setUploading(null);
-    }
-  }
-
-  async function handleDelete(type: ContractType) {
-    const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
-    await Promise.allSettled(
-      exts.map(ext => supabase.storage.from('contract-icons').remove([`type-icons/${type}.${ext}`]))
-    );
-    onUploaded(type, '');
-    toast({ title: `ลบไอคอน ${typeLabel[type]} แล้ว` });
-  }
-
-  return (
-    <div className="flex items-center gap-2.5 bg-[#FAF6F0] dark:bg-[#231C17] px-3.5 py-1.5 rounded-2xl border border-[#F0E8DC] dark:border-[#382B22] shadow-sm">
-      <span className="text-xs font-medium text-[#827160] dark:text-[#BAA796]">ไอคอนสัญญา:</span>
-      {(['house', 'personal_role', 'boost_role', 'ad'] as ContractType[]).map(type => (
-        <div key={type} className="relative group">
-          <button
-            onClick={() => handleClick(type)}
-            title={`อัปโหลดไอคอน ${typeLabel[type]}`}
-            className="relative w-9 h-9 rounded-xl border-2 border-dashed border-[#DFD5C0] dark:border-[#42342A] hover:border-amber-500 hover:bg-amber-500/10 bg-white dark:bg-[#1A1512] transition-all flex items-center justify-center overflow-hidden shadow-xs active:scale-95"
-          >
-            {uploading === type ? (
-              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
-            ) : typeIcons[type] ? (
-              <img src={typeIcons[type]!} alt={type} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
-            ) : (
-              React.createElement(typeIconsMap[type], { className: "w-4 h-4 text-[#827160] dark:text-[#A89889] group-hover:text-amber-500 transition-colors" })
-            )}
-            <span className="absolute bottom-0 right-0 bg-black/60 backdrop-blur-xs rounded-tl px-0.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Upload className="w-2.5 h-2.5 text-white" />
-            </span>
-          </button>
-          {typeIcons[type] && (
-            <button
-              onClick={() => handleDelete(type)}
-              title={`ลบไอคอน ${typeLabel[type]}`}
-              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md z-10 hover:scale-110"
-            >
-              <X className="w-2.5 h-2.5" />
-            </button>
-          )}
-        </div>
-      ))}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-    </div>
-  );
-}
 
 // ─── Add Dialog (Single screen visual configuration) ────────────────────────
 
@@ -303,16 +187,58 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
     setRolesLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.access_token) {
+      const token = session?.access_token;
+
+      // In local dev with mock session, use dev fallback roles
+      if (import.meta.env.DEV && (!token || token === 'mock-token' || sessionError)) {
+        setDiscordRoles([
+          { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Mock)', color: '#F47FFF' },
+          { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Mock)', color: '#FF73FA' },
+          { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Mock)', color: '#FBBF24' },
+          { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Mock)', color: '#3B82F6' },
+        ]);
+        toast({ title: 'โหมดพัฒนา (Local Dev)', description: 'โหลดรายการยศจำลองสำหรับการทดสอบหน้าเว็บ' });
+        return;
+      }
+
+      if (!token) {
         throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
       }
+
       const { data, error } = await supabase.functions.invoke('discord-roles', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (error) throw error;
+
+      if (error) {
+        // If in DEV and Cloud Edge Function rejected with 403 (token mismatch or unauthenticated)
+        if (import.meta.env.DEV) {
+          console.warn('[ContractsManagement] discord-roles returned 403/error in dev. Using dev fallback roles:', error);
+          setDiscordRoles([
+            { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
+            { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
+            { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
+            { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
+          ]);
+          toast({
+            title: 'เชื่อมต่อ Discord Roles บนคลาวด์ไม่สำเร็จ (403)',
+            description: 'โหลดรายการยศจำลองในโหมด Dev ให้เรียบร้อยเพื่อทดสอบต่อได้',
+          });
+          return;
+        }
+        throw error;
+      }
+
       setDiscordRoles(data?.roles ?? []);
     } catch (e: any) {
-      toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message, variant: 'destructive' });
+      if (import.meta.env.DEV) {
+        setDiscordRoles([
+          { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
+          { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
+        ]);
+        toast({ title: 'เปิดใช้งานยศจำลอง (Dev Fallback)', description: 'เนื่องจาก Token ในโหมด Dev ไม่สามารถเรียก Edge Function บน Cloud ได้' });
+      } else {
+        toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message, variant: 'destructive' });
+      }
     } finally {
       setRolesLoading(false);
     }
@@ -426,10 +352,36 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       operator_name: operatorName,
       edit_log: [],
     };
-    const { error } = await (supabase as any).from('contracts').insert(payload);
+    const { data: insertedContract, error } = await (supabase as any).from('contracts').insert(payload).select().maybeSingle();
     setSaving(false);
     if (error) { toast({ title: 'เกิดข้อผิดพลาด', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'เพิ่มสัญญาสำเร็จ' });
+
+    // If role type contract, grant Discord role immediately!
+    if (isRoleType && payload.discord_role_id && payload.member_id) {
+      try {
+        const { data: syncRes, error: syncErr } = await supabase.functions.invoke('sync-contract-roles', {
+          body: {
+            action: 'grant',
+            contract_id: insertedContract?.id,
+            member_id: payload.member_id,
+            role_id: payload.discord_role_id,
+          }
+        });
+        if (syncErr || !syncRes?.success) {
+          toast({
+            title: 'บันทึกสัญญาสำเร็จ แต่ไม่สามารถมอบยศ Discord ได้',
+            description: syncRes?.message || syncErr?.message || 'โปรดตรวจสอบสิทธิ์บอท Discord ในเซิร์ฟเวอร์',
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'เพิ่มสัญญาและมอบยศ Discord ให้สมาชิกสำเร็จ 🎉' });
+        }
+      } catch {
+        toast({ title: 'เพิ่มสัญญาสำเร็จ แต่เกิดข้อผิดพลาดขณะเชื่อมต่อ Discord API', variant: 'destructive' });
+      }
+    } else {
+      toast({ title: 'เพิ่มสัญญาสำเร็จ' });
+    }
     reset(); onSaved();
   }
 
@@ -459,7 +411,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Home className="w-5 h-5 shrink-0" />
+              <span className="text-2xl shrink-0 select-none">🏡</span>
               <span className="text-xs font-bold">เช่าบ้าน</span>
             </button>
 
@@ -473,7 +425,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Star className="w-5 h-5 shrink-0" />
+              <span className="text-2xl shrink-0 select-none">🏅</span>
               <span className="text-xs font-bold">ยศส่วนตัว</span>
             </button>
 
@@ -487,7 +439,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Rocket className="w-5 h-5 shrink-0" />
+              <span className="text-2xl shrink-0 select-none">🌸</span>
               <span className="text-xs font-bold">ยศบูสต์</span>
             </button>
 
@@ -501,7 +453,7 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   : 'border-[#F4EEE5] dark:border-[#2D2520] bg-white dark:bg-[#201D1A] text-[#827160] hover:border-[#EFE7DC] dark:hover:border-stone-850'
               )}
             >
-              <Megaphone className="w-5 h-5 shrink-0" />
+              <span className="text-2xl shrink-0 select-none">📢</span>
               <span className="text-xs font-bold">โฆษณา</span>
             </button>
           </div>
@@ -821,8 +773,14 @@ function EditDialog({ contract, onClose, onSaved, operatorName, operatorAvatar }
       <DialogContent className="max-w-md bg-[#FDFAF7] dark:bg-[#1A1816] border-2 border-[#F4EEE5] dark:border-[#2D2520] rounded-3xl p-6 shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-extrabold text-[#4E3F30] dark:text-[#E8E1D9] flex items-center gap-2.5">
-            {isAd ? <Megaphone className="w-5 h-5 text-[#6366F1]" /> : <Edit2 className="w-5 h-5 text-[#8C6239]" />}
-            {isAd ? 'แก้ไขสัญญาโฆษณา' : 'แก้ไขสัญญาเช่าบ้าน'}
+            <span className="text-xl select-none">{CONTRACT_EMOJIS[contract.type as ContractType] || '📜'}</span>
+            {contract.type === 'house'
+              ? 'แก้ไขสัญญาเช่าบ้าน'
+              : contract.type === 'personal_role'
+                ? 'แก้ไขสัญญายศส่วนตัว'
+                : contract.type === 'boost_role'
+                  ? 'แก้ไขสัญญายศบูสต์'
+                  : 'แก้ไขสัญญาโฆษณา'}
           </DialogTitle>
           <DialogDescription className="text-sm font-semibold text-[#827160]">
             สมาชิก ID: {contract.member_id}
@@ -973,14 +931,13 @@ function EditLogDialog({ contract, onClose }: EditLogDialogProps) {
 
 interface ContractCardProps {
   contract: Contract;
-  typeIcons: TypeIcons;
   memberProfiles: Record<string, { username: string; discord_username: string | null }>;
   onEdit: (c: Contract) => void;
   onRefresh: () => void;
   onShowLogs: (c: Contract) => void;
 }
 
-function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, onShowLogs }: ContractCardProps) {
+function ContractCard({ contract, memberProfiles, onEdit, onRefresh, onShowLogs }: ContractCardProps) {
   const { toast } = useToast();
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1008,6 +965,17 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
 
   async function handleDelete() {
     setDeleting(true);
+    // If contract is a role type, revoke the role in Discord upon deletion
+    if ((contract.type === 'personal_role' || contract.type === 'boost_role') && contract.discord_role_id && contract.member_id) {
+      await supabase.functions.invoke('sync-contract-roles', {
+        body: {
+          action: 'revoke',
+          contract_id: contract.id,
+          member_id: contract.member_id,
+          role_id: contract.discord_role_id,
+        }
+      }).catch(() => {});
+    }
     const { error } = await (supabase as any).from('contracts').delete().eq('id', contract.id);
     setDeleting(false);
     if (error) {
@@ -1017,6 +985,38 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
     toast({ title: 'ลบสัญญาเรียบร้อยแล้ว' });
     setDeleteOpen(false);
     onRefresh();
+  }
+
+  const [syncingRole, setSyncingRole] = useState(false);
+
+  async function handleSyncRole() {
+    if (!contract.discord_role_id || !contract.member_id) return;
+    setSyncingRole(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-contract-roles', {
+        body: {
+          action: 'sync_single',
+          contract_id: contract.id,
+        }
+      });
+      if (error || !data?.success) {
+        toast({
+          title: 'ซิงค์ยศไม่สำเร็จ',
+          description: data?.message || error?.message || 'ไม่สามารถติดต่อ Discord API ได้',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: data.message || 'ซิงค์ยศ Discord สำเร็จ',
+          className: 'bg-emerald-600 text-white',
+        });
+        onRefresh();
+      }
+    } catch (err: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการเชื่อมต่อ', description: err.message, variant: 'destructive' });
+    } finally {
+      setSyncingRole(false);
+    }
   }
 
   const [roleTotal, setRoleTotal] = useState<number | null>(null);
@@ -1155,8 +1155,6 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
           ? 'bg-purple-500/10 text-purple-600 border-purple-500/30 dark:bg-purple-950/40 dark:text-purple-300'
           : 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20 dark:bg-[#1E1B4B]/40 dark:text-[#A5B4FC]';
 
-  const TypeIcon = typeIconsMap[contract.type as ContractType] || HelpCircle;
-  const iconUrl = typeIcons[contract.type as ContractType];
 
   const profile = memberProfiles[contract.member_id];
   const discordName = profile?.discord_username ?? profile?.username ?? null;
@@ -1171,6 +1169,9 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
           member_id: contract.member_id,
           end_unix,
           room_link: contract.room_link ?? '-',
+          type: contract.type,
+          role_name: contract.role_name,
+          package_name: contract.package_name,
         },
       });
       if (error) throw error;
@@ -1212,13 +1213,8 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
         <div className="space-y-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="shrink-0 w-12 h-12 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] relative overflow-hidden shadow-inner">
-                {iconUrl ? (
-                  <img src={iconUrl} alt={contract.type} className="w-full h-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <TypeIcon className="w-5 h-5 text-[#827160] dark:text-[#A89889]" />
-                )}
+              <div className="shrink-0 w-12 h-12 rounded-2xl bg-[#FAF6F0] dark:bg-[#2C241E] flex items-center justify-center border border-[#F0E8DC] dark:border-[#42352B] text-2xl shadow-inner select-none">
+                {CONTRACT_EMOJIS[contract.type as ContractType] || '📜'}
               </div>
               <div className="min-w-0">
                 <Badge variant="outline" className={cn('text-[10px] px-2 py-0.5 rounded-full font-bold mb-1', typeBadgeStyle)}>
@@ -1377,18 +1373,34 @@ function ContractCard({ contract, typeIcons, memberProfiles, onEdit, onRefresh, 
           </div>
 
           <div className="flex items-center justify-between gap-2 pt-1">
-            {contract.end_at && days !== null && days <= 3 && days > 0 ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 gap-1 border-rose-300 hover:bg-rose-50 text-rose-600 text-[11px] rounded-lg shadow-sm cursor-pointer"
-                disabled={sending}
-                onClick={() => setNotifyOpen(true)}
-              >
-                <Bell className={cn('w-3 h-3 text-rose-500', sending && 'animate-spin')} />
-                แจ้งเตือน
-              </Button>
-            ) : <div />}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(contract.type === 'personal_role' || contract.type === 'boost_role') && contract.discord_role_id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 gap-1.5 border-purple-300 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer"
+                  disabled={syncingRole}
+                  onClick={handleSyncRole}
+                  title="ซิงค์ยศกับ Discord ทันที (มอบยศถ้าสัญญาปกติ หรือถอดยศถ้าหมดอายุ)"
+                >
+                  <Shield className={cn('w-3 h-3 text-purple-600', syncingRole && 'animate-spin')} />
+                  {syncingRole ? 'กำลังซิงค์...' : 'ซิงค์ยศ'}
+                </Button>
+              )}
+
+              {contract.end_at && days !== null && days <= 3 && days > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 gap-1 border-rose-300 hover:bg-rose-50 text-rose-600 text-[11px] rounded-lg shadow-sm cursor-pointer"
+                  disabled={sending}
+                  onClick={() => setNotifyOpen(true)}
+                >
+                  <Bell className={cn('w-3 h-3 text-rose-500', sending && 'animate-spin')} />
+                  แจ้งเตือน
+                </Button>
+              )}
+            </div>
 
             <div className="flex items-center gap-1 bg-[#FAF5EE] dark:bg-[#25201C] p-0.5 rounded-xl border border-[#EFE8DD] dark:border-[#382F28]">
               <Button size="icon" variant="ghost"
@@ -1470,8 +1482,6 @@ export function ContractsManagement() {
   const [editTarget, setEditTarget] = useState<Contract | null>(null);
   const [selectedLogContract, setSelectedLogContract] = useState<Contract | null>(null);
   const [cleaningChannels, setCleaningChannels] = useState(false);
-
-  const [typeIcons, setTypeIcons] = useState<TypeIcons>({ house: null, personal_role: null, boost_role: null, ad: null });
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { username: string; discord_username: string | null }>>({});
 
   // Filters state
@@ -1479,26 +1489,6 @@ export function ContractsManagement() {
   const [searchOperator, setSearchOperator] = useState('');
   const [filterType, setFilterType] = useState<ContractType | 'all' | 'urgent'>('all');
   const [page, setPage] = useState(1);
-
-  // Load stored icon URLs from storage
-  useEffect(() => {
-    const types: ContractType[] = ['house', 'personal_role', 'boost_role', 'ad'];
-    const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
-    const result: TypeIcons = { house: null, personal_role: null, boost_role: null, ad: null };
-
-    for (const type of types) {
-      for (const ext of exts) {
-        const { data } = supabase.storage
-          .from('contract-icons')
-          .getPublicUrl(`type-icons/${type}.${ext}`);
-        if (data?.publicUrl) {
-          result[type] = data.publicUrl;
-          break;
-        }
-      }
-    }
-    setTypeIcons(result);
-  }, []);
 
   async function fetchMemberProfiles(memberIds: string[]) {
     if (memberIds.length === 0) return;
@@ -1554,7 +1544,49 @@ export function ContractsManagement() {
         }
       }).catch(() => {});
     }
+
+    // Auto-cleanup expired role contracts in background if any exist
+    const hasUncleanedExpiredRole = list.some(
+      c => (c.type === 'personal_role' || c.type === 'boost_role') && c.discord_role_id && c.end_at && new Date(c.end_at).getTime() <= Date.now()
+    );
+    if (hasUncleanedExpiredRole) {
+      supabase.functions.invoke('sync-contract-roles', { body: { action: 'cleanup_expired' } }).then(({ data: cleanupRes }) => {
+        if (cleanupRes?.revokedCount > 0) {
+          (supabase as any)
+            .from('contracts')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .then(({ data: updatedData }: any) => {
+              if (updatedData) {
+                setContracts(updatedData.filter((c: any) => c.type !== 'role'));
+              }
+            });
+        }
+      }).catch(() => {});
+    }
   }, [toast]);
+
+  const [cleaningRoles, setCleaningRoles] = useState(false);
+
+  async function handleCleanupExpiredRoles() {
+    setCleaningRoles(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-contract-roles', {
+        body: { action: 'cleanup_expired' },
+      });
+      if (error) throw error;
+      toast({
+        title: 'ตรวจสอบสัญญายศสำเร็จ',
+        description: data?.message || `ถอดยศที่หมดอายุเรียบร้อยแล้ว (${data?.revokedCount ?? 0} รายการ)`,
+        className: 'bg-emerald-600 text-white',
+      });
+      fetchContracts();
+    } catch (e: any) {
+      toast({ title: 'เกิดข้อผิดพลาดในการตรวจสอบยศ', description: e.message, variant: 'destructive' });
+    } finally {
+      setCleaningRoles(false);
+    }
+  }
 
   async function handleCleanupExpiredAdChannels() {
     setCleaningChannels(true);
@@ -1621,10 +1653,6 @@ export function ContractsManagement() {
 
   const hasFilter = searchMember || searchOperator || filterType !== 'all';
 
-  function handleIconUploaded(type: ContractType, url: string) {
-    setTypeIcons(prev => ({ ...prev, [type]: url || null }));
-  }
-
   // Derived stats
   const countByType = {
     house: contracts.filter(c => c.type === 'house').length,
@@ -1653,9 +1681,6 @@ export function ContractsManagement() {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap self-stretch md:self-auto">
-            {user?.is_owner && (
-              <IconUpload typeIcons={typeIcons} onUploaded={handleIconUploaded} />
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -1666,6 +1691,17 @@ export function ContractsManagement() {
             >
               <Trash2 className={cn('w-3.5 h-3.5', cleaningChannels && 'animate-spin')} />
               ลบห้องโฆษณาหมดอายุ
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCleanupExpiredRoles}
+              disabled={cleaningRoles}
+              className="gap-1.5 h-9 rounded-xl border-purple-400/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-300 font-bold cursor-pointer"
+              title="ตรวจและถอดยศ Discord ของสัญญาเช่ายศส่วนตัวและยศบูสต์ที่หมดอายุแล้ว"
+            >
+              <Shield className={cn('w-3.5 h-3.5', cleaningRoles && 'animate-spin')} />
+              ถอดยศสัญญาหมดอายุ
             </Button>
             <Button
               variant="outline"
@@ -1692,13 +1728,13 @@ export function ContractsManagement() {
       {/* ── Stats Panel (Interactive Quick Filters) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {([
-          { key: 'all', label: 'สัญญาทั้งหมด', count: contracts.length, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239]', icon: Home },
-          { key: 'house', label: 'สัญญาเช่าบ้าน', count: countByType.house, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8B5E3C] bg-[#8B5E3C]/5 text-[#8B5E3C]', icon: Home },
-          { key: 'personal_role', label: 'สัญญายศส่วนตัว', count: countByType.personal_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#D97706] bg-[#D97706]/5 text-[#D97706]', icon: Star },
-          { key: 'boost_role', label: 'สัญญายศบูสต์', count: countByType.boost_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-purple-500 bg-purple-500/5 text-purple-600', icon: Rocket },
-          { key: 'ad', label: 'สัญญาโฆษณา', count: countByType.ad, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1]', icon: Megaphone },
-          { key: 'urgent', label: 'ใกล้หมดอายุ/หมดอายุ', count: urgentCount, color: 'bg-white dark:bg-[#1E1B18] text-[#C23B51] dark:text-red-400 border-[#F4EEE5] dark:border-[#2D2520] hover:border-red-200', activeBg: 'border-red-500 bg-red-500/5 text-red-600', icon: AlertTriangle },
-        ] as const).map(({ key, label, count, color, activeBg, icon: IconComponent }) => {
+          { key: 'all', label: 'สัญญาทั้งหมด', count: contracts.length, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8C6239] bg-[#8C6239]/5 text-[#8C6239]', emoji: '📜' },
+          { key: 'house', label: 'สัญญาเช่าบ้าน', count: countByType.house, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#8B5E3C] bg-[#8B5E3C]/5 text-[#8B5E3C]', emoji: '🏡' },
+          { key: 'personal_role', label: 'สัญญายศส่วนตัว', count: countByType.personal_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#D97706] bg-[#D97706]/5 text-[#D97706]', emoji: '🏅' },
+          { key: 'boost_role', label: 'สัญญายศบูสต์', count: countByType.boost_role, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-purple-500 bg-purple-500/5 text-purple-600', emoji: '🌸' },
+          { key: 'ad', label: 'สัญญาโฆษณา', count: countByType.ad, color: 'bg-white dark:bg-[#1E1B18] text-[#4E3F30] dark:text-[#E8E1D9] border-[#F4EEE5] dark:border-[#2D2520] hover:border-[#DFD5C0]', activeBg: 'border-[#6366F1] bg-[#6366F1]/5 text-[#6366F1]', emoji: '📢' },
+          { key: 'urgent', label: 'ใกล้หมดอายุ/หมดอายุ', count: urgentCount, color: 'bg-white dark:bg-[#1E1B18] text-[#C23B51] dark:text-red-400 border-[#F4EEE5] dark:border-[#2D2520] hover:border-red-200', activeBg: 'border-red-500 bg-red-500/5 text-red-600', emoji: '⚠️' },
+        ] as const).map(({ key, label, count, color, activeBg, emoji }) => {
           const isActive = filterType === key;
           return (
             <button
@@ -1711,7 +1747,7 @@ export function ContractsManagement() {
             >
               <div className="flex items-center justify-between w-full">
                 <span className="text-[11px] font-bold tracking-tight opacity-75">{label}</span>
-                <IconComponent className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                <span className="text-base select-none shrink-0">{emoji}</span>
               </div>
               <p className="text-xl font-bold leading-none tracking-tight">{count}</p>
             </button>
@@ -1784,7 +1820,6 @@ export function ContractsManagement() {
             <ContractCard
               key={c.id}
               contract={c}
-              typeIcons={typeIcons}
               memberProfiles={memberProfiles}
               onEdit={setEditTarget}
               onRefresh={fetchContracts}

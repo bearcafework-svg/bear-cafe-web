@@ -1,7 +1,7 @@
 /**
  * send-contract-notify
- * ส่งการแจ้งเตือนสัญญาเช่าบ้านใกล้หมดผ่าน Discord Bot API (Components V2)
- * รับ: { member_id, end_unix, room_link, channel_id? }
+ * ส่งการแจ้งเตือนสัญญา (บ้านเช่า / ยศบูสต์ / ยศส่วนตัว / โฆษณา) ใกล้หมดผ่าน Discord Bot API (Components V2)
+ * รับ: { member_id, end_unix, room_link?, channel_id?, type?, role_name?, package_name? }
  */
 import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
 
@@ -16,10 +16,13 @@ Deno.serve(async (req): Promise<Response> => {
   }
 
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const member_id: string = String(body.member_id ?? "").trim();
     const end_unix: number = Number(body.end_unix ?? 0);
     const room_link: string = String(body.room_link ?? "-").trim() || "-";
+    const type: string = String(body.type ?? "house").trim();
+    const role_name: string = String(body.role_name ?? "").trim();
+    const package_name: string = String(body.package_name ?? "").trim();
     const channelId: string = String(
       body.channel_id ?? Deno.env.get("DISCORD_CONTRACT_NOTIFY_CHANNEL_ID") ?? ""
     ).trim();
@@ -34,19 +37,39 @@ Deno.serve(async (req): Promise<Response> => {
     if (!channelId) {
       return new Response(
         JSON.stringify({
-          error: "Missing channel_id — set DISCORD_CONTRACT_NOTIFY_CHANNEL_ID env var or pass channel_id in body",
+          error: "ยังไม่ได้ตั้งค่าห้องแจ้งเตือน (กรุณาระบุ DISCORD_CONTRACT_NOTIFY_CHANNEL_ID ใน Environment Variables หรือระบุ channel_id ใน request)",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const textContent = [
-      `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 \`__`,
-      `-# **สาเหตุ:** บ้านเช่าของคุณใกล้หมดแล้ว หากไม่อยากให้บ้านถูกยึด ต่อด่วน ต่อด่วน ต่อด่วน! <:cuteplant:1152834055528783872>`,
-      ``,
+    // สร้างเนื้อหาแจ้งเตือนตามประเภทสัญญา
+    let causeText = "บ้านเช่าของคุณใกล้หมดแล้ว หากไม่อยากให้บ้านถูกยึด ต่อด่วน ต่อด่วน ต่อด่วน! <:cuteplant:1152834055528783872>";
+    const detailLines: string[] = [
       `> (👤)︰<@${member_id}> — ${member_id}`,
       `> (⏰)︰<t:${end_unix}:F> (<t:${end_unix}:R>)`,
-      `> (🏡)︰${room_link}`,
+    ];
+
+    if (type === "boost_role") {
+      causeText = `สัญญายศบูสต์ ${role_name ? `**${role_name}** ` : ""}ของคุณใกล้หมดอายุแล้ว หากต้องการต่ออายุยศ อย่าลืมต่อสัญญานะคะ <:cuteplant:1152834055528783872>`;
+      if (role_name) detailLines.push(`> (🎖️)︰ยศ ${role_name}`);
+    } else if (type === "personal_role") {
+      causeText = `สัญญายศส่วนตัว ${role_name ? `**${role_name}** ` : ""}ของคุณใกล้หมดอายุแล้ว หากต้องการต่ออายุยศ อย่าลืมต่อสัญญานะคะ <:cuteplant:1152834055528783872>`;
+      if (role_name) detailLines.push(`> (🎖️)︰ยศ ${role_name}`);
+    } else if (type === "ad") {
+      causeText = `สัญญาโฆษณา ${package_name ? `**${package_name}** ` : ""}ของคุณใกล้หมดอายุแล้ว ห้องโฆษณาจะถูกลบอัตโนมัติเมื่อสิ้นสุดสัญญา <:cuteplant:1152834055528783872>`;
+      if (package_name) detailLines.push(`> (📢)︰แพ็กเกจ ${package_name}`);
+    } else {
+      if (room_link && room_link !== "-") {
+        detailLines.push(`> (🏡)︰${room_link}`);
+      }
+    }
+
+    const textContent = [
+      `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ แจ้งเตือนสัญญาใกล้หมดอายุ 𓂃 \`__`,
+      `-# **สาเหตุ:** ${causeText}`,
+      ``,
+      ...detailLines,
     ].join("\n");
 
     const payload: Record<string, unknown> = {
@@ -77,7 +100,7 @@ Deno.serve(async (req): Promise<Response> => {
                 {
                   type: 2,  // Button
                   style: 5, // Link — ห้ามมี custom_id
-                  label: "คลิกเพื่อต่อบ้านเช่า",
+                  label: "คลิกเพื่อติดต่อต่อสัญญา",
                   url: "https://discord.com/channels/1144251788493602848/1524124116053917747",
                 },
               ],
@@ -88,7 +111,7 @@ Deno.serve(async (req): Promise<Response> => {
     };
 
     const result = await sendDiscordBotMessage(channelId, payload, {
-      dedupKey: `contract-notify:${member_id}:${end_unix}`,
+      dedupKey: `contract-notify:${member_id}:${end_unix}:${type}`,
     });
 
     if (!result.success) {

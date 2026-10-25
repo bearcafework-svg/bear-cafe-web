@@ -51,6 +51,7 @@ import { HealingMessagesManagement } from '@/components/admin/HealingMessagesMan
 import { HealingBatchFloatingWidget } from '@/components/admin/HealingBatchFloatingWidget';
 import { ContractsManagement } from '@/components/admin/ContractsManagement';
 import { StaffManagement } from '@/components/admin/StaffManagement';
+import { StaffNoteModal } from '@/components/admin/StaffNoteModal';
 import { StickyMessagesManagement } from '@/components/admin/StickyMessagesManagement';
 import { BannerManagement } from '@/components/admin/BannerManagement';
 import { HealJaiManagement } from '@/components/admin/HealJaiManagement';
@@ -195,6 +196,7 @@ function AdminPageContent() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [staffNoteOpen, setStaffNoteOpen] = useState(false);
 
   // Admin role allowed pages from site_settings
   const [adminRolePages, setAdminRolePages] = useState<string[]>([]);
@@ -432,22 +434,35 @@ function AdminPageContent() {
               title="สลับธีม (โหมดมืด / สว่าง)"
             />
 
-            {/* User Profile Avatar */}
-            <Avatar
-              className="w-8 h-8 rounded-full border border-border/60 shadow-xs shrink-0 ring-1 ring-primary/20 overflow-hidden"
-              title={user?.username || 'โปรไฟล์ผู้ใช้งาน'}
+            {/* User Profile Avatar with Clickable Staff Note Modal */}
+            <button
+              type="button"
+              onClick={() => setStaffNoteOpen(true)}
+              className="rounded-full ring-2 ring-primary/20 hover:ring-primary/50 transition-all hover:scale-105 active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary p-0.5 shrink-0"
+              title="คลิกเพื่อแก้ไขข้อความต้อนรับทีมงาน (staff_members.notes)"
             >
-              {user?.avatar_url && (
-                <AvatarImage
-                  src={user.avatar_url}
-                  alt={user.username || 'User Profile'}
-                  className="object-cover w-full h-full"
-                />
-              )}
-              <AvatarFallback className="w-full h-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-primary">
-                <User className="w-4 h-4" />
-              </AvatarFallback>
-            </Avatar>
+              <Avatar
+                className="w-8 h-8 rounded-full border border-border/60 shadow-xs shrink-0 overflow-hidden"
+              >
+                {user?.avatar_url && (
+                  <AvatarImage
+                    src={user.avatar_url}
+                    alt={user.username || 'User Profile'}
+                    className="object-cover w-full h-full"
+                  />
+                )}
+                <AvatarFallback className="w-full h-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-primary font-bold">
+                  <User className="w-4 h-4" />
+                </AvatarFallback>
+              </Avatar>
+            </button>
+
+            {/* Staff Note Modal */}
+            <StaffNoteModal
+              open={staffNoteOpen}
+              onOpenChange={setStaffNoteOpen}
+              currentUser={user}
+            />
 
             {/* Mobile / Tablet Navigation Sheet */}
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
