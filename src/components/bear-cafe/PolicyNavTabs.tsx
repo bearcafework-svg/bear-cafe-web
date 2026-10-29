@@ -1,22 +1,32 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, FileText, Database, ArrowLeft } from 'lucide-react';
+import { Shield, FileText, Database, ArrowLeft, Bot, Sparkles } from 'lucide-react';
 
 interface PolicyNavTabsProps {
   showBackToHome?: boolean;
+  variant?: 'auto' | 'community' | 'kuma';
 }
 
-export const PolicyNavTabs: React.FC<PolicyNavTabsProps> = ({ showBackToHome = false }) => {
+export const PolicyNavTabs: React.FC<PolicyNavTabsProps> = ({ 
+  showBackToHome = false,
+  variant = 'auto'
+}) => {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const tabs = [
+  const isKuma = variant === 'kuma' || (variant === 'auto' && (
+    currentPath === '/term-of-service' || 
+    currentPath === '/privacy-policy' || 
+    currentPath.startsWith('/kuma')
+  ));
+
+  const communityTabs = [
     {
       label: 'ข้อกำหนดการใช้งาน',
       enLabel: 'Terms',
       path: '/terms',
       icon: FileText,
-      description: 'เงื่อนไขและกฎระเบียบการใช้งานเว็บไซต์และบริการ',
+      description: 'เงื่อนไขและกฎระเบียบการใช้งานเว็บไซต์และบริการคอมมูนิตี้ Bear Café',
     },
     {
       label: 'นโยบายความเป็นส่วนตัว',
@@ -34,17 +44,59 @@ export const PolicyNavTabs: React.FC<PolicyNavTabsProps> = ({ showBackToHome = f
     },
   ];
 
+  const kumaTabs = [
+    {
+      label: 'ข้อกำหนดการให้บริการ',
+      enLabel: 'Terms of Service',
+      path: '/term-of-service',
+      icon: FileText,
+      description: 'ข้อกำหนดและเงื่อนไขการใช้งาน Kuma Bot',
+    },
+    {
+      label: 'นโยบายความเป็นส่วนตัว',
+      enLabel: 'Privacy Policy',
+      path: '/privacy-policy',
+      icon: Shield,
+      description: 'นโยบายความเป็นส่วนตัวและการคุ้มครองข้อมูล Kuma Bot',
+    },
+  ];
+
+  const activeTabs = isKuma ? kumaTabs : communityTabs;
+
   return (
     <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 py-1">
-      {showBackToHome && (
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors self-start sm:self-center"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>กลับสู่หน้าหลัก</span>
-        </Link>
-      )}
+      <div className="flex items-center gap-2 self-start sm:self-center">
+        {showBackToHome && (
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mr-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>กลับสู่หน้าหลัก</span>
+          </Link>
+        )}
+
+        {/* Cross switcher pill between Community & Kuma Bot */}
+        {isKuma ? (
+          <Link
+            to="/terms"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/60 hover:bg-secondary border border-border/70 transition-colors"
+            title="สลับไปยังเอกสารกฎระเบียบคอมมูนิตี้ Bear Café"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-honey" />
+            <span>เอกสารคอมมูนิตี้ Bear Café</span>
+          </Link>
+        ) : (
+          <Link
+            to="/term-of-service"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/60 hover:bg-secondary border border-border/70 transition-colors"
+            title="สลับไปยังข้อกำหนดและนโยบายของ Kuma Bot"
+          >
+            <Bot className="w-3.5 h-3.5 text-honey" />
+            <span>ข้อกำหนดบอท Kuma (Kuma Bot)</span>
+          </Link>
+        )}
+      </div>
 
       {/* Pill Navigation Tabs */}
       <nav
@@ -52,9 +104,11 @@ export const PolicyNavTabs: React.FC<PolicyNavTabsProps> = ({ showBackToHome = f
         className="flex items-center p-1.5 rounded-2xl bg-card/80 border border-border/70 shadow-xs backdrop-blur-md max-w-full overflow-x-auto no-scrollbar w-full sm:w-auto"
       >
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 w-full sm:w-auto justify-start sm:justify-center">
-          {tabs.map((tab) => {
+          {activeTabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = currentPath === tab.path;
+            const isActive = currentPath === tab.path || 
+              (tab.path === '/term-of-service' && (currentPath === '/kuma/terms' || currentPath === '/kuma/term-of-service')) ||
+              (tab.path === '/privacy-policy' && (currentPath === '/kuma/privacy' || currentPath === '/kuma/privacy-policy'));
 
             return (
               <Link

@@ -29,6 +29,8 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import PrivacyPermissionsPage from "./pages/PrivacyPermissionsPage";
+import KumaTermsPage from "./pages/KumaTermsPage";
+import KumaPrivacyPage from "./pages/KumaPrivacyPage";
 
 const queryClient = new QueryClient();
 
@@ -139,10 +141,22 @@ export function AppRoutes() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      
+      {/* Bear Café Community Legal Pages */}
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/privacy/permissions" element={<PrivacyPermissionsPage />} />
       <Route path="/rules" element={<Navigate to="/terms" replace />} />
+
+      {/* Kuma Bot Legal Pages */}
+      <Route path="/term-of-service" element={<KumaTermsPage />} />
+      <Route path="/terms-of-service" element={<Navigate to="/term-of-service" replace />} />
+      <Route path="/privacy-policy" element={<KumaPrivacyPage />} />
+      <Route path="/kuma/terms" element={<Navigate to="/term-of-service" replace />} />
+      <Route path="/kuma/term-of-service" element={<Navigate to="/term-of-service" replace />} />
+      <Route path="/kuma/privacy" element={<Navigate to="/privacy-policy" replace />} />
+      <Route path="/kuma/privacy-policy" element={<Navigate to="/privacy-policy" replace />} />
+
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/banned-role" element={<RoleBannedPage />} />
 
