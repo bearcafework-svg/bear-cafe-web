@@ -1404,7 +1404,7 @@ export function KumaTenantsManagement() {
               ยืนยันการปรับลดเป็น Standard
             </DialogTitle>
             <DialogDescription>
-              การกระทำนี้จะเปลี่ยนแผนของเซิร์ฟเวอร์กลับเป็น Standard (ฟรี) และเซิร์ฟเวอร์จะถูกจำกัดให้เล่นได้เฉพาะ 3 มินิเกมเริ่มต้น
+              การกระทำนี้จะเปลี่ยนแผนของเซิร์ฟเวอร์กลับเป็น Standard (ฟรี) และเซิร์ฟเวอร์จะถูกจำกัดให้เล่นได้เฉพาะ 5 มินิเกมเริ่มต้น
             </DialogDescription>
           </DialogHeader>
 
@@ -1486,7 +1486,7 @@ export function KumaTenantsManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard">Standard (ฟรี 3 มินิเกม)</SelectItem>
+                  <SelectItem value="standard">Standard (ฟรี 5 มินิเกม)</SelectItem>
                   <SelectItem value="premium">👑 Premium (ครบ 13 เกม)</SelectItem>
                 </SelectContent>
               </Select>
