@@ -565,6 +565,10 @@ export function TradingHistoryManagement() {
       const itemsMap = await fetchPurchaseItems(orderIds);
       for (const r of newOrders) {
         r.purchase_items = itemsMap.get(r.id) ?? [];
+        // Fallback guard: หาก orders.total_amount เป็น 0 แต่มีรายการสินค้า ให้คำนวณราคารวมจาก purchase_items
+        if (r.total_amount <= 0 && r.purchase_items.length > 0) {
+          r.total_amount = r.purchase_items.reduce((sum, it) => sum + (Number(it.price_paid) || 0), 0);
+        }
       }
 
       // 4. Merge and sort by transaction_date desc, then log_timestamp desc
@@ -787,7 +791,7 @@ export function TradingHistoryManagement() {
         recipient_id: recipientIdToInsert,
         staff_id: user?.discord_id ?? null,
         transaction_date: newBill.transactionDate,
-        total_amount: 0, // trigger will update this
+        total_amount: computedTotalAmount,
         type_bill: newBill.billType,
         slip_url: imageUrls[0] ?? null,
         slip_url_2: imageUrls[1] ?? null,
