@@ -851,143 +851,7 @@ export type Database = {
           },
         ]
       }
-      dm_broadcast_logs: {
-        Row: {
-          error_message: string | null
-          id: string
-          queue_id: string
-          sent_at: string | null
-          status: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          error_message?: string | null
-          id?: string
-          queue_id: string
-          sent_at?: string | null
-          status?: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          error_message?: string | null
-          id?: string
-          queue_id?: string
-          sent_at?: string | null
-          status?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dm_broadcast_logs_queue_fkey"
-            columns: ["queue_id"]
-            isOneToOne: false
-            referencedRelation: "dm_broadcast_queues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dm_broadcast_queues: {
-        Row: {
-          created_at: string
-          failed_count: number
-          id: string
-          message_payload: Json
-          sent_count: number
-          status: string
-          target_type: string
-          target_value: string | null
-          title: string
-          token_type: string
-          total_targets: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          failed_count?: number
-          id?: string
-          message_payload: Json
-          sent_count?: number
-          status?: string
-          target_type: string
-          target_value?: string | null
-          title: string
-          token_type?: string
-          total_targets?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          failed_count?: number
-          id?: string
-          message_payload?: Json
-          sent_count?: number
-          status?: string
-          target_type?: string
-          target_value?: string | null
-          title?: string
-          token_type?: string
-          total_targets?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      dm_broadcast_system_logs: {
-        Row: {
-          created_at: string
-          id: number
-          level: string
-          message_th: string
-          queue_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: never
-          level?: string
-          message_th: string
-          queue_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: never
-          level?: string
-          message_th?: string
-          queue_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dm_broadcast_system_logs_queue_id_fkey"
-            columns: ["queue_id"]
-            isOneToOne: false
-            referencedRelation: "dm_broadcast_queues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dms_options: {
-        Row: {
-          created_at: string
-          id: string
-          option_value: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          option_value: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          option_value?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      flower_sessions: {
+flower_sessions: {
         Row: {
           channel_id: string
           created_at: string | null
@@ -1465,31 +1329,7 @@ export type Database = {
         }
         Relationships: []
       }
-      member_dm_status: {
-        Row: {
-          dm_status: string
-          last_checked_at: string
-          last_error: string | null
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          dm_status?: string
-          last_checked_at?: string
-          last_error?: string | null
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          dm_status?: string
-          last_checked_at?: string
-          last_error?: string | null
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
-      member_roles: {
+member_roles: {
         Row: {
           discord_id: string
           granted_at: string
@@ -3871,11 +3711,7 @@ export type Database = {
         Args: { _reason?: string; _rejecter_id: string; _request_ids: string[] }
         Returns: Json
       }
-      clean_old_dm_broadcast_logs: {
-        Args: { days_older?: number }
-        Returns: number
-      }
-      cleanup_old_sessions: { Args: never; Returns: undefined }
+cleanup_old_sessions: { Args: never; Returns: undefined }
       cleanup_stale_queue: { Args: never; Returns: undefined }
       deduct_points_safe: {
         Args: { p_amount: number; p_user_id: string }

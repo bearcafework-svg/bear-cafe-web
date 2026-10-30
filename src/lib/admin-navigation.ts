@@ -190,13 +190,7 @@ export function getAdminNavTree(
               description: 'ปักหมุดข้อความในห้องดิสคอร์ด',
               icon: Pin,
             },
-            {
-              id: 'dm-broadcast',
-              label: 'ข่าวสารบอท DM',
-              description: 'บรอดแคสต์ประกาศตรงถึงสมาชิก',
-              icon: Send,
-            },
-          ],
+                      ],
         },
         {
           title: 'มินิเกมและ AI',

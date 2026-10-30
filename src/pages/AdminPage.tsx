@@ -40,7 +40,6 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonCards';
 import { ADMIN_PAGES } from '@/lib/admin-pages';
 import { BannedWordsManagement } from '@/components/admin/BannedWordsManagement';
-import { DMBroadcastManagement } from '@/components/admin/DMBroadcastManagement';
 import { RedeemCodesManagement } from '@/components/admin/RedeemCodesManagement';
 import { TagWarnLogsManagement } from '@/components/admin/TagWarnLogsManagement';
 import { TradingHistoryManagement } from '@/components/admin/TradingHistoryManagement';
@@ -132,7 +131,6 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'discord-servers': Settings,
   'campaigns': Send,
   'product-catalog': ShoppingCart,
-  'dm-broadcast': Send,
   'manage-staff': Users,
   'sticky-messages': Pin,
   'minigames': Gamepad2,
@@ -302,7 +300,6 @@ function AdminPageContent() {
         case 'permissions': return isOwner ? <PermissionsManagement /> : null;
         case 'campaigns': return canAccessPage('campaigns') ? <CampaignsManagement /> : null;
         case 'product-catalog': return canAccessPage('product-catalog') ? <ProductCatalogManagement /> : null;
-        case 'dm-broadcast': return canAccessPage('dm-broadcast') ? <DMBroadcastManagement /> : null;
         case 'manage-staff': return canAccessPage('manage-staff') ? <StaffManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
         case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;

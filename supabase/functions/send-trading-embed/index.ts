@@ -10,6 +10,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DEFAULT_CHANNEL_ID = "1524124428454203553";
+
 function toUnicodeNumber(n: number): string {
   const unicodeDigits = ["𝟢", "𝟣", "𝟤", "𝟥", "𝟦", "𝟧", "𝟨", "𝟩", "𝟪", "𝟫"];
   const formatted = n.toLocaleString("en-US", {
@@ -34,7 +36,7 @@ Deno.serve(async (req): Promise<Response> => {
     const channelId: string =
       body.channel_id ??
       Deno.env.get("DISCORD_TRADING_EMBED_CHANNEL_ID") ??
-      "";
+      DEFAULT_CHANNEL_ID;
 
     if (!memberId) {
       return new Response(

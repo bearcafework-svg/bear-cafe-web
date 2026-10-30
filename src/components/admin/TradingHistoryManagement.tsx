@@ -21,6 +21,7 @@ import { RichSelect, type RichSelectItem } from '@/components/ui/rich-select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
+import { readFunctionsErrorPayload } from '@/lib/function-error';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
 import { UserClickMenu } from '@/components/admin/UserClickMenu';
@@ -1009,10 +1010,18 @@ export function TradingHistoryManagement() {
           latest_amount: r.total_amount,
           total_amount: totalAmountByMember.get(r.member_id) ?? r.total_amount,
           avatar_url: profileMap.get(r.member_id)?.avatar_url ?? '',
+          channel_id: '1524124428454203553',
         },
       });
       if (error) {
-        throw new Error(error.message || 'ส่ง embed ไม่สำเร็จ');
+        const errorPayload = await readFunctionsErrorPayload(error);
+        const detailedMessage =
+          errorPayload?.message ||
+          errorPayload?.error ||
+          (errorPayload as any)?.details ||
+          error.message ||
+          'ส่ง embed ไม่สำเร็จ';
+        throw new Error(detailedMessage);
       }
       if (data && data.ok === false) {
         throw new Error(data.message || data.error || 'ส่ง embed ไม่สำเร็จ');

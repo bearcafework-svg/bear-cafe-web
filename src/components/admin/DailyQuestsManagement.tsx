@@ -67,6 +67,8 @@ import {
   ArrowRight,
   ArrowLeft,
   Settings2,
+  Power,
+  AlertTriangle,
 } from 'lucide-react';
 
 export interface QuestTemplate {
@@ -438,6 +440,14 @@ export function DailyQuestsManagement() {
   const [newTimeInput, setNewTimeInput] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
 
+  // Master Quest System Status (Active / Paused)
+  const [isQuestSystemActive, setIsQuestSystemActive] = useState(true);
+  const [questPausedMessage, setQuestPausedMessage] = useState('ระบบเควสประจำวันปิดปรับปรุงชั่วคราว ขออภัยในความไม่สะดวกค่ะ');
+  const [pauseModalMsgInput, setPauseModalMsgInput] = useState('');
+  const [pauseConfigDialogOpen, setPauseConfigDialogOpen] = useState(false);
+  const [isTogglingSystem, setIsTogglingSystem] = useState(false);
+  const [pauseConfirmDialogOpen, setPauseConfirmDialogOpen] = useState(false);
+
   // Delete Dialog State
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<QuestTemplate | null>(null);
@@ -609,6 +619,8 @@ export function DailyQuestsManagement() {
         }
         if (val.announce_channel_id) setAnnounceChannelId(val.announce_channel_id);
         if (val.announce_ping_role_id) setAnnouncePingRoleId(val.announce_ping_role_id);
+        if (typeof val.is_active === 'boolean') setIsQuestSystemActive(val.is_active);
+        if (val.paused_message) setQuestPausedMessage(val.paused_message);
       }
     } catch (err: any) {
       console.error('Failed to load daily quest settings:', err);
@@ -659,6 +671,53 @@ export function DailyQuestsManagement() {
     setScheduleModalTimes(scheduleModalTimes.filter((t) => t !== timeToRemove));
   };
 
+
+  const handleToggleQuestSystem = async (targetActive: boolean, newPausedMsg?: string) => {
+    try {
+      setIsTogglingSystem(true);
+      const msg = newPausedMsg !== undefined ? newPausedMsg : questPausedMessage;
+      const payload = {
+        is_active: targetActive,
+        paused_message: msg,
+        announcement_times: announcementTimes,
+        announce_channel_id: announceChannelId,
+        announce_ping_role_id: announcePingRoleId,
+      };
+
+      const { error } = await supabase
+        .from('site_settings' as any)
+        .upsert(
+          {
+            key: 'daily_quest_settings',
+            value: payload,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+      setIsQuestSystemActive(targetActive);
+      if (newPausedMsg !== undefined) setQuestPausedMessage(newPausedMsg);
+
+      toast({
+        title: targetActive ? 'เปิดใช้งานระบบเควสแล้ว' : 'พักระบบเควสเรียบร้อยแล้ว',
+        description: targetActive
+          ? 'บอทจะกลับมานับเควส ส่งการ์ดประกาศ และแจกรางวัลตามปกติ'
+          : 'บอทได้หยุดนับเควส งดส่งการ์ด และระงับการแจ้งเตือนทั้งหมดแล้ว',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะ',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTogglingSystem(false);
+      setPauseConfirmDialogOpen(false);
+      setPauseConfigDialogOpen(false);
+    }
+  };
+
   const handleSaveScheduleSettings = async () => {
     if (scheduleModalTimes.length === 0) {
       toast({ title: 'ต้องมีเวลาประกาศอย่างน้อย 1 เวลา', variant: 'destructive' });
@@ -668,6 +727,8 @@ export function DailyQuestsManagement() {
       setSavingSchedule(true);
       const sortedTimes = [...scheduleModalTimes].sort();
       const payload = {
+        is_active: isQuestSystemActive,
+        paused_message: questPausedMessage,
         announcement_times: sortedTimes,
         announce_channel_id: scheduleModalChanId.trim() || '1529885509260673034',
         announce_ping_role_id: scheduleModalRoleId.trim() || '1144700895020462200',
@@ -1484,13 +1545,77 @@ export function DailyQuestsManagement() {
         </div>
       </div>
 
-      {/* Production Public Mode Alert Callout */}
-      <div className="flex items-center justify-between p-3.5 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-xs text-emerald-800 dark:text-emerald-300">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>
-            <strong>โหมด Public:</strong> ปัจจุบันระบบบอทเปิดให้สมาชิกทุกคนในเซิร์ฟเวอร์สามารถทำภารกิจและสะสมแต้มได้แบบเรียลไทม์แล้วค่ะ 🐻✨
-          </span>
+      {/* Master Quest System Status Control Banner */}
+      <div className={cn(
+        "p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm",
+        isQuestSystemActive
+          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200"
+          : "bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200"
+      )}>
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+            isQuestSystemActive ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+          )}>
+            {isQuestSystemActive ? <Sparkles className="w-5 h-5" /> : <Power className="w-5 h-5" />}
+          </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm">
+                {isQuestSystemActive ? 'ระบบเควสเปิดทำงานตามปกติ (Active)' : 'พักระบบเควสชั่วคราว (Paused)'}
+              </span>
+              <Badge variant="outline" className={cn(
+                "text-[10px] font-semibold px-2 py-0.5",
+                isQuestSystemActive
+                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                  : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40"
+              )}>
+                {isQuestSystemActive ? '🟢 Live on Discord' : '⏸️ บอทพักการนับ ส่ง และเก็บ'}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isQuestSystemActive
+                ? 'บอทเปิดรับความคืบหน้าเควสแบบเรียลไทม์ ส่งการ์ดตามรอบ และแจกรางวัลเมื่อสำเร็จ'
+                : `บอทหยุดนับเควส งดส่งการ์ดประกาศ และระงับการแจ้งเตือนทั้งหมด ("${questPausedMessage}")`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+          {!isQuestSystemActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPauseModalMsgInput(questPausedMessage);
+                setPauseConfigDialogOpen(true);
+              }}
+              className="h-8 px-2.5 text-xs gap-1 border-rose-500/30 hover:bg-rose-500/10 text-rose-700 dark:text-rose-300"
+            >
+              <Edit2 className="w-3.5 h-3.5" /> แก้ไขข้อความแจ้งเตือน
+            </Button>
+          )}
+
+          <div className="flex items-center gap-2.5 bg-background/90 px-3 py-1.5 rounded-xl border shadow-xs">
+            <span className="text-xs font-semibold">
+              {isQuestSystemActive ? 'เปิดใช้งาน' : 'พักระบบ'}
+            </span>
+            <Switch
+              checked={isQuestSystemActive}
+              disabled={isTogglingSystem}
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  setPauseModalMsgInput(questPausedMessage);
+                  setPauseConfirmDialogOpen(true);
+                } else {
+                  handleToggleQuestSystem(true);
+                }
+              }}
+              className={cn(
+                isQuestSystemActive ? 'data-[state=checked]:bg-emerald-600' : 'data-[state=unchecked]:bg-rose-500'
+              )}
+            />
+          </div>
         </div>
       </div>
 
