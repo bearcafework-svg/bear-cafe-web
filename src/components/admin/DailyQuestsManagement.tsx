@@ -1604,12 +1604,7 @@ export function DailyQuestsManagement() {
               checked={isQuestSystemActive}
               disabled={isTogglingSystem}
               onCheckedChange={(checked) => {
-                if (!checked) {
-                  setPauseModalMsgInput(questPausedMessage);
-                  setPauseConfirmDialogOpen(true);
-                } else {
-                  handleToggleQuestSystem(true);
-                }
+                handleToggleQuestSystem(checked);
               }}
               className={cn(
                 isQuestSystemActive ? 'data-[state=checked]:bg-emerald-600' : 'data-[state=unchecked]:bg-rose-500'
@@ -3680,6 +3675,44 @@ export function DailyQuestsManagement() {
             >
               <Check className="w-4 h-4" />
               ยืนยันเปลี่ยนเควส
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: แก้ไขข้อความแจ้งเตือนเมื่อปิดเควส */}
+      <Dialog open={pauseConfigDialogOpen} onOpenChange={setPauseConfigDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="w-5 h-5 text-amber-500" />
+              แก้ไขข้อความแจ้งเตือนสมาชิก
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ข้อความนี้จะแสดงเฉพาะตัวผู้กด (Ephemeral) เมื่อสมาชิกคลิกปุ่ม &quot;ดูความคืบหน้า&quot; ใน Discord ระหว่างที่ระบบพักอยู่
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <Input
+              value={pauseModalMsgInput}
+              onChange={(e) => setPauseModalMsgInput(e.target.value)}
+              placeholder="ระบบเควสประจำวันปิดปรับปรุงชั่วคราว ขออภัยในความไม่สะดวกค่ะ"
+              className="text-xs"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPauseConfigDialogOpen(false)} disabled={isTogglingSystem}>
+              ยกเลิก
+            </Button>
+            <Button
+              disabled={isTogglingSystem || !pauseModalMsgInput.trim()}
+              onClick={() => handleToggleQuestSystem(false, pauseModalMsgInput.trim())}
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+            >
+              {isTogglingSystem && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+              บันทึกข้อความ
             </Button>
           </DialogFooter>
         </DialogContent>
