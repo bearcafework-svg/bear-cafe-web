@@ -113,7 +113,7 @@ export function ThemeToggle({ className }: { className?: string } = {}) {
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-honey/20 to-transparent dark:from-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
       {/* Icon container with rotation animation */}
-      <div className="relative w-5 h-5 flex items-center justify-center">
+      <div className="relative w-5 h-5 flex items-center justify-center shrink-0">
         <AnimatePresence mode="wait">
           {isDark ? (
             <motion.div
@@ -127,7 +127,7 @@ export function ThemeToggle({ className }: { className?: string } = {}) {
               }}
               className="absolute"
             >
-              <Moon className="w-5 h-5 text-primary" />
+              <Moon className="w-5 h-5 text-primary shrink-0" />
             </motion.div>
           ) : (
             <motion.div
@@ -141,7 +141,7 @@ export function ThemeToggle({ className }: { className?: string } = {}) {
               }}
               className="absolute"
             >
-              <Sun className="w-5 h-5 text-honey" />
+              <Sun className="w-5 h-5 text-honey shrink-0" />
             </motion.div>
           )}
         </AnimatePresence>

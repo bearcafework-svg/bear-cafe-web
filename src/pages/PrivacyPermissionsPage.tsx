@@ -70,35 +70,35 @@ export default function PrivacyPermissionsPage() {
       case 'Confirmed':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+            <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
             <span>Confirmed</span>
           </span>
         );
       case 'Not Found':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-stone-500/15 text-stone-600 dark:text-stone-400 border border-stone-400/30">
-            <AlertCircle className="w-3 h-3 text-stone-500" />
+            <AlertCircle className="w-3 h-3 text-stone-500 shrink-0" />
             <span>Not Found</span>
           </span>
         );
       case 'Unknown':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-            <HelpCircle className="w-3 h-3 text-amber-500" />
+            <HelpCircle className="w-3 h-3 text-amber-500 shrink-0" />
             <span>Unknown</span>
           </span>
         );
       case 'Needs Review':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30">
-            <Info className="w-3 h-3 text-sky-500" />
+            <Info className="w-3 h-3 text-sky-500 shrink-0" />
             <span>Needs Review</span>
           </span>
         );
       case 'Demo / Development':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-500/15 text-purple-800 dark:text-purple-300 border border-purple-500/30">
-            <Sparkles className="w-3 h-3 text-purple-500" />
+            <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />
             <span>Demo</span>
           </span>
         );

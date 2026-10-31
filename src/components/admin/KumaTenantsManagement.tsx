@@ -793,11 +793,11 @@ export function KumaTenantsManagement() {
       <Tabs defaultValue="servers" className="space-y-4">
         <TabsList className="bg-muted/40 p-1 border border-border/50">
           <TabsTrigger value="servers" className="gap-2 text-xs">
-            <Server className="w-3.5 h-3.5" />
+            <Server className="w-3.5 h-3.5 shrink-0" />
             <span>จัดการเซิร์ฟเวอร์ ({stats.total})</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2 text-xs">
-            <BarChart3 className="w-3.5 h-3.5 text-primary" />
+            <BarChart3 className="w-3.5 h-3.5 text-primary shrink-0" />
             <span>สถิติมินิเกมรวม ({globalAnalytics.totalPlayers} ผู้เล่น)</span>
           </TabsTrigger>
         </TabsList>

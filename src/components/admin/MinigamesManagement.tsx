@@ -2154,10 +2154,10 @@ export function MinigamesManagement() {
       <Tabs defaultValue="questions" className="w-full space-y-6">
         <TabsList className="bg-[#FAF6F0] dark:bg-[#25201C] p-1.5 rounded-2xl border border-[#EAD8C8] dark:border-[#2D2520] grid grid-cols-2 sm:grid-cols-4 h-auto gap-1">
           <TabsTrigger value="questions" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Edit3 className="w-4 h-4 text-blue-500" /> 1. คลังคำศัพท์ & จัดการโจทย์
+            <Edit3 className="w-4 h-4 text-blue-500 shrink-0" /> 1. คลังคำศัพท์ & จัดการโจทย์
           </TabsTrigger>
           <TabsTrigger value="pending" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Clock className="w-4 h-4 text-amber-500" /> 2. รายการรอดำเนินการ
+            <Clock className="w-4 h-4 text-amber-500 shrink-0" /> 2. รายการรอดำเนินการ
             {pendingRequests.length > 0 && (
               <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full font-bold ml-1">
                 {pendingRequests.length}
@@ -2165,10 +2165,10 @@ export function MinigamesManagement() {
             )}
           </TabsTrigger>
           <TabsTrigger value="settings" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Settings2 className="w-4 h-4 text-purple-500" /> 3. ตั้งค่าห้อง & แต้มรางวัล
+            <Settings2 className="w-4 h-4 text-purple-500 shrink-0" /> 3. ตั้งค่าห้อง & แต้มรางวัล
           </TabsTrigger>
           <TabsTrigger value="leaderboard" className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-[#1E1B18] data-[state=active]:shadow-xs">
-            <Trophy className="w-4 h-4 text-amber-500" /> 4. จัดอันดับผู้ชนะ
+            <Trophy className="w-4 h-4 text-amber-500 shrink-0" /> 4. จัดอันดับผู้ชนะ
           </TabsTrigger>
         </TabsList>
 

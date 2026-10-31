@@ -74,6 +74,7 @@ import {
   Award,
   Check,
   FileText,
+  Send,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -294,8 +295,10 @@ export function TradingHistoryManagement() {
   // ── Create Bill state ──
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [ticketNoticeChannelId, setTicketNoticeChannelId] = useState('');
+  const [isSendingTicketNotice, setIsSendingTicketNotice] = useState(false);
   const [newBill, setNewBill] = useState({
-    purchaseType: 'self' as 'self' | 'gift',
+    purchaseType: 'self' as 'self' | 'gift' | 'ticket_notice',
     memberId: '',
     recipientId: '',
     transactionDate: '',
@@ -747,6 +750,73 @@ export function TradingHistoryManagement() {
   );
 
   const salmonPointPreview = useMemo(() => computeSalmonPreview(String(computedTotalAmount)), [computedTotalAmount]);
+
+  // ── Send ticket notice (จากเซอร์วิส) ──
+  const handleSendTicketNotice = async () => {
+    if (!newBill.memberId.trim()) {
+      toast({ title: 'กรุณากรอก Member ID', variant: 'destructive' });
+      return;
+    }
+    if (!ticketNoticeChannelId.trim()) {
+      toast({ title: 'กรุณากรอก Channel ID', variant: 'destructive' });
+      return;
+    }
+
+    setIsSendingTicketNotice(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const targetMemberId = newBill.memberId.trim();
+      const targetChannelId = ticketNoticeChannelId.trim();
+      const deadlineSeconds = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // นับไปข้างหน้า 24 ชม.
+
+      const payload = {
+        flags: 32768,
+        components: [
+          {
+            type: 17,
+            components: [
+              {
+                type: 10,
+                content: `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 \`__\n-# ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้ รบกวนทำรายการให้เรียบร้อยตามข้อมูลด้านล่างด้วยค่ะ <:cuteplant:1152834055528783872>`,
+              },
+              {
+                type: 14,
+                spacing: 2,
+              },
+              {
+                type: 10,
+                content: `>>> (👤)︰<@${targetMemberId}> — ${targetMemberId}\n(⏰)︰<t:${deadlineSeconds}:f> (<t:${deadlineSeconds}:R>)\n(📝)︰<#${targetChannelId}>`,
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-broadcast-test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({
+          channel_id: targetChannelId,
+          payload,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.details || json?.error || `HTTP ${res.status}`);
+
+      toast({ title: 'ส่งแท็กเตือนตั๋วสำเร็จ', className: 'bg-success text-success-foreground' });
+      setIsAddDialogOpen(false);
+      setTicketNoticeChannelId('');
+      setNewBill(prev => ({ ...prev, purchaseType: 'self', memberId: '', recipientId: '' }));
+    } catch (err: any) {
+      toast({ title: 'ส่งแท็กเตือนไม่สำเร็จ', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSendingTicketNotice(false);
+    }
+  };
 
   // ── Create bill (new system → orders + purchase_items) ──
   const handleAddBill = async () => {
@@ -1432,11 +1502,68 @@ export function TradingHistoryManagement() {
                         <Gift className="w-3.5 h-3.5" />
                         ซื้อให้คนอื่น (ของขวัญ)
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewBill(p => ({ ...p, purchaseType: 'ticket_notice' }))}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                          newBill.purchaseType === 'ticket_notice'
+                            ? 'bg-primary text-primary-foreground shadow-sm font-bold'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        แจ้งเตือนตั๋ว (เซอร์วิส)
+                      </button>
                     </div>
                   </div>
 
-                  {/* Form Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {newBill.purchaseType === 'ticket_notice' ? (
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="ticketMemberId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                            <User className="w-3.5 h-3.5 text-primary" /> Member ID (ผู้เปิดตั๋ว) *
+                          </Label>
+                          <Input
+                            id="ticketMemberId"
+                            value={newBill.memberId}
+                            onChange={e => setNewBill(p => ({ ...p, memberId: e.target.value }))}
+                            placeholder="Discord ID ของสมาชิก (เช่น 123456789012345678)"
+                            className="h-9 text-xs rounded-xl bg-background border-border/50 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="ticketChannelId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
+                            <Send className="w-3.5 h-3.5 text-primary" /> Channel ID (ห้องตั๋วที่ต้องการส่ง) *
+                          </Label>
+                          <Input
+                            id="ticketChannelId"
+                            value={ticketNoticeChannelId}
+                            onChange={e => setTicketNoticeChannelId(e.target.value)}
+                            placeholder="Channel ID ห้องตั๋ว Discord (เช่น 152412345678901234)"
+                            className="h-9 text-xs rounded-xl bg-background border-border/50 focus:ring-primary/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-2 text-xs">
+                        <p className="font-semibold text-foreground/90 flex items-center gap-1.5">
+                          <Send className="w-3.5 h-3.5 text-primary" /> ตัวอย่างข้อความที่จะส่ง (จากเซอร์วิส):
+                        </p>
+                        <div className="bg-background/80 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground border border-border/40 space-y-1">
+                          <p className="font-bold text-foreground">## 🐻︲__` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 `__</p>
+                          <p className="text-[10px] text-muted-foreground">-# ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้ รบกวนทำรายการให้เรียบร้อยตามข้อมูลด้านล่างด้วยค่ะ &lt;:cuteplant:1152834055528783872&gt;</p>
+                          <div className="pt-1 text-foreground/80">
+                            <p>&gt;&gt;&gt; (👤)︰&lt;@{newBill.memberId || 'memberID'}&gt; — {newBill.memberId || 'memberID'}</p>
+                            <p>(⏰)︰&lt;t:อีก 24 ชม.:f&gt; (&lt;t:อีก 24 ชม.:R&gt;)</p>
+                            <p>(📝)︰&lt;#{ticketNoticeChannelId || 'channelID'}&gt;</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="memberId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
                         <User className="w-3.5 h-3.5 text-primary" /> Member ID (ผู้ซื้อ) *
@@ -1488,8 +1615,11 @@ export function TradingHistoryManagement() {
                       />
                     </div>
                   </div>
-                </div>
+                )}
+              </div>
 
+              {newBill.purchaseType !== 'ticket_notice' && (
+                <>
                 {/* 2-Column Grid: Catalog vs Shopping Cart */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column: Product Catalog */}
@@ -1839,13 +1969,26 @@ export function TradingHistoryManagement() {
                     </div>
                   )}
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading} className="rounded-xl">ยกเลิก</Button>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={addLoading || isSendingTicketNotice} className="rounded-xl">ยกเลิก</Button>
+              {newBill.purchaseType === 'ticket_notice' ? (
+                <Button
+                  onClick={handleSendTicketNotice}
+                  disabled={isSendingTicketNotice}
+                  className="gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                >
+                  {isSendingTicketNotice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  ส่งแท็กเตือนตั๋ว
+                </Button>
+              ) : (
                 <Button onClick={handleAddBill} disabled={addLoading} className="gap-2 rounded-xl">
                   {addLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />} สร้างบิล
                 </Button>
-              </DialogFooter>
+              )}
+            </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -1853,8 +1996,8 @@ export function TradingHistoryManagement() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:w-[400px] mb-4">
-          <TabsTrigger value="data" className="gap-2"><List className="h-4 w-4" /> ข้อมูลบิล</TabsTrigger>
-          <TabsTrigger value="stats" className="gap-2"><PieChart className="h-4 w-4" /> สถิติ</TabsTrigger>
+          <TabsTrigger value="data" className="gap-2"><List className="h-4 w-4 shrink-0" /> ข้อมูลบิล</TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2"><PieChart className="h-4 w-4 shrink-0" /> สถิติ</TabsTrigger>
         </TabsList>
 
         {/* ── Stats Tab ── */}

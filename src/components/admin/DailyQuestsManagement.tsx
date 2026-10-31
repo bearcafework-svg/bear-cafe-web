@@ -1618,13 +1618,13 @@ export function DailyQuestsManagement() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full space-y-6">
         <TabsList className="grid grid-cols-3 max-w-md bg-muted/60 p-1 rounded-xl">
           <TabsTrigger value="templates" className="rounded-lg gap-2 text-xs md:text-sm">
-            <Target className="w-4 h-4" /> คลังเควส
+            <Target className="w-4 h-4 shrink-0" /> คลังเควส
           </TabsTrigger>
           <TabsTrigger value="sets" className="rounded-lg gap-2 text-xs md:text-sm">
-            <Calendar className="w-4 h-4" /> เควสประจำวัน
+            <Calendar className="w-4 h-4 shrink-0" /> เควสประจำวัน
           </TabsTrigger>
           <TabsTrigger value="analytics" className="rounded-lg gap-2 text-xs md:text-sm">
-            <Award className="w-4 h-4" /> สถิติ & บันทึก
+            <Award className="w-4 h-4 shrink-0" /> สถิติ & บันทึก
           </TabsTrigger>
         </TabsList>
 

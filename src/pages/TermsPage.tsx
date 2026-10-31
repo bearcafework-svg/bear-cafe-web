@@ -235,14 +235,14 @@ export default function TermsPage() {
                   className="text-honey hover:underline flex items-center justify-between font-medium"
                 >
                   <span>นโยบายความเป็นส่วนตัว (Privacy)</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                 </a>
                 <a
                   href="/privacy/permissions"
                   className="text-honey hover:underline flex items-center justify-between font-medium"
                 >
                   <span>การจัดการข้อมูลและ Retention</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                 </a>
               </div>
             </div>
@@ -741,7 +741,7 @@ export default function TermsPage() {
                         </p>
                       </div>
                       <span className="text-xs text-honey font-medium hidden sm:inline-flex items-center gap-1">
-                        ส่งอีเมลหาเรา <ExternalLink className="w-3 h-3" />
+                        ส่งอีเมลหาเรา <ExternalLink className="w-3 h-3 shrink-0" />
                       </span>
                     </div>
                   </a>
@@ -780,7 +780,7 @@ export default function TermsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <span>Bear Cafe Server</span>
-                        <ExternalLink className="w-3 h-3 text-honey" />
+                        <ExternalLink className="w-3 h-3 text-honey shrink-0" />
                       </p>
                       <p className="text-xs sm:text-sm font-semibold text-honey group-hover:underline">
                         กดเข้าร่วมเซิร์ฟเวอร์

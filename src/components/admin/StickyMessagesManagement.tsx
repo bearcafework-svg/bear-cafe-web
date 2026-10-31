@@ -589,7 +589,7 @@ export function StickyMessagesManagement() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาชื่อห้อง, Channel ID, เนื้อหา..."
-              className="pl-8.5 h-8.5 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#382F28] rounded-xl"
+              className="pl-9 h-9 text-xs bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#382F28] rounded-xl"
             />
           </div>
         </div>
@@ -838,7 +838,7 @@ export function StickyMessagesManagement() {
                   value={channelSearch}
                   onChange={(e) => setChannelSearch(e.target.value)}
                   placeholder="พิมพ์ค้นหาชื่อห้องหรือ ID..."
-                  className="pl-8.5 h-8.5 text-xs rounded-xl bg-white dark:bg-[#25201C] border-[#EFE7DC] dark:border-[#3A3027]"
+                  className="pl-9 h-9 text-xs rounded-xl bg-white dark:bg-[#25201C] border-[#EFE7DC] dark:border-[#3A3027]"
                 />
               </div>
 

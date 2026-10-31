@@ -194,10 +194,10 @@ function PointsWidget() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <div className="flex items-center gap-2">
-            <img src={strawberryIcon} alt="" className="w-4 h-4 object-contain" />
+            <img src={strawberryIcon} alt="" className="w-4 h-4 object-contain shrink-0" />
             <span className="text-xs font-bold text-muted-foreground">แต้มสะสม</span>
           </div>
-          {loading && <Sparkles className="w-3 h-3 animate-pulse text-honey" />}
+          {loading && <Sparkles className="w-3 h-3 animate-pulse text-honey shrink-0" />}
         </div>
 
         {/* Points display */}

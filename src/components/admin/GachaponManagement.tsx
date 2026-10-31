@@ -599,19 +599,19 @@ export function GachaponManagement() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
         <TabsList className="grid grid-cols-4 max-w-xl">
           <TabsTrigger value="overview" className="gap-2">
-            <TrendingUp className="w-4 h-4" />
+            <TrendingUp className="w-4 h-4 shrink-0" />
             ภาพรวม & เรท
           </TabsTrigger>
           <TabsTrigger value="items" className="gap-2">
-            <Dices className="w-4 h-4" />
+            <Dices className="w-4 h-4 shrink-0" />
             รายการไอเทม ({items.length})
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-2">
-            <Settings className="w-4 h-4" />
+            <Settings className="w-4 h-4 shrink-0" />
             ตั้งค่าตู้กาชา
           </TabsTrigger>
           <TabsTrigger value="logs" className="gap-2">
-            <History className="w-4 h-4" />
+            <History className="w-4 h-4 shrink-0" />
             ประวัติการหมุน
           </TabsTrigger>
         </TabsList>

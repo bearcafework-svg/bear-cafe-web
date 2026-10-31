@@ -171,7 +171,7 @@ export default function LeaderboardPage() {
                 <SelectValue placeholder="เลือกมินิเกม" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">🎮 มินิเกมทั้งหมดรวมกัน (13 เกม)</SelectItem>
+                <SelectItem value="all">🎮 &nbsp;มินิเกมทั้งหมดรวมกัน (13 เกม)</SelectItem>
                 <SelectItem value="1">1. เติมคำศัพท์ (ไทย)</SelectItem>
                 <SelectItem value="2">2. เติมคำศัพท์ (อังกฤษ)</SelectItem>
                 <SelectItem value="3">3. สุ่มโจทย์คณิตฯ</SelectItem>

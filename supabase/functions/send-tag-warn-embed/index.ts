@@ -2,6 +2,7 @@
  * send-tag-warn-embed
  * ส่ง Components V2 แจ้งเตือนแท็กเตือนผ่าน Discord Bot API
  * รับ: { member_id, message, punish, image_url_1, image_url_2?, barista_discord_id?, is_spoiler? }
+ * หรือ Ticket Notice: { action: 'ticket_notice', member_id, channel_id, source?: 'barista' | 'service' }
  */
 import { sendDiscordBotMessage } from "../_shared/discord-webhook.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -44,6 +45,74 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const body = await req.json();
+
+    // ── Mode: แท็กแจ้งเตือนตั๋ว (Ticket Notice) ──
+    if (body.action === "ticket_notice" || body.type === "ticket_notice") {
+      const targetMemberId: string = String(body.member_id ?? "").trim();
+      const targetChannelId: string = String(body.channel_id ?? "").trim();
+      const noticeSource: string = String(body.source ?? "barista").trim();
+
+      if (!targetMemberId || !targetChannelId) {
+        return new Response(
+          JSON.stringify({ error: "member_id and channel_id are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const deadlineSeconds = nowSeconds + 24 * 60 * 60; // นับไปข้างหน้าอีก 24 ชั่วโมงหลังแท็กเตือน
+      const titleLabel = noticeSource === "service" ? "จากเซอร์วิส" : "จากบาริสต้า";
+
+      const ticketPayload: Record<string, unknown> = {
+        flags: 32768,
+        components: [
+          {
+            type: 17,
+            components: [
+              {
+                type: 10,
+                content: `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ ${titleLabel} 𓂃 \`__\n-# ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้ รบกวนทำรายการให้เรียบร้อยตามข้อมูลด้านล่างด้วยค่ะ <:cuteplant:1152834055528783872>`,
+              },
+              {
+                type: 14,
+                spacing: 2,
+              },
+              {
+                type: 10,
+                content: `>>> (👤)︰<@${targetMemberId}> — ${targetMemberId}\n(⏰)︰<t:${deadlineSeconds}:f> (<t:${deadlineSeconds}:R>)\n(📝)︰<#${targetChannelId}>`,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await sendDiscordBotMessage(targetChannelId, ticketPayload, {
+        dedupKey: `ticket-notice:${targetMemberId}:${targetChannelId}:${nowSeconds}`,
+      });
+
+      if (!result.success) {
+        console.error("[send-tag-warn-embed] Discord send ticket notice failed", {
+          targetMemberId,
+          targetChannelId,
+          error: result.error,
+          errorCode: result.errorCode ?? null,
+        });
+        return new Response(
+          JSON.stringify({
+            error: "Discord API failed",
+            details: result.error,
+            errorCode: result.errorCode ?? null,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message_id: result.messageId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const memberId: string = String(body.member_id ?? "").trim();
     const message: string = String(body.message ?? "").trim();
     const punish: string = String(body.punish ?? "").trim();
@@ -72,39 +141,49 @@ Deno.serve(async (req): Promise<Response> => {
       mediaItems.push({ media: { url: imageUrl2 }, ...(isSpoiler2 ? { spoiler: true } : {}) });
     }
 
+    const isGeneralNotice = punish.trim() === "แท็กบอกทั่วไป";
+
+    const containerInnerComponents: Record<string, unknown>[] = [
+      {
+        type: 12, // Media Gallery
+        items: mediaItems,
+      },
+      { type: 14, spacing: 2 }, // Separator
+      {
+        type: 10, // Text Display
+        content: textContent,
+      },
+    ];
+
+    // ถ้าเป็น "แท็กบอกทั่วไป" จะไม่ต้องมีปุ่มลิงก์ปลดถ้วยความผิด
+    if (!isGeneralNotice) {
+      containerInnerComponents.push(
+        { type: 14, spacing: 2 }, // Separator
+        {
+          type: 1, // Action Row
+          components: [
+            {
+              type: 2, // Button
+              style: 5, // Link
+              label: "︲คลิกปลดถ้วยความผิด",
+              emoji: {
+                id: "1256669436350562355",
+                name: "bee20000",
+                animated: false,
+              },
+              url: "https://discord.com/channels/1144251788493602848/1524123185325543587",
+            },
+          ],
+        },
+      );
+    }
+
     const payload: Record<string, unknown> = {
       flags: 32768,
       components: [
         {
           type: 17, // Container
-          components: [
-            {
-              type: 12, // Media Gallery
-              items: mediaItems,
-            },
-            { type: 14, spacing: 2 }, // Separator
-            {
-              type: 10, // Text Display
-              content: textContent,
-            },
-            { type: 14, spacing: 2 }, // Separator
-            {
-              type: 1, // Action Row
-              components: [
-                {
-                  type: 2, // Button
-                  style: 5, // Link
-                  label: "︲คลิกปลดถ้วยความผิด",
-                  emoji: {
-                    id: "1256669436350562355",
-                    name: "bee20000",
-                    animated: false
-                  },
-                  url: "https://discord.com/channels/1144251788493602848/1524123185325543587",
-                },
-              ],
-            },
-          ],
+          components: containerInnerComponents,
         },
       ],
     };
@@ -125,8 +204,9 @@ Deno.serve(async (req): Promise<Response> => {
         JSON.stringify({
           error: "Discord API failed",
           details: result.error,
+          errorCode: result.errorCode ?? null,
+          status: result.status ?? null,
           discordErrorCode: result.discordErrorCode ?? null,
-          discordStatus: result.status ?? null,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
