@@ -206,65 +206,99 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
       }
 
       // 2. Fetch active session and auto-refresh if token is expired or expiring soon (< 60s)
-      let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      let { data: { session } } = await supabase.auth.getSession();
       if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60000) {
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        const { data: refreshData } = await supabase.auth.refreshSession();
         if (refreshData?.session) {
           session = refreshData.session;
-          sessionError = null;
-        } else if (refreshError) {
-          console.warn('[ContractsManagement] Token refresh failed:', refreshError);
         }
       }
 
       const token = session?.access_token || authSession?.access_token;
-      if (!token || token === 'mock-token') {
-        if (import.meta.env.DEV) {
-          setDiscordRoles([
-            { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
-            { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
-            { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
-            { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
-          ]);
-          return;
-        }
-        throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
-      }
+      let fetchedRoles: DiscordRole[] = [];
 
-      const { data, error } = await supabase.functions.invoke('discord-roles', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (error) {
-        // If in DEV and Cloud Edge Function rejected with 403 (token mismatch or unauthenticated)
-        if (import.meta.env.DEV) {
-          console.warn('[ContractsManagement] discord-roles returned error in dev. Using dev fallback roles:', error);
-          setDiscordRoles([
-            { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
-            { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
-            { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
-            { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
-          ]);
-          toast({
-            title: 'เชื่อมต่อ Discord Roles บนคลาวด์ไม่สำเร็จ',
-            description: 'โหลดรายการยศจำลองในโหมด Dev ให้เรียบร้อยเพื่อทดสอบต่อได้',
+      // 3. Try primary Edge Function if authenticated
+      if (token && token !== 'mock-token') {
+        try {
+          const { data, error } = await supabase.functions.invoke('discord-roles', {
+            headers: { Authorization: `Bearer ${token}` },
           });
-          return;
+          if (!error && data?.roles && Array.isArray(data.roles) && data.roles.length > 0) {
+            fetchedRoles = data.roles;
+            try {
+              localStorage.setItem('bear_cafe_discord_roles_cache', JSON.stringify(data.roles));
+            } catch {}
+          } else if (error) {
+            console.warn('[ContractsManagement] discord-roles Edge Function returned error:', error);
+          }
+        } catch (callErr) {
+          console.warn('[ContractsManagement] Failed calling discord-roles function:', callErr);
         }
-        throw error;
       }
 
-      setDiscordRoles(data?.roles ?? []);
-    } catch (e: any) {
-      if (import.meta.env.DEV) {
-        setDiscordRoles([
-          { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
-          { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
-        ]);
-        toast({ title: 'เปิดใช้งานยศจำลอง (Dev Fallback)', description: 'เนื่องจาก Token ในโหมด Dev ไม่สามารถเรียก Edge Function บน Cloud ได้' });
-      } else {
-        toast({ title: 'โหลดยศ Discord ไม่สำเร็จ', description: e.message || 'โปรดตรวจสอบสิทธิ์บัญชีผู้ใช้หรือเข้าสู่ระบบใหม่', variant: 'destructive' });
+      // 4. Fallback Strategy 1: Load roles from database non_transferable_roles
+      if (fetchedRoles.length === 0) {
+        const { data: dbRoles } = await supabase
+          .from('non_transferable_roles')
+          .select('discord_role_id, role_name')
+          .order('role_name', { ascending: true });
+
+        if (dbRoles && dbRoles.length > 0) {
+          fetchedRoles = dbRoles.map((r: any) => ({
+            id: r.discord_role_id,
+            name: r.role_name,
+            color: '#D97706',
+          }));
+        }
       }
+
+      // 5. Fallback Strategy 2: Load roles from localStorage cache
+      if (fetchedRoles.length === 0) {
+        try {
+          const cached = localStorage.getItem('bear_cafe_discord_roles_cache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              fetchedRoles = parsed;
+            }
+          }
+        } catch {}
+      }
+
+      if (fetchedRoles.length > 0) {
+        setDiscordRoles(fetchedRoles);
+      } else {
+        if (import.meta.env.DEV) {
+          setDiscordRoles([
+            { id: 'dev-role-boost-1', name: '🌸 Server Booster (Dev Fallback)', color: '#F47FFF' },
+            { id: 'dev-role-boost-2', name: '🌸 Super Booster 2x (Dev Fallback)', color: '#FF73FA' },
+            { id: 'dev-role-vip-1', name: '🏅 VIP Member (Dev Fallback)', color: '#FBBF24' },
+            { id: 'dev-role-vip-2', name: '🏅 Elite Sponsor (Dev Fallback)', color: '#3B82F6' },
+          ]);
+        } else {
+          toast({
+            title: 'ไม่สามารถดึงยศอัตโนมัติได้',
+            description: 'คุณยังสามารถระบุหรือค้นหาด้วย Discord Role ID ได้โดยตรง',
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn('[ContractsManagement] Error loading discord roles:', e);
+      try {
+        const { data: dbRoles } = await supabase
+          .from('non_transferable_roles')
+          .select('discord_role_id, role_name')
+          .limit(100);
+        if (dbRoles && dbRoles.length > 0) {
+          setDiscordRoles(
+            dbRoles.map((r: any) => ({
+              id: r.discord_role_id,
+              name: r.role_name,
+              color: '#D97706',
+            }))
+          );
+        }
+      } catch {}
     } finally {
       setRolesLoading(false);
     }
@@ -309,7 +343,9 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   }, [startAt]);
 
   const filteredDiscordRoles = discordRoles.filter(r =>
-    !roleSearch || r.name.toLowerCase().includes(roleSearch.toLowerCase())
+    !roleSearch ||
+    r.name.toLowerCase().includes(roleSearch.toLowerCase()) ||
+    r.id.includes(roleSearch.trim())
   );
 
   function reset() {
@@ -672,11 +708,33 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
                   <Input
                     className="pl-9 h-9 text-xs font-medium bg-white dark:bg-[#1E1B18] border-[#EFE7DC] dark:border-[#3E3229]"
-                    placeholder="ค้นหาชื่อบทบาท/ยศ..."
+                    placeholder="ค้นหาชื่อบทบาท/ยศ หรือพิมพ์ Role ID..."
                     value={roleSearch}
                     onChange={e => setRoleSearch(e.target.value)}
                   />
                 </div>
+
+                {/^\d{17,20}$/.test(roleSearch.trim()) && !discordRoles.some(r => r.id === roleSearch.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const customRole: DiscordRole = {
+                        id: roleSearch.trim(),
+                        name: `Discord Role (${roleSearch.trim()})`,
+                        color: '#D97706',
+                      };
+                      setDiscordRoles(prev => [customRole, ...prev.filter(r => r.id !== customRole.id)]);
+                      setSelectedDiscordRole(customRole);
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                      ใช้ Role ID นี้โดยตรง: <span className="font-mono">{roleSearch.trim()}</span>
+                    </span>
+                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">คลิกเพื่อเลือก</span>
+                  </button>
+                )}
 
                 {rolesLoading ? (
                   <div className="flex justify-center py-5">

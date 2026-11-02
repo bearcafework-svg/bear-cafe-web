@@ -51,21 +51,31 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Get user's discord_id from metadata
-    const discordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
-    if (!discordId) {
-      return new Response(
-        JSON.stringify({ error: 'No Discord ID found' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Get user's discord_id from metadata or profile
+    let discordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
+
+    // Get profile ID and role (supporting discord_id or user.id mapping)
+    let profile: any = null;
+    if (discordId) {
+      const { data } = await adminClient
+        .from('profiles')
+        .select('id, role, discord_id')
+        .eq('discord_id', discordId)
+        .maybeSingle();
+      profile = data;
     }
 
-    // Get profile ID and role
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('id, role')
-      .eq('discord_id', discordId)
-      .single();
+    if (!profile) {
+      const { data } = await adminClient
+        .from('profiles')
+        .select('id, role, discord_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      profile = data;
+      if (profile?.discord_id) {
+        discordId = profile.discord_id;
+      }
+    }
 
     if (!profile) {
       return new Response(
@@ -74,7 +84,20 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const isOwnerOrAdmin = profile.role === 'owner' || profile.role === 'admin';
+    let isOwnerOrAdmin = profile.role === 'owner' || profile.role === 'admin';
+
+    // Also check user_roles table for admin or moderator
+    if (!isOwnerOrAdmin) {
+      const { data: userRole } = await adminClient
+        .from('user_roles')
+        .select('role')
+        .or(`user_id.eq.${profile.id},user_id.eq.${user.id}`)
+        .in('role', ['admin', 'moderator'])
+        .maybeSingle();
+      if (userRole) {
+        isOwnerOrAdmin = true;
+      }
+    }
 
     // Run role ban guard for non-owners/non-admins (non-blocking if it errors)
     if (!isOwnerOrAdmin) {
@@ -114,7 +137,21 @@ Deno.serve(async (req): Promise<Response> => {
         console.warn('Direct custom permissions check failed, trying RPC:', err);
       }
 
-      // Strategy 2: Fallback to single-page RPC has_page_access (Present on Supabase 2)
+      // Strategy 2: Single-argument RPC has_page_access(_page)
+      if (!hasAccess) {
+        try {
+          const checks = await Promise.all(
+            allowedPages.map(page =>
+              adminClient.rpc('has_page_access', { _page: page })
+            )
+          );
+          if (checks.some(c => c.data === true)) {
+            hasAccess = true;
+          }
+        } catch {}
+      }
+
+      // Strategy 3: Two-argument RPC has_page_access(_user_id, _page)
       if (!hasAccess) {
         try {
           const checks = await Promise.all(
@@ -128,7 +165,7 @@ Deno.serve(async (req): Promise<Response> => {
         } catch {}
       }
 
-      // Strategy 3: Fallback to has_any_page_access (Legacy Supabase 1)
+      // Strategy 4: Fallback to has_any_page_access
       if (!hasAccess) {
         try {
           const [{ data: accessByProfile }, { data: accessByAuth }] = await Promise.all([

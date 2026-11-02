@@ -220,6 +220,9 @@ function SafeServerIcon({
   );
 }
 
+let isTrendingScoreRpcSupported: boolean | null = null;
+let isPersonalizedRecRpcSupported: boolean | null = null;
+
 // ─── Bump countdown ───────────────────────────────────────────────────────────
 function useBumpCountdown(bumpedAt: string | null) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -1429,24 +1432,31 @@ export default function DiscordServersPage() {
         }
       >();
 
-      try {
-        const { data: scoreData } = await (supabase.rpc('get_discovery_trending_scores' as any)) as any;
-        if (scoreData && Array.isArray(scoreData)) {
-          scoreData.forEach((row: any) => {
-            trendingScoreMap.set(row.server_id, {
-              discovery_score: Number(row.discovery_score) || 0,
-              recent_clicks: Number(row.recent_clicks) || 0,
-              recent_saves: Number(row.recent_saves) || 0,
-              previous_clicks: Number(row.previous_clicks) || 0,
-              previous_saves: Number(row.previous_saves) || 0,
-              growth_rate: row.growth_rate != null ? Number(row.growth_rate) : null,
-              is_new_breakout: !!row.is_new_breakout,
-              is_rising: !!row.is_rising,
+      if (isTrendingScoreRpcSupported !== false) {
+        try {
+          const { data: scoreData, error: rpcErr } = await (supabase.rpc('get_discovery_trending_scores' as any)) as any;
+          if (rpcErr) {
+            if (rpcErr.code === 'PGRST202' || rpcErr.message?.includes('schema cache')) {
+              isTrendingScoreRpcSupported = false;
+            }
+          } else if (scoreData && Array.isArray(scoreData)) {
+            isTrendingScoreRpcSupported = true;
+            scoreData.forEach((row: any) => {
+              trendingScoreMap.set(row.server_id, {
+                discovery_score: Number(row.discovery_score) || 0,
+                recent_clicks: Number(row.recent_clicks) || 0,
+                recent_saves: Number(row.recent_saves) || 0,
+                previous_clicks: Number(row.previous_clicks) || 0,
+                previous_saves: Number(row.previous_saves) || 0,
+                growth_rate: row.growth_rate != null ? Number(row.growth_rate) : null,
+                is_new_breakout: !!row.is_new_breakout,
+                is_rising: !!row.is_rising,
+              });
             });
-          });
+          }
+        } catch (err) {
+          isTrendingScoreRpcSupported = false;
         }
-      } catch (err) {
-        console.warn('Discovery trending score RPC unavailable, using local calculation:', err);
       }
 
       // Fetch personalized recommendations from RPC (Plan 2)
@@ -1461,21 +1471,28 @@ export default function DiscordServersPage() {
       >();
       let determinedUserState: UserStateType = 'NEW';
 
-      try {
-        const { data: recData } = await (supabase.rpc('get_personalized_recommendations' as any, { p_limit: 50 })) as any;
-        if (recData && Array.isArray(recData)) {
-          recData.forEach((row: any) => {
-            recMap.set(row.server_id, {
-              recommendation_score: Number(row.recommendation_score) || 0,
-              recommendation_reason: row.recommendation_reason || '',
-              is_exploration: !!row.is_exploration,
-              user_state: (row.user_state as UserStateType) || 'NEW',
+      if (isPersonalizedRecRpcSupported !== false) {
+        try {
+          const { data: recData, error: recErr } = await (supabase.rpc('get_personalized_recommendations' as any, { p_limit: 50 })) as any;
+          if (recErr) {
+            if (recErr.code === 'PGRST202' || recErr.message?.includes('schema cache')) {
+              isPersonalizedRecRpcSupported = false;
+            }
+          } else if (recData && Array.isArray(recData)) {
+            isPersonalizedRecRpcSupported = true;
+            recData.forEach((row: any) => {
+              recMap.set(row.server_id, {
+                recommendation_score: Number(row.recommendation_score) || 0,
+                recommendation_reason: row.recommendation_reason || '',
+                is_exploration: !!row.is_exploration,
+                user_state: (row.user_state as UserStateType) || 'NEW',
+              });
+              if (row.user_state) determinedUserState = row.user_state as UserStateType;
             });
-            if (row.user_state) determinedUserState = row.user_state as UserStateType;
-          });
+          }
+        } catch (err) {
+          isPersonalizedRecRpcSupported = false;
         }
-      } catch (err) {
-        console.warn('Personalized recommendation RPC unavailable, using local fallback:', err);
       }
       setUserState(determinedUserState);
 
