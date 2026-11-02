@@ -226,9 +226,9 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Filter out @everyone role and bot-managed roles, sort by position
+    // Filter out @everyone role and bot-managed roles (except Server Booster role), sort by position
     const filteredRoles = roles
-      .filter(role => role.name !== '@everyone' && !role.managed)
+      .filter(role => role.name !== '@everyone' && (!role.managed || (role as any).tags?.premium_subscriber !== undefined))
       .sort((a, b) => b.position - a.position)
       .map(role => {
         // Build icon URL if role has a custom icon

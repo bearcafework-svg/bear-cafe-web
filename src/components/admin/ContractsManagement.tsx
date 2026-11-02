@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
+import { PRESET_DISCORD_ROLES } from '@/lib/discord-roles-preset';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -183,6 +184,39 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
   const [rolesLoading, setRolesLoading] = useState(false);
   const [roleSearch, setRoleSearch] = useState('');
   const [selectedDiscordRole, setSelectedDiscordRole] = useState<DiscordRole | null>(null);
+  const [isResolvingCustomRole, setIsResolvingCustomRole] = useState(false);
+
+  async function handleResolveDirectRoleId(roleId: string) {
+    setIsResolvingCustomRole(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-role-info', {
+        body: { role_id: roleId }
+      });
+      if (!error && data?.id) {
+        const resolved: DiscordRole = {
+          id: data.id,
+          name: data.name || `Role (${data.id})`,
+          color: data.color || '#D97706',
+        };
+        setDiscordRoles(prev => [resolved, ...prev.filter(r => r.id !== resolved.id)]);
+        setSelectedDiscordRole(resolved);
+        toast({ title: 'ตรวจสอบยศ Discord สำเร็จ', description: `เลือกยศ "${data.name}" เรียบร้อย` });
+        return;
+      }
+    } catch (e) {
+      console.warn('Error resolving role via get-role-info:', e);
+    } finally {
+      setIsResolvingCustomRole(false);
+    }
+
+    const directRole: DiscordRole = {
+      id: roleId,
+      name: `Discord Role (${roleId})`,
+      color: '#D97706',
+    };
+    setDiscordRoles(prev => [directRole, ...prev.filter(r => r.id !== directRole.id)]);
+    setSelectedDiscordRole(directRole);
+  }
 
   async function fetchDiscordRoles() {
     setRolesLoading(true);
@@ -236,7 +270,16 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
         }
       }
 
-      // 4. Fallback Strategy 1: Load roles from database non_transferable_roles
+      // 4. Fallback Strategy 1: Load pre-cached verified Bear Cafe roles (including Server Booster)
+      if (fetchedRoles.length === 0 && PRESET_DISCORD_ROLES && PRESET_DISCORD_ROLES.length > 0) {
+        fetchedRoles = PRESET_DISCORD_ROLES.map(r => ({
+          id: r.id,
+          name: r.name,
+          color: r.color || '#D97706',
+        }));
+      }
+
+      // 5. Fallback Strategy 2: Load roles from database non_transferable_roles
       if (fetchedRoles.length === 0) {
         const { data: dbRoles } = await supabase
           .from('non_transferable_roles')
@@ -714,25 +757,35 @@ function AddDialog({ open, onClose, onSaved, operatorId, operatorName }: AddDial
                   />
                 </div>
 
-                {/^\d{17,20}$/.test(roleSearch.trim()) && !discordRoles.some(r => r.id === roleSearch.trim()) && (
+                {type === 'boost_role' && !selectedDiscordRole && discordRoles.some(r => r.id === '1144577398583599218') && (
                   <button
                     type="button"
                     onClick={() => {
-                      const customRole: DiscordRole = {
-                        id: roleSearch.trim(),
-                        name: `Discord Role (${roleSearch.trim()})`,
-                        color: '#D97706',
-                      };
-                      setDiscordRoles(prev => [customRole, ...prev.filter(r => r.id !== customRole.id)]);
-                      setSelectedDiscordRole(customRole);
+                      const booster = discordRoles.find(r => r.id === '1144577398583599218');
+                      if (booster) setSelectedDiscordRole(booster);
                     }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <span className="text-base">🌸</span>
+                      ยศบูสต์เซิร์ฟเวอร์หลัก: <span className="font-semibold text-fuchsia-700 dark:text-fuchsia-300">① 𝐁𝐎𝐎𝐒𝐓𝐄𝐑 — นายทุนคาเฟ่หมี ✦</span>
+                    </span>
+                    <span className="text-[11px] font-bold text-fuchsia-600 dark:text-fuchsia-400 shrink-0">คลิกเลือกทันที</span>
+                  </button>
+                )}
+
+                {/^\d{17,20}$/.test(roleSearch.trim()) && !discordRoles.some(r => r.id === roleSearch.trim()) && (
+                  <button
+                    type="button"
+                    disabled={isResolvingCustomRole}
+                    onClick={() => handleResolveDirectRoleId(roleSearch.trim())}
                     className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 text-xs font-bold transition-all cursor-pointer"
                   >
                     <span className="flex items-center gap-1.5 truncate">
-                      <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                      {isResolvingCustomRole ? <Loader2 className="w-4 h-4 animate-spin text-amber-600 shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />}
                       ใช้ Role ID นี้โดยตรง: <span className="font-mono">{roleSearch.trim()}</span>
                     </span>
-                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">คลิกเพื่อเลือก</span>
+                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">คลิกเพื่อเลือกและดึงข้อมูลยศ</span>
                   </button>
                 )}
 
