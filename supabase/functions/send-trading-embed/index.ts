@@ -54,30 +54,11 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const latestAmountStr = toUnicodeNumber(latestAmount);
-    const totalAmountStr = toUnicodeNumber(totalAmount);
+    const formattedAmount = Number(latestAmount).toLocaleString("th-TH");
+    const salmonPoints = Math.floor(Number(latestAmount) / 100);
 
-    const isDiscordCdnUrl =
-      avatarUrl.startsWith("https://cdn.discordapp.com/") ||
-      avatarUrl.startsWith("https://media.discordapp.net/");
-    const safeAvatarUrl = isDiscordCdnUrl ? avatarUrl : "";
-
-    const textContent = `## 🐟︲__\` 𝖳𝗁𝖺𝗇𝗄 𝗒𝗈𝗎 𝟦 𝗌𝗎𝗉𝗉𝗈𝗋𝗍 𓂃 \`__\n-# <:line:1144701793989840997> <@${memberId}> ขอขอบคุณสำหรับการสนับสนุนให้กับทางคาเฟ่หมี **${latestAmountStr} บาท** นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด **${totalAmountStr} บาท** <:cuteplant:1152834055528783872>`;
-
-    // ถ้ามี avatar ใช้ Section (type 9) + Thumbnail, ถ้าไม่มีใช้ Text Display (type 10) ตรงๆ
-    const contentComponent: Record<string, unknown> = safeAvatarUrl
-      ? {
-          type: 9, // Section
-          components: [{ type: 10, content: textContent }],
-          accessory: {
-            type: 11, // Thumbnail
-            media: { url: safeAvatarUrl },
-          },
-        }
-      : {
-          type: 10, // Text Display
-          content: textContent,
-        };
+    const THX_BANNER_IMAGE =
+      "https://cdn.discordapp.com/attachments/1565777850022232075/1566788367277101067/thx.png?ex=6aef16e0&is=6aedc560&hm=e7117e860f326c3602f3944ca7af9121259907dd231bcd19e9104332753c1366&";
 
     const payload: Record<string, unknown> = {
       flags: 32768,
@@ -90,14 +71,25 @@ Deno.serve(async (req): Promise<Response> => {
               items: [
                 {
                   media: {
-                    url: "https://cdn.discordapp.com/attachments/1524742861223100416/1525096175315849318/NewsBoard_-_bearcafe_3.png?ex=6ab9a1bf&is=6ab8503f&hm=fd2e87804ee2ceeba764582e18fde72d792a5bb2a65a08444395e076cc33d4a3&",
+                    url: THX_BANNER_IMAGE,
                   },
                 },
               ],
             },
+            {
+              type: 10, // Text Display - Header
+              content:
+                "## <:bee20000:1256669436350562355>︲__` 𝖳𝗁𝖺𝗇𝗄𝗌 𝖿𝗈𝗋 𝗒𝗈𝗎𝗋 𝗈𝗋𝖽𝖾𝗋  ₊ ขอบคุณนะคะ 𓂃 `__\n-# ขอบคุณสำหรับการอุดหนุนและโดเนทให้กับคาเฟ่หมีนะคะ การสนับสนุนของคุณช่วยให้พวกเราสามารถพัฒนาและดูแลคอมมูนิตี้ให้ดียิ่งขึ้นต่อไปค่ะ <:cuteplant:1152834055528783872>",
+            },
             { type: 14, divider: true, spacing: 2 }, // Separator
-            contentComponent,
-            { type: 14, divider: true, spacing: 2 }, // Separator
+            {
+              type: 10, // Text Display - Details
+              content:
+                `> (👤)︰<@${memberId}>\n` +
+                `> (<:bankmoney:1567217849968234658>)︰**+${formattedAmount} บาท**\n` +
+                `> (<:fishicon:1568281136675823817>)︰**+${salmonPoints} แต้ม**`,
+            },
+            { type: 14, divider: false, spacing: 1 }, // Separator
             {
               type: 1, // Action Row
               components: [
@@ -105,8 +97,13 @@ Deno.serve(async (req): Promise<Response> => {
                   type: 2, // Button
                   style: 5, // Link
                   label: "︲เช็กยอดโดเนทของคุณ",
-                  emoji: { id: "1256669436350562355", name: "bee20000", animated: false },
+                  emoji: {
+                    id: "1522154708200849449",
+                    name: "bagpack_icon",
+                    animated: false,
+                  },
                   url: "https://discord.com/channels/1144251788493602848/1524124513728598178",
+                  custom_id: "p_365896668341604367",
                 },
               ],
             },

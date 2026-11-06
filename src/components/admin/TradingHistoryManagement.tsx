@@ -769,12 +769,23 @@ export function TradingHistoryManagement() {
       const targetChannelId = ticketNoticeChannelId.trim();
       const deadlineSeconds = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // นับไปข้างหน้า 24 ชม.
 
+      const TICKET_BANNER_IMAGE =
+        "https://cdn.discordapp.com/attachments/1565840974737973428/1568279453040246836/fdf7bf3da4fdfcd2.png?ex=6aef3d8e&is=6aedec0e&hm=581811a45f0d910e52d9b6a60f425c27559c7a927282d2b2dd033c57d30d0803&";
+
       const payload = {
         flags: 32768,
         components: [
           {
             type: 17,
             components: [
+              {
+                type: 12,
+                items: [
+                  {
+                    media: { url: TICKET_BANNER_IMAGE },
+                  },
+                ],
+              },
               {
                 type: 10,
                 content: `## <a:bearg11:1396016056035840140>︲__\` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 \`__\n-# ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้ รบกวนทำรายการให้เรียบร้อยตามข้อมูลด้านล่างด้วยค่ะ <:cuteplant:1152834055528783872>`,
@@ -785,7 +796,31 @@ export function TradingHistoryManagement() {
               },
               {
                 type: 10,
-                content: `>>> (👤)︰<@${targetMemberId}> — ${targetMemberId}\n(⏰)︰<t:${deadlineSeconds}:f> (<t:${deadlineSeconds}:R>)\n(📝)︰<#${targetChannelId}>`,
+                content:
+                  `- **\` 📌 รายละเอียด \`** *!*\n` +
+                  `>>> (👤)︰<@${targetMemberId}> — ${targetMemberId}\n` +
+                  `(<a:7596clock:1160230591892029510>)︰<t:${deadlineSeconds}:f> (<t:${deadlineSeconds}:R>)`,
+              },
+              {
+                type: 14,
+                divider: false,
+              },
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 2,
+                    style: 5,
+                    url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
+                    custom_id: "p_365877444575498244",
+                    label: "︲คลิกไปที่ห้อง",
+                    emoji: {
+                      id: "1563093703168360479",
+                      name: "pingroleicon",
+                      animated: false,
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -1552,12 +1587,14 @@ export function TradingHistoryManagement() {
                           <Send className="w-3.5 h-3.5 text-primary" /> ตัวอย่างข้อความที่จะส่ง (จากเซอร์วิส):
                         </p>
                         <div className="bg-background/80 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground border border-border/40 space-y-1">
-                          <p className="font-bold text-foreground">## 🐻︲__` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 `__</p>
+                          <p className="text-[10px] text-muted-foreground/70">[🖼️ แบนเนอร์ Ticket Notice]</p>
+                          <p className="font-bold text-foreground">## &lt;a:bearg11:1396016056035840140&gt;︲__` 𝖭𝗈𝗍𝗂𝖼𝖾 ₊ จากเซอร์วิส 𓂃 `__</p>
                           <p className="text-[10px] text-muted-foreground">-# ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้ รบกวนทำรายการให้เรียบร้อยตามข้อมูลด้านล่างด้วยค่ะ &lt;:cuteplant:1152834055528783872&gt;</p>
                           <div className="pt-1 text-foreground/80">
+                            <p>- **` 📌 รายละเอียด `** *!*</p>
                             <p>&gt;&gt;&gt; (👤)︰&lt;@{newBill.memberId || 'memberID'}&gt; — {newBill.memberId || 'memberID'}</p>
-                            <p>(⏰)︰&lt;t:อีก 24 ชม.:f&gt; (&lt;t:อีก 24 ชม.:R&gt;)</p>
-                            <p>(📝)︰&lt;#{ticketNoticeChannelId || 'channelID'}&gt;</p>
+                            <p>(&lt;a:7596clock:1160230591892029510&gt;)︰&lt;t:อีก 24 ชม.:f&gt; (&lt;t:อีก 24 ชม.:R&gt;)</p>
+                            <p className="text-primary mt-1">🔘 [ ปุ่ม: ︲คลิกไปที่ห้อง ]</p>
                           </div>
                         </div>
                       </div>
