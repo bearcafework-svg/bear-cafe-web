@@ -904,7 +904,6 @@ export function TagWarnLogsManagement() {
                     type: 2,
                     style: 5,
                     url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
-                    custom_id: "p_365877444575498244",
                     label: "︲คลิกไปที่ห้อง",
                     emoji: {
                       id: "1563093703168360479",

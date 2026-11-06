@@ -106,7 +106,6 @@ Deno.serve(async (req): Promise<Response> => {
                     type: 2,
                     style: 5,
                     url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
-                    custom_id: "p_365877444575498244",
                     label: "︲คลิกไปที่ห้อง",
                     emoji: {
                       id: "1563093703168360479",
@@ -225,7 +224,6 @@ Deno.serve(async (req): Promise<Response> => {
                 animated: false,
               },
               url: "https://discord.com/channels/1144251788493602848/1524123796825706506",
-              custom_id: "p_365873459160420355",
             },
           ],
         },

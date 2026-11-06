@@ -103,7 +103,6 @@ Deno.serve(async (req): Promise<Response> => {
                     animated: false,
                   },
                   url: "https://discord.com/channels/1144251788493602848/1524124513728598178",
-                  custom_id: "p_365896668341604367",
                 },
               ],
             },
