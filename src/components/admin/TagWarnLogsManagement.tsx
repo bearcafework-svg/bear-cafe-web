@@ -850,7 +850,7 @@ export function TagWarnLogsManagement() {
       return;
     }
     if (!ticketNotice.channelId.trim()) {
-      toast({ title: 'กรุณากรอก Channel ID', variant: 'destructive' });
+      toast({ title: 'กรุณากรอก Channel ID ห้องตั๋ว', variant: 'destructive' });
       return;
     }
 
@@ -863,6 +863,12 @@ export function TagWarnLogsManagement() {
 
       const TICKET_BANNER_IMAGE =
         "https://cdn.discordapp.com/attachments/1565840974737973428/1568279453040246836/fdf7bf3da4fdfcd2.png?ex=6aef3d8e&is=6aedec0e&hm=581811a45f0d910e52d9b6a60f425c27559c7a927282d2b2dd033c57d30d0803&";
+
+      const rawChannel = targetChannelId.trim();
+      const extractedChannelId = rawChannel.match(/\d{17,20}$/)?.[0] || rawChannel.replace(/\D/g, '');
+      const ticketUrl = rawChannel.startsWith('http')
+        ? rawChannel
+        : `https://discord.com/channels/1144251788493602848/${extractedChannelId || rawChannel}`;
 
       const payload = {
         flags: 32768,
@@ -903,7 +909,7 @@ export function TagWarnLogsManagement() {
                   {
                     type: 2,
                     style: 5,
-                    url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
+                    url: ticketUrl,
                     label: "︲คลิกไปที่ห้อง",
                     emoji: {
                       id: "1563093703168360479",
@@ -918,6 +924,8 @@ export function TagWarnLogsManagement() {
         ],
       };
 
+      const NOTICE_CHANNEL_ID = "1524123469011357705";
+
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-broadcast-test`, {
         method: 'POST',
         headers: {
@@ -925,7 +933,7 @@ export function TagWarnLogsManagement() {
           Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
         body: JSON.stringify({
-          channel_id: targetChannelId,
+          channel_id: NOTICE_CHANNEL_ID,
           payload,
         }),
       });
@@ -1380,12 +1388,12 @@ export function TagWarnLogsManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ticketChannelId">Channel ID (ห้องตั๋วที่ต้องการส่ง) *</Label>
+                    <Label htmlFor="ticketChannelId">Channel ID (ห้องตั๋วสำหรับปุ่มลิงก์) *</Label>
                     <Input
                       id="ticketChannelId"
                       value={ticketNotice.channelId}
                       onChange={(e) => setTicketNotice(prev => ({ ...prev, channelId: e.target.value }))}
-                      placeholder="ไอดีห้องตั๋ว (Discord Channel ID)"
+                      placeholder="ไอดีหรือลิงก์ห้องตั๋ว (Discord Channel ID)"
                     />
                   </div>
                   <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-2 text-xs">

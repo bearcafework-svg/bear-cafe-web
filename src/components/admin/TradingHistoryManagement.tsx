@@ -758,7 +758,7 @@ export function TradingHistoryManagement() {
       return;
     }
     if (!ticketNoticeChannelId.trim()) {
-      toast({ title: 'กรุณากรอก Channel ID', variant: 'destructive' });
+      toast({ title: 'กรุณากรอก Channel ID ห้องตั๋ว', variant: 'destructive' });
       return;
     }
 
@@ -771,6 +771,12 @@ export function TradingHistoryManagement() {
 
       const TICKET_BANNER_IMAGE =
         "https://cdn.discordapp.com/attachments/1565840974737973428/1568279453040246836/fdf7bf3da4fdfcd2.png?ex=6aef3d8e&is=6aedec0e&hm=581811a45f0d910e52d9b6a60f425c27559c7a927282d2b2dd033c57d30d0803&";
+
+      const rawChannel = targetChannelId.trim();
+      const extractedChannelId = rawChannel.match(/\d{17,20}$/)?.[0] || rawChannel.replace(/\D/g, '');
+      const ticketUrl = rawChannel.startsWith('http')
+        ? rawChannel
+        : `https://discord.com/channels/1144251788493602848/${extractedChannelId || rawChannel}`;
 
       const payload = {
         flags: 32768,
@@ -811,7 +817,7 @@ export function TradingHistoryManagement() {
                   {
                     type: 2,
                     style: 5,
-                    url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
+                    url: ticketUrl,
                     label: "︲คลิกไปที่ห้อง",
                     emoji: {
                       id: "1563093703168360479",
@@ -826,6 +832,8 @@ export function TradingHistoryManagement() {
         ],
       };
 
+      const NOTICE_CHANNEL_ID = "1524123469011357705";
+
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-broadcast-test`, {
         method: 'POST',
         headers: {
@@ -833,7 +841,7 @@ export function TradingHistoryManagement() {
           Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
         body: JSON.stringify({
-          channel_id: targetChannelId,
+          channel_id: NOTICE_CHANNEL_ID,
           payload,
         }),
       });
@@ -1569,13 +1577,13 @@ export function TradingHistoryManagement() {
                         </div>
                         <div className="space-y-1">
                           <Label htmlFor="ticketChannelId" className="text-xs font-semibold flex items-center gap-1 text-foreground/90">
-                            <Send className="w-3.5 h-3.5 text-primary" /> Channel ID (ห้องตั๋วที่ต้องการส่ง) *
+                            <Send className="w-3.5 h-3.5 text-primary" /> Channel ID (ห้องตั๋วสำหรับปุ่มลิงก์) *
                           </Label>
                           <Input
                             id="ticketChannelId"
                             value={ticketNoticeChannelId}
                             onChange={e => setTicketNoticeChannelId(e.target.value)}
-                            placeholder="Channel ID ห้องตั๋ว Discord (เช่น 152412345678901234)"
+                            placeholder="Channel ID หรือลิงก์ห้องตั๋ว Discord"
                             className="h-9 text-xs rounded-xl bg-background border-border/50 focus:ring-primary/20"
                           />
                         </div>

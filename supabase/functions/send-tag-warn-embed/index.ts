@@ -66,6 +66,12 @@ Deno.serve(async (req): Promise<Response> => {
       const TICKET_BANNER_IMAGE =
         "https://cdn.discordapp.com/attachments/1565840974737973428/1568279453040246836/fdf7bf3da4fdfcd2.png?ex=6aef3d8e&is=6aedec0e&hm=581811a45f0d910e52d9b6a60f425c27559c7a927282d2b2dd033c57d30d0803&";
 
+      const rawChannel = targetChannelId.trim();
+      const extractedChannelId = rawChannel.match(/\d{17,20}$/)?.[0] || rawChannel.replace(/\D/g, '');
+      const ticketUrl = rawChannel.startsWith("http")
+        ? rawChannel
+        : `https://discord.com/channels/1144251788493602848/${extractedChannelId || rawChannel}`;
+
       const ticketPayload: Record<string, unknown> = {
         flags: 32768,
         components: [
@@ -105,7 +111,7 @@ Deno.serve(async (req): Promise<Response> => {
                   {
                     type: 2,
                     style: 5,
-                    url: `https://discord.com/channels/1144251788493602848/${targetChannelId}`,
+                    url: ticketUrl,
                     label: "︲คลิกไปที่ห้อง",
                     emoji: {
                       id: "1563093703168360479",
@@ -120,7 +126,7 @@ Deno.serve(async (req): Promise<Response> => {
         ],
       };
 
-      const result = await sendDiscordBotMessage(targetChannelId, ticketPayload, {
+      const result = await sendDiscordBotMessage(TAG_WARN_CHANNEL_ID, ticketPayload, {
         dedupKey: `ticket-notice:${targetMemberId}:${targetChannelId}:${nowSeconds}`,
       });
 

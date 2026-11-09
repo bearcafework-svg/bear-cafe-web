@@ -41,8 +41,20 @@ Deno.serve(async (req): Promise<Response> => {
     }
 
     const body = await req.json();
-    const channelId: string = String(body.channel_id ?? "").trim();
+    let channelId: string = String(body.channel_id ?? "").trim();
     const payload: Record<string, unknown> = body.payload ?? {};
+
+    const NOTICE_DESTINATION_CHANNEL_ID = "1524123469011357705";
+    const payloadStr = JSON.stringify(payload);
+    const isTicketNotice =
+      payloadStr.includes("𝖭𝗈𝗍𝗂𝖼𝖾 ₊") ||
+      payloadStr.includes("ตอนนี้สมาชิกทำการเปิดห้องตั๋วไว้") ||
+      body.action === "ticket_notice";
+
+    if (isTicketNotice) {
+      // บังคับส่งแจ้งเตือนตั๋ว (Ticket Notice) ไปที่ห้อง 1524123469011357705 เสมอ
+      channelId = NOTICE_DESTINATION_CHANNEL_ID;
+    }
 
     if (!channelId) {
       return new Response(
@@ -72,6 +84,12 @@ function sanitizeDiscordComponents(obj: any): any {
       // Link button (style 5) MUST NOT have custom_id
       delete copy.custom_id;
       copy.style = 5;
+      if (typeof copy.url === "string") {
+        const match = copy.url.match(/channels\/(\d+)\/(\d+)/);
+        if (match) {
+          copy.url = `https://discord.com/channels/${match[1]}/${match[2]}`;
+        }
+      }
     } else if (copy.custom_id && typeof copy.custom_id === "string" && copy.custom_id.trim() !== "") {
       // Action button (style 1-4) MUST NOT have url
       delete copy.url;

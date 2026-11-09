@@ -81,3 +81,12 @@ verify_jwt = false
 
 [functions.voice-activity-points]
 verify_jwt = false
+
+[functions.send-tag-warn-embed]
+verify_jwt = false
+
+[functions.send-trading-embed]
+verify_jwt = false
+
+[functions.send-broadcast-test]
+verify_jwt = false
