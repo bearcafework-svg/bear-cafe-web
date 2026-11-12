@@ -54,11 +54,11 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    const formattedAmount = Number(latestAmount).toLocaleString("th-TH");
-    const salmonPoints = Math.floor(Number(latestAmount) / 100);
+    const formattedLatestAmount = Number(latestAmount).toLocaleString("th-TH");
+    const formattedTotalAmount = Number(totalAmount).toLocaleString("th-TH");
 
     const THX_BANNER_IMAGE =
-      "https://cdn.discordapp.com/attachments/1565777850022232075/1566788367277101067/thx.png?ex=6aef16e0&is=6aedc560&hm=e7117e860f326c3602f3944ca7af9121259907dd231bcd19e9104332753c1366&";
+      "https://cdn.discordapp.com/attachments/1565777850022232075/1566788367277101067/thx.png";
 
     const payload: Record<string, unknown> = {
       flags: 32768,
@@ -77,17 +77,10 @@ Deno.serve(async (req): Promise<Response> => {
               ],
             },
             {
-              type: 10, // Text Display - Header
+              type: 10, // Text Display - Header & Details
               content:
-                "## <:bee20000:1256669436350562355>︲__` 𝖳𝗁𝖺𝗇𝗄𝗌 𝖿𝗈𝗋 𝗒𝗈𝗎𝗋 𝗈𝗋𝖽𝖾𝗋  ₊ ขอบคุณนะคะ 𓂃 `__\n-# ขอบคุณสำหรับการอุดหนุนและโดเนทให้กับคาเฟ่หมีนะคะ การสนับสนุนของคุณช่วยให้พวกเราสามารถพัฒนาและดูแลคอมมูนิตี้ให้ดียิ่งขึ้นต่อไปค่ะ <:cuteplant:1152834055528783872>",
-            },
-            { type: 14, divider: true, spacing: 2 }, // Separator
-            {
-              type: 10, // Text Display - Details
-              content:
-                `> (👤)︰<@${memberId}>\n` +
-                `> (<:bankmoney:1567217849968234658>)︰**+${formattedAmount} บาท**\n` +
-                `> (<:fishicon:1568281136675823817>)︰**+${salmonPoints} แต้ม**`,
+                `## <:bee20000:1256669436350562355>︲__\` 𝖳𝗁𝖺𝗇𝗄𝗌 𝖿𝗈𝗋 𝗒𝗈𝗎𝗋 𝗈𝗋𝖽𝖾𝗋  ₊ ขอบคุณนะคะ 𓂃 \`__\n` +
+                `-# ขอขอบคุณ <@${memberId}> สำหรับการสนับสนุนให้กับทางคาเฟ่หมี +${formattedLatestAmount} บาท นะคะ ตอนนี้ยอดรวมการโดเนทของคุณทั้งหมด ${formattedTotalAmount} บาท <:cuteplant:1152834055528783872>`,
             },
             { type: 14, divider: false, spacing: 1 }, // Separator
             {
