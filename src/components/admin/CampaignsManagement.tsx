@@ -81,6 +81,7 @@ type BroadcastAdMessage = {
   target_channels: string[];
   sort_order: number;
   is_active: boolean;
+  auto_delete_seconds?: number | null;
   last_sent_at: string | null;
   next_send_at: string | null;
   created_at: string;
@@ -111,6 +112,8 @@ interface FormData {
   payloadStr: string;
   target_channels: string[];
   is_active: boolean;
+  auto_delete_value: number;
+  auto_delete_unit: 'seconds' | 'minutes' | 'hours';
 }
 
 const DEFAULT_JSON = CAMPAIGN_JSON_PRESETS[0].json;
@@ -120,6 +123,8 @@ const INITIAL_FORM: FormData = {
   payloadStr: DEFAULT_JSON,
   target_channels: [],
   is_active: true,
+  auto_delete_value: 0,
+  auto_delete_unit: 'minutes',
 };
 
 // ============================================================================
@@ -153,6 +158,7 @@ export function CampaignsManagement() {
   const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
   const [testSendCampaign, setTestSendCampaign] = useState<BroadcastAdMessage | null>(null);
   const [testSendPayload, setTestSendPayload] = useState<any>(null);
+  const [testSendAutoDeleteSeconds, setTestSendAutoDeleteSeconds] = useState<number>(0);
   const [testSendChannelId, setTestSendChannelId] = useState<string>('');
   const [customTestChannelId, setCustomTestChannelId] = useState<string>('');
   const [isTestSending, setIsTestSending] = useState(false);
@@ -269,6 +275,31 @@ export function CampaignsManagement() {
     return channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()));
   }, [channels, channelSearch]);
 
+  // Helper: Convert auto delete seconds to value + unit
+  const parseAutoDeleteSeconds = (totalSec: number | null | undefined): { value: number; unit: 'seconds' | 'minutes' | 'hours' } => {
+    const sec = Math.max(0, Number(totalSec) || 0);
+    if (sec === 0) return { value: 0, unit: 'minutes' };
+    if (sec % 3600 === 0) return { value: sec / 3600, unit: 'hours' };
+    if (sec % 60 === 0) return { value: sec / 60, unit: 'minutes' };
+    return { value: sec, unit: 'seconds' };
+  };
+
+  const toTotalSeconds = (val: number, unit: 'seconds' | 'minutes' | 'hours'): number => {
+    const num = Math.max(0, Number(val) || 0);
+    if (num === 0) return 0;
+    if (unit === 'hours') return num * 3600;
+    if (unit === 'minutes') return num * 60;
+    return num;
+  };
+
+  const formatAutoDeleteLabel = (totalSec: number | null | undefined): string => {
+    const sec = Math.max(0, Number(totalSec) || 0);
+    if (sec === 0) return 'ไม่ลบอัตโนมัติ';
+    if (sec % 3600 === 0) return `ลบใน ${sec / 3600} ชม.`;
+    if (sec % 60 === 0) return `ลบใน ${sec / 60} นาที`;
+    return `ลบใน ${sec} วินาที`;
+  };
+
   // ── Open Modals ─────────────────────────────────────────────────────────────
   const openCreateDialog = () => {
     setEditingCampaign(null);
@@ -279,11 +310,14 @@ export function CampaignsManagement() {
 
   const openEditDialog = (item: BroadcastAdMessage) => {
     setEditingCampaign(item);
+    const parsed = parseAutoDeleteSeconds(item.auto_delete_seconds);
     setFormData({
       internal_name: item.internal_name,
       payloadStr: JSON.stringify(item.payload, null, 2),
       target_channels: item.target_channels || [],
       is_active: item.is_active,
+      auto_delete_value: parsed.value,
+      auto_delete_unit: parsed.unit,
     });
     setComposerTab('editor');
     setDialogOpen(true);
@@ -298,16 +332,19 @@ export function CampaignsManagement() {
   const openTestSendDialog = (
     item?: BroadcastAdMessage,
     customPayload?: any,
-    defaultChannels?: string[]
+    defaultChannels?: string[],
+    autoDeleteSec?: number
   ) => {
     if (item) {
       setTestSendCampaign(item);
       setTestSendPayload(item.payload);
+      setTestSendAutoDeleteSeconds(item.auto_delete_seconds || 0);
       const defaultChan = item.target_channels?.[0] || channels[0]?.id || '';
       setTestSendChannelId(defaultChan);
     } else if (customPayload) {
       setTestSendCampaign(null);
       setTestSendPayload(customPayload);
+      setTestSendAutoDeleteSeconds(autoDeleteSec || 0);
       const defaultChan = defaultChannels?.[0] || channels[0]?.id || '';
       setTestSendChannelId(defaultChan);
     }
@@ -392,6 +429,7 @@ export function CampaignsManagement() {
           body: JSON.stringify({
             channel_id: finalChannelId,
             payload: cleanPayload,
+            auto_delete_seconds: testSendAutoDeleteSeconds,
           }),
         }
       );
@@ -559,6 +597,7 @@ export function CampaignsManagement() {
 
     try {
       const payloadObj = valid.payloadObj;
+      const autoDeleteSeconds = toTotalSeconds(formData.auto_delete_value, formData.auto_delete_unit);
 
       if (editingCampaign) {
         // Edit existing
@@ -567,6 +606,7 @@ export function CampaignsManagement() {
           payload: payloadObj,
           target_channels: formData.target_channels,
           is_active: formData.is_active,
+          auto_delete_seconds: autoDeleteSeconds,
         };
 
         if (formData.is_active) {
@@ -608,6 +648,7 @@ export function CampaignsManagement() {
           target_channels: formData.target_channels,
           sort_order: maxSort + 1,
           is_active: formData.is_active,
+          auto_delete_seconds: autoDeleteSeconds,
           next_send_at: newNextSendAt,
         });
 
@@ -1117,6 +1158,16 @@ export function CampaignsManagement() {
                                           {channelCount > 3 ? ` +${channelCount - 3}` : ''})
                                         </span>
 
+                                        <span className={cn(
+                                          "flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[11px]",
+                                          (item.auto_delete_seconds && item.auto_delete_seconds > 0)
+                                            ? "bg-rose-500/10 border-rose-500/30 text-rose-300 font-medium"
+                                            : "bg-[#161210] border-[#2A221E] text-stone-500"
+                                        )}>
+                                          <Trash2 className="w-3 h-3 text-rose-400" />
+                                          {formatAutoDeleteLabel(item.auto_delete_seconds)}
+                                        </span>
+
                                         {item.is_active ? (() => {
                                           const qStatus = getQueueTimeStatus(item.next_send_at);
                                           if (qStatus.variant === 'processing') {
@@ -1408,6 +1459,35 @@ export function CampaignsManagement() {
                     </div>
                   </div>
 
+                  {/* Variable Helper Banner */}
+                  <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>ตัวแปรเวลาพิเศษ:</span>
+                        <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-300 font-mono text-xs border border-amber-400/40">
+                          {'{time}'}
+                        </code>
+                      </div>
+                      <p className="text-[11px] text-stone-300 leading-relaxed">
+                        พิมพ์ <span className="font-mono text-amber-300">{'{time}'}</span> ในข้อความ ระบบจะแปลงเป็นเวลาลบจริงบน Discord (<code className="text-amber-400 font-mono">&lt;t:xxxx:R&gt;</code>) เช่น <span className="text-amber-300 font-semibold">in 30 minutes</span>
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText('{time}');
+                        toast({ title: 'คัดลอก {time} แล้วค่ะ' });
+                      }}
+                      className="h-6 text-[10px] rounded-lg px-2 text-amber-300 hover:bg-amber-500/20 shrink-0 gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      คัดลอก
+                    </Button>
+                  </div>
+
                   {/* Editor Toolbars */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
@@ -1476,7 +1556,95 @@ export function CampaignsManagement() {
                   />
                 </div>
 
-                {/* 4. Active Status Switch */}
+                {/* 4. Auto Delete Setting */}
+                <div className="p-3.5 rounded-2xl border border-[#2E241E] bg-[#1A1412] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-bold text-stone-200 flex items-center gap-1.5">
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        กำหนดเวลาลบข้อความอัตโนมัติ (Auto Delete)
+                      </Label>
+                      <p className="text-[11px] text-stone-400">
+                        ใส่ 0 = ไม่ลบอัตโนมัติ (จะลบก็ต่อเมื่อมีแคมเปญรอบใหม่ส่งมาแทนที่)
+                      </p>
+                    </div>
+                    {toTotalSeconds(formData.auto_delete_value, formData.auto_delete_unit) > 0 && (
+                      <Badge variant="outline" className="text-[10px] bg-rose-500/10 border-rose-500/30 text-rose-300">
+                        ลบอัตโนมัติ: {formData.auto_delete_value} {formData.auto_delete_unit === 'hours' ? 'ชั่วโมง' : formData.auto_delete_unit === 'minutes' ? 'นาที' : 'วินาที'}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Quick Presets for Auto Delete */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-stone-400">พรีเซ็ตด่วน:</span>
+                    {[
+                      { label: 'ไม่ลบ (0)', val: 0, unit: 'minutes' as const },
+                      { label: '5 นาที', val: 5, unit: 'minutes' as const },
+                      { label: '15 นาที', val: 15, unit: 'minutes' as const },
+                      { label: '30 นาที', val: 30, unit: 'minutes' as const },
+                      { label: '1 ชม.', val: 1, unit: 'hours' as const },
+                      { label: '2 ชม.', val: 2, unit: 'hours' as const },
+                    ].map((ps) => {
+                      const totalCurrent = toTotalSeconds(formData.auto_delete_value, formData.auto_delete_unit);
+                      const totalPs = toTotalSeconds(ps.val, ps.unit);
+                      const isMatch = totalCurrent === totalPs;
+                      return (
+                        <button
+                          key={ps.label}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, auto_delete_value: ps.val, auto_delete_unit: ps.unit })}
+                          className={cn(
+                            'px-2 py-0.5 text-[10px] rounded-lg border transition-all',
+                            isMatch
+                              ? 'bg-rose-500/20 text-rose-200 border-rose-500/50 font-bold'
+                              : 'bg-[#221B17] border-[#3A2C23] text-stone-400 hover:text-stone-200 hover:bg-[#2A221E]'
+                          )}
+                        >
+                          {ps.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Input value and unit dropdown */}
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <div>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={formData.auto_delete_value === 0 ? '' : formData.auto_delete_value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            auto_delete_value: Math.max(0, parseInt(e.target.value) || 0),
+                          })
+                        }
+                        placeholder="ระบุตัวเลข (เช่น 30)"
+                        className="rounded-xl h-8 text-xs bg-[#221B17] border-[#3A2C23] text-stone-100 placeholder:text-stone-600"
+                      />
+                    </div>
+                    <div>
+                      <Select
+                        value={formData.auto_delete_unit}
+                        onValueChange={(val: 'seconds' | 'minutes' | 'hours') =>
+                          setFormData({ ...formData, auto_delete_unit: val })
+                        }
+                      >
+                        <SelectTrigger className="rounded-xl h-8 text-xs bg-[#221B17] border-[#3A2C23] text-stone-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl bg-[#221B17] border-[#3A2C23] text-stone-200">
+                          <SelectItem value="seconds" className="text-xs">วินาที (Seconds)</SelectItem>
+                          <SelectItem value="minutes" className="text-xs">นาที (Minutes)</SelectItem>
+                          <SelectItem value="hours" className="text-xs">ชั่วโมง (Hours)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Active Status Switch */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[#2E241E] bg-[#1A1412]">
                   <div>
                     <Label className="text-xs font-bold text-stone-200">เปิดใช้งานข้อความนี้ในคิวบรอดแคสต์</Label>
@@ -1537,7 +1705,8 @@ export function CampaignsManagement() {
                 onClick={() => {
                   const valid = validateAndNormalizeForm();
                   if (valid) {
-                    openTestSendDialog(undefined, valid.payloadObj, formData.target_channels);
+                    const autoSec = toTotalSeconds(formData.auto_delete_value, formData.auto_delete_unit);
+                    openTestSendDialog(undefined, valid.payloadObj, formData.target_channels, autoSec);
                   }
                 }}
                 className="rounded-xl text-xs gap-1.5 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 font-medium"

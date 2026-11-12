@@ -504,16 +504,17 @@ export function parseDiscordMarkdown(text: string): React.ReactNode[] {
     // Token regex supporting:
     // 1. Custom Emoji: <:name:id> or <a:name:id>
     // 2. Slash command: </name:id>
-    // 3. Bold: **text**
-    // 4. Underline: __text__
-    // 5. Strikethrough: ~~text~~
-    // 6. Spoiler: ||text||
-    // 7. Markdown link: [text](url)
-    // 8. Raw url: https://...
-    // 9. Channel: <#id>
-    // 10. Mention: <@&?id>
-    // 11. Code: `code`
-    const tokenRegex = /(<a?:([a-zA-Z0-9_]+):([0-9]+)>|<\/([a-zA-Z0-9_\u0E00-\u0E7F]+):([0-9]+)>|\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\|\|([^|]+)\|\||\[([^\]]+)\]\((https?:\/\/[^\)]+)\)|(https?:\/\/[^\s]+)|<#([0-9]+)>|<@&?([0-9]+)>|`([^`]+)`)/g;
+    // 3. Discord Timestamp: <t:1234567890:R> or {time}
+    // 4. Bold: **text**
+    // 5. Underline: __text__
+    // 6. Strikethrough: ~~text~~
+    // 7. Spoiler: ||text||
+    // 8. Markdown link: [text](url)
+    // 9. Raw url: https://...
+    // 10. Channel: <#id>
+    // 11. Mention: <@&?id>
+    // 12. Code: `code`
+    const tokenRegex = /(<a?:([a-zA-Z0-9_]+):([0-9]+)>|<\/([a-zA-Z0-9_\u0E00-\u0E7F]+):([0-9]+)>|<t:([0-9]+)(?::([tTdDfFR]))?>|\{time\}|\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\|\|([^|]+)\|\||\[([^\]]+)\]\((https?:\/\/[^\)]+)\)|(https?:\/\/[^\s]+)|<#([0-9]+)>|<@&?([0-9]+)>|`([^`]+)`)/g;
 
     let lastIdx = 0;
     let match: RegExpExecArray | null;
@@ -553,28 +554,60 @@ export function parseDiscordMarkdown(text: string): React.ReactNode[] {
             /{match[4]}
           </span>
         );
-      } else if (match[6]) {
-        // Bold
+      } else if (match[6] || match[0] === '{time}') {
+        // Discord Timestamp <t:1234567890:R> or {time}
+        const isVariable = match[0] === '{time}';
+        const rawTs = match[6] ? parseInt(match[6], 10) : null;
+        let timeLabel = 'in 30 minutes';
+
+        if (rawTs) {
+          const style = match[7] || 'f';
+          const date = new Date(rawTs * 1000);
+          if (style === 'R') {
+            const diffSec = Math.round((date.getTime() - Date.now()) / 1000);
+            const absMins = Math.round(Math.abs(diffSec) / 60);
+            timeLabel = diffSec > 0 ? `in ${absMins} minutes` : `${absMins} minutes ago`;
+          } else {
+            timeLabel = date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          }
+        }
+
         parts.push(
-          <strong key={`bold-${lineIdx}-${keyIdx++}`} className="font-bold text-white">
-            {match[6]}
-          </strong>
-        );
-      } else if (match[7]) {
-        // Underline
-        parts.push(
-          <span key={`u-${lineIdx}-${keyIdx++}`} className="underline">
-            {match[7]}
+          <span
+            key={`ts-${lineIdx}-${keyIdx++}`}
+            title={isVariable ? 'ตัวแปร {time} จะแทนที่ด้วยเวลาลบจริง <t:xxxx:R>' : `Timestamp: ${match[0]}`}
+            className={cn(
+              'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium mx-0.5 cursor-help',
+              isVariable
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'bg-[#2B2D31] text-[#DBDEE1]'
+            )}
+          >
+            {timeLabel}
           </span>
         );
       } else if (match[8]) {
+        // Bold
+        parts.push(
+          <strong key={`bold-${lineIdx}-${keyIdx++}`} className="font-bold text-white">
+            {match[8]}
+          </strong>
+        );
+      } else if (match[9]) {
+        // Underline
+        parts.push(
+          <span key={`u-${lineIdx}-${keyIdx++}`} className="underline">
+            {match[9]}
+          </span>
+        );
+      } else if (match[10]) {
         // Strikethrough
         parts.push(
           <span key={`s-${lineIdx}-${keyIdx++}`} className="line-through opacity-70">
-            {match[8]}
+            {match[10]}
           </span>
         );
-      } else if (match[9]) {
+      } else if (match[11]) {
         // Spoiler
         parts.push(
           <span
@@ -582,63 +615,63 @@ export function parseDiscordMarkdown(text: string): React.ReactNode[] {
             className="px-1 py-0.5 rounded bg-black/90 text-transparent hover:text-white transition-colors cursor-pointer"
             title="คลิกเพื่อดูสปอยเลอร์"
           >
-            {match[9]}
+            {match[11]}
           </span>
         );
-      } else if (match[10] && match[11]) {
+      } else if (match[12] && match[13]) {
         // Markdown Link [text](url)
         parts.push(
           <a
             key={`link-${lineIdx}-${keyIdx++}`}
-            href={match[11]}
+            href={match[13]}
             target="_blank"
             rel="noreferrer"
             className="text-[#00A8FC] hover:underline inline-flex items-center gap-0.5"
           >
-            {match[10]}
+            {match[12]}
           </a>
         );
-      } else if (match[12]) {
+      } else if (match[14]) {
         // Raw URL
         parts.push(
           <a
             key={`url-${lineIdx}-${keyIdx++}`}
-            href={match[12]}
+            href={match[14]}
             target="_blank"
             rel="noreferrer"
             className="text-[#00A8FC] hover:underline"
           >
-            {match[12]}
+            {match[14]}
           </a>
         );
-      } else if (match[13]) {
+      } else if (match[15]) {
         // Channel mention <#id>
         parts.push(
           <span
             key={`ch-${lineIdx}-${keyIdx++}`}
             className="inline-flex items-center px-1 rounded bg-[#35384B] text-[#C9CDFB] font-medium text-xs mx-0.5 hover:underline cursor-pointer"
           >
-            #{match[13]}
+            #{match[15]}
           </span>
         );
-      } else if (match[14]) {
+      } else if (match[16]) {
         // User/Role mention <@id> or <@&id>
         parts.push(
           <span
             key={`mention-${lineIdx}-${keyIdx++}`}
             className="inline-flex items-center px-1 rounded bg-[#35384B] text-[#C9CDFB] font-medium text-xs mx-0.5 hover:underline cursor-pointer"
           >
-            @{match[14]}
+            @{match[16]}
           </span>
         );
-      } else if (match[15]) {
+      } else if (match[17]) {
         // Inline code `code`
         parts.push(
           <code
             key={`code-${lineIdx}-${keyIdx++}`}
             className="px-1.5 py-0.5 rounded bg-[#1E1F22] text-amber-300 font-mono text-[11px]"
           >
-            {match[15]}
+            {match[17]}
           </code>
         );
       }

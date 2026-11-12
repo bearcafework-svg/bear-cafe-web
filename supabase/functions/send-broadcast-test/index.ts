@@ -42,7 +42,23 @@ Deno.serve(async (req): Promise<Response> => {
 
     const body = await req.json();
     let channelId: string = String(body.channel_id ?? "").trim();
-    const payload: Record<string, unknown> = body.payload ?? {};
+    let payload: Record<string, unknown> = body.payload ?? {};
+    const autoDeleteSeconds = Math.max(0, Number(body.auto_delete_seconds) || 0);
+
+    // Interpolate {time} variable if present
+    const nowTimestampSec = Math.floor(Date.now() / 1000);
+    const targetTimestampSec = autoDeleteSeconds > 0
+      ? nowTimestampSec + autoDeleteSeconds
+      : nowTimestampSec + (60 * 60); // Default +1 hour if not specified
+
+    const rawPayloadStr = JSON.stringify(payload);
+    if (rawPayloadStr.includes("{time}")) {
+      try {
+        payload = JSON.parse(rawPayloadStr.replaceAll("{time}", `<t:${targetTimestampSec}:R>`));
+      } catch {
+        // Fallback to original payload if JSON parse fails
+      }
+    }
 
     const NOTICE_DESTINATION_CHANNEL_ID = "1524123469011357705";
     const payloadStr = JSON.stringify(payload);
