@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, Sparkles, ChevronDown, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // Types
