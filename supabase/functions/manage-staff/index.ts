@@ -22,7 +22,7 @@ Deno.serve(async (req): Promise<Response> => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Using service role client to enable rollback deletes and audits
+    // Using service role client to enable database management and audit logging
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -37,29 +37,101 @@ Deno.serve(async (req): Promise<Response> => {
       );
     }
 
-    // Verify operator profile & permission
-    const operatorDiscordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
-    const { data: operatorProfile } = await adminClient
-      .from('profiles')
-      .select('id, username')
-      .eq('discord_id', operatorDiscordId)
-      .single();
+    // ── Verify operator profile & permissions ──
+    let operatorDiscordId = user.user_metadata?.discord_id || user.user_metadata?.provider_id;
+    let operatorProfile: any = null;
 
-    if (!operatorProfile) {
-      return new Response(
-        JSON.stringify({ error: 'Operator profile not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (operatorDiscordId) {
+      const { data } = await adminClient
+        .from('profiles')
+        .select('id, username, role, discord_id')
+        .eq('discord_id', operatorDiscordId)
+        .maybeSingle();
+      operatorProfile = data;
     }
 
-    const { data: hasAccess } = await adminClient.rpc('has_any_page_access', {
-      _user_id: operatorProfile.id,
-      _pages: ['manage-staff'],
-    });
+    if (!operatorProfile) {
+      const { data } = await adminClient
+        .from('profiles')
+        .select('id, username, role, discord_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      operatorProfile = data;
+      if (operatorProfile?.discord_id) {
+        operatorDiscordId = operatorProfile.discord_id;
+      }
+    }
+
+    if (!operatorProfile) {
+      operatorProfile = {
+        id: user.id,
+        username: user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Admin',
+        role: user.app_metadata?.role || 'admin',
+        discord_id: operatorDiscordId,
+      };
+    }
+
+    // Check if operator is owner or admin in profiles
+    let isOwnerOrAdmin = operatorProfile.role === 'owner' || operatorProfile.role === 'admin';
+
+    // Also check user_roles table
+    if (!isOwnerOrAdmin) {
+      const { data: userRole } = await adminClient
+        .from('user_roles')
+        .select('role')
+        .or(`user_id.eq.${operatorProfile.id},user_id.eq.${user.id}`)
+        .in('role', ['admin', 'moderator', 'owner'])
+        .maybeSingle();
+      if (userRole) {
+        isOwnerOrAdmin = true;
+      }
+    }
+
+    // Check custom permissions via RPC or direct query
+    let hasAccess = isOwnerOrAdmin;
+    if (!hasAccess) {
+      const allowedPages = ['manage-staff', 'staff'];
+      try {
+        const { data: rpcAccess } = await adminClient.rpc('has_any_page_access', {
+          _user_id: operatorProfile.id,
+          _pages: allowedPages,
+        });
+        if (rpcAccess) hasAccess = true;
+      } catch (_) {}
+
+      if (!hasAccess) {
+        try {
+          const { data: authRpcAccess } = await adminClient.rpc('has_any_page_access', {
+            _user_id: user.id,
+            _pages: allowedPages,
+          });
+          if (authRpcAccess) hasAccess = true;
+        } catch (_) {}
+      }
+
+      if (!hasAccess) {
+        try {
+          const { data: ucpList } = await adminClient
+            .from('user_custom_permissions')
+            .select('custom_permissions(allowed_pages)')
+            .or(`user_id.eq.${operatorProfile.id},user_id.eq.${user.id}`);
+
+          if (ucpList && ucpList.length > 0) {
+            for (const item of ucpList) {
+              const pages = (item.custom_permissions as any)?.allowed_pages;
+              if (Array.isArray(pages) && pages.some((p: string) => allowedPages.includes(p))) {
+                hasAccess = true;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     if (!hasAccess) {
       return new Response(
-        JSON.stringify({ error: 'Access denied' }),
+        JSON.stringify({ error: 'Access denied - คุณไม่มีสิทธิ์จัดการข้อมูลทีมงาน' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -67,18 +139,11 @@ Deno.serve(async (req): Promise<Response> => {
     const body = await req.json();
     const { action } = body;
 
-    const botToken = Deno.env.get('DISCORD_BOT_TOKEN')!;
-    const guildId = Deno.env.get('DISCORD_GUILD_ID')!;
-
-    if (!botToken || !guildId) {
-      return new Response(
-        JSON.stringify({ error: 'Discord configuration missing' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const botToken = Deno.env.get('DISCORD_BOT_TOKEN') || '';
+    const guildId = Deno.env.get('DISCORD_GUILD_ID') || '';
 
     // ============================================================
-    // Action: ADD STAFF
+    // Action: ADD STAFF (บันทึกข้อมูลทีมงานใหม่ - ไม่ยุ่งเกี่ยวกับยศ Discord)
     // ============================================================
     if (action === 'add') {
       const {
@@ -129,31 +194,20 @@ Deno.serve(async (req): Promise<Response> => {
         );
       }
 
-      // Track created entities for manual rollback
-      const createdTimelineIds: string[] = [];
-
+      // 3. Create timeline logs
       try {
-        // 3. Add Discord roles
-        // Position Role
-        if (position.discord_role_id) {
-          await addDiscordRole(botToken, guildId, discord_id, position.discord_role_id);
-        }
-
-        // Level Role
-        if (level.discord_role_id) {
-          await addDiscordRole(botToken, guildId, discord_id, level.discord_role_id);
-        }
-
-        // 4. Create timeline logs
-        const { data: timelineJoin } = await adminClient.from('staff_timeline').insert({
+        await adminClient.from('staff_timeline').insert({
           staff_member_id: newMember.id,
           event_type: 'join',
           details: `เข้าทีมงาน: ตำแหน่ง ${position.name}, ระดับ ${level.name}`,
           created_by: operatorProfile.id
-        }).select('id').single();
-        if (timelineJoin) createdTimelineIds.push(timelineJoin.id);
+        });
+      } catch (timelineErr) {
+        console.warn('Failed to insert timeline log (non-fatal):', timelineErr);
+      }
 
-        // 5. Create audit logs
+      // 4. Create audit logs
+      try {
         await adminClient.from('staff_audit_logs').insert({
           staff_member_id: newMember.id,
           action: 'add_staff',
@@ -162,8 +216,12 @@ Deno.serve(async (req): Promise<Response> => {
           before_data: null,
           after_data: newMember
         });
+      } catch (auditErr) {
+        console.warn('Failed to insert audit log (non-fatal):', auditErr);
+      }
 
-        // Send Discord notification asynchronously or safely catch errors
+      // 5. Send Discord notification embed to announcement channel (safely async, non-fatal)
+      if (botToken && guildId) {
         try {
           const avatarUrl = await getDiscordMemberAvatar(botToken, guildId, discord_id);
           await sendAddStaffNotification(
@@ -177,35 +235,18 @@ Deno.serve(async (req): Promise<Response> => {
             avatarUrl
           );
         } catch (notifErr) {
-          console.error('Failed to send add staff notification:', notifErr);
+          console.warn('Failed to send add staff notification (non-fatal):', notifErr);
         }
-
-        return new Response(
-          JSON.stringify({ success: true, member: newMember }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-
-      } catch (discordError: any) {
-        console.error('Discord assignment failed. Rolling back database changes...', discordError);
-
-        // ROLLBACK: Delete newly inserted staff member and timeline records
-        await adminClient.from('staff_members').delete().eq('id', newMember.id);
-        if (createdTimelineIds.length > 0) {
-          await adminClient.from('staff_timeline').delete().in('id', createdTimelineIds);
-        }
-
-        return new Response(
-          JSON.stringify({
-            error: 'discord_role_assignment_failed',
-            message: `ไม่สามารถปรับเปลี่ยนยศใน Discord ได้: ${discordError.message}. โรลแบ็กข้อมูลทั้งหมดแล้ว`
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
+
+      return new Response(
+        JSON.stringify({ success: true, member: newMember }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // ============================================================
-    // Action: UPDATE STAFF
+    // Action: UPDATE STAFF (อัปเดตข้อมูลทีมงาน - ไม่ยุ่งเกี่ยวกับยศ Discord)
     // ============================================================
     if (action === 'update') {
       const {
@@ -220,7 +261,7 @@ Deno.serve(async (req): Promise<Response> => {
         );
       }
 
-      // 1. Fetch current database record for rollback & diff
+      // 1. Fetch current database record for diff
       const { data: beforeMember, error: fetchError } = await adminClient
         .from('staff_members')
         .select('*')
@@ -273,66 +314,52 @@ Deno.serve(async (req): Promise<Response> => {
       }
 
       const timelineInserts: any[] = [];
-      let levelHistoryId = null;
 
-      try {
-        const discord_id = beforeMember.discord_id;
+      // Position changed
+      if (beforeMember.position_id !== position_id) {
+        timelineInserts.push({
+          staff_member_id: member_id,
+          event_type: 'change_position',
+          details: `เปลี่ยนตำแหน่งจาก ${oldPosition?.name || 'ไม่มี'} เป็น ${newPosition.name}`,
+          created_by: operatorProfile.id
+        });
+      }
 
-        // 3. Diff & Update Discord Roles
-        // Position changed
-        if (beforeMember.position_id !== position_id) {
-          if (oldPosition?.discord_role_id) {
-            await removeDiscordRole(botToken, guildId, discord_id, oldPosition.discord_role_id).catch(() => { });
-          }
-          if (newPosition.discord_role_id) {
-            await addDiscordRole(botToken, guildId, discord_id, newPosition.discord_role_id);
-          }
-          timelineInserts.push({
-            staff_member_id: member_id,
-            event_type: 'change_position',
-            details: `เปลี่ยนตำแหน่งจาก ${oldPosition?.name || 'ไม่มี'} เป็น ${newPosition.name}`,
-            created_by: operatorProfile.id
-          });
-        }
+      // Level changed
+      if (beforeMember.level_id !== level_id) {
+        const isUpgrade = oldLevel?.next_level_id === level_id || newLevel.prev_level_id === beforeMember.level_id;
+        const isDowngrade = oldLevel?.prev_level_id === level_id || newLevel.next_level_id === beforeMember.level_id;
+        const eventType = isUpgrade ? 'level_up' : (isDowngrade ? 'level_down' : 'change_level');
+        const actionLabel = isUpgrade ? 'เลื่อนระดับ' : (isDowngrade ? 'ลดระดับ' : 'เปลี่ยนระดับ');
 
-        // Level changed
-        if (beforeMember.level_id !== level_id) {
-          if (oldLevel?.discord_role_id) {
-            await removeDiscordRole(botToken, guildId, discord_id, oldLevel.discord_role_id).catch(() => { });
-          }
-          if (newLevel.discord_role_id) {
-            await addDiscordRole(botToken, guildId, discord_id, newLevel.discord_role_id);
-          }
+        timelineInserts.push({
+          staff_member_id: member_id,
+          event_type: eventType,
+          details: `${actionLabel}จาก ${oldLevel?.name || 'ไม่มี'} เป็น ${newLevel.name}. เหตุผล: ${level_change_reason || '-'}`,
+          created_by: operatorProfile.id
+        });
 
-          const isUpgrade = oldLevel?.next_level_id === level_id || newLevel.prev_level_id === beforeMember.level_id;
-          const isDowngrade = oldLevel?.prev_level_id === level_id || newLevel.next_level_id === beforeMember.level_id;
-          const eventType = isUpgrade ? 'level_up' : (isDowngrade ? 'level_down' : 'change_level');
-          const actionLabel = isUpgrade ? 'เลื่อนระดับ' : (isDowngrade ? 'ลดระดับ' : 'เปลี่ยนระดับ');
-
-          timelineInserts.push({
-            staff_member_id: member_id,
-            event_type: eventType,
-            details: `${actionLabel}จาก ${oldLevel?.name || 'ไม่มี'} เป็น ${newLevel.name}. เหตุผล: ${level_change_reason || '-'}`,
-            created_by: operatorProfile.id
-          });
-
-          // Insert staff level history record
-          const { data: levelHistory } = await adminClient.from('staff_level_history').insert({
+        // Insert staff level history record
+        try {
+          await adminClient.from('staff_level_history').insert({
             staff_member_id: member_id,
             operator_id: operatorProfile.id,
             from_level_id: beforeMember.level_id,
             to_level_id: level_id,
             reason: level_change_reason || 'เปลี่ยนระดับทีมงาน'
-          }).select('id').single();
-          if (levelHistory) levelHistoryId = levelHistory.id;
+          });
+        } catch (lhErr) {
+          console.warn('Failed to insert level history (non-fatal):', lhErr);
+        }
 
-          // Send Discord notification for level change (Upgrade/Downgrade)
+        // Send Discord notification for level change (Upgrade/Downgrade) (non-fatal)
+        if (botToken && guildId) {
           try {
-            const avatarUrl = await getDiscordMemberAvatar(botToken, guildId, discord_id);
+            const avatarUrl = await getDiscordMemberAvatar(botToken, guildId, beforeMember.discord_id);
             if (isUpgrade) {
               await sendLevelUpNotification(
                 botToken,
-                discord_id,
+                beforeMember.discord_id,
                 newPosition.discord_role_id || '0',
                 operatorDiscordId || '0',
                 avatarUrl
@@ -340,49 +367,55 @@ Deno.serve(async (req): Promise<Response> => {
             } else if (isDowngrade) {
               await sendLevelDownNotification(
                 botToken,
-                discord_id,
+                beforeMember.discord_id,
                 newPosition.discord_role_id || '0',
                 operatorDiscordId || '0',
                 avatarUrl
               );
             }
           } catch (notifErr) {
-            console.error('Failed to send level change notification:', notifErr);
+            console.warn('Failed to send level change notification (non-fatal):', notifErr);
           }
         }
+      }
 
-        // Status changed
-        if (beforeMember.status !== status) {
-          let eventType = 'change_status';
-          let ThaiStatus = status;
-          if (status === 'Vacation') {
-            eventType = 'vacation';
-            ThaiStatus = 'พักงาน (Vacation)';
-          } else if (status === 'Suspended') {
-            eventType = 'suspend';
-            ThaiStatus = 'ระงับงาน (Suspended)';
-          } else if (status === 'Resigned') {
-            eventType = 'resign';
-            ThaiStatus = 'ลาออก (Resigned)';
-          } else if (status === 'Active') {
-            eventType = 'active';
-            ThaiStatus = 'ทำงานปกติ (Active)';
-          }
-
-          timelineInserts.push({
-            staff_member_id: member_id,
-            event_type: eventType,
-            details: `เปลี่ยนสถานะการทำงานจาก ${beforeMember.status} เป็น ${ThaiStatus}`,
-            created_by: operatorProfile.id
-          });
+      // Status changed
+      if (beforeMember.status !== status) {
+        let eventType = 'change_status';
+        let ThaiStatus = status;
+        if (status === 'Vacation') {
+          eventType = 'vacation';
+          ThaiStatus = 'พักงาน (Vacation)';
+        } else if (status === 'Suspended') {
+          eventType = 'suspend';
+          ThaiStatus = 'ระงับงาน (Suspended)';
+        } else if (status === 'Resigned') {
+          eventType = 'resign';
+          ThaiStatus = 'ลาออก (Resigned)';
+        } else if (status === 'Active') {
+          eventType = 'active';
+          ThaiStatus = 'ทำงานปกติ (Active)';
         }
 
-        // 4. Save timeline inserts to database
-        if (timelineInserts.length > 0) {
+        timelineInserts.push({
+          staff_member_id: member_id,
+          event_type: eventType,
+          details: `เปลี่ยนสถานะการทำงานจาก ${beforeMember.status} เป็น ${ThaiStatus}`,
+          created_by: operatorProfile.id
+        });
+      }
+
+      // Save timeline inserts to database
+      if (timelineInserts.length > 0) {
+        try {
           await adminClient.from('staff_timeline').insert(timelineInserts);
+        } catch (tlErr) {
+          console.warn('Failed to insert timeline entries (non-fatal):', tlErr);
         }
+      }
 
-        // 5. Create audit logs
+      // Create audit logs
+      try {
         await adminClient.from('staff_audit_logs').insert({
           staff_member_id: member_id,
           action: 'edit_info',
@@ -391,43 +424,14 @@ Deno.serve(async (req): Promise<Response> => {
           before_data: beforeMember,
           after_data: afterMember
         });
-
-        return new Response(
-          JSON.stringify({ success: true, member: afterMember }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-
-      } catch (discordError: any) {
-        console.error('Update Discord roles failed. Rolling back database updates...', discordError);
-
-        // ROLLBACK: Revert DB member to before state
-        await adminClient
-          .from('staff_members')
-          .update({
-            nickname: beforeMember.nickname,
-            position_id: beforeMember.position_id,
-            level_id: beforeMember.level_id,
-            joined_at: beforeMember.joined_at,
-            intern_start_at: beforeMember.intern_start_at,
-            intern_end_at: beforeMember.intern_end_at,
-            notes: beforeMember.notes,
-            status: beforeMember.status,
-            updated_at: beforeMember.updated_at
-          })
-          .eq('id', member_id);
-
-        if (levelHistoryId) {
-          await adminClient.from('staff_level_history').delete().eq('id', levelHistoryId);
-        }
-
-        return new Response(
-          JSON.stringify({
-            error: 'discord_role_update_failed',
-            message: `ไม่สามารถอัปเดตยศใน Discord ได้: ${discordError.message}. โรลแบ็กข้อมูลในระบบแล้ว`
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      } catch (auditErr) {
+        console.warn('Failed to insert audit log (non-fatal):', auditErr);
       }
+
+      return new Response(
+        JSON.stringify({ success: true, member: afterMember }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
@@ -443,55 +447,6 @@ Deno.serve(async (req): Promise<Response> => {
     );
   }
 });
-
-// Helper Discord API actions
-async function addDiscordRole(botToken: string, guildId: string, userId: string, roleId: string) {
-  if (!roleId || roleId === '0') return;
-  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bot ${botToken}`,
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    let detailMsg = text;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.message) detailMsg = parsed.message;
-      if (parsed.code === 50013 || res.status === 403) {
-        detailMsg = `Bot ไม่มีสิทธิ์จัดการยศนี้ (Missing Permissions) กรุณาตรวจสอบว่ายศของ Bot อยู่สูงกว่ายศ ${roleId} ใน Discord หรือไม่`;
-      } else if (parsed.code === 10007 || res.status === 404) {
-        detailMsg = `ไม่พบผู้ใช้ ID ${userId} ในเซิร์ฟเวอร์ Discord`;
-      } else if (parsed.code === 10011) {
-        detailMsg = `ไม่พบยศ ID ${roleId} ในเซิร์ฟเวอร์ Discord`;
-      }
-    } catch (_) {}
-    throw new Error(detailMsg);
-  }
-}
-
-async function removeDiscordRole(botToken: string, guildId: string, userId: string, roleId: string) {
-  if (!roleId || roleId === '0') return;
-  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bot ${botToken}`,
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    let detailMsg = text;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.message) detailMsg = parsed.message;
-      if (parsed.code === 50013 || res.status === 403) {
-        detailMsg = `Bot ไม่มีสิทธิ์ปลดหรือจัดการยศนี้ (Missing Permissions) กรุณาตรวจสอบลำดับยศของ Bot ใน Discord`;
-      }
-    } catch (_) {}
-    throw new Error(detailMsg);
-  }
-}
 
 // Helper to get Discord member's avatar URL (checks guild member first, then user, fallbacks to default)
 async function getDiscordMemberAvatar(botToken: string, guildId: string, userId: string): Promise<string> {
@@ -529,10 +484,10 @@ async function sendDiscordChannelMessage(botToken: string, channelId: string, pa
     });
     if (!res.ok) {
       const text = await res.text();
-      console.error(`Failed to send Discord message to channel ${channelId}: ${res.status} ${text}`);
+      console.warn(`Failed to send Discord message to channel ${channelId}: ${res.status} ${text}`);
     }
   } catch (err) {
-    console.error(`Error sending Discord message:`, err);
+    console.warn(`Error sending Discord message:`, err);
   }
 }
 
@@ -552,7 +507,7 @@ async function sendAddStaffNotification(
   const startStr = internStart ? `<t:${Math.floor(new Date(internStart).getTime() / 1000)}:f>` : '-';
   const endStr = internEnd ? `<t:${Math.floor(new Date(internEnd).getTime() / 1000)}:f>` : '-';
 
-  const content = `## <:bear9:1148271110132072598> ︲__\` 𝖭𝖾𝗐 𝗌𝗍𝖺𝖿𝖿 ₊ กำเนิดพี่เลี้ยงหมีตัวใหม่ 𓂃 \`__\n-# <@&1144697989986791576> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`𝐦𝐬𝐠\`__ : หวัดดีเราชื่อ **'${nickname}'** (<t:${joinedUnix}:R>) <:cuteplant:1152834055528783872>\n  -  __\`𝐬𝐭𝐚𝐫𝐭\`__ : ${startStr}\n  -  __\`𝐞𝐧𝐝\`__ : ${endStr}\n\n-# กำลังติดต่อพี่สตาฟ <@&${roleId}> ให้คุณ สามารถนั่งรอได้ที่ https://discord.com/channels/1144251788493602848/1524123213884293211`;
+  const content = `## <:bear9:1148271110132072598> ︲__\` 𝖭𝖾𝗐 𝗌𝗍𝖺𝖿𝖿 ₊ กำเนิดพี่เลี้ยงหมีตัวใหม่ 𓂃 \`__\n-# <@&1144697989986791576> <@&1144698080239829092>\n<:line:1144701793989840997>\n- <:bear_star1:1152782839671169184>︲<@${userId}> *!*\n  - __\`𝐦𝐬𝐠\`__ : หหวัดดีเราชื่อ **'${nickname}'** (<t:${joinedUnix}:R>) <:cuteplant:1152834055528783872>\n  -  __\`𝐬𝐭𝐚𝐫𝐭\`__ : ${startStr}\n  -  __\`𝐞𝐧𝐝\`__ : ${endStr}\n\n-# กำลังติดต่อพี่สตาฟ <@&${roleId}> ให้คุณ สามารถนั่งรอได้ที่ https://discord.com/channels/1144251788493602848/1524123213884293211`;
 
   const payload = {
     "flags": 32768,
