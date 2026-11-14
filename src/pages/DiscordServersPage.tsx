@@ -1272,6 +1272,43 @@ function ServerCard({
   );
 }
 
+// ─── Animated Number Counter ──────────────────────────────────────────────────
+function AnimatedCounter({ target, duration = 1400 }: { target: number; duration?: number }) {
+  const [count, setCount] = useState(target > 0 ? 1 : 0);
+
+  useEffect(() => {
+    if (target <= 0) {
+      setCount(0);
+      return;
+    }
+
+    let startTimestamp: number | null = null;
+    const startValue = 1;
+    let animFrame: number;
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const elapsed = timestamp - startTimestamp;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutExpo: fast start, smooth deceleration
+      const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      const current = Math.floor(startValue + (target - startValue) * easeOut);
+      setCount(current);
+
+      if (progress < 1) {
+        animFrame = requestAnimationFrame(step);
+      } else {
+        setCount(target);
+      }
+    };
+
+    animFrame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animFrame);
+  }, [target, duration]);
+
+  return <span className="tabular-nums">{count.toLocaleString()}</span>;
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DiscordServersPage() {
   const { user, isAuthenticated } = useAuth();
@@ -2126,6 +2163,19 @@ export default function DiscordServersPage() {
           >
             หาเพื่อนใหม่ <span className="text-primary font-bold">เข้าดิสคอร์ด</span>
           </motion.h1>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="text-lg sm:text-2xl md:text-3xl font-bold text-foreground/90 font-athiti -mt-1 sm:-mt-2"
+            style={{ fontFamily: "'Athiti', sans-serif" }}
+          >
+            มากถึง{' '}
+            <span className="text-primary font-extrabold">
+              <AnimatedCounter target={servers.length} />
+            </span>{' '}
+            เซิร์ฟเวอร์
+          </motion.div>
           <motion.p
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}

@@ -270,7 +270,9 @@ export function DiscordServersManagement() {
   // ── Batch scan all invites ────────────────────────────────────────────────
   const handleStartScan = async () => {
     setIsScanning(true);
-    const targets = servers.map((s) => ({ id: s.id, invite_url: s.invite_url, name: s.name }));
+    // ตรวจสอบเฉพาะเซิร์ฟเวอร์ที่อนุมัติแล้ว (ไม่ตรวจสอบรายการที่ปฏิเสธ)
+    const approvedTargets = servers.filter((s) => s.status === 'approved');
+    const targets = approvedTargets.map((s) => ({ id: s.id, invite_url: s.invite_url, name: s.name }));
     setScanSummary({
       total: targets.length,
       current: 0,
@@ -1506,10 +1508,10 @@ export function DiscordServersManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
-              ตรวจสอบลิงก์เชิญทั้งหมด (Batch Scan)
+              ตรวจสอบลิงก์เชิญ (เฉพาะที่อนุมัติแล้ว)
             </DialogTitle>
             <DialogDescription>
-              ระบบจะยิงตรวจสอบลิงก์เชิญ Discord ของทุกเซิร์ฟเวอร์ และอัปเดตสถานะ (ลิงก์ปกติ / ลิงก์พัง) ให้อัตโนมัติ
+              ระบบจะยิงตรวจสอบลิงก์เชิญ Discord เฉพาะเซิร์ฟเวอร์ที่อนุมัติแล้ว และอัปเดตสถานะ (ลิงก์ปกติ / ลิงก์พัง) ให้อัตโนมัติ (ไม่ตรวจสอบรายการที่ปฏิเสธ)
             </DialogDescription>
           </DialogHeader>
 
@@ -1518,10 +1520,10 @@ export function DiscordServersManagement() {
             {!scanSummary && (
               <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 border border-primary/20 space-y-2">
                 <p className="text-sm font-semibold flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-primary" /> ตรวจสอบทั้งหมด {servers.length} เซิร์ฟเวอร์
+                  <Sparkles className="w-4 h-4 text-primary" /> ตรวจสอบทั้งหมด {approvedServers.length} เซิร์ฟเวอร์ (เฉพาะที่อนุมัติแล้ว)
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  ระบบจะเว้นระยะเวลา 500ms ต่อลิงก์เพื่อป้องกัน Discord API Rate limit (429) โดยจะอัปเดตข้อมูลสมาชิกและรูปภาพล่าสุดให้อัตโนมัติด้วย
+                  ระบบจะตรวจสอบเฉพาะเซิร์ฟเวอร์ที่ได้รับการอนุมัติแล้ว และเว้นระยะเวลา 500ms ต่อลิงก์เพื่อป้องกัน Discord API Rate limit (429) โดยจะอัปเดตข้อมูลสมาชิกและรูปภาพล่าสุดให้อัตโนมัติด้วย
                 </p>
               </div>
             )}
@@ -1584,7 +1586,7 @@ export function DiscordServersManagement() {
             </Button>
             <Button
               onClick={handleStartScan}
-              disabled={isScanning || servers.length === 0}
+              disabled={isScanning || approvedServers.length === 0}
               className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
             >
               {isScanning ? (
@@ -1595,7 +1597,7 @@ export function DiscordServersManagement() {
               ) : (
                 <>
                   <Search className="w-4 h-4" />
-                  <span>เริ่มตรวจสอบ ({servers.length} รายการ)</span>
+                  <span>เริ่มตรวจสอบ ({approvedServers.length} รายการที่อนุมัติแล้ว)</span>
                 </>
               )}
             </Button>
