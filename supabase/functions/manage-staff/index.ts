@@ -446,7 +446,7 @@ Deno.serve(async (req): Promise<Response> => {
 
 // Helper Discord API actions
 async function addDiscordRole(botToken: string, guildId: string, userId: string, roleId: string) {
-  if (!roleId) return;
+  if (!roleId || roleId === '0') return;
   const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
     method: 'PUT',
     headers: {
@@ -455,12 +455,24 @@ async function addDiscordRole(botToken: string, guildId: string, userId: string,
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Failed to add role ${roleId}: ${res.status} ${text}`);
+    let detailMsg = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.message) detailMsg = parsed.message;
+      if (parsed.code === 50013 || res.status === 403) {
+        detailMsg = `Bot ไม่มีสิทธิ์จัดการยศนี้ (Missing Permissions) กรุณาตรวจสอบว่ายศของ Bot อยู่สูงกว่ายศ ${roleId} ใน Discord หรือไม่`;
+      } else if (parsed.code === 10007 || res.status === 404) {
+        detailMsg = `ไม่พบผู้ใช้ ID ${userId} ในเซิร์ฟเวอร์ Discord`;
+      } else if (parsed.code === 10011) {
+        detailMsg = `ไม่พบยศ ID ${roleId} ในเซิร์ฟเวอร์ Discord`;
+      }
+    } catch (_) {}
+    throw new Error(detailMsg);
   }
 }
 
 async function removeDiscordRole(botToken: string, guildId: string, userId: string, roleId: string) {
-  if (!roleId) return;
+  if (!roleId || roleId === '0') return;
   const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
     method: 'DELETE',
     headers: {
@@ -469,7 +481,15 @@ async function removeDiscordRole(botToken: string, guildId: string, userId: stri
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Failed to remove role ${roleId}: ${res.status} ${text}`);
+    let detailMsg = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.message) detailMsg = parsed.message;
+      if (parsed.code === 50013 || res.status === 403) {
+        detailMsg = `Bot ไม่มีสิทธิ์ปลดหรือจัดการยศนี้ (Missing Permissions) กรุณาตรวจสอบลำดับยศของ Bot ใน Discord`;
+      }
+    } catch (_) {}
+    throw new Error(detailMsg);
   }
 }
 

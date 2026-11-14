@@ -30,6 +30,7 @@ import {
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { DatePicker } from '@/components/ui/date-picker';
 import { cn } from '@/lib/utils';
+import { readFunctionsErrorPayload } from '@/lib/function-error';
 
 interface Position {
   id: string;
@@ -525,6 +526,14 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
     setSubmittingMember(true);
 
+    const parseDateOrNull = (dateStr?: string | null) => {
+      if (!dateStr || !dateStr.trim()) return null;
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
+    const joinedDateIso = parseDateOrNull(memberForm.joined_at) || new Date().toISOString();
+
     const payload = {
       action: selectedMember ? 'update' : 'add',
       discord_id: selectedMember ? undefined : selectedDiscordUser?.id,
@@ -532,9 +541,9 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
       nickname: memberForm.nickname.trim() || null,
       position_id: memberForm.position_id,
       level_id: memberForm.level_id,
-      joined_at: new Date(memberForm.joined_at).toISOString(),
-      intern_start_at: memberForm.intern_start_at ? new Date(memberForm.intern_start_at).toISOString() : null,
-      intern_end_at: memberForm.intern_end_at ? new Date(memberForm.intern_end_at).toISOString() : null,
+      joined_at: joinedDateIso,
+      intern_start_at: parseDateOrNull(memberForm.intern_start_at),
+      intern_end_at: parseDateOrNull(memberForm.intern_end_at),
       notes: memberForm.notes.trim() || null,
       status: memberForm.status,
       level_change_reason: memberForm.level_change_reason.trim()
@@ -549,13 +558,22 @@ export function StaffManagement({ currentUser, isOwner }: { currentUser: any; is
 
     try {
       const { data, error } = await supabase.functions.invoke('manage-staff', { body: payload });
-      if (error) throw error;
+      if (error) {
+        const errorPayload = await readFunctionsErrorPayload(error);
+        const detailedMessage =
+          errorPayload?.message ||
+          errorPayload?.error ||
+          (errorPayload as any)?.details ||
+          error.message ||
+          'บันทึกข้อมูลทีมงานไม่สำเร็จ';
+        throw new Error(detailedMessage);
+      }
 
       toast({ title: selectedMember ? 'อัปเดตข้อมูลทีมงานสำเร็จ' : 'เพิ่มทีมงานสำเร็จ' });
       setMemberDialogOpen(false);
       fetchInitialData(true);
     } catch (e: any) {
-      toast({ title: 'เกิดข้อผิดพลาด', description: e.message || e, variant: 'destructive' });
+      toast({ title: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', description: e.message || String(e), variant: 'destructive' });
     } finally {
       setSubmittingMember(false);
     }
