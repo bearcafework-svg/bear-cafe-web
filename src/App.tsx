@@ -31,6 +31,7 @@ import PrivacyPage from "./pages/PrivacyPage";
 import PrivacyPermissionsPage from "./pages/PrivacyPermissionsPage";
 import KumaTermsPage from "./pages/KumaTermsPage";
 import KumaPrivacyPage from "./pages/KumaPrivacyPage";
+import TarotPage from "./pages/TarotPage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }
 
+  return <>{children}</>;
+}
+
+function OwnerRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <LoadingPage />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!user?.is_owner) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -174,6 +183,7 @@ export function AppRoutes() {
       <Route path="/leaderboard" element={<LeaderboardPage />} />
       <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/overview" replace /></ProtectedRoute>} />
       <Route path="/admin/:section" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+      <Route path="/tarot" element={<OwnerRoute><TarotPage /></OwnerRoute>} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
