@@ -17,11 +17,22 @@ import {
   X,
   Search,
   ArrowUpDown,
-  RefreshCw
+  RefreshCw,
+  ScrollText,
+  Copy,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
 export type QueueType = 'คิว (ธ)' | 'คิวเร่ง' | 'คิว V';
@@ -32,6 +43,7 @@ export interface TarotQueueItem {
   type: QueueType;
   number: string;
   customerName: string;
+  prediction?: string;
   group: GroupType;
   createdAt: number;
   deadlineAt: number;
@@ -103,6 +115,7 @@ export function TarotQueueManager() {
     type: row.queue_type as QueueType,
     number: row.queue_number,
     customerName: row.customer_name || '',
+    prediction: row.prediction || '',
     group: row.queue_group as GroupType,
     createdAt: new Date(row.created_at).getTime(),
     deadlineAt: new Date(row.deadline_at).getTime(),
@@ -120,7 +133,6 @@ export function TarotQueueManager() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table not created yet or RLS blocked, silent fallback to local cache
         console.warn('[TarotQueue] Supabase fetch fallback to local:', error.message);
         return;
       }
@@ -140,7 +152,6 @@ export function TarotQueueManager() {
   useEffect(() => {
     fetchFromDatabase();
 
-    // Supabase Realtime channel for live cross-device sync
     const channel = supabase
       .channel('public:tarot_queues')
       .on(
@@ -161,6 +172,8 @@ export function TarotQueueManager() {
   const [selectedType, setSelectedType] = useState<QueueType>('คิวเร่ง');
   const [queueNumber, setQueueNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [initialPrediction, setInitialPrediction] = useState('');
+  const [showPredictionInput, setShowPredictionInput] = useState(false);
   const [currentGroup, setCurrentGroup] = useState<GroupType>(() => getRandomGroup());
 
   // Search & Filter
@@ -171,8 +184,14 @@ export function TarotQueueManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNumber, setEditNumber] = useState('');
   const [editCustomer, setEditCustomer] = useState('');
+  const [editPrediction, setEditPrediction] = useState('');
   const [editType, setEditType] = useState<QueueType>('คิวเร่ง');
   const [editGroup, setEditGroup] = useState<GroupType>('กลุ่ม 1');
+
+  // Dedicated Prediction Modal state
+  const [predictionModalItem, setPredictionModalItem] = useState<TarotQueueItem | null>(null);
+  const [predictionDraft, setPredictionDraft] = useState('');
+  const [predictionCopied, setPredictionCopied] = useState(false);
 
   // Input references for auto-focus
   const numInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +201,71 @@ export function TarotQueueManager() {
   const handleRandomGroup = () => {
     const next = getRandomGroup();
     setCurrentGroup(next);
+  };
+
+  // Open Prediction Modal
+  const openPredictionModal = (item: TarotQueueItem) => {
+    setPredictionModalItem(item);
+    setPredictionDraft(item.prediction || '');
+    setPredictionCopied(false);
+  };
+
+  // Save Prediction from Modal
+  const handleSavePrediction = async () => {
+    if (!predictionModalItem) return;
+    const targetId = predictionModalItem.id;
+    const newPrediction = predictionDraft.trim();
+
+    // ⚡ STEP 1: Update UI instantly in 0ms
+    setQueues((prev) =>
+      prev.map((item) => (item.id === targetId ? { ...item, prediction: newPrediction } : item))
+    );
+
+    setPredictionModalItem(null);
+    toast({
+      title: 'บันทึกคำทำนายแล้ว',
+      description: `บันทึกคำทำนายของ ${predictionModalItem.type} ${predictionModalItem.number} เรียบร้อย`,
+    });
+
+    // 🛡️ STEP 2: Background Supabase Update
+    if (targetId && !targetId.startsWith('temp_')) {
+      try {
+        await supabase
+          .from('tarot_queues' as any)
+          .update({ prediction: newPrediction })
+          .eq('id', targetId);
+      } catch (err) {
+        console.warn('[TarotQueue] Async DB prediction update deferred:', err);
+      }
+    }
+  };
+
+  // Copy Prediction to Clipboard
+  const handleCopyPrediction = async () => {
+    if (!predictionDraft.trim()) {
+      toast({ title: 'ยังไม่มีคำทำนายให้คัดลอก', variant: 'destructive' });
+      return;
+    }
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(predictionDraft);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = predictionDraft;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setPredictionCopied(true);
+      setTimeout(() => setPredictionCopied(false), 2000);
+      toast({
+        title: 'คัดลอกคำทำนายแล้ว!',
+        description: 'สามารถนำไปวางใน Discord ส่งให้ลูกค้าได้ทันที',
+      });
+    } catch (err) {
+      console.error('Failed to copy prediction:', err);
+    }
   };
 
   // Add new queue (0ms Optimistic UI + Background DB Sync)
@@ -203,12 +287,14 @@ export function TarotQueueManager() {
     const duration = getDurationMs(selectedType);
     const deadlineAt = selectedType === 'คิว V' ? createdAt : createdAt + duration;
     const optimisticId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const finalPrediction = initialPrediction.trim();
 
     const newItem: TarotQueueItem = {
       id: optimisticId,
       type: selectedType,
       number: numTrimmed,
       customerName: customerName.trim(),
+      prediction: finalPrediction,
       group: currentGroup,
       createdAt,
       deadlineAt,
@@ -221,6 +307,7 @@ export function TarotQueueManager() {
     // Reset inputs immediately for next queue
     setCustomerName('');
     setQueueNumber('');
+    setInitialPrediction('');
     setCurrentGroup(getRandomGroup());
 
     setTimeout(() => {
@@ -240,6 +327,7 @@ export function TarotQueueManager() {
           queue_type: selectedType,
           queue_number: numTrimmed,
           customer_name: newItem.customerName,
+          prediction: newItem.prediction,
           queue_group: newItem.group,
           deadline_at: new Date(deadlineAt).toISOString(),
           status: 'pending',
@@ -248,7 +336,6 @@ export function TarotQueueManager() {
         .single();
 
       if (data && !error) {
-        // Replace temp optimistic id with true database UUID
         setQueues((prev) =>
           prev.map((item) => (item.id === optimisticId ? mapDbRow(data) : item))
         );
@@ -260,7 +347,6 @@ export function TarotQueueManager() {
 
   // Toggle Complete / Pending (0ms Optimistic + Background DB Sync)
   const toggleComplete = async (id: string) => {
-    let targetItem: TarotQueueItem | undefined;
     let nextStatus: 'pending' | 'completed' = 'completed';
 
     // ⚡ STEP 1: Update UI instantly in 0ms
@@ -269,12 +355,11 @@ export function TarotQueueManager() {
         if (item.id === id) {
           const isDone = item.status === 'completed';
           nextStatus = isDone ? 'pending' : 'completed';
-          targetItem = {
+          return {
             ...item,
             status: nextStatus,
             completedAt: isDone ? undefined : Date.now(),
           };
-          return targetItem;
         }
         return item;
       })
@@ -323,6 +408,7 @@ export function TarotQueueManager() {
     setEditingId(item.id);
     setEditNumber(item.number);
     setEditCustomer(item.customerName);
+    setEditPrediction(item.prediction || '');
     setEditType(item.type);
     setEditGroup(item.group);
   };
@@ -335,6 +421,7 @@ export function TarotQueueManager() {
     }
 
     const duration = getDurationMs(editType);
+    const newPred = editPrediction.trim();
 
     // ⚡ STEP 1: Update UI instantly in 0ms
     setQueues((prev) =>
@@ -345,6 +432,7 @@ export function TarotQueueManager() {
             type: editType,
             number: editNumber.trim(),
             customerName: editCustomer.trim(),
+            prediction: newPred,
             group: editGroup,
             deadlineAt: editType === 'คิว V' ? item.createdAt : item.createdAt + duration,
           };
@@ -364,6 +452,7 @@ export function TarotQueueManager() {
             queue_type: editType,
             queue_number: editNumber.trim(),
             customer_name: editCustomer.trim(),
+            prediction: newPred,
             queue_group: editGroup,
           })
           .eq('id', id);
@@ -390,6 +479,7 @@ export function TarotQueueManager() {
       return (
         fullTitle.includes(q) ||
         item.customerName.toLowerCase().includes(q) ||
+        (item.prediction && item.prediction.toLowerCase().includes(q)) ||
         item.group.toLowerCase().includes(q)
       );
     });
@@ -582,7 +672,7 @@ export function TarotQueueManager() {
             </div>
           </div>
 
-          {/* Row 2: Queue Number & Customer Name (Enter to Submit) */}
+          {/* Row 2: Queue Number, Customer Name, and Action */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
             <div className="sm:col-span-4">
               <label className="text-[11px] text-muted-foreground mb-1 block">
@@ -599,15 +689,25 @@ export function TarotQueueManager() {
             </div>
 
             <div className="sm:col-span-6">
-              <label className="text-[11px] text-muted-foreground mb-1 block">
-                ชื่อลูกค้า / รายละเอียด (กด Enter เพื่อเพิ่มทันที)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-muted-foreground">
+                  ชื่อลูกค้า / หมายเหตุ (กด Enter เพิ่มทันที)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPredictionInput(!showPredictionInput)}
+                  className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                >
+                  <ScrollText className="w-3 h-3" />
+                  {showPredictionInput ? 'ซ่อนช่องคำทำนาย' : '+ ใส่คำทำนายตอนสร้าง'}
+                </button>
+              </div>
               <Input
                 ref={nameInputRef}
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="ชื่อลูกค้า, เรื่องที่ดู หรือหมายเหตุ..."
+                placeholder="ชื่อลูกค้า หรือเรื่องที่ดู..."
                 className="h-11 bg-background/80 border-border text-sm focus-visible:ring-amber-500"
               />
             </div>
@@ -622,6 +722,22 @@ export function TarotQueueManager() {
               </Button>
             </div>
           </div>
+
+          {/* Optional Initial Prediction Input */}
+          {showPredictionInput && (
+            <div className="pt-1">
+              <label className="text-[11px] text-muted-foreground mb-1 block">
+                คำทำนาย (ไม่บังคับ - สามารถเขียนหรือแก้ทีหลังได้):
+              </label>
+              <Textarea
+                value={initialPrediction}
+                onChange={(e) => setInitialPrediction(e.target.value)}
+                placeholder="พิมพ์คำทำนายของคิวนี้ที่นี่..."
+                rows={2}
+                className="bg-background/80 text-xs border-border resize-none"
+              />
+            </div>
+          )}
         </form>
       </div>
 
@@ -678,7 +794,8 @@ export function TarotQueueManager() {
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
                   <th className="py-2.5 px-3 min-w-[110px]">ชื่อคิว</th>
                   <th className="py-2.5 px-3 min-w-[90px]">กลุ่ม</th>
-                  <th className="py-2.5 px-3 min-w-[140px]">ลูกค้า / รายละเอียด</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">ลูกค้า / รายละเอียด</th>
+                  <th className="py-2.5 px-3 min-w-[140px]">คำทำนาย</th>
                   <th className="py-2.5 px-3 min-w-[130px]">เวลาที่บันทึก (ไทย)</th>
                   <th className="py-2.5 px-3 min-w-[130px]">นับเวลาถอยหลัง / สถานะ</th>
                   <th className="py-2.5 px-3 min-w-[110px] text-right">จัดการ</th>
@@ -688,6 +805,7 @@ export function TarotQueueManager() {
                 {chronologicalQueues.map((item, index) => {
                   const fullTitle = `${item.type} ${item.number}`;
                   const isDone = item.status === 'completed';
+                  const hasPred = !!item.prediction && item.prediction.trim().length > 0;
 
                   return (
                     <tr
@@ -721,7 +839,7 @@ export function TarotQueueManager() {
                       </td>
 
                       {/* Customer / Note */}
-                      <td className="py-2.5 px-3 max-w-[200px] truncate" title={item.customerName}>
+                      <td className="py-2.5 px-3 max-w-[160px] truncate" title={item.customerName}>
                         {item.customerName ? (
                           <span className={isDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
                             {item.customerName}
@@ -729,6 +847,25 @@ export function TarotQueueManager() {
                         ) : (
                           <span className="text-muted-foreground/50 italic text-[11px]">ไม่มีหมายเหตุ</span>
                         )}
+                      </td>
+
+                      {/* Prediction Column */}
+                      <td className="py-2.5 px-3 min-w-[140px] max-w-[220px]">
+                        <button
+                          type="button"
+                          onClick={() => openPredictionModal(item)}
+                          className={`flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all text-xs w-full truncate ${
+                            hasPred
+                              ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 font-medium'
+                              : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/60 border border-dashed border-border/60'
+                          }`}
+                          title={hasPred ? item.prediction : 'คลิกเพื่อใส่คำทำนาย'}
+                        >
+                          <ScrollText className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">
+                            {hasPred ? item.prediction : '+ เพิ่มคำทำนาย'}
+                          </span>
+                        </button>
                       </td>
 
                       {/* Thai Timestamp */}
@@ -793,7 +930,7 @@ export function TarotQueueManager() {
           <Input
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="ค้นหาตามคิว, ชื่อลูกค้า, กลุ่ม..."
+            placeholder="ค้นหาตามคิว, ชื่อลูกค้า, คำทำนาย, กลุ่ม..."
             className="pl-9 h-9 text-xs bg-background/70 border-border"
           />
           {searchFilter && (
@@ -848,10 +985,11 @@ export function TarotQueueManager() {
           <p className="text-muted-foreground text-xs">ไม่พบคิวที่ตรงกับเงื่อนไขการค้นหา</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filteredQueues.map((item) => {
             const isEditing = editingId === item.id;
             const fullTitle = `${item.type} ${item.number}`;
+            const hasPred = !!item.prediction && item.prediction.trim().length > 0;
 
             if (isEditing) {
               return (
@@ -905,6 +1043,17 @@ export function TarotQueueManager() {
                     />
                   </div>
 
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">คำทำนาย:</label>
+                    <Textarea
+                      value={editPrediction}
+                      onChange={(e) => setEditPrediction(e.target.value)}
+                      placeholder="บันทึกคำทำนาย..."
+                      rows={2}
+                      className="text-xs resize-none"
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="ghost"
@@ -929,133 +1078,236 @@ export function TarotQueueManager() {
             return (
               <div
                 key={item.id}
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border transition-all ${
+                className={`flex flex-col gap-2 p-3.5 rounded-xl border transition-all ${
                   item.status === 'completed'
                     ? 'bg-card/30 border-border/40 opacity-70'
                     : 'bg-card/80 border-border/80 hover:border-amber-500/40 shadow-sm'
                 }`}
               >
-                {/* Left: Queue Title + Customer + Group */}
-                <div className="flex items-start sm:items-center gap-3 min-w-0">
-                  {/* Mark complete checkbox button */}
-                  <button
-                    type="button"
-                    onClick={() => toggleComplete(item.id)}
-                    className={`mt-0.5 sm:mt-0 w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
-                      item.status === 'completed'
-                        ? 'bg-emerald-600 border-emerald-500 text-white'
-                        : 'border-border/80 hover:border-amber-500 text-transparent hover:text-muted-foreground'
-                    }`}
-                    title={item.status === 'completed' ? 'กดเพื่อกลับเป็นกำลังรอ' : 'กดเพื่อทำเครื่องหมายว่าเสร็จแล้ว'}
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  </button>
+                {/* Top Row: Info & Countdown */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleComplete(item.id)}
+                      className={`mt-0.5 sm:mt-0 w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
+                        item.status === 'completed'
+                          ? 'bg-emerald-600 border-emerald-500 text-white'
+                          : 'border-border/80 hover:border-amber-500 text-transparent hover:text-muted-foreground'
+                      }`}
+                      title={item.status === 'completed' ? 'กดเพื่อกลับเป็นกำลังรอ' : 'กดเพื่อทำเครื่องหมายว่าเสร็จแล้ว'}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
 
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`font-bold text-sm sm:text-base ${
-                          item.status === 'completed'
-                            ? 'line-through text-muted-foreground'
-                            : 'text-foreground'
-                        }`}
-                      >
-                        {fullTitle}
-                      </span>
-
-                      {/* Group Badge */}
-                      <Badge
-                        variant="outline"
-                        className="text-[11px] py-0 px-2 font-medium bg-amber-500/10 text-amber-300 border-amber-500/30"
-                      >
-                        {item.group}
-                      </Badge>
-
-                      {/* Type Badge */}
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] py-0 px-1.5 font-normal ${
-                          item.type === 'คิว V'
-                            ? 'bg-amber-500/20 text-amber-300'
-                            : item.type === 'คิวเร่ง'
-                            ? 'bg-orange-500/20 text-orange-300'
-                            : 'bg-blue-500/20 text-blue-300'
-                        }`}
-                      >
-                        {item.type}
-                      </Badge>
-                    </div>
-
-                    {/* Customer & Timestamp */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                      {item.customerName ? (
-                        <span className="text-foreground/90 font-medium truncate max-w-[200px] sm:max-w-[300px]">
-                          {item.customerName}
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`font-bold text-sm sm:text-base ${
+                            item.status === 'completed'
+                              ? 'line-through text-muted-foreground'
+                              : 'text-foreground'
+                          }`}
+                        >
+                          {fullTitle}
                         </span>
-                      ) : (
-                        <span className="italic opacity-50">ไม่มีหมายเหตุ</span>
-                      )}
-                      <span>•</span>
-                      <span className="flex items-center gap-1 text-[11px]">
-                        <Calendar className="w-3 h-3 text-muted-foreground/70" />
-                        {formatThaiDateTime(item.createdAt)}
-                      </span>
+
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] py-0 px-2 font-medium bg-amber-500/10 text-amber-300 border-amber-500/30"
+                        >
+                          {item.group}
+                        </Badge>
+
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] py-0 px-1.5 font-normal ${
+                            item.type === 'คิว V'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : item.type === 'คิวเร่ง'
+                              ? 'bg-orange-500/20 text-orange-300'
+                              : 'bg-blue-500/20 text-blue-300'
+                          }`}
+                        >
+                          {item.type}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                        {item.customerName ? (
+                          <span className="text-foreground/90 font-medium truncate max-w-[200px] sm:max-w-[300px]">
+                            {item.customerName}
+                          </span>
+                        ) : (
+                          <span className="italic opacity-50">ไม่มีหมายเหตุ</span>
+                        )}
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-[11px]">
+                          <Calendar className="w-3 h-3 text-muted-foreground/70" />
+                          {formatThaiDateTime(item.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0">
+                    <div>{renderCountdown(item)}</div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleComplete(item.id)}
+                        className={`h-8 px-2 text-xs gap-1 ${
+                          item.status === 'completed'
+                            ? 'text-muted-foreground hover:text-foreground'
+                            : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                        }`}
+                        title={item.status === 'completed' ? 'ยกเลิกสถานะเสร็จ' : 'สำเร็จ'}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">
+                          {item.status === 'completed' ? 'ย้อนกลับ' : 'สำเร็จ'}
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(item)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                        title="แก้ไข"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(item.id, fullTitle)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10"
+                        title="ลบ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Countdown & Quick Actions */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 w-full sm:w-auto">
-                  {/* Countdown Timer */}
-                  <div className="shrink-0">
-                    {renderCountdown(item)}
+                {/* Prediction Expand Box (if available or button to add) */}
+                <div className="pt-2 border-t border-border/40 flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    {hasPred ? (
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2 text-xs text-foreground/90 whitespace-pre-wrap">
+                        <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px] mb-1">
+                          <ScrollText className="w-3.5 h-3.5" />
+                          <span>คำทำนาย:</span>
+                        </div>
+                        <p className="line-clamp-3">{item.prediction}</p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openPredictionModal(item)}
+                        className="text-xs text-muted-foreground hover:text-amber-400 flex items-center gap-1.5 py-1 px-2 rounded border border-dashed border-border/60 hover:border-amber-500/40"
+                      >
+                        <ScrollText className="w-3 h-3" />
+                        <span>+ เพิ่มคำทำนาย</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
+                  {hasPred && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => toggleComplete(item.id)}
-                      className={`h-8 px-2 text-xs gap-1 ${
-                        item.status === 'completed'
-                          ? 'text-muted-foreground hover:text-foreground'
-                          : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                      }`}
-                      title={item.status === 'completed' ? 'ยกเลิกสถานะเสร็จ' : 'สำเร็จ'}
+                      onClick={() => openPredictionModal(item)}
+                      className="h-7 text-xs px-2 shrink-0 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
                     >
-                      <Check className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">
-                        {item.status === 'completed' ? 'ย้อนกลับ' : 'สำเร็จ'}
-                      </span>
+                      <ScrollText className="w-3 h-3 mr-1" />
+                      ดู/แก้ไข
                     </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => startEditing(item)}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                      title="แก้ไข"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(item.id, fullTitle)}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10"
-                      title="ลบ"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* 📜 DIALOG: ดูและแก้ไขคำทำนาย (Prediction Modal with Quick Copy) */}
+      <Dialog open={!!predictionModalItem} onOpenChange={(open) => !open && setPredictionModalItem(null)}>
+        <DialogContent className="max-w-lg bg-card/95 backdrop-blur-xl border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <ScrollText className="w-4 h-4 text-amber-400" />
+              <span>
+                คำทำนาย: {predictionModalItem?.type} {predictionModalItem?.number}
+              </span>
+              {predictionModalItem?.customerName && (
+                <span className="text-muted-foreground font-normal text-xs">
+                  ({predictionModalItem.customerName})
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>เนื้อหาคำทำนาย:</span>
+              <span className="font-mono text-[11px]">{predictionDraft.length} ตัวอักษร</span>
+            </div>
+
+            <Textarea
+              value={predictionDraft}
+              onChange={(e) => setPredictionDraft(e.target.value)}
+              placeholder="พิมพ์คำทำนาย ข้อความเปิดไพ่ หรือรายละเอียดสำหรับส่งให้ลูกค้าที่นี่..."
+              rows={7}
+              className="bg-background/80 text-sm border-border focus-visible:ring-amber-500 resize-y"
+            />
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCopyPrediction}
+              disabled={!predictionDraft.trim()}
+              className="gap-1.5 text-xs h-9 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+            >
+              {predictionCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  คัดลอกแล้ว!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  คัดลอกคำทำนาย (สำหรับส่ง Discord)
+                </>
+              )}
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setPredictionModalItem(null)}
+                className="text-xs h-9"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSavePrediction}
+                className="text-xs h-9 bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+              >
+                บันทึกคำทำนาย
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

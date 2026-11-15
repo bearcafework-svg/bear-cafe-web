@@ -4,12 +4,16 @@ CREATE TABLE IF NOT EXISTS public.tarot_queues (
     queue_type TEXT NOT NULL,
     queue_number TEXT NOT NULL,
     customer_name TEXT DEFAULT '',
+    prediction TEXT DEFAULT '',
     queue_group TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     deadline_at TIMESTAMPTZ NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     completed_at TIMESTAMPTZ
 );
+
+-- Ensure prediction column exists if table was already created
+ALTER TABLE public.tarot_queues ADD COLUMN IF NOT EXISTS prediction TEXT DEFAULT '';
 
 -- Index for instant sorting and queries (speed optimization)
 CREATE INDEX IF NOT EXISTS idx_tarot_queues_created_at ON public.tarot_queues(created_at DESC);
