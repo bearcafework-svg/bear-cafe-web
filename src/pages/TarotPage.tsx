@@ -620,8 +620,24 @@ export default function TarotPage() {
           )}
 
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Output Preview */}
-            <div className="flex-1 min-w-0 flex items-center gap-2 bg-card/70 border border-border/80 rounded-xl px-3 py-1.5 focus-within:border-amber-500">
+            {/* Output Preview (Click anywhere to copy) */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleCopy}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleCopy();
+                }
+              }}
+              className={`flex-1 min-w-0 flex items-center gap-2 bg-card/70 border rounded-xl px-3 py-1.5 transition-all cursor-pointer select-none ${
+                copied
+                  ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
+                  : 'border-border/80 hover:border-amber-500/60 hover:bg-card/90 active:scale-[0.99]'
+              }`}
+              title="กดตรงไหนก็ได้ของข้อความเพื่อคัดลอก"
+            >
               <span className="text-xs text-muted-foreground shrink-0 font-medium hidden sm:inline">
                 ผลลัพธ์ ({selectedCards.length}):
               </span>
@@ -629,14 +645,29 @@ export default function TarotPage() {
                 type="text"
                 readOnly
                 value={copiedString}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
                 placeholder="ยังไม่ได้เลือกไพ่ (คลิกเลือกไพ่ที่ต้องการด้านบน)"
-                className="flex-1 bg-transparent font-mono text-xs text-amber-400 placeholder:text-muted-foreground/60 placeholder:italic outline-none w-full cursor-pointer select-all"
+                className="flex-1 bg-transparent font-mono text-xs text-amber-400 placeholder:text-muted-foreground/60 placeholder:italic outline-none w-full cursor-pointer select-all pointer-events-none"
               />
+              {selectedCards.length > 0 && (
+                <span className="text-[10px] text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full shrink-0 hidden sm:inline-flex items-center gap-1">
+                  {copied ? (
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> คัดลอกแล้ว!
+                    </span>
+                  ) : (
+                    <>
+                      <Copy className="w-2.5 h-2.5" /> กดตรงไหนก็ได้เพื่อคัดลอก
+                    </>
+                  )}
+                </span>
+              )}
               {selectedCards.length > 0 && (
                 <button
                   type="button"
-                  onClick={clearSelection}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearSelection();
+                  }}
                   className="text-muted-foreground hover:text-rose-400 p-1 rounded transition-colors shrink-0"
                   title="ล้างทั้งหมด"
                 >

@@ -192,6 +192,7 @@ export function TarotQueueManager() {
   const [predictionModalItem, setPredictionModalItem] = useState<TarotQueueItem | null>(null);
   const [predictionDraft, setPredictionDraft] = useState('');
   const [predictionCopied, setPredictionCopied] = useState(false);
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
 
   // Input references for auto-focus
   const numInputRef = useRef<HTMLInputElement>(null);
@@ -240,32 +241,56 @@ export function TarotQueueManager() {
     }
   };
 
-  // Copy Prediction to Clipboard
-  const handleCopyPrediction = async () => {
-    if (!predictionDraft.trim()) {
+  // Direct 1-click copy by clicking anywhere on the prediction text
+  const handleCopyPredictionDirect = async (text: string, itemId?: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
       toast({ title: 'ยังไม่มีคำทำนายให้คัดลอก', variant: 'destructive' });
       return;
     }
+
+    let success = false;
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(predictionDraft);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = predictionDraft;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+        await navigator.clipboard.writeText(trimmed);
+        success = true;
       }
-      setPredictionCopied(true);
-      setTimeout(() => setPredictionCopied(false), 2000);
-      toast({
-        title: 'คัดลอกคำทำนายแล้ว!',
-        description: 'สามารถนำไปวางใน Discord ส่งให้ลูกค้าได้ทันที',
-      });
-    } catch (err) {
-      console.error('Failed to copy prediction:', err);
+    } catch {
+      success = false;
     }
+
+    if (!success) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = trimmed;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) {
+        success = false;
+      }
+    }
+
+    if (itemId) {
+      setCopiedItemId(itemId);
+      setTimeout(() => setCopiedItemId(null), 2500);
+    }
+    setPredictionCopied(true);
+    setTimeout(() => setPredictionCopied(false), 2500);
+
+    toast({
+      title: '📋 คัดลอกคำทำนายแล้ว!',
+      description: 'นำข้อความไปส่งใน Discord ได้ทันที',
+    });
+  };
+
+  // Copy Prediction from Modal
+  const handleCopyPrediction = async () => {
+    await handleCopyPredictionDirect(predictionDraft, predictionModalItem?.id);
   };
 
   // Add new queue (0ms Optimistic UI + Background DB Sync)
@@ -850,22 +875,50 @@ export function TarotQueueManager() {
                       </td>
 
                       {/* Prediction Column */}
-                      <td className="py-2.5 px-3 min-w-[140px] max-w-[220px]">
-                        <button
-                          type="button"
-                          onClick={() => openPredictionModal(item)}
-                          className={`flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all text-xs w-full truncate ${
-                            hasPred
-                              ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 font-medium'
-                              : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/60 border border-dashed border-border/60'
-                          }`}
-                          title={hasPred ? item.prediction : 'คลิกเพื่อใส่คำทำนาย'}
-                        >
-                          <ScrollText className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">
-                            {hasPred ? item.prediction : '+ เพิ่มคำทำนาย'}
-                          </span>
-                        </button>
+                      <td className="py-2.5 px-3 min-w-[150px] max-w-[240px]">
+                        {hasPred ? (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPredictionDirect(item.prediction || '', item.id)}
+                              className={`flex-1 flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all text-xs truncate border cursor-pointer ${
+                                copiedItemId === item.id
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-medium'
+                                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30 hover:border-amber-500/60 font-medium'
+                              }`}
+                              title="กดตรงไหนก็ได้ของข้อความเพื่อคัดลอก"
+                            >
+                              {copiedItemId === item.id ? (
+                                <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                              ) : (
+                                <ScrollText className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                              )}
+                              <span className="truncate flex-1">
+                                {copiedItemId === item.id ? 'คัดลอกแล้ว!' : item.prediction}
+                              </span>
+                            </button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openPredictionModal(item)}
+                              className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10"
+                              title="ดูหรือแก้ไขคำทำนายเต็ม"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openPredictionModal(item)}
+                            className="flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all text-xs w-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/60 border border-dashed border-border/60"
+                            title="คลิกเพื่อใส่คำทำนาย"
+                          >
+                            <ScrollText className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">+ เพิ่มคำทำนาย</span>
+                          </button>
+                        )}
                       </td>
 
                       {/* Thai Timestamp */}
@@ -1194,16 +1247,53 @@ export function TarotQueueManager() {
                   </div>
                 </div>
 
-                {/* Prediction Expand Box (if available or button to add) */}
+                {/* Prediction Expand Box (Click anywhere to copy) */}
                 <div className="pt-2 border-t border-border/40 flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     {hasPred ? (
-                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2 text-xs text-foreground/90 whitespace-pre-wrap">
-                        <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px] mb-1">
-                          <ScrollText className="w-3.5 h-3.5" />
-                          <span>คำทำนาย:</span>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleCopyPredictionDirect(item.prediction || '', item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleCopyPredictionDirect(item.prediction || '', item.id);
+                          }
+                        }}
+                        className={`group relative rounded-lg p-2.5 text-xs whitespace-pre-wrap cursor-pointer transition-all border ${
+                          copiedItemId === item.id
+                            ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-200 shadow-sm'
+                            : 'bg-amber-500/5 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/60 text-foreground/90 active:scale-[0.99]'
+                        }`}
+                        title="กดตรงไหนก็ได้ของข้อความเพื่อคัดลอก"
+                      >
+                        <div className="flex items-center justify-between font-semibold text-[11px] mb-1.5 select-none">
+                          <div className={`flex items-center gap-1.5 ${copiedItemId === item.id ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            <ScrollText className="w-3.5 h-3.5" />
+                            <span>คำทำนาย:</span>
+                          </div>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 font-normal transition-colors ${
+                              copiedItemId === item.id
+                                ? 'bg-emerald-500/25 text-emerald-300 font-semibold'
+                                : 'bg-amber-500/15 text-amber-300 group-hover:bg-amber-500/25'
+                            }`}
+                          >
+                            {copiedItemId === item.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                คัดลอกแล้ว!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-2.5 h-2.5" />
+                                กดตรงไหนก็ได้เพื่อคัดลอก
+                              </>
+                            )}
+                          </span>
                         </div>
-                        <p className="line-clamp-3">{item.prediction}</p>
+                        <p className="line-clamp-3 select-all leading-relaxed">{item.prediction}</p>
                       </div>
                     ) : (
                       <button
@@ -1224,8 +1314,8 @@ export function TarotQueueManager() {
                       onClick={() => openPredictionModal(item)}
                       className="h-7 text-xs px-2 shrink-0 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
                     >
-                      <ScrollText className="w-3 h-3 mr-1" />
-                      ดู/แก้ไข
+                      <Edit3 className="w-3 h-3 mr-1" />
+                      แก้ไข
                     </Button>
                   )}
                 </div>
@@ -1257,6 +1347,37 @@ export function TarotQueueManager() {
               <span>เนื้อหาคำทำนาย:</span>
               <span className="font-mono text-[11px]">{predictionDraft.length} ตัวอักษร</span>
             </div>
+
+            {/* Quick Click Anywhere To Copy Banner */}
+            {predictionDraft.trim() && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={handleCopyPrediction}
+                className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs group select-none ${
+                  predictionCopied
+                    ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200'
+                    : 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 active:scale-[0.99]'
+                }`}
+                title="กดแถบนี้ตรงไหนก็ได้เพื่อคัดลอกคำทำนายทั้งหมด"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  {predictionCopied ? (
+                    <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 shrink-0 text-amber-400 group-hover:scale-110 transition-transform" />
+                  )}
+                  <span className="truncate font-medium">
+                    {predictionCopied ? 'คัดลอกคำทำนายแล้ว!' : 'กดแถบนี้ตรงไหนก็ได้เพื่อคัดลอกคำทำนายทั้งหมด'}
+                  </span>
+                </div>
+                {predictionCopied && (
+                  <span className="text-emerald-400 font-semibold text-[11px] shrink-0">
+                    พร้อมส่งใน Discord
+                  </span>
+                )}
+              </div>
+            )}
 
             <Textarea
               value={predictionDraft}
