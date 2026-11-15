@@ -10,7 +10,7 @@
       ]
     },
     {
-      "source": "/(banner|icons|images)/(.*)",
+      "source": "/banner/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -19,7 +19,16 @@
       ]
     },
     {
-      "source": "/(.*\\.(png|jpg|jpeg|svg|webp|ico|gif|woff2?))",
+      "source": "/icons/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/images/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -47,7 +56,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|banner/|icons/|images/|.*\\.[a-zA-Z0-9]+$).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
