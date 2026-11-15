@@ -36,7 +36,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export type QueueType = 'คิว (ธ)' | 'คิวเร่ง' | 'คิว V';
-export type GroupType = 'กลุ่ม 1' | 'กลุ่ม 2❤️' | 'กลุ่ม 3 🧡';
+export type GroupType = '❤️กลุ่ม1' | 'กลุ่ม2💫' | 'กลุ่ม 3 🧡' | 'กลุ่ม 1' | 'กลุ่ม 2❤️';
 
 export interface TarotQueueItem {
   id: string;
@@ -51,7 +51,7 @@ export interface TarotQueueItem {
   completedAt?: number;
 }
 
-const GROUPS: GroupType[] = ['กลุ่ม 1', 'กลุ่ม 2❤️', 'กลุ่ม 3 🧡'];
+const GROUPS: GroupType[] = ['❤️กลุ่ม1', 'กลุ่ม2💫', 'กลุ่ม 3 🧡'];
 
 function getRandomGroup(): GroupType {
   const idx = Math.floor(Math.random() * GROUPS.length);
@@ -80,11 +80,36 @@ const STORAGE_KEY = 'bear_tarot_queues_v1';
 export function TarotQueueManager() {
   const { toast } = useToast();
 
-  // 1. Instant Cache Initialization (0ms from LocalStorage)
+  // Helper to swap legacy groups: Group 1 -> 'กลุ่ม2💫', Group 2 -> '❤️กลุ่ม1'
+  const swapLegacyGroup = (rawGroup: string): GroupType => {
+    if (rawGroup === 'กลุ่ม 1' || rawGroup === 'กลุ่ม1') return 'กลุ่ม2💫';
+    if (rawGroup === 'กลุ่ม 2❤️' || rawGroup === 'กลุ่ม 2' || rawGroup === 'กลุ่ม2') return '❤️กลุ่ม1';
+    if (rawGroup === '❤️กลุ่ม1') return '❤️กลุ่ม1';
+    if (rawGroup === 'กลุ่ม2💫') return 'กลุ่ม2💫';
+    return (rawGroup as GroupType) || 'กลุ่ม 3 🧡';
+  };
+
+  // 1. Instant Cache Initialization (0ms from LocalStorage) with automatic 1 <-> 2 Swap Migration
   const [queues, setQueues] = useState<TarotQueueItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed: TarotQueueItem[] = JSON.parse(saved);
+
+      const MIGRATION_KEY = 'bear_tarot_groups_swapped_v2';
+      const hasSwapped = localStorage.getItem(MIGRATION_KEY);
+
+      if (!hasSwapped) {
+        const swapped = parsed.map((item) => ({
+          ...item,
+          group: swapLegacyGroup(item.group as string),
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(swapped));
+        localStorage.setItem(MIGRATION_KEY, 'true');
+        return swapped;
+      }
+
+      return parsed;
     } catch (e) {
       return [];
     }
@@ -109,14 +134,14 @@ export function TarotQueueManager() {
     }
   }, [queues]);
 
-  // Map Supabase DB row to local TarotQueueItem
+  // Map Supabase DB row to local TarotQueueItem with group normalization
   const mapDbRow = (row: any): TarotQueueItem => ({
     id: row.id,
     type: row.queue_type as QueueType,
     number: row.queue_number,
     customerName: row.customer_name || '',
     prediction: row.prediction || '',
-    group: row.queue_group as GroupType,
+    group: swapLegacyGroup(row.queue_group || ''),
     createdAt: new Date(row.created_at).getTime(),
     deadlineAt: new Date(row.deadline_at).getTime(),
     status: row.status as 'pending' | 'completed',
@@ -186,7 +211,7 @@ export function TarotQueueManager() {
   const [editCustomer, setEditCustomer] = useState('');
   const [editPrediction, setEditPrediction] = useState('');
   const [editType, setEditType] = useState<QueueType>('คิวเร่ง');
-  const [editGroup, setEditGroup] = useState<GroupType>('กลุ่ม 1');
+  const [editGroup, setEditGroup] = useState<GroupType>('❤️กลุ่ม1');
 
   // Dedicated Prediction Modal state
   const [predictionModalItem, setPredictionModalItem] = useState<TarotQueueItem | null>(null);
@@ -202,6 +227,40 @@ export function TarotQueueManager() {
   const handleRandomGroup = () => {
     const next = getRandomGroup();
     setCurrentGroup(next);
+  };
+
+  // Swap group 1 <-> group 2 across all queues
+  const handleSwapGroups = async () => {
+    const updated = queues.map((item) => {
+      const g = item.group as string;
+      let nextG: GroupType = item.group;
+      if (g === '❤️กลุ่ม1' || g === 'กลุ่ม 1' || g === 'กลุ่ม1') {
+        nextG = 'กลุ่ม2💫';
+      } else if (g === 'กลุ่ม2💫' || g === 'กลุ่ม 2❤️' || g === 'กลุ่ม 2' || g === 'กลุ่ม2') {
+        nextG = '❤️กลุ่ม1';
+      }
+      return { ...item, group: nextG };
+    });
+
+    setQueues(updated);
+    toast({
+      title: 'สลับข้อมูลกลุ่ม 1 ⇄ 2 เรียบร้อย!',
+      description: 'สลับคิวระหว่าง ❤️กลุ่ม1 ⇄ กลุ่ม2💫 ครบทุกคิวแล้ว',
+    });
+
+    // Background sync to Supabase
+    try {
+      for (const it of updated) {
+        if (!it.id.startsWith('temp_')) {
+          await supabase
+            .from('tarot_queues' as any)
+            .update({ queue_group: it.group })
+            .eq('id', it.id);
+        }
+      }
+    } catch (err) {
+      console.warn('Sync swapped groups error:', err);
+    }
   };
 
   // Open Prediction Modal
@@ -686,7 +745,11 @@ export function TarotQueueManager() {
                     onClick={() => setCurrentGroup(grp)}
                     className={`py-2 px-1 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                       currentGroup === grp
-                        ? 'bg-amber-600/20 border-amber-500 text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
+                        ? grp.includes('❤️')
+                          ? 'bg-rose-500/25 border-rose-500 text-rose-200 ring-1 ring-rose-500/50 shadow-sm'
+                          : grp.includes('💫')
+                          ? 'bg-amber-500/25 border-amber-400 text-amber-200 ring-1 ring-amber-400/50 shadow-sm'
+                          : 'bg-orange-500/25 border-orange-500 text-orange-200 ring-1 ring-orange-500/50 shadow-sm'
                         : 'bg-card/50 border-border text-muted-foreground hover:bg-card hover:text-foreground'
                     }`}
                   >
@@ -791,6 +854,16 @@ export function TarotQueueManager() {
 
           <div className="flex items-center gap-2 shrink-0">
             <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSwapGroups}
+              className="h-7 px-2 text-xs border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              title="สลับข้อมูลกลุ่ม 1 (❤️กลุ่ม1) และกลุ่ม 2 (กลุ่ม2💫) ของคิวทั้งหมด"
+            >
+              <Shuffle className="w-3 h-3 mr-1" />
+              สลับกลุ่ม 1 ⇄ 2
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={fetchFromDatabase}
@@ -857,7 +930,13 @@ export function TarotQueueManager() {
                       <td className="py-2.5 px-3">
                         <Badge
                           variant="outline"
-                          className="text-[10px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-300 border-amber-500/30 whitespace-nowrap"
+                          className={`text-[10px] font-medium py-0 px-1.5 whitespace-nowrap ${
+                            item.group.includes('❤️')
+                              ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              : item.group.includes('💫')
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                          }`}
                         >
                           {item.group}
                         </Badge>
@@ -1167,7 +1246,13 @@ export function TarotQueueManager() {
 
                         <Badge
                           variant="outline"
-                          className="text-[11px] py-0 px-2 font-medium bg-amber-500/10 text-amber-300 border-amber-500/30"
+                          className={`text-[11px] py-0 px-2 font-medium ${
+                            item.group.includes('❤️')
+                              ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              : item.group.includes('💫')
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                          }`}
                         >
                           {item.group}
                         </Badge>

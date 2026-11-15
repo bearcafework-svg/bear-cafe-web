@@ -15,6 +15,15 @@ CREATE TABLE IF NOT EXISTS public.tarot_queues (
 -- Ensure prediction column exists if table was already created
 ALTER TABLE public.tarot_queues ADD COLUMN IF NOT EXISTS prediction TEXT DEFAULT '';
 
+-- Swap legacy group 1 -> 2 and group 2 -> 1
+UPDATE public.tarot_queues
+SET queue_group = CASE
+    WHEN queue_group LIKE '%กลุ่ม 1%' OR queue_group LIKE '%กลุ่ม1%' THEN 'กลุ่ม2💫'
+    WHEN queue_group LIKE '%กลุ่ม 2%' OR queue_group LIKE '%กลุ่ม2%' THEN '❤️กลุ่ม1'
+    ELSE queue_group
+END
+WHERE queue_group LIKE '%กลุ่ม 1%' OR queue_group LIKE '%กลุ่ม1%' OR queue_group LIKE '%กลุ่ม 2%' OR queue_group LIKE '%กลุ่ม2%';
+
 -- Index for instant sorting and queries (speed optimization)
 CREATE INDEX IF NOT EXISTS idx_tarot_queues_created_at ON public.tarot_queues(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tarot_queues_status ON public.tarot_queues(status);
