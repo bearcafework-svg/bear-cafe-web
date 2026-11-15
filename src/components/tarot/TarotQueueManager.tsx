@@ -14,7 +14,9 @@ import {
   Sparkles,
   Calendar,
   X,
-  Search
+  Search,
+  ArrowUpDown,
+  ListOrdered
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -229,10 +231,15 @@ export function TarotQueueManager() {
     toast({ title: 'บันทึกการแก้ไขแล้ว' });
   };
 
-  // Filtered Queues
+  // Sorted Queues (Chronological: Newest to Oldest)
+  const chronologicalQueues = useMemo(() => {
+    return [...queues].sort((a, b) => b.createdAt - a.createdAt);
+  }, [queues]);
+
+  // Filtered Queues for Cards/View
   const filteredQueues = useMemo(() => {
     const q = searchFilter.trim().toLowerCase();
-    return queues.filter((item) => {
+    return chronologicalQueues.filter((item) => {
       if (statusFilter === 'pending' && item.status !== 'pending') return false;
       if (statusFilter === 'completed' && item.status !== 'completed') return false;
 
@@ -244,7 +251,7 @@ export function TarotQueueManager() {
         item.group.toLowerCase().includes(q)
       );
     });
-  }, [queues, searchFilter, statusFilter]);
+  }, [chronologicalQueues, searchFilter, statusFilter]);
 
   // Statistics
   const pendingCount = useMemo(() => queues.filter((q) => q.status === 'pending').length, [queues]);
@@ -470,7 +477,157 @@ export function TarotQueueManager() {
         </form>
       </div>
 
-      {/* 📊 FILTER & SEARCH BAR */}
+      {/* 📜 ตารางรวมคิวทั้งหมด (เรียงตามลำดับการกรอก ใหม่-เก่า) - เลื่อนดูใน Card ได้ทันที ไม่ต้องเลื่อนลงสุดเว็บ */}
+      <div className="bg-card/75 border border-border/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+        {/* Card Header */}
+        <div className="p-3.5 sm:p-4 border-b border-border/60 bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+              <ArrowUpDown className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-foreground">
+                  ตารางรวมคิวทั้งหมด
+                </h3>
+                <Badge variant="outline" className="text-[10px] font-normal bg-amber-500/10 text-amber-400 border-amber-500/30 px-1.5 py-0">
+                  เรียง: ใหม่ ➔ เก่า
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                เลื่อนดูข้อมูลได้ใน Card นี้เลย ไม่ต้องเลื่อนลงสุดหน้าเว็บ (ทั้งหมด {queues.length} รายการ)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="secondary" className="text-xs">
+              รอ {pendingCount} / เสร็จ {completedCount}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Scrollable Table Content (Max-Height Card with internal scrolling) */}
+        <div className="max-h-[380px] sm:max-h-[440px] overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent">
+          {chronologicalQueues.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-xs">
+              ยังไม่มีคิวในตาราง เพิ่มคิวจากฟอร์มด้านบนได้เลยครับ
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-md text-[11px] font-semibold text-muted-foreground border-b border-border/60 select-none shadow-sm">
+                <tr>
+                  <th className="py-2.5 px-3 w-10 text-center">#</th>
+                  <th className="py-2.5 px-3 min-w-[110px]">ชื่อคิว</th>
+                  <th className="py-2.5 px-3 min-w-[90px]">กลุ่ม</th>
+                  <th className="py-2.5 px-3 min-w-[140px]">ลูกค้า / รายละเอียด</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">เวลาที่บันทึก (ไทย)</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">นับเวลาถอยหลัง / สถานะ</th>
+                  <th className="py-2.5 px-3 min-w-[110px] text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {chronologicalQueues.map((item, index) => {
+                  const fullTitle = `${item.type} ${item.number}`;
+                  const isDone = item.status === 'completed';
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`hover:bg-muted/40 transition-colors ${
+                        isDone ? 'bg-muted/10 opacity-70' : 'bg-transparent'
+                      }`}
+                    >
+                      {/* Row Index */}
+                      <td className="py-2.5 px-3 text-center text-muted-foreground/70 font-mono text-[11px]">
+                        {index + 1}
+                      </td>
+
+                      {/* Queue Title */}
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className={isDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
+                            {fullTitle}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Group */}
+                      <td className="py-2.5 px-3">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-300 border-amber-500/30 whitespace-nowrap"
+                        >
+                          {item.group}
+                        </Badge>
+                      </td>
+
+                      {/* Customer / Note */}
+                      <td className="py-2.5 px-3 max-w-[200px] truncate" title={item.customerName}>
+                        {item.customerName ? (
+                          <span className={isDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
+                            {item.customerName}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50 italic text-[11px]">ไม่มีหมายเหตุ</span>
+                        )}
+                      </td>
+
+                      {/* Thai Timestamp */}
+                      <td className="py-2.5 px-3 text-muted-foreground text-[11px] whitespace-nowrap">
+                        {formatThaiDateTime(item.createdAt)}
+                      </td>
+
+                      {/* Realtime Countdown */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {renderCountdown(item)}
+                      </td>
+
+                      {/* Action Buttons */}
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleComplete(item.id)}
+                            className={`p-1.5 rounded-lg border transition-all ${
+                              isDone
+                                ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
+                                : 'border-border hover:border-emerald-500 text-muted-foreground hover:text-emerald-400'
+                            }`}
+                            title={isDone ? 'ย้อนกลับ' : 'เสร็จแล้ว'}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => startEditing(item)}
+                            className="p-1.5 rounded-lg border border-border hover:border-amber-500 text-muted-foreground hover:text-amber-400 transition-all"
+                            title="แก้ไข"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item.id, fullTitle)}
+                            className="p-1.5 rounded-lg border border-border hover:border-rose-500 text-muted-foreground hover:text-rose-400 transition-all"
+                            title="ลบ"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* 📊 FILTER & SEARCH BAR (สำหรับมุมมองการ์ดด้านล่าง) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card/40 border border-border/60 rounded-xl p-3">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
@@ -526,14 +683,11 @@ export function TarotQueueManager() {
         </div>
       </div>
 
-      {/* 📋 QUEUE TABLE / LIST */}
+      {/* 📋 QUEUE CARDS LIST */}
       {filteredQueues.length === 0 ? (
-        <div className="text-center py-16 bg-card/20 rounded-2xl border border-dashed border-border/60">
-          <Clock className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-muted-foreground text-sm">ยังไม่มีรายการคิว</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">
-            พิมพ์เลขคิวที่ช่องด้านบนแล้วกด Enter เพื่อเพิ่มคิวได้เลยครับ
-          </p>
+        <div className="text-center py-12 bg-card/20 rounded-2xl border border-dashed border-border/60">
+          <Clock className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+          <p className="text-muted-foreground text-xs">ไม่พบคิวที่ตรงกับเงื่อนไขการค้นหา</p>
         </div>
       ) : (
         <div className="space-y-2">
