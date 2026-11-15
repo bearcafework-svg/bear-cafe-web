@@ -348,10 +348,6 @@ export default function TarotPage() {
                 )}
               </div>
             </div>
-              </Button>
-            )}
-          </div>
-        </div>
 
         {/* Search & Filter Controls */}
         <div className="space-y-3">
