@@ -579,7 +579,46 @@ export default function TarotPage() {
 
       {/* Sticky Bottom Action Bar (Only visible in Tarot Picker mode) */}
       {pageMode === 'picker' && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-2xl p-3 sm:p-4">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-2xl p-3 sm:p-4 space-y-2.5">
+          {/* Selected Cards Chips Tray: Quick removal without scrolling */}
+          {selectedCards.length > 0 && (
+            <div className="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              <span className="text-[11px] text-muted-foreground shrink-0 font-medium mr-1 flex items-center gap-1">
+                <span>ไพ่ที่เลือก ({selectedCards.length}):</span>
+              </span>
+              {selectedCards.map((item) => {
+                const cardData = TAROT_CARDS.find((c) => c.name === item.name);
+                const displayName = copyFormat === 'th' && cardData ? cardData.thaiName.split(' (')[0] : item.name;
+
+                return (
+                  <div
+                    key={item.name}
+                    className={`inline-flex items-center gap-1.5 py-1 pl-2.5 pr-1.5 rounded-lg border text-xs font-medium shrink-0 shadow-sm transition-all ${
+                      item.isReversed
+                        ? 'bg-purple-950/60 border-purple-500/60 text-purple-200'
+                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                    }`}
+                  >
+                    <span>
+                      {displayName}
+                      {item.isReversed && (
+                        <span className="ml-1 text-[10px] text-purple-300/80 font-normal">(กลับหัว)</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleCard(item.name)}
+                      className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/40 text-muted-foreground hover:text-rose-400 transition-colors ml-0.5"
+                      title={`เอา ${item.name} ออก`}
+                    >
+                      <X className="w-3 h-3 stroke-[2.5]" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Output Preview */}
             <div className="flex-1 min-w-0 flex items-center gap-2 bg-card/70 border border-border/80 rounded-xl px-3 py-1.5 focus-within:border-amber-500">

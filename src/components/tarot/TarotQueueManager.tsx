@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Clock, 
   Check, 
@@ -16,7 +17,7 @@ import {
   X,
   Search,
   ArrowUpDown,
-  ListOrdered
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,16 +68,17 @@ const STORAGE_KEY = 'bear_tarot_queues_v1';
 export function TarotQueueManager() {
   const { toast } = useToast();
 
-  // Load from localStorage
+  // 1. Instant Cache Initialization (0ms from LocalStorage)
   const [queues, setQueues] = useState<TarotQueueItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
-      console.error('Failed to load queues from localStorage:', e);
       return [];
     }
   });
+
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Current time for countdown calculation (ticks every second)
   const [now, setNow] = useState(Date.now());
@@ -86,14 +88,74 @@ export function TarotQueueManager() {
     return () => clearInterval(timer);
   }, []);
 
-  // Save to localStorage whenever queues change
+  // Sync state to LocalStorage cache
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(queues));
     } catch (e) {
-      console.error('Failed to save queues to localStorage:', e);
+      console.error('Failed to save to local cache:', e);
     }
   }, [queues]);
+
+  // Map Supabase DB row to local TarotQueueItem
+  const mapDbRow = (row: any): TarotQueueItem => ({
+    id: row.id,
+    type: row.queue_type as QueueType,
+    number: row.queue_number,
+    customerName: row.customer_name || '',
+    group: row.queue_group as GroupType,
+    createdAt: new Date(row.created_at).getTime(),
+    deadlineAt: new Date(row.deadline_at).getTime(),
+    status: row.status as 'pending' | 'completed',
+    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
+  });
+
+  // Fetch queues from Supabase in background
+  const fetchFromDatabase = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      const { data, error } = await supabase
+        .from('tarot_queues' as any)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // If table not created yet or RLS blocked, silent fallback to local cache
+        console.warn('[TarotQueue] Supabase fetch fallback to local:', error.message);
+        return;
+      }
+
+      if (data && Array.isArray(data)) {
+        const mapped = data.map(mapDbRow);
+        setQueues(mapped);
+      }
+    } catch (err) {
+      console.warn('[TarotQueue] Network error:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // On mount: fetch DB and subscribe to Realtime
+  useEffect(() => {
+    fetchFromDatabase();
+
+    // Supabase Realtime channel for live cross-device sync
+    const channel = supabase
+      .channel('public:tarot_queues')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tarot_queues' },
+        () => {
+          fetchFromDatabase();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchFromDatabase]);
 
   // Form Inputs for Quick Add
   const [selectedType, setSelectedType] = useState<QueueType>('คิวเร่ง');
@@ -122,8 +184,8 @@ export function TarotQueueManager() {
     setCurrentGroup(next);
   };
 
-  // Add new queue (Fast entry on Enter)
-  const handleAddQueue = (e?: React.FormEvent) => {
+  // Add new queue (0ms Optimistic UI + Background DB Sync)
+  const handleAddQueue = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     const numTrimmed = queueNumber.trim();
@@ -140,9 +202,10 @@ export function TarotQueueManager() {
     const createdAt = Date.now();
     const duration = getDurationMs(selectedType);
     const deadlineAt = selectedType === 'คิว V' ? createdAt : createdAt + duration;
+    const optimisticId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     const newItem: TarotQueueItem = {
-      id: `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: optimisticId,
       type: selectedType,
       number: numTrimmed,
       customerName: customerName.trim(),
@@ -152,48 +215,107 @@ export function TarotQueueManager() {
       status: 'pending',
     };
 
+    // ⚡ STEP 1: Update UI instantly in 0ms
     setQueues((prev) => [newItem, ...prev]);
 
-    // Reset fields for the next quick entry
+    // Reset inputs immediately for next queue
     setCustomerName('');
     setQueueNumber('');
-    setCurrentGroup(getRandomGroup()); // Randomize for next queue
+    setCurrentGroup(getRandomGroup());
 
-    // Re-focus number input for speedy continuous entry
     setTimeout(() => {
       numInputRef.current?.focus();
     }, 50);
 
     toast({
       title: `เพิ่ม ${selectedType} ${numTrimmed} สำเร็จ!`,
-      description: `กลุ่ม: ${newItem.group} • สร้างเวลา ${formatThaiDateTime(createdAt)}`,
+      description: `กลุ่ม: ${newItem.group} • ${formatThaiDateTime(createdAt)}`,
     });
+
+    // 🛡️ STEP 2: Background Supabase Insert
+    try {
+      const { data, error } = await supabase
+        .from('tarot_queues' as any)
+        .insert({
+          queue_type: selectedType,
+          queue_number: numTrimmed,
+          customer_name: newItem.customerName,
+          queue_group: newItem.group,
+          deadline_at: new Date(deadlineAt).toISOString(),
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (data && !error) {
+        // Replace temp optimistic id with true database UUID
+        setQueues((prev) =>
+          prev.map((item) => (item.id === optimisticId ? mapDbRow(data) : item))
+        );
+      }
+    } catch (err) {
+      console.warn('[TarotQueue] Async DB insert deferred:', err);
+    }
   };
 
-  // Toggle Complete / Pending
-  const toggleComplete = (id: string) => {
+  // Toggle Complete / Pending (0ms Optimistic + Background DB Sync)
+  const toggleComplete = async (id: string) => {
+    let targetItem: TarotQueueItem | undefined;
+    let nextStatus: 'pending' | 'completed' = 'completed';
+
+    // ⚡ STEP 1: Update UI instantly in 0ms
     setQueues((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           const isDone = item.status === 'completed';
-          return {
+          nextStatus = isDone ? 'pending' : 'completed';
+          targetItem = {
             ...item,
-            status: isDone ? 'pending' : 'completed',
+            status: nextStatus,
             completedAt: isDone ? undefined : Date.now(),
           };
+          return targetItem;
         }
         return item;
       })
     );
+
+    // 🛡️ STEP 2: Background DB Sync
+    if (id && !id.startsWith('temp_')) {
+      try {
+        await supabase
+          .from('tarot_queues' as any)
+          .update({
+            status: nextStatus,
+            completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('[TarotQueue] Async DB update deferred:', err);
+      }
+    }
   };
 
-  // Delete Queue directly
-  const handleDelete = (id: string, label: string) => {
+  // Delete Queue directly (0ms Optimistic + Background DB Sync)
+  const handleDelete = async (id: string, label: string) => {
+    // ⚡ STEP 1: Update UI instantly in 0ms
     setQueues((prev) => prev.filter((item) => item.id !== id));
     toast({
       title: 'ลบคิวเรียบร้อย',
       description: `ลบ ${label} แล้ว`,
     });
+
+    // 🛡️ STEP 2: Background DB Sync
+    if (id && !id.startsWith('temp_')) {
+      try {
+        await supabase
+          .from('tarot_queues' as any)
+          .delete()
+          .eq('id', id);
+      } catch (err) {
+        console.warn('[TarotQueue] Async DB delete deferred:', err);
+      }
+    }
   };
 
   // Start Editing
@@ -205,16 +327,19 @@ export function TarotQueueManager() {
     setEditGroup(item.group);
   };
 
-  // Save Edit
-  const saveEdit = (id: string) => {
+  // Save Edit (0ms Optimistic + Background DB Sync)
+  const saveEdit = async (id: string) => {
     if (!editNumber.trim()) {
       toast({ title: 'เลขคิวต้องไม่ว่างเปล่า', variant: 'destructive' });
       return;
     }
+
+    const duration = getDurationMs(editType);
+
+    // ⚡ STEP 1: Update UI instantly in 0ms
     setQueues((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const duration = getDurationMs(editType);
           return {
             ...item,
             type: editType,
@@ -229,6 +354,23 @@ export function TarotQueueManager() {
     );
     setEditingId(null);
     toast({ title: 'บันทึกการแก้ไขแล้ว' });
+
+    // 🛡️ STEP 2: Background DB Sync
+    if (id && !id.startsWith('temp_')) {
+      try {
+        await supabase
+          .from('tarot_queues' as any)
+          .update({
+            queue_type: editType,
+            queue_number: editNumber.trim(),
+            customer_name: editCustomer.trim(),
+            queue_group: editGroup,
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('[TarotQueue] Async DB edit deferred:', err);
+      }
+    }
   };
 
   // Sorted Queues (Chronological: Newest to Oldest)
@@ -333,6 +475,12 @@ export function TarotQueueManager() {
           </div>
 
           <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            {isSyncing && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 mr-1 animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                ซิงค์คลาวด์...
+              </span>
+            )}
             <Badge variant="outline" className="text-xs bg-amber-500/5 text-amber-400 border-amber-500/30">
               รออยู่: <strong>{pendingCount}</strong> คิว
             </Badge>
@@ -501,6 +649,16 @@ export function TarotQueueManager() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchFromDatabase}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              title="รีเฟรชจากคลาวด์"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+              รีเฟรช
+            </Button>
             <Badge variant="secondary" className="text-xs">
               รอ {pendingCount} / เสร็จ {completedCount}
             </Badge>
