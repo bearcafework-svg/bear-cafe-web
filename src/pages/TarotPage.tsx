@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { TAROT_CARDS, TarotCard } from '@/data/tarotCards';
+import { TarotQueueManager } from '@/components/tarot/TarotQueueManager';
 import { 
   Search, 
   Copy, 
@@ -19,7 +20,8 @@ import {
   X,
   Image as ImageIcon,
   ImageOff,
-  RotateCw
+  RotateCw,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +74,7 @@ export default function TarotPage() {
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [pageMode, setPageMode] = useState<'queue' | 'picker'>('queue');
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [selectedCards, setSelectedCards] = useState<SelectedCardItem[]>([]);
   const [copied, setCopied] = useState(false);
@@ -220,91 +223,131 @@ export default function TarotPage() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-36">
       {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/')}
-              className="text-muted-foreground hover:text-foreground -ml-2"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              หน้าแรก
-            </Button>
-            <div className="h-4 w-[1px] bg-border" />
+      <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 sm:px-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg">🔮</span>
-              <h1 className="font-semibold text-base sm:text-lg text-foreground">Tarot Card Picker</h1>
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-xs hidden sm:inline-flex">
-                Owner Only
-              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="text-muted-foreground hover:text-foreground -ml-2 h-8 px-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                หน้าแรก
+              </Button>
+              <div className="h-4 w-[1px] bg-border" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg">🔮</span>
+                <h1 className="font-bold text-sm sm:text-base text-foreground">ระบบทาโรต์ & จัดการคิว</h1>
+              </div>
             </div>
+
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] px-2 py-0.5">
+              Owner Only
+            </Badge>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Toggle Image Mode for bandwidth conservation */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowImages(!showImages)}
-              className="text-xs h-8 gap-1.5 hidden sm:inline-flex text-muted-foreground hover:text-foreground"
-              title="สลับโหมดเปิด/ซ่อนรูปเพื่อประหยัดเน็ต"
+          {/* Navigation Mode Switcher Pills */}
+          <div className="flex items-center justify-center gap-1 bg-card/80 border border-border p-1 rounded-xl shadow-inner">
+            <button
+              type="button"
+              onClick={() => setPageMode('queue')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                pageMode === 'queue'
+                  ? 'bg-amber-500 text-black shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {showImages ? (
-                <>
-                  <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
-                  รูปภาพ (เปิด)
-                </>
-              ) : (
-                <>
-                  <ImageOff className="w-3.5 h-3.5 text-muted-foreground" />
-                  โหมดประหยัดเน็ต (ซ่อนรูป)
-                </>
+              <Clock className="w-3.5 h-3.5" />
+              <span>ตารางคิวดูดวง</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageMode('picker')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                pageMode === 'picker'
+                  ? 'bg-amber-500 text-black shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>เลือกไพ่ทาโรต์ (78 ใบ)</span>
+              {selectedCards.length > 0 && (
+                <span className="ml-1 bg-black/20 text-black px-1.5 py-0.2 rounded-full text-[10px]">
+                  {selectedCards.length}
+                </span>
               )}
-            </Button>
-
-            <Badge variant="secondary" className="text-xs font-normal">
-              เลือกแล้ว: <strong className="ml-1 text-primary">{selectedCards.length}</strong> / 78 ใบ
-            </Badge>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Description & Overview */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/50 border border-border/60 rounded-2xl p-4 sm:p-5">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              คัดเลือกไพ่ทาโรต์ 78 ใบ (รองรับไพ่กลับหัว)
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              คลิกการ์ดเพื่อเลือก/ยกเลิก • กดปุ่ม <strong>🔄 กลับหัว</strong> บนการ์ดเพื่อตั้งค่าไพ่กลับหัว • เมื่อกดคัดลอกจะมี <code>(กลับหัว)</code> ต่อท้ายให้อัตโนมัติ
-            </p>
-          </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {pageMode === 'queue' ? (
+          /* TAB 1: Queue Manager Table */
+          <TarotQueueManager />
+        ) : (
+          /* TAB 2: Tarot Card Picker */
+          <div className="space-y-6">
+            {/* Description & Overview */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/50 border border-border/60 rounded-2xl p-4 sm:p-5">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  คัดเลือกไพ่ทาโรต์ 78 ใบ (รองรับไพ่กลับหัว)
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                  คลิกการ์ดเพื่อเลือก/ยกเลิก • กดปุ่ม <strong>🔄 กลับหัว</strong> บนการ์ดเพื่อตั้งค่าไพ่กลับหัว • เมื่อกดคัดลอกจะมี <code>(กลับหัว)</code> ต่อท้ายให้อัตโนมัติ
+                </p>
+              </div>
 
-          {/* Quick Clear & Select All */}
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={selectAllVisible}
-              className="text-xs h-8"
-              disabled={filteredCards.length === 0}
-            >
-              เลือกทั้งหมด ({filteredCards.length})
-            </Button>
-            {selectedCards.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                className="text-xs h-8 text-rose-400 hover:text-rose-500 hover:bg-rose-500/10"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
-                ล้าง ({selectedCards.length})
+              {/* Quick Clear & Select All & Image Toggle */}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImages(!showImages)}
+                  className="text-xs h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                  title="สลับโหมดเปิด/ซ่อนรูปเพื่อประหยัดเน็ต"
+                >
+                  {showImages ? (
+                    <>
+                      <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                      รูปภาพ (เปิด)
+                    </>
+                  ) : (
+                    <>
+                      <ImageOff className="w-3.5 h-3.5 text-muted-foreground" />
+                      โหมดประหยัดเน็ต
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={selectAllVisible}
+                  className="text-xs h-8"
+                  disabled={filteredCards.length === 0}
+                >
+                  เลือกทั้งหมด ({filteredCards.length})
+                </Button>
+
+                {selectedCards.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                    className="text-xs h-8 text-rose-400 hover:text-rose-500 hover:bg-rose-500/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    ล้าง ({selectedCards.length})
+                  </Button>
+                )}
+              </div>
+            </div>
               </Button>
             )}
           </div>
@@ -534,89 +577,93 @@ export default function TarotPage() {
             })}
           </div>
         )}
+          </div>
+        )}
       </main>
 
-      {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-2xl p-3 sm:p-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Output Preview */}
-          <div className="flex-1 min-w-0 flex items-center gap-2 bg-card/70 border border-border/80 rounded-xl px-3 py-1.5 focus-within:border-amber-500">
-            <span className="text-xs text-muted-foreground shrink-0 font-medium hidden sm:inline">
-              ผลลัพธ์ ({selectedCards.length}):
-            </span>
-            <input
-              type="text"
-              readOnly
-              value={copiedString}
-              onClick={(e) => (e.target as HTMLInputElement).select()}
-              placeholder="ยังไม่ได้เลือกไพ่ (คลิกเลือกไพ่ที่ต้องการด้านบน)"
-              className="flex-1 bg-transparent font-mono text-xs text-amber-400 placeholder:text-muted-foreground/60 placeholder:italic outline-none w-full cursor-pointer select-all"
-            />
-            {selectedCards.length > 0 && (
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="text-muted-foreground hover:text-rose-400 p-1 rounded transition-colors shrink-0"
-                title="ล้างทั้งหมด"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Action Buttons & Format Options */}
-          <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
-            {/* Format toggle: EN vs TH */}
-            <div className="flex items-center bg-card border border-border rounded-lg p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setCopyFormat('en')}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  copyFormat === 'en'
-                    ? 'bg-amber-600 text-white font-medium'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                อังกฤษ (EN)
-              </button>
-              <button
-                type="button"
-                onClick={() => setCopyFormat('th')}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  copyFormat === 'th'
-                    ? 'bg-amber-600 text-white font-medium'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                ไทย (TH)
-              </button>
+      {/* Sticky Bottom Action Bar (Only visible in Tarot Picker mode) */}
+      {pageMode === 'picker' && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-2xl p-3 sm:p-4">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Output Preview */}
+            <div className="flex-1 min-w-0 flex items-center gap-2 bg-card/70 border border-border/80 rounded-xl px-3 py-1.5 focus-within:border-amber-500">
+              <span className="text-xs text-muted-foreground shrink-0 font-medium hidden sm:inline">
+                ผลลัพธ์ ({selectedCards.length}):
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={copiedString}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                placeholder="ยังไม่ได้เลือกไพ่ (คลิกเลือกไพ่ที่ต้องการด้านบน)"
+                className="flex-1 bg-transparent font-mono text-xs text-amber-400 placeholder:text-muted-foreground/60 placeholder:italic outline-none w-full cursor-pointer select-all"
+              />
+              {selectedCards.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-muted-foreground hover:text-rose-400 p-1 rounded transition-colors shrink-0"
+                  title="ล้างทั้งหมด"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Copy Button */}
-            <Button
-              onClick={handleCopy}
-              disabled={selectedCards.length === 0}
-              className={`h-10 px-5 rounded-xl font-medium shadow-md transition-all ${
-                copied
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-amber-500 hover:bg-amber-600 text-black'
-              }`}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 mr-1.5" />
-                  คัดลอกแล้ว!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 mr-1.5" />
-                  คัดลอกชื่อไพ่ ({selectedCards.length})
-                </>
-              )}
-            </Button>
+            {/* Action Buttons & Format Options */}
+            <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
+              {/* Format toggle: EN vs TH */}
+              <div className="flex items-center bg-card border border-border rounded-lg p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCopyFormat('en')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    copyFormat === 'en'
+                      ? 'bg-amber-600 text-white font-medium'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  อังกฤษ (EN)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCopyFormat('th')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    copyFormat === 'th'
+                      ? 'bg-amber-600 text-white font-medium'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  ไทย (TH)
+                </button>
+              </div>
+
+              {/* Copy Button */}
+              <Button
+                onClick={handleCopy}
+                disabled={selectedCards.length === 0}
+                className={`h-10 px-5 rounded-xl font-medium shadow-md transition-all ${
+                  copied
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-black'
+                }`}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5" />
+                    คัดลอกแล้ว!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-1.5" />
+                    คัดลอกชื่อไพ่ ({selectedCards.length})
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
