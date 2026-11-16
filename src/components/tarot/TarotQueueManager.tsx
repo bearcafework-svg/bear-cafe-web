@@ -536,13 +536,16 @@ export function TarotQueueManager() {
           customer_name: newItem.customerName,
           prediction: newItem.prediction,
           queue_group: newItem.group,
+          created_at: new Date(createdAt).toISOString(),
           deadline_at: new Date(deadlineAt).toISOString(),
           status: 'pending',
         })
         .select()
         .single();
 
-      if (data && !error) {
+      if (error) {
+        console.error('[TarotQueue] Supabase insert error:', error);
+      } else if (data) {
         setQueues((prev) =>
           prev.map((item) => (item.id === optimisticId ? mapDbRow(data) : item))
         );

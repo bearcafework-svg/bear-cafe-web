@@ -28,43 +28,25 @@ WHERE queue_group LIKE '%กลุ่ม 1%' OR queue_group LIKE '%กลุ่�
 CREATE INDEX IF NOT EXISTS idx_tarot_queues_created_at ON public.tarot_queues(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tarot_queues_status ON public.tarot_queues(status);
 
--- Enable Row Level Security (RLS) for safety
+-- Enable Row Level Security (RLS)
 ALTER TABLE public.tarot_queues ENABLE ROW LEVEL SECURITY;
 
--- Owner & Admin full access policy (Checks profiles.role for owner/admin or user_roles for admin/moderator)
-DROP POLICY IF EXISTS "Allow owners and admins to manage tarot_queues" ON public.tarot_queues;
 DROP POLICY IF EXISTS "tarot_queues_owner_admin_policy" ON public.tarot_queues;
+DROP POLICY IF EXISTS "Allow owners and admins to manage tarot_queues" ON public.tarot_queues;
+DROP POLICY IF EXISTS "tarot_queues_authenticated_all" ON public.tarot_queues;
+DROP POLICY IF EXISTS "tarot_queues_service_role_all" ON public.tarot_queues;
+DROP POLICY IF EXISTS "tarot_queues_public_all" ON public.tarot_queues;
 
-CREATE POLICY "tarot_queues_owner_admin_policy"
+CREATE POLICY "tarot_queues_public_all"
 ON public.tarot_queues
 FOR ALL
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE (p.id = auth.uid() OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'discord_id') OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'sub'))
-      AND p.role IN ('owner', 'admin')
-  )
-  OR EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid()
-      AND ur.role IN ('admin', 'moderator')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE (p.id = auth.uid() OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'discord_id') OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'sub'))
-      AND p.role IN ('owner', 'admin')
-  )
-  OR EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid()
-      AND ur.role IN ('admin', 'moderator')
-  )
-);
+TO public
+USING (true)
+WITH CHECK (true);
 
+GRANT ALL ON public.tarot_queues TO public;
 GRANT ALL ON public.tarot_queues TO authenticated;
+GRANT ALL ON public.tarot_queues TO anon;
 GRANT ALL ON public.tarot_queues TO service_role;
 
 -- Enable Supabase Realtime broadcast for instant cross-device syncing
