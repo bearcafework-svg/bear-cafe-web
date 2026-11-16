@@ -20,7 +20,8 @@ import {
   RefreshCw,
   ScrollText,
   Copy,
-  FileText
+  FileText,
+  UploadCloud
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,7 +136,7 @@ export function TarotQueueManager() {
   }, [queues]);
 
   // Map Supabase DB row to local TarotQueueItem with group normalization
-  const mapDbRow = (row: any): TarotQueueItem => ({
+  const mapDbRow = useCallback((row: any): TarotQueueItem => ({
     id: row.id,
     type: row.queue_type as QueueType,
     number: row.queue_number,
@@ -146,7 +147,71 @@ export function TarotQueueManager() {
     deadlineAt: new Date(row.deadline_at).getTime(),
     status: row.status as 'pending' | 'completed',
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
-  });
+  }), []);
+
+  // Auto-sync or manual sync local queues to Supabase Cloud so all devices see the same data
+  const syncLocalToCloud = useCallback(async (customList?: TarotQueueItem[]) => {
+    try {
+      setIsSyncing(true);
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const listToSync = customList || (saved ? JSON.parse(saved) : []);
+      if (!listToSync || listToSync.length === 0) {
+        setIsSyncing(false);
+        return;
+      }
+
+      // Check what exists in DB currently
+      const { data: dbData } = await supabase
+        .from('tarot_queues' as any)
+        .select('id, queue_type, queue_number, created_at');
+
+      const existingKeys = new Set(
+        (dbData || []).map((row: any) => `${row.queue_type}_${row.queue_number}_${new Date(row.created_at).getTime()}`)
+      );
+
+      let syncedCount = 0;
+      for (const item of listToSync) {
+        const itemKey = `${item.type}_${item.number}_${item.createdAt}`;
+        // If not in DB, upload it!
+        if (!existingKeys.has(itemKey)) {
+          const { error } = await supabase.from('tarot_queues' as any).insert({
+            queue_type: item.type,
+            queue_number: item.number,
+            customer_name: item.customerName || '',
+            prediction: item.prediction || '',
+            queue_group: item.group,
+            created_at: new Date(item.createdAt).toISOString(),
+            deadline_at: new Date(item.deadlineAt).toISOString(),
+            status: item.status,
+            completed_at: item.completedAt ? new Date(item.completedAt).toISOString() : null,
+          });
+
+          if (!error) syncedCount++;
+        }
+      }
+
+      if (syncedCount > 0) {
+        toast({
+          title: '☁️ ซิงค์ข้อมูลขึ้นคลาวด์แล้ว!',
+          description: `นำข้อมูล ${syncedCount} รายการขึ้นระบบเรียบร้อย ทุกเครื่องจะเห็นข้อมูลตรงกัน`,
+        });
+      }
+
+      // Refresh from DB after syncing
+      const { data: refreshed } = await supabase
+        .from('tarot_queues' as any)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (refreshed && Array.isArray(refreshed) && refreshed.length > 0) {
+        setQueues(refreshed.map(mapDbRow));
+      }
+    } catch (err) {
+      console.warn('[TarotQueue] syncLocalToCloud error:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [mapDbRow, toast]);
 
   // Fetch queues from Supabase in background
   const fetchFromDatabase = useCallback(async () => {
@@ -163,15 +228,29 @@ export function TarotQueueManager() {
       }
 
       if (data && Array.isArray(data)) {
-        const mapped = data.map(mapDbRow);
-        setQueues(mapped);
+        if (data.length > 0) {
+          const mapped = data.map(mapDbRow);
+          setQueues(mapped);
+        } else {
+          // Cloud has 0 items! If this device has local data, auto-seed it to cloud
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            try {
+              const localParsed: TarotQueueItem[] = JSON.parse(saved);
+              if (localParsed.length > 0) {
+                console.log('[TarotQueue] Seeding local queues to empty Supabase cloud...');
+                syncLocalToCloud(localParsed);
+              }
+            } catch (e) {}
+          }
+        }
       }
     } catch (err) {
       console.warn('[TarotQueue] Network error:', err);
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [mapDbRow, syncLocalToCloud]);
 
   // On mount: fetch DB and subscribe to Realtime
   useEffect(() => {
@@ -897,6 +976,16 @@ export function TarotQueueManager() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncLocalToCloud()}
+              className="h-7 px-2 text-xs border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              title="ซิงค์ข้อมูลในเครื่องนี้ขึ้นคลาวด์ เพื่อให้อุปกรณ์อื่นมองเห็นข้อมูลเดียวกัน"
+            >
+              <UploadCloud className={`w-3 h-3 mr-1 ${isSyncing ? 'animate-pulse text-amber-400' : ''}`} />
+              ซิงค์ขึ้นคลาวด์
+            </Button>
             <Button
               variant="outline"
               size="sm"

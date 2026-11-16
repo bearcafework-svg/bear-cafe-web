@@ -31,19 +31,41 @@ CREATE INDEX IF NOT EXISTS idx_tarot_queues_status ON public.tarot_queues(status
 -- Enable Row Level Security (RLS) for safety
 ALTER TABLE public.tarot_queues ENABLE ROW LEVEL SECURITY;
 
--- Owner & Admin full access policy
-CREATE POLICY "Allow owners and admins to manage tarot_queues"
+-- Owner & Admin full access policy (Checks profiles.role for owner/admin or user_roles for admin/moderator)
+DROP POLICY IF EXISTS "Allow owners and admins to manage tarot_queues" ON public.tarot_queues;
+DROP POLICY IF EXISTS "tarot_queues_owner_admin_policy" ON public.tarot_queues;
+
+CREATE POLICY "tarot_queues_owner_admin_policy"
 ON public.tarot_queues
 FOR ALL
 TO authenticated
 USING (
-  public.has_role(public.get_profile_by_discord_id(public.get_jwt_discord_id()), 'moderator'::public.app_role)
-  OR public.has_role(public.get_profile_by_discord_id(public.get_jwt_discord_id()), 'admin'::public.app_role)
+  EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE (p.id = auth.uid() OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'discord_id') OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'sub'))
+      AND p.role IN ('owner', 'admin')
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = auth.uid()
+      AND ur.role IN ('admin', 'moderator')
+  )
 )
 WITH CHECK (
-  public.has_role(public.get_profile_by_discord_id(public.get_jwt_discord_id()), 'moderator'::public.app_role)
-  OR public.has_role(public.get_profile_by_discord_id(public.get_jwt_discord_id()), 'admin'::public.app_role)
+  EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE (p.id = auth.uid() OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'discord_id') OR p.discord_id = (auth.jwt() -> 'user_metadata' ->> 'sub'))
+      AND p.role IN ('owner', 'admin')
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = auth.uid()
+      AND ur.role IN ('admin', 'moderator')
+  )
 );
+
+GRANT ALL ON public.tarot_queues TO authenticated;
+GRANT ALL ON public.tarot_queues TO service_role;
 
 -- Enable Supabase Realtime broadcast for instant cross-device syncing
 DO $$
