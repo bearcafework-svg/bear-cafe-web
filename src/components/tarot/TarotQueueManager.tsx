@@ -218,6 +218,7 @@ export function TarotQueueManager() {
   const [predictionDraft, setPredictionDraft] = useState('');
   const [predictionCopied, setPredictionCopied] = useState(false);
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [copiedCustomerItemId, setCopiedCustomerItemId] = useState<string | null>(null);
 
   // Input references for auto-focus
   const numInputRef = useRef<HTMLInputElement>(null);
@@ -344,6 +345,49 @@ export function TarotQueueManager() {
     toast({
       title: '📋 คัดลอกคำทำนายแล้ว!',
       description: 'นำข้อความไปส่งใน Discord ได้ทันที',
+    });
+  };
+
+  // Direct 1-click copy by clicking anywhere on Customer name / details
+  const handleCopyCustomerDirect = async (text: string, itemId: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      toast({ title: 'ไม่มีข้อมูลลูกค้า/รายละเอียดให้คัดลอก', variant: 'destructive' });
+      return;
+    }
+
+    let success = false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(trimmed);
+        success = true;
+      }
+    } catch {
+      success = false;
+    }
+
+    if (!success) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = trimmed;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) {
+        success = false;
+      }
+    }
+
+    setCopiedCustomerItemId(itemId);
+    setTimeout(() => setCopiedCustomerItemId(null), 2500);
+
+    toast({
+      title: '📋 คัดลอกข้อมูลลูกค้า/รายละเอียดแล้ว!',
+      description: `"${trimmed}"`,
     });
   };
 
@@ -943,13 +987,29 @@ export function TarotQueueManager() {
                       </td>
 
                       {/* Customer / Note */}
-                      <td className="py-2.5 px-3 max-w-[160px] truncate" title={item.customerName}>
+                      <td className="py-2.5 px-3 max-w-[180px]">
                         {item.customerName ? (
-                          <span className={isDone ? 'line-through text-muted-foreground' : 'text-foreground'}>
-                            {item.customerName}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCustomerDirect(item.customerName, item.id)}
+                            className={`group flex items-center gap-1.5 py-1 px-2 rounded-lg text-left transition-all text-xs truncate border cursor-pointer max-w-full ${
+                              copiedCustomerItemId === item.id
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-medium'
+                                : 'bg-muted/40 hover:bg-muted/70 text-foreground/90 border-border/60 hover:border-amber-500/50'
+                            }`}
+                            title="กดตรงไหนก็ได้เพื่อคัดลอกลูกค้า / รายละเอียด"
+                          >
+                            {copiedCustomerItemId === item.id ? (
+                              <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3 shrink-0 text-muted-foreground group-hover:text-amber-400" />
+                            )}
+                            <span className={`truncate flex-1 ${isDone && copiedCustomerItemId !== item.id ? 'line-through text-muted-foreground' : ''}`}>
+                              {copiedCustomerItemId === item.id ? 'คัดลอกแล้ว!' : item.customerName}
+                            </span>
+                          </button>
                         ) : (
-                          <span className="text-muted-foreground/50 italic text-[11px]">ไม่มีหมายเหตุ</span>
+                          <span className="text-muted-foreground/50 italic text-[11px] px-1">ไม่มีหมายเหตุ</span>
                         )}
                       </td>
 
@@ -1273,9 +1333,25 @@ export function TarotQueueManager() {
 
                       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                         {item.customerName ? (
-                          <span className="text-foreground/90 font-medium truncate max-w-[200px] sm:max-w-[300px]">
-                            {item.customerName}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCustomerDirect(item.customerName, item.id)}
+                            className={`group inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md transition-all text-xs border cursor-pointer max-w-[200px] sm:max-w-[320px] truncate ${
+                              copiedCustomerItemId === item.id
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-semibold'
+                                : 'bg-muted/30 hover:bg-muted/70 text-foreground/90 border-border/50 hover:border-amber-500/50'
+                            }`}
+                            title="กดตรงไหนก็ได้เพื่อคัดลอกลูกค้า / รายละเอียด"
+                          >
+                            {copiedCustomerItemId === item.id ? (
+                              <Check className="w-3 h-3 shrink-0 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-2.5 h-2.5 shrink-0 text-muted-foreground group-hover:text-amber-400" />
+                            )}
+                            <span className="truncate">
+                              {copiedCustomerItemId === item.id ? 'คัดลอกแล้ว!' : item.customerName}
+                            </span>
+                          </button>
                         ) : (
                           <span className="italic opacity-50">ไม่มีหมายเหตุ</span>
                         )}
@@ -1420,9 +1496,15 @@ export function TarotQueueManager() {
                 คำทำนาย: {predictionModalItem?.type} {predictionModalItem?.number}
               </span>
               {predictionModalItem?.customerName && (
-                <span className="text-muted-foreground font-normal text-xs">
-                  ({predictionModalItem.customerName})
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCustomerDirect(predictionModalItem.customerName, predictionModalItem.id)}
+                  className="text-muted-foreground hover:text-amber-300 font-normal text-xs inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/40 hover:bg-muted/80 border border-border/40 transition-colors cursor-pointer"
+                  title="กดตรงไหนก็ได้เพื่อคัดลอกลูกค้า / รายละเอียด"
+                >
+                  <Copy className="w-2.5 h-2.5" />
+                  <span>({predictionModalItem.customerName})</span>
+                </button>
               )}
             </DialogTitle>
           </DialogHeader>
