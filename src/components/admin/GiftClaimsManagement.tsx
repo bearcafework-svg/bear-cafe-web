@@ -86,6 +86,7 @@ export function GiftClaimsManagement() {
   const { toast } = useToast();
 
   const [rolls, setRolls] = useState<CoinRoll[]>([]);
+  const [stats, setStats] = useState({ pending: 0, claimed: 0, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'pending' | 'claimed' | 'all'>('pending');
@@ -98,18 +99,42 @@ export function GiftClaimsManagement() {
   const fetchRolls = useCallback(async () => {
     setIsLoading(true);
     try {
+      // ดึงสถิติจำนวนเฉพาะของรางวัล manual ("🎁 ติดต่อรับกับทีมงาน")
+      const [pendingCountRes, claimedCountRes] = await Promise.all([
+        supabase
+          .from('gacha_coin_rolls')
+          .select('*', { count: 'exact', head: true })
+          .eq('reward_type', 'manual')
+          .eq('is_claimed', false),
+        supabase
+          .from('gacha_coin_rolls')
+          .select('*', { count: 'exact', head: true })
+          .eq('reward_type', 'manual')
+          .eq('is_claimed', true)
+      ]);
+
+      const pendingCount = pendingCountRes.count ?? 0;
+      const claimedCount = claimedCountRes.count ?? 0;
+      setStats({
+        pending: pendingCount,
+        claimed: claimedCount,
+        total: pendingCount + claimedCount
+      });
+
+      // ดึงรายการ rolls เฉพาะ reward_type = 'manual' เสมอ
       let query = supabase
         .from('gacha_coin_rolls')
         .select('*')
+        .eq('reward_type', 'manual')
         .order('created_at', { ascending: false });
 
       if (filter === 'pending') {
-        query = query.eq('is_claimed', false).eq('reward_type', 'manual');
+        query = query.eq('is_claimed', false);
       } else if (filter === 'claimed') {
         query = query.eq('is_claimed', true);
       }
 
-      const { data, error } = await query.limit(100);
+      const { data, error } = await query.limit(200);
       if (error) throw error;
       const fetchedRolls = (data as unknown as CoinRoll[]) || [];
       setRolls(fetchedRolls);
@@ -120,18 +145,28 @@ export function GiftClaimsManagement() {
       ) as string[];
 
       if (adminIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, discord_id, username, discord_username, nickname, avatar_url')
-          .or(`id.in.(${adminIds.join(',')}),discord_id.in.(${adminIds.join(',')})`);
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const uuidIds = adminIds.filter((id) => uuidPattern.test(id));
+        const discordIds = adminIds.filter((id) => !uuidPattern.test(id));
 
-        if (profilesData) {
-          const map: Record<string, AdminProfile> = {};
-          profilesData.forEach((p) => {
-            if (p.id) map[p.id] = p;
-            if (p.discord_id) map[p.discord_id] = p;
-          });
-          setAdminProfiles(map);
+        const orConditions: string[] = [];
+        if (uuidIds.length > 0) orConditions.push(`id.in.(${uuidIds.join(',')})`);
+        if (discordIds.length > 0) orConditions.push(`discord_id.in.(${discordIds.join(',')})`);
+
+        if (orConditions.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, discord_id, username, discord_username, nickname, avatar_url')
+            .or(orConditions.join(','));
+
+          if (profilesData) {
+            const map: Record<string, AdminProfile> = {};
+            profilesData.forEach((p) => {
+              if (p.id) map[p.id] = p;
+              if (p.discord_id) map[p.discord_id] = p;
+            });
+            setAdminProfiles((prev) => ({ ...prev, ...map }));
+          }
         }
       }
     } catch (err: unknown) {
@@ -176,28 +211,8 @@ export function GiftClaimsManagement() {
         description: `บันทึกการส่งมอบ "${confirmingRoll.reward_name}" เรียบร้อยแล้ว`
       });
 
-      // แคชโปรไฟล์แอดมินปัจจุบันไว้ทันที
-      if (user) {
-        setAdminProfiles((prev) => ({
-          ...prev,
-          [adminId]: {
-            id: adminId,
-            discord_id: user.discord_id,
-            username: user.username || user.email || 'Admin',
-            nickname: user.nickname || user.username || 'Admin',
-            avatar_url: user.avatar_url || user.user_metadata?.avatar_url
-          }
-        }));
-      }
-
-      setRolls((prev) =>
-        prev.map((r) =>
-          r.id === confirmingRoll.id
-            ? { ...r, is_claimed: true, claimed_at: now, claimed_by_admin_id: adminId }
-            : r
-        )
-      );
       setConfirmingRoll(null);
+      await fetchRolls();
     } catch (err: unknown) {
       const e = err as Error;
       toast({ variant: 'destructive', title: 'เกิดข้อผิดพลาดในการยืนยัน', description: e.message });
@@ -223,14 +238,6 @@ export function GiftClaimsManagement() {
       return matchesSearch;
     });
   }, [rolls, search]);
-
-  // ── Summary Stats ──────────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const pending = rolls.filter((r) => !r.is_claimed && r.reward_type === 'manual').length;
-    const claimed = rolls.filter((r) => r.is_claimed).length;
-    const total = rolls.length;
-    return { pending, claimed, total };
-  }, [rolls]);
 
   return (
     <div className="space-y-6">
@@ -285,7 +292,7 @@ export function GiftClaimsManagement() {
         <Card className="bg-card/50">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">ประวัติการสุ่มที่โหลดมาทั้งหมด</p>
+              <p className="text-xs text-muted-foreground font-medium">ของขวัญติดต่อรับทั้งหมด</p>
               <p className="text-2xl font-bold mt-1 text-sky-500">{stats.total} รายการ</p>
             </div>
             <Gift className="h-8 w-8 text-sky-500/30" />
@@ -314,8 +321,8 @@ export function GiftClaimsManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">⏳ รอมอบของ (Pending)</SelectItem>
-                  <SelectItem value="claimed">✅ มอบแล้ว (Claimed)</SelectItem>
-                  <SelectItem value="all">ทั้งหมด (All Rolls)</SelectItem>
+                  <SelectItem value="claimed">✅ ส่งมอบแล้ว (Claimed)</SelectItem>
+                  <SelectItem value="all">ทั้งหมด (All Gifts)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -391,11 +398,7 @@ export function GiftClaimsManagement() {
                               <span>{roll.reward_name}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground">
-                              {roll.reward_type === 'auto' ? (
-                                <span className="text-emerald-500">⚡ ระบบอัตโนมัติ (บอทมอบแล้ว)</span>
-                              ) : (
-                                <span className="text-amber-500">🎁 ติดต่อรับกับทีมงาน</span>
-                              )}
+                              <span className="text-amber-500 font-medium">🎁 ติดต่อรับกับทีมงาน</span>
                             </div>
                           </div>
                         </TableCell>
@@ -408,9 +411,7 @@ export function GiftClaimsManagement() {
 
                         {/* 4. เวลาคงเหลือ / หมดเขต */}
                         <TableCell className="text-xs">
-                          {roll.reward_type === 'auto' ? (
-                            <span className="text-muted-foreground">-</span>
-                          ) : expiresDate ? (
+                          {expiresDate ? (
                             <div className={cn(isExpired && !roll.is_claimed ? 'text-destructive font-medium' : 'text-muted-foreground')}>
                               <div>{expiresDate.toLocaleDateString('th-TH')}</div>
                               {isExpired && !roll.is_claimed ? (
@@ -464,7 +465,7 @@ export function GiftClaimsManagement() {
 
                         {/* 7. ปุ่มยืนยันการรับ */}
                         <TableCell className="text-right">
-                          {!roll.is_claimed && roll.reward_type === 'manual' ? (
+                          {!roll.is_claimed ? (
                             <Button
                               size="sm"
                               className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
@@ -474,7 +475,9 @@ export function GiftClaimsManagement() {
                               ยืนยันแจกแล้ว
                             </Button>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            <span className="text-xs text-emerald-500 font-medium inline-flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> ส่งมอบแล้ว
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>
