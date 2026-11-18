@@ -33,7 +33,7 @@ import {
   Eye, CheckCircle, XCircle, Clock, Palette, Image as ImageIcon, Ticket, Heart, Home,
   ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
-  Copy, Target, Sparkles, Trash2, HeartHandshake, Bot,
+  Copy, Target, Sparkles, Trash2, HeartHandshake, Bot, Gift,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
