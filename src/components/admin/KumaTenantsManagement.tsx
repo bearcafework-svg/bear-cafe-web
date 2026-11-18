@@ -184,37 +184,97 @@ export function KumaTenantsManagement() {
 
       if (configsErr) throw configsErr;
 
-      // 2. Fetch tenant_minigame_channels
-      const { data: channelsData, error: channelsErr } = await (supabase
-        .from('tenant_minigame_channels' as any)
-        .select('*')) as any;
+      // 2. Fetch tenant_minigame_channels (พร้อม Pagination ป้องกันติด Limit 1,000 แถว)
+      const fetchedChannels: any[] = [];
+      let fromChannels = 0;
+      const CHANNELS_PAGE_SIZE = 1000;
+      let hasMoreChannels = true;
 
-      if (channelsErr) {
-        console.warn('[KumaTenants] Failed to fetch channels count:', channelsErr.message);
+      while (hasMoreChannels) {
+        const { data: pageData, error: pageErr } = await (supabase
+          .from('tenant_minigame_channels' as any)
+          .select('*')
+          .range(fromChannels, fromChannels + CHANNELS_PAGE_SIZE - 1)) as any;
+
+        if (pageErr) {
+          console.warn('[KumaTenants] Failed to fetch channels page:', pageErr.message);
+          break;
+        }
+
+        if (pageData && pageData.length > 0) {
+          fetchedChannels.push(...pageData);
+          if (pageData.length < CHANNELS_PAGE_SIZE) {
+            hasMoreChannels = false;
+          } else {
+            fromChannels += CHANNELS_PAGE_SIZE;
+          }
+        } else {
+          hasMoreChannels = false;
+        }
       }
 
-      // 3. Fetch tenant_minigame_settings
-      const { data: settingsData, error: settingsErr } = await (supabase
-        .from('tenant_minigame_settings' as any)
-        .select('*')) as any;
+      // 3. Fetch tenant_minigame_settings (พร้อม Pagination)
+      const fetchedSettings: any[] = [];
+      let fromSettings = 0;
+      const SETTINGS_PAGE_SIZE = 1000;
+      let hasMoreSettings = true;
 
-      if (settingsErr) {
-        console.warn('[KumaTenants] Failed to fetch settings:', settingsErr.message);
+      while (hasMoreSettings) {
+        const { data: pageData, error: pageErr } = await (supabase
+          .from('tenant_minigame_settings' as any)
+          .select('*')
+          .range(fromSettings, fromSettings + SETTINGS_PAGE_SIZE - 1)) as any;
+
+        if (pageErr) {
+          console.warn('[KumaTenants] Failed to fetch settings page:', pageErr.message);
+          break;
+        }
+
+        if (pageData && pageData.length > 0) {
+          fetchedSettings.push(...pageData);
+          if (pageData.length < SETTINGS_PAGE_SIZE) {
+            hasMoreSettings = false;
+          } else {
+            fromSettings += SETTINGS_PAGE_SIZE;
+          }
+        } else {
+          hasMoreSettings = false;
+        }
       }
 
-      // 4. Fetch tenant_minigame_scores (เพื่อสรุปสถิติผู้เล่นในตาราง)
-      const { data: scoresData, error: scoresErr } = await (supabase
-        .from('tenant_minigame_scores' as any)
-        .select('guild_id, user_id, points, wins')) as any;
+      // 4. Fetch tenant_minigame_scores (พร้อม Pagination เพื่อไม่ให้ติด Limit 1,000 แถวของ Supabase)
+      const fetchedScores: any[] = [];
+      let fromScores = 0;
+      const SCORES_PAGE_SIZE = 1000;
+      let hasMoreScores = true;
 
-      if (scoresErr) {
-        console.warn('[KumaTenants] Failed to fetch scores:', scoresErr.message);
+      while (hasMoreScores) {
+        const { data: pageData, error: pageErr } = await (supabase
+          .from('tenant_minigame_scores' as any)
+          .select('guild_id, user_id, points, wins')
+          .range(fromScores, fromScores + SCORES_PAGE_SIZE - 1)) as any;
+
+        if (pageErr) {
+          console.warn('[KumaTenants] Failed to fetch scores page:', pageErr.message);
+          break;
+        }
+
+        if (pageData && pageData.length > 0) {
+          fetchedScores.push(...pageData);
+          if (pageData.length < SCORES_PAGE_SIZE) {
+            hasMoreScores = false;
+          } else {
+            fromScores += SCORES_PAGE_SIZE;
+          }
+        } else {
+          hasMoreScores = false;
+        }
       }
 
       setTenants(configsData || []);
-      setChannels(channelsData || []);
-      setSettings(settingsData || []);
-      setAllScores(scoresData || []);
+      setChannels(fetchedChannels);
+      setSettings(fetchedSettings);
+      setAllScores(fetchedScores);
     } catch (err: any) {
       console.error('[KumaTenants] Fetch error:', err.message);
       toast({
