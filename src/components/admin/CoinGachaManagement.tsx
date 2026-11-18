@@ -15,6 +15,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth-context';
@@ -35,7 +36,10 @@ import {
   Calendar,
   User,
   Copy,
-  Check
+  Check,
+  Flame,
+  Award,
+  Crown
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -70,45 +74,83 @@ export interface CoinRoll {
   created_at: string;
 }
 
-const TIER_CONFIG = {
-  god: {
-    label: 'God',
+interface AdminProfile {
+  id: string;
+  discord_id?: string;
+  username?: string;
+  discord_username?: string;
+  nickname?: string;
+  avatar_url?: string;
+}
+
+// การตั้งค่าและมีเดียของทั้ง 4 ระดับรางวัลตรงตามเอกสาร แผนระบบหมีโยนเหรียญ.md
+const TIERS_DATA: {
+  key: 'god' | 'epic' | 'rare' | 'common';
+  name: string;
+  rate: string;
+  description: string;
+  gif: string;
+  colorClass: string;
+  borderClass: string;
+  badgeClass: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    key: 'god',
+    name: 'God',
     rate: '0.07%',
-    color: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
-    badge: 'bg-gradient-to-r from-amber-500 to-yellow-300 text-black font-bold'
+    description: 'ระดับสูงสุด ออกยากที่สุด (0.07%)',
+    gif: 'https://cdn.discordapp.com/attachments/1565856976552988804/1572480702337786037/3.gif',
+    colorClass: 'text-amber-400',
+    borderClass: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-transparent',
+    badgeClass: 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-extrabold',
+    icon: <Crown className="h-5 w-5 text-amber-400" />
   },
-  epic: {
-    label: 'Epic',
+  {
+    key: 'epic',
+    name: 'Epic',
     rate: '1.00%',
-    color: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    badge: 'bg-gradient-to-r from-purple-500 to-indigo-400 text-white font-bold'
+    description: 'ระดับพิเศษ หายากมาก (1.00%)',
+    gif: 'https://cdn.discordapp.com/attachments/1565856976552988804/1572480702719463496/2.gif',
+    colorClass: 'text-purple-400',
+    borderClass: 'border-purple-500/40 bg-gradient-to-b from-purple-500/10 to-transparent',
+    badgeClass: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold',
+    icon: <Sparkles className="h-5 w-5 text-purple-400" />
   },
-  rare: {
-    label: 'Rare',
+  {
+    key: 'rare',
+    name: 'Rare',
     rate: '45.00%',
-    color: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-    badge: 'bg-gradient-to-r from-sky-500 to-blue-400 text-white font-bold'
+    description: 'ระดับหายากปานกลาง (45.00%)',
+    gif: 'https://cdn.discordapp.com/attachments/1565856976552988804/1572480703298408600/1.gif',
+    colorClass: 'text-sky-400',
+    borderClass: 'border-sky-500/40 bg-gradient-to-b from-sky-500/10 to-transparent',
+    badgeClass: 'bg-gradient-to-r from-sky-500 to-blue-500 text-white font-bold',
+    icon: <Award className="h-5 w-5 text-sky-400" />
   },
-  common: {
-    label: 'Common',
+  {
+    key: 'common',
+    name: 'Common',
     rate: '85.00%',
-    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    badge: 'bg-gradient-to-r from-emerald-500 to-teal-400 text-white font-bold'
+    description: 'ระดับพื้นฐาน รางวัลทั่วไป (85.00%)',
+    gif: 'https://cdn.discordapp.com/attachments/1565856976552988804/1572480703755714672/e6d42f9e6f60a678.gif',
+    colorClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/40 bg-gradient-to-b from-emerald-500/10 to-transparent',
+    badgeClass: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold',
+    icon: <Gift className="h-5 w-5 text-emerald-400" />
   }
-};
+];
 
 export function CoinGachaManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Tabs
+  // Tabs: rewards (แบ่ง 4 ระดับ) vs claims (รายการรอมอบของ)
   const [activeTab, setActiveTab] = useState<'rewards' | 'claims'>('rewards');
 
   // Rewards State
   const [rewards, setRewards] = useState<CoinReward[]>([]);
   const [isLoadingRewards, setIsLoadingRewards] = useState(true);
-  const [rewardSearch, setRewardSearch] = useState('');
-  const [rewardTierFilter, setRewardTierFilter] = useState<string>('all');
 
   // Dialog State (Add/Edit)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -134,9 +176,10 @@ export function CoinGachaManagement() {
   const [rolls, setRolls] = useState<CoinRoll[]>([]);
   const [isLoadingRolls, setIsLoadingRolls] = useState(true);
   const [claimSearch, setClaimSearch] = useState('');
-  const [claimFilter, setClaimFilter] = useState<'all' | 'pending' | 'claimed'>('pending');
+  const [claimFilter, setClaimFilter] = useState<'pending' | 'claimed' | 'all'>('pending');
   const [markingRollId, setMarkingRollId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [adminProfiles, setAdminProfiles] = useState<Record<string, AdminProfile>>({});
 
   // ── Fetch Rewards ──────────────────────────────────────────────────────────
   const fetchRewards = useCallback(async () => {
@@ -163,7 +206,7 @@ export function CoinGachaManagement() {
     }
   }, [toast]);
 
-  // ── Fetch Rolls / Claims ───────────────────────────────────────────────────
+  // ── Fetch Rolls / Claims & Admin Profiles ───────────────────────────────────
   const fetchRolls = useCallback(async () => {
     setIsLoadingRolls(true);
     try {
@@ -180,7 +223,29 @@ export function CoinGachaManagement() {
 
       const { data, error } = await query.limit(100);
       if (error) throw error;
-      setRolls((data as unknown as CoinRoll[]) || []);
+      const fetchedRolls = (data as unknown as CoinRoll[]) || [];
+      setRolls(fetchedRolls);
+
+      // ดึงโปรไฟล์แอดมินที่เคยกดยืนยันแจกของ
+      const adminIds = Array.from(
+        new Set(fetchedRolls.map((r) => r.claimed_by_admin_id).filter(Boolean))
+      ) as string[];
+
+      if (adminIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, discord_id, username, discord_username, nickname, avatar_url')
+          .or(`id.in.(${adminIds.join(',')}),discord_id.in.(${adminIds.join(',')})`);
+
+        if (profilesData) {
+          const map: Record<string, AdminProfile> = {};
+          profilesData.forEach((p) => {
+            if (p.id) map[p.id] = p;
+            if (p.discord_id) map[p.discord_id] = p;
+          });
+          setAdminProfiles(map);
+        }
+      }
     } catch (err: unknown) {
       const e = err as Error;
       console.error('Error fetching coin rolls:', e);
@@ -205,7 +270,7 @@ export function CoinGachaManagement() {
   }, [activeTab, fetchRolls]);
 
   // ── Save Reward (Create / Update) ──────────────────────────────────────────
-  const handleOpenDialog = (reward?: CoinReward) => {
+  const handleOpenDialog = (tierDefault: 'god' | 'epic' | 'rare' | 'common' = 'common', reward?: CoinReward) => {
     if (reward) {
       setEditingReward(reward);
       setRewardForm({
@@ -225,14 +290,14 @@ export function CoinGachaManagement() {
       setRewardForm({
         name: '',
         history_name: '',
-        tier: 'common',
+        tier: tierDefault,
         reward_type: 'manual',
         role_id: '',
         points_reward: 0,
         is_unlimited: true,
         stock: -1,
         is_active: true,
-        sort_order: rewards.length
+        sort_order: rewards.filter((r) => r.tier === tierDefault).length
       });
     }
     setIsDialogOpen(true);
@@ -328,7 +393,7 @@ export function CoinGachaManagement() {
     }
   };
 
-  // ── Mark Claim as Completed ────────────────────────────────────────────────
+  // ── Mark Claim as Completed (บันทึกเวลาและโปรไฟล์ผู้ดำเนินการ) ──────────────
   const handleMarkClaimed = async (roll: CoinRoll) => {
     setMarkingRollId(roll.id);
     try {
@@ -347,9 +412,21 @@ export function CoinGachaManagement() {
       if (error) throw error;
 
       toast({
-        title: 'ยืนยันการมอบของขวัญสำเร็จ',
-        description: `ทำรายการมอบ "${roll.reward_name}" ให้ <@${roll.discord_id}> เรียบร้อยแล้ว`
+        title: '✅ ยืนยันการมอบของขวัญสำเร็จ!',
+        description: `ทำรายการมอบ "${roll.reward_name}" ให้ <@${roll.discord_id}> เรียบร้อยแล้วค่ะ`
       });
+
+      // ดึงโปรไฟล์แอดมินคนปัจจุบันมาเก็บใน map ทันที
+      if (user && !adminProfiles[adminId]) {
+        setAdminProfiles((prev) => ({
+          ...prev,
+          [adminId]: {
+            id: user.id,
+            username: user.user_metadata?.full_name || user.email || 'Admin',
+            avatar_url: user.user_metadata?.avatar_url
+          }
+        }));
+      }
 
       // อัปเดต State ตาราง
       setRolls((prev) =>
@@ -374,18 +451,6 @@ export function CoinGachaManagement() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // ── Filtered Rewards ───────────────────────────────────────────────────────
-  const filteredRewards = useMemo(() => {
-    return rewards.filter((r) => {
-      const matchesSearch =
-        r.name.toLowerCase().includes(rewardSearch.toLowerCase()) ||
-        r.history_name.toLowerCase().includes(rewardSearch.toLowerCase()) ||
-        (r.role_id && r.role_id.includes(rewardSearch));
-      const matchesTier = rewardTierFilter === 'all' || r.tier === rewardTierFilter;
-      return matchesSearch && matchesTier;
-    });
-  }, [rewards, rewardSearch, rewardTierFilter]);
-
   // ── Filtered Rolls ─────────────────────────────────────────────────────────
   const filteredRolls = useMemo(() => {
     return rolls.filter((r) => {
@@ -397,7 +462,7 @@ export function CoinGachaManagement() {
     });
   }, [rolls, claimSearch]);
 
-  // ── Stats Summary ──────────────────────────────────────────────────────────
+  // ── Summary Stats ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const totalRewards = rewards.length;
     const activeRewards = rewards.filter((r) => r.is_active).length;
@@ -413,85 +478,81 @@ export function CoinGachaManagement() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Coins className="h-6 w-6 text-amber-500" />
+            <Coins className="h-7 w-7 text-amber-500 animate-pulse" />
             <h1 className="text-2xl font-bold tracking-tight">ระบบของขวัญหมีโยนเหรียญ (Coin Gacha)</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            จัดการรายการของรางวัลในตู้สุ่มเหรียญกาชา ตรวจสอบและกดยืนยันการมอบของรางวัลที่รอการรับ
+            จัดการของรางวัลแยก 4 ระดับ (God, Epic, Rare, Common) อัตราออก สต็อกเรียลไทม์ และระบบตรวจสอบยืนยันการมอบของขวัญ
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {activeTab === 'rewards' && (
-            <Button onClick={() => handleOpenDialog()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              เพิ่มของรางวัล
-            </Button>
-          )}
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={activeTab === 'rewards' ? fetchRewards : fetchRolls}
             disabled={isLoadingRewards || isLoadingRolls}
+            className="gap-2"
           >
             <RefreshCw className={cn('h-4 w-4', (isLoadingRewards || isLoadingRolls) && 'animate-spin')} />
+            รีเฟรชข้อมูล
           </Button>
         </div>
       </div>
 
-      {/* ── Stats Cards ────────────────────────────────────────────────────── */}
+      {/* ── Overview Summary Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-card/50">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">ของรางวัลทั้งหมด</p>
-              <p className="text-2xl font-bold mt-1">{stats.totalRewards}</p>
+              <p className="text-xs text-muted-foreground font-medium">ของรางวัลทั้งหมด (4 ระดับ)</p>
+              <p className="text-2xl font-bold mt-1">{stats.totalRewards} ชิ้น</p>
             </div>
             <Gift className="h-8 w-8 text-muted-foreground/30" />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card/50">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">ของรางวัลที่เปิดใช้งาน</p>
-              <p className="text-2xl font-bold mt-1 text-emerald-500">{stats.activeRewards}</p>
+              <p className="text-xs text-muted-foreground font-medium">พร้อมสุ่มในตู้ (Active)</p>
+              <p className="text-2xl font-bold mt-1 text-emerald-500">{stats.activeRewards} ชิ้น</p>
             </div>
             <Sparkles className="h-8 w-8 text-emerald-500/30" />
           </CardContent>
         </Card>
 
-        <Card className={cn(stats.pendingRolls > 0 && 'border-amber-500/50 bg-amber-500/5')}>
+        <Card className={cn('transition-all', stats.pendingRolls > 0 ? 'border-amber-500/60 bg-amber-500/10' : 'bg-card/50')}>
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">รอมอบของขวัญ (Pending)</p>
-              <p className="text-2xl font-bold mt-1 text-amber-500">{stats.pendingRolls}</p>
+              <p className="text-xs text-muted-foreground font-medium">รอมอบของขวัญ (Pending)</p>
+              <p className="text-2xl font-bold mt-1 text-amber-500">{stats.pendingRolls} รายการ</p>
             </div>
-            <Clock className="h-8 w-8 text-amber-500/30" />
+            <Clock className="h-8 w-8 text-amber-500/40" />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card/50">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">มอบสำเร็จแล้ว</p>
-              <p className="text-2xl font-bold mt-1 text-sky-500">{stats.claimedRolls}</p>
+              <p className="text-xs text-muted-foreground font-medium">ส่งมอบสำเร็จแล้ว</p>
+              <p className="text-2xl font-bold mt-1 text-sky-500">{stats.claimedRolls} รายการ</p>
             </div>
             <CheckCircle2 className="h-8 w-8 text-sky-500/30" />
           </CardContent>
         </Card>
       </div>
 
-      {/* ── Tabs Navigation ────────────────────────────────────────────────── */}
+      {/* ── Main Tabs: ของรางวัล (4 ระดับ) VS รายการรอมอบของขวัญ ──────────── */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'rewards' | 'claims')}>
-        <TabsList className="grid w-full md:w-[400px] grid-cols-2">
+        <TabsList className="grid w-full md:w-[480px] grid-cols-2">
           <TabsTrigger value="rewards" className="gap-2">
             <Gift className="h-4 w-4" />
-            จัดการของรางวัล
+            ของรางวัลทั้ง 4 ระดับ (Tiers)
           </TabsTrigger>
           <TabsTrigger value="claims" className="gap-2">
             <Clock className="h-4 w-4" />
-            รายการรอมอบของ
+            หน้าตรวจเช็กการรับของขวัญ
             {stats.pendingRolls > 0 && (
               <Badge variant="secondary" className="ml-1 bg-amber-500 text-black text-xs px-1.5 py-0 font-bold">
                 {stats.pendingRolls}
@@ -500,172 +561,195 @@ export function CoinGachaManagement() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── TAB 1: Rewards Management ───────────────────────────────────── */}
-        <TabsContent value="rewards" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="p-4 pb-2">
-              <div className="flex flex-col md:flex-row gap-3 justify-between md:items-center">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="ค้นหาชื่อรางวัล หรือ Role ID..."
-                    value={rewardSearch}
-                    onChange={(e) => setRewardSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+        {/* ── TAB 1: ของรางวัลทั้ง 4 ระดับ (God, Epic, Rare, Common) ───────── */}
+        <TabsContent value="rewards" className="mt-6 space-y-6">
+          {isLoadingRewards ? (
+            <Card>
+              <CardContent className="p-12 text-center text-muted-foreground">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-3 text-amber-500" />
+                กำลังโหลดรายการของรางวัลทั้ง 4 ระดับ...
+              </CardContent>
+            </Card>
+          ) : (
+            TIERS_DATA.map((tierInfo) => {
+              const tierRewards = rewards.filter((r) => r.tier === tierInfo.key);
+              const activeCount = tierRewards.filter((r) => r.is_active).length;
 
-                <div className="flex items-center gap-2">
-                  <Select value={rewardTierFilter} onValueChange={setRewardTierFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="ระดับ (Tier)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">ทุกระดับ</SelectItem>
-                      <SelectItem value="god">God (0.07%)</SelectItem>
-                      <SelectItem value="epic">Epic (1%)</SelectItem>
-                      <SelectItem value="rare">Rare (45%)</SelectItem>
-                      <SelectItem value="common">Common (85%)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
+              return (
+                <Card key={tierInfo.key} className={cn('border-2 overflow-hidden shadow-sm', tierInfo.borderClass)}>
+                  {/* Tier Header with GIF and Add Button */}
+                  <CardHeader className="p-5 bg-card/60 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      {/* Tier GIF Thumbnail */}
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border shadow-inner bg-black/40 flex-shrink-0">
+                        <img
+                          src={tierInfo.gif}
+                          alt={tierInfo.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://cdn.discordapp.com/embed/avatars/0.png';
+                          }}
+                        />
+                      </div>
 
-            <CardContent className="p-0">
-              <div className="rounded-md border-t">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">ระดับ</TableHead>
-                      <TableHead>ชื่อของรางวัล / ชื่อประวัติ</TableHead>
-                      <TableHead className="w-[160px]">ประเภทการแจก</TableHead>
-                      <TableHead className="w-[140px] text-center">สต็อกคงเหลือ</TableHead>
-                      <TableHead className="w-[100px] text-center">สถานะ</TableHead>
-                      <TableHead className="w-[110px] text-right">จัดการ</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoadingRewards ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                          <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-                          กำลังโหลดข้อมูลของรางวัล...
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredRewards.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                          <Gift className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                          {rewards.length === 0
-                            ? 'ยังไม่มีรายการของรางวัล กดปุ่ม "เพิ่มของรางวัล" เพื่อเริ่มต้นค่ะ'
-                            : 'ไม่พบของรางวัลที่ตรงกับเงื่อนไขการค้นหา'}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredRewards.map((reward) => {
-                        const tierInfo = TIER_CONFIG[reward.tier] || TIER_CONFIG.common;
-                        return (
-                          <TableRow key={reward.id} className={cn(!reward.is_active && 'opacity-60 bg-muted/20')}>
-                            <TableCell>
-                              <Badge className={cn('text-xs uppercase', tierInfo.badge)}>
-                                {tierInfo.label}
-                              </Badge>
-                              <div className="text-[10px] text-muted-foreground mt-0.5">{tierInfo.rate}</div>
-                            </TableCell>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn('text-sm px-2.5 py-0.5 uppercase tracking-wider', tierInfo.badgeClass)}>
+                            {tierInfo.name}
+                          </Badge>
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-muted text-foreground border">
+                            อัตราออก: {tierInfo.rate}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          {tierInfo.description} • มี {tierRewards.length} รายการ (เปิดใช้งาน {activeCount} รายการ)
+                        </p>
+                      </div>
+                    </div>
 
-                            <TableCell>
-                              <div className="font-semibold text-foreground">{reward.name}</div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                <span>ในประวัติ: <span className="text-foreground/80 font-mono">`{reward.history_name}`</span></span>
-                              </div>
-                            </TableCell>
+                    <Button
+                      size="sm"
+                      onClick={() => handleOpenDialog(tierInfo.key)}
+                      className="gap-1.5 shadow-sm self-start md:self-auto"
+                    >
+                      <Plus className="h-4 w-4" />
+                      เพิ่มรางวัลระดับ {tierInfo.name}
+                    </Button>
+                  </CardHeader>
 
-                            <TableCell>
-                              {reward.reward_type === 'auto' ? (
-                                <div className="space-y-0.5">
-                                  <Badge variant="outline" className="text-xs border-sky-500/40 text-sky-400 bg-sky-500/5">
-                                    ⚡ แจกอัตโนมัติ
-                                  </Badge>
-                                  {reward.role_id && (
-                                    <div className="text-[11px] text-muted-foreground font-mono">
-                                      Role: {reward.role_id}
-                                    </div>
-                                  )}
-                                  {reward.points_reward > 0 && (
-                                    <div className="text-[11px] text-amber-500 font-mono">
-                                      +{formatNumber(reward.points_reward)} แต้ม
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/5">
-                                  🤝 รับกับทีมงาน
-                                </Badge>
-                              )}
-                            </TableCell>
-
-                            <TableCell className="text-center">
-                              {reward.is_unlimited ? (
-                                <Badge variant="secondary" className="text-xs font-normal">
-                                  ♾️ ไม่จำกัด
-                                </Badge>
-                              ) : (
-                                <span
-                                  className={cn(
-                                    'font-mono font-bold text-sm px-2 py-0.5 rounded',
-                                    reward.stock > 5
-                                      ? 'bg-emerald-500/10 text-emerald-400'
-                                      : reward.stock > 0
-                                      ? 'bg-amber-500/10 text-amber-400'
-                                      : 'bg-red-500/10 text-red-400 line-through'
-                                  )}
-                                >
-                                  {reward.stock} ชิ้น
-                                </span>
-                              )}
-                            </TableCell>
-
-                            <TableCell className="text-center">
-                              <Switch
-                                checked={reward.is_active}
-                                onCheckedChange={() => handleToggleActive(reward, reward.is_active)}
-                              />
-                            </TableCell>
-
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                  onClick={() => handleOpenDialog(reward)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                  onClick={() => setDeletingReward(reward)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                  {/* Tier Rewards Table */}
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="w-[45%]">ชื่อรางวัล / ชื่อในประวัติ</TableHead>
+                          <TableHead className="w-[20%]">ประเภทการรับ</TableHead>
+                          <TableHead className="w-[15%] text-center">สต็อกคงเหลือ (เรียลไทม์)</TableHead>
+                          <TableHead className="w-[10%] text-center">เปิดใช้งาน</TableHead>
+                          <TableHead className="w-[10%] text-right">จัดการ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tierRewards.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-xs">
+                              ยังไม่มีของรางวัลในระดับ {tierInfo.name} กดปุ่ม &quot;เพิ่มรางวัลระดับ {tierInfo.name}&quot; เพื่อเริ่มต้นค่ะ
                             </TableCell>
                           </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                        ) : (
+                          tierRewards.map((reward) => (
+                            <TableRow key={reward.id} className={cn(!reward.is_active && 'opacity-60 bg-muted/10')}>
+                              {/* 1. ชื่อรางวัล & ชื่อในประวัติ */}
+                              <TableCell>
+                                <div className="font-semibold text-foreground text-sm">{reward.name}</div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                  <span>ชื่อในประวัติ:</span>
+                                  <span className="text-foreground/90 font-mono bg-muted px-1.5 py-0.2 rounded border">
+                                    `{reward.history_name}`
+                                  </span>
+                                </div>
+                              </TableCell>
+
+                              {/* 2. ประเภทการรับ */}
+                              <TableCell>
+                                {reward.reward_type === 'auto' ? (
+                                  <div className="space-y-0.5">
+                                    <Badge variant="outline" className="text-xs border-sky-500/40 text-sky-400 bg-sky-500/10 gap-1">
+                                      ⚡ รับอัตโนมัติ
+                                    </Badge>
+                                    {reward.role_id && (
+                                      <div className="text-[11px] text-muted-foreground font-mono">
+                                        Role ID: {reward.role_id}
+                                      </div>
+                                    )}
+                                    {reward.points_reward > 0 && (
+                                      <div className="text-[11px] text-amber-500 font-mono font-bold">
+                                        +{formatNumber(reward.points_reward)} แต้ม
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10 gap-1">
+                                      🤝 รับกับทีมงาน
+                                    </Badge>
+                                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                                      หมดเขตใน 1 เดือน
+                                    </div>
+                                  </div>
+                                )}
+                              </TableCell>
+
+                              {/* 3. สต็อกคงเหลือแบบเรียลไทม์ */}
+                              <TableCell className="text-center">
+                                {reward.is_unlimited ? (
+                                  <Badge variant="secondary" className="text-xs font-normal">
+                                    ♾️ ไม่จำกัด
+                                  </Badge>
+                                ) : (
+                                  <div className="inline-block">
+                                    <span
+                                      className={cn(
+                                        'font-mono font-bold text-xs px-2.5 py-1 rounded-md border',
+                                        reward.stock > 5
+                                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                          : reward.stock > 0
+                                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                          : 'bg-red-500/10 text-red-400 border-red-500/30 line-through'
+                                      )}
+                                    >
+                                      {reward.stock} ชิ้น
+                                    </span>
+                                    {reward.stock === 0 && (
+                                      <p className="text-[10px] text-red-400 mt-1">หมดสต็อก (Reroll อัตโนมัติ)</p>
+                                    )}
+                                  </div>
+                                )}
+                              </TableCell>
+
+                              {/* 4. สวิตช์เปิด/ปิด */}
+                              <TableCell className="text-center">
+                                <Switch
+                                  checked={reward.is_active}
+                                  onCheckedChange={() => handleToggleActive(reward, reward.is_active)}
+                                />
+                              </TableCell>
+
+                              {/* 5. ปุ่มแก้ไข / ลบ */}
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    onClick={() => handleOpenDialog(reward.tier, reward)}
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                    onClick={() => setDeletingReward(reward)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </TabsContent>
 
-        {/* ── TAB 2: Pending Claims & History ─────────────────────────────── */}
-        <TabsContent value="claims" className="mt-4 space-y-4">
+        {/* ── TAB 2: หน้าตรวจสอบการรับของขวัญ (Pending Claims & History) ─────── */}
+        <TabsContent value="claims" className="mt-6 space-y-4">
           <Card>
             <CardHeader className="p-4 pb-2">
               <div className="flex flex-col md:flex-row gap-3 justify-between md:items-center">
@@ -680,13 +764,13 @@ export function CoinGachaManagement() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Select value={claimFilter} onValueChange={(v) => setClaimFilter(v as 'all' | 'pending' | 'claimed')}>
-                    <SelectTrigger className="w-[160px]">
+                  <Select value={claimFilter} onValueChange={(v) => setClaimFilter(v as 'pending' | 'claimed' | 'all')}>
+                    <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="สถานะการรับ" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pending">⏳ รอมอบของ (Pending)</SelectItem>
-                      <SelectItem value="claimed">✅ มอบสำเร็จแล้ว</SelectItem>
+                      <SelectItem value="claimed">✅ มอบแล้ว (Claimed)</SelectItem>
                       <SelectItem value="all">ทั้งหมด</SelectItem>
                     </SelectContent>
                   </Select>
@@ -699,41 +783,43 @@ export function CoinGachaManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[180px]">ผู้รับรางวัล (Discord ID)</TableHead>
-                      <TableHead>ของรางวัลที่ได้รับ</TableHead>
-                      <TableHead className="w-[160px]">วันเวลาที่สุ่มได้</TableHead>
-                      <TableHead className="w-[160px]">หมดเขตรับ</TableHead>
-                      <TableHead className="w-[150px] text-center">สถานะการมอบ</TableHead>
-                      <TableHead className="w-[120px] text-right">ดำเนินการ</TableHead>
+                      <TableHead className="w-[180px]">ผู้รับรางวัล (DiscordID)</TableHead>
+                      <TableHead className="w-[200px]">ของรางวัลที่ได้รับ</TableHead>
+                      <TableHead className="w-[140px]">วันเวลาที่สุ่มได้</TableHead>
+                      <TableHead className="w-[150px]">เวลาคงเหลือ / หมดเขต</TableHead>
+                      <TableHead className="w-[140px] text-center">สถานะการรับ</TableHead>
+                      <TableHead className="w-[180px]">วันเวลารับ & ผู้ดำเนินการ</TableHead>
+                      <TableHead className="w-[110px] text-right">ดำเนินการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoadingRolls ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                           <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
                           กำลังโหลดรายการของขวัญ...
                         </TableCell>
                       </TableRow>
                     ) : filteredRolls.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                           <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500 opacity-60" />
                           {claimFilter === 'pending'
-                            ? 'ไม่มีรายการของรางวัลที่ค้างมอบในขณะนี้ค่ะ 🎉'
+                            ? 'ไม่มีรายการของขวัญที่รอการรับในขณะนี้ค่ะ 🎉'
                             : 'ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา'}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredRolls.map((roll) => {
-                        const tierInfo = TIER_CONFIG[roll.tier] || TIER_CONFIG.common;
+                        const tierInfo = TIERS_DATA.find((t) => t.key === roll.tier) || TIERS_DATA[3];
                         const isExpired = roll.expires_at && new Date(roll.expires_at).getTime() < Date.now();
+                        const adminProf = roll.claimed_by_admin_id ? adminProfiles[roll.claimed_by_admin_id] : null;
 
                         return (
                           <TableRow key={roll.id} className={cn(roll.is_claimed && 'bg-muted/10')}>
-                            {/* Discord ID */}
+                            {/* 1. Discord ID */}
                             <TableCell>
-                              <div className="flex items-center gap-1.5 font-mono text-xs">
+                              <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
                                 <span>{roll.discord_id}</span>
                                 <Button
                                   variant="ghost"
@@ -753,28 +839,28 @@ export function CoinGachaManagement() {
                               </div>
                             </TableCell>
 
-                            {/* Reward */}
+                            {/* 2. ของรางวัล & ระดับ */}
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Badge className={cn('text-[10px] uppercase font-bold', tierInfo.badge)}>
-                                  {tierInfo.label}
+                              <div className="flex items-center gap-1.5">
+                                <Badge className={cn('text-[10px] px-1.5 py-0 uppercase', tierInfo.badgeClass)}>
+                                  {tierInfo.name}
                                 </Badge>
-                                <span className="font-semibold text-foreground">{roll.reward_name}</span>
+                                <span className="font-semibold text-foreground text-sm">{roll.reward_name}</span>
                               </div>
                               <div className="text-xs text-muted-foreground mt-0.5">
-                                {roll.reward_type === 'auto' ? '⚡ มอบอัตโนมัติ' : '🤝 ต้องติดต่อรับกับทีมงาน'}
+                                {roll.reward_type === 'auto' ? '⚡ มอบอัตโนมัติ' : '🤝 ติดต่อรับกับทีมงาน'}
                               </div>
                             </TableCell>
 
-                            {/* Created At */}
-                            <TableCell className="text-xs text-muted-foreground">
+                            {/* 3. วันเวลาที่สุ่มได้ (<t:created_at:s>) */}
+                            <TableCell className="text-xs text-muted-foreground font-mono">
                               {new Date(roll.created_at).toLocaleString('th-TH', {
                                 dateStyle: 'short',
                                 timeStyle: 'short'
                               })}
                             </TableCell>
 
-                            {/* Expiry */}
+                            {/* 4. เวลาคงเหลือ / หมดเขต (<t:expires_at:R>) */}
                             <TableCell className="text-xs">
                               {roll.expires_at ? (
                                 <div className={cn(isExpired ? 'text-destructive font-bold' : 'text-muted-foreground')}>
@@ -782,46 +868,65 @@ export function CoinGachaManagement() {
                                     dateStyle: 'short',
                                     timeStyle: 'short'
                                   })}
-                                  {isExpired && !roll.is_claimed && (
+                                  {isExpired && !roll.is_claimed ? (
                                     <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
-                                      หมดเวลา
+                                      หมดเขต
                                     </Badge>
-                                  )}
+                                  ) : !roll.is_claimed ? (
+                                    <Badge variant="outline" className="ml-1 text-[10px] border-amber-500 text-amber-400 px-1 py-0">
+                                      1 เดือน
+                                    </Badge>
+                                  ) : null}
                                 </div>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
 
-                            {/* Claim Status */}
+                            {/* 5. สถานะการรับ */}
                             <TableCell className="text-center">
                               {roll.is_claimed ? (
-                                <div className="space-y-0.5">
-                                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10 text-xs gap-1">
-                                    <CheckCircle2 className="h-3 w-3" />
-                                    มอบแล้ว
-                                  </Badge>
-                                  {roll.claimed_at && (
-                                    <div className="text-[10px] text-muted-foreground">
-                                      {new Date(roll.claimed_at).toLocaleDateString('th-TH')}
-                                    </div>
-                                  )}
-                                </div>
+                                <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10 text-xs gap-1 font-semibold">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  รับแล้ว
+                                </Badge>
                               ) : (
-                                <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 text-xs gap-1">
+                                <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 text-xs gap-1 font-semibold">
                                   <Clock className="h-3 w-3" />
                                   รอดำเนินการ
                                 </Badge>
                               )}
                             </TableCell>
 
-                            {/* Action Button */}
+                            {/* 6. วันเวลารับ & โปรไฟล์ผู้ดำเนินการ */}
+                            <TableCell>
+                              {roll.is_claimed ? (
+                                <div className="space-y-1">
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {roll.claimed_at ? new Date(roll.claimed_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs text-foreground">
+                                    <Avatar className="h-5 w-5">
+                                      <AvatarImage src={adminProf?.avatar_url || ''} />
+                                      <AvatarFallback className="text-[10px]">AD</AvatarFallback>
+                                    </Avatar>
+                                    <span className="truncate max-w-[110px]">
+                                      {adminProf?.nickname || adminProf?.discord_username || adminProf?.username || roll.claimed_by_admin_id || 'Admin'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+
+                            {/* 7. ปุ่มติ๊กยืนยันว่าแจกแล้ว */}
                             <TableCell className="text-right">
                               {!roll.is_claimed && roll.reward_type === 'manual' ? (
                                 <Button
                                   size="sm"
                                   variant="default"
-                                  className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
                                   disabled={markingRollId === roll.id}
                                   onClick={() => handleMarkClaimed(roll)}
                                 >
@@ -830,10 +935,10 @@ export function CoinGachaManagement() {
                                   ) : (
                                     <Check className="h-3.5 w-3.5" />
                                   )}
-                                  ยืนยันแจกแล้ว
+                                  ติ๊กว่ารับแล้ว
                                 </Button>
                               ) : (
-                                <span className="text-xs text-muted-foreground">เรียบร้อย</span>
+                                <span className="text-xs text-muted-foreground">✅ เรียบร้อย</span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -854,13 +959,13 @@ export function CoinGachaManagement() {
           <DialogHeader>
             <DialogTitle>{editingReward ? 'แก้ไขของรางวัล' : 'เพิ่มของรางวัลใหม่'}</DialogTitle>
             <DialogDescription>
-              กำหนดรายละเอียดของรางวัล ระดับ Tier การแจก และระบบสต็อก
+              กำหนดรายละเอียดของรางวัล ระดับ Tier การแจก และระบบสต็อกตามเอกสาร
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="reward-name">ชื่อของรางวัล (แสดงในการ์ดตอนสุ่มได้) *</Label>
+              <Label htmlFor="reward-name">1. ชื่อของรางวัล (แสดงในการ์ดตอนสุ่มได้) *</Label>
               <Input
                 id="reward-name"
                 placeholder="เช่น Nitro 1 เดือน, ยศหมีโยนเหรียญ, 500 แต้ม"
@@ -870,7 +975,7 @@ export function CoinGachaManagement() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="reward-history-name">ชื่อแสดงในประวัติ (สั้น กระชับ) *</Label>
+              <Label htmlFor="reward-history-name">4. ชื่อแสดงในประวัติ (สั้น กระชับ เชื่อมกับปุ่มประวัติ) *</Label>
               <Input
                 id="reward-history-name"
                 placeholder="เช่น Nitro 1 ด., ยศหมี 7 วัน"
@@ -881,7 +986,7 @@ export function CoinGachaManagement() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>ระดับ (Tier)</Label>
+                <Label>ระดับ (Tier จากทั้ง 4 ระดับ)</Label>
                 <Select
                   value={rewardForm.tier}
                   onValueChange={(v) =>
@@ -892,16 +997,16 @@ export function CoinGachaManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="god">God 🌟 (0.07%)</SelectItem>
-                    <SelectItem value="epic">Epic 🔮 (1.00%)</SelectItem>
-                    <SelectItem value="rare">Rare 💎 (45.00%)</SelectItem>
-                    <SelectItem value="common">Common 🍃 (85.00%)</SelectItem>
+                    <SelectItem value="god">🌟 God (0.07%)</SelectItem>
+                    <SelectItem value="epic">🔮 Epic (1.00%)</SelectItem>
+                    <SelectItem value="rare">💎 Rare (45.00%)</SelectItem>
+                    <SelectItem value="common">🍃 Common (85.00%)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label>ประเภทการรับรางวัล</Label>
+                <Label>2. ประเภทการรับรางวัล</Label>
                 <Select
                   value={rewardForm.reward_type}
                   onValueChange={(v) =>
@@ -912,8 +1017,8 @@ export function CoinGachaManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="manual">🤝 รับกับทีมงาน</SelectItem>
-                    <SelectItem value="auto">⚡ แจกอัตโนมัติ</SelectItem>
+                    <SelectItem value="manual">🤝 รับกับทีมงาน (ใน 1 เดือน)</SelectItem>
+                    <SelectItem value="auto">⚡ รับอัตโนมัติ (ยศ/แต้ม)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -950,12 +1055,12 @@ export function CoinGachaManagement() {
               </div>
             )}
 
-            {/* การจัดการสต็อก */}
+            {/* 3. การจัดการสต็อก */}
             <div className="p-3 bg-muted/30 rounded-lg space-y-3 border">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="cursor-pointer">ไม่จำกัดสต็อก (Unlimited Stock)</Label>
-                  <p className="text-xs text-muted-foreground">หากเปิด รางวัลนี้จะสามารถสุ่มได้ตลอดเวลา</p>
+                  <Label className="cursor-pointer">3. ไม่จำกัดสต็อก (Unlimited Stock)</Label>
+                  <p className="text-xs text-muted-foreground">กดปิดเพื่อกำหนดจำนวนสต็อกจำกัด</p>
                 </div>
                 <Switch
                   checked={rewardForm.is_unlimited}
@@ -967,7 +1072,7 @@ export function CoinGachaManagement() {
 
               {!rewardForm.is_unlimited && (
                 <div className="space-y-1.5 pt-2 border-t">
-                  <Label htmlFor="stock-count">จำนวนสต็อกคงเหลือ</Label>
+                  <Label htmlFor="stock-count">จำนวนสต็อกคงเหลือ (อัปเดตแบบเรียลไทม์)</Label>
                   <Input
                     id="stock-count"
                     type="number"
@@ -1023,7 +1128,7 @@ export function CoinGachaManagement() {
               ยืนยันการลบของรางวัล
             </DialogTitle>
             <DialogDescription>
-              คุณแน่ใจหรือไม่ว่าต้องการลบ &quot;{deletingReward?.name}&quot; ออกจากระบบ? การกระทำนี้ไม่สามารถย้อนกลับได้
+              คุณแน่ใจหรือไม่ว่าต้องการลบ &quot;{deletingReward?.name}&quot; ออกจากระดับ {deletingReward?.tier?.toUpperCase()}? การกระทำนี้ไม่สามารถย้อนกลับได้
             </DialogDescription>
           </DialogHeader>
 
