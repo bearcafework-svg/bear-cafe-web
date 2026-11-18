@@ -51,6 +51,7 @@ export interface CoinReward {
   reward_type: 'auto' | 'manual';
   role_id: string | null;
   points_reward: number;
+  duplicate_compensation_points?: number;
   is_unlimited: boolean;
   stock: number;
   is_active: boolean;
@@ -162,6 +163,7 @@ export function CoinGachaManagement() {
     reward_type: 'manual' as 'auto' | 'manual',
     role_id: '',
     points_reward: 0,
+    duplicate_compensation_points: 300,
     is_unlimited: true,
     stock: -1,
     is_active: true,
@@ -280,6 +282,7 @@ export function CoinGachaManagement() {
         reward_type: reward.reward_type,
         role_id: reward.role_id || '',
         points_reward: reward.points_reward || 0,
+        duplicate_compensation_points: reward.duplicate_compensation_points ?? 300,
         is_unlimited: reward.is_unlimited,
         stock: reward.stock,
         is_active: reward.is_active,
@@ -294,6 +297,7 @@ export function CoinGachaManagement() {
         reward_type: 'manual',
         role_id: '',
         points_reward: 0,
+        duplicate_compensation_points: 300,
         is_unlimited: true,
         stock: -1,
         is_active: true,
@@ -321,6 +325,7 @@ export function CoinGachaManagement() {
         reward_type: rewardForm.reward_type,
         role_id: rewardForm.reward_type === 'auto' && rewardForm.role_id.trim() ? rewardForm.role_id.trim() : null,
         points_reward: rewardForm.reward_type === 'auto' ? Number(rewardForm.points_reward) || 0 : 0,
+        duplicate_compensation_points: rewardForm.reward_type === 'auto' && rewardForm.role_id.trim() ? Number(rewardForm.duplicate_compensation_points) || 300 : 300,
         is_unlimited: rewardForm.is_unlimited,
         stock: rewardForm.is_unlimited ? -1 : Math.max(0, Number(rewardForm.stock) || 0),
         is_active: rewardForm.is_active,
@@ -660,6 +665,9 @@ export function CoinGachaManagement() {
                                     {reward.role_id && (
                                       <div className="text-[11px] text-muted-foreground font-mono">
                                         Role ID: {reward.role_id}
+                                        <span className="block text-amber-500 font-sans">
+                                          (ซ้ำแจก +{formatNumber(reward.duplicate_compensation_points ?? 300)} แต้ม)
+                                        </span>
                                       </div>
                                     )}
                                     {reward.points_reward > 0 && (
@@ -1036,9 +1044,23 @@ export function CoinGachaManagement() {
                     value={rewardForm.role_id}
                     onChange={(e) => setRewardForm({ ...rewardForm, role_id: e.target.value })}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    *หากผู้เล่นมียศนี้อยู่แล้ว ระบบจะแปลงเป็นแต้มโบนัสสำรองให้อัตโนมัติ
-                  </p>
+                  {rewardForm.role_id.trim() && (
+                    <div className="pt-1.5">
+                      <Label htmlFor="comp-points" className="text-xs">แต้มชดเชยกรณียศซ้ำ (Points Fallback)</Label>
+                      <Input
+                        id="comp-points"
+                        type="number"
+                        min={0}
+                        placeholder="300"
+                        value={rewardForm.duplicate_compensation_points}
+                        onChange={(e) => setRewardForm({ ...rewardForm, duplicate_compensation_points: parseInt(e.target.value, 10) || 0 })}
+                        className="mt-1"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        *หากผู้เล่นมียศนี้อยู่แล้ว ระบบจะแปลงเป็นแต้มจำนวนนี้ให้แทนทันที
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
