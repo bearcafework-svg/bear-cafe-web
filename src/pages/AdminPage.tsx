@@ -79,6 +79,7 @@ import { DailyQuestsManagement } from '@/components/admin/DailyQuestsManagement'
 import { GachaponManagement } from '@/components/admin/GachaponManagement';
 import { AIAssistantManagement } from '@/components/admin/AIAssistantManagement';
 import { KumaTenantsManagement } from '@/components/admin/KumaTenantsManagement';
+import { CoinGachaManagement } from '@/components/admin/CoinGachaManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -305,6 +306,7 @@ function AdminPageContent() {
         case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;
         case 'daily-quests': return canAccessPage('daily-quests') ? <DailyQuestsManagement /> : null;
         case 'gachapon': return canAccessPage('gachapon') ? <GachaponManagement /> : null;
+        case 'gift': return canAccessPage('gift') ? <CoinGachaManagement /> : null;
         case 'ai-assistant': return canAccessPage('ai-assistant') ? <AIAssistantManagement /> : null;
         case 'heal-jai': return canAccessPage('heal-jai') ? <HealJaiManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'kuma-tenants': return canAccessPage('kuma-tenants') ? <KumaTenantsManagement /> : null;

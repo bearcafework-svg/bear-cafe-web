@@ -26,6 +26,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'redeem-codes', label: 'โค้ดแลกรางวัล', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'campaigns', label: 'จัดการโฆษณา', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'gachapon', label: 'ตู้กาชาปอง', group: 'products', groupLabel: 'สินค้าและบริการ' },
+  { id: 'gift', label: 'ของขวัญหมีโยนเหรียญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
 
   // ─── ดูแลชุมชน ───
   { id: 'users', label: 'จัดการผู้ใช้', group: 'community', groupLabel: 'ดูแลชุมชน' },

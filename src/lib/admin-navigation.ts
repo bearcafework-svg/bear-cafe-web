@@ -80,6 +80,12 @@ export function getAdminNavTree(
               icon: Sparkles,
             },
             {
+              id: 'gift',
+              label: 'ของขวัญหมีโยนเหรียญ',
+              description: 'จัดการตู้สุ่มเหรียญกาชา ตรวจสอบและแจกของรางวัล',
+              icon: Gift,
+            },
+            {
               id: 'checkin-rewards',
               label: 'เช็กอินรายวัน',
               description: 'ตั้งค่ารางวัลประจำวันและของขวัญใหญ่',
