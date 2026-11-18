@@ -158,7 +158,7 @@ export function GiftClaimsManagement() {
 
     try {
       const now = new Date().toISOString();
-      const adminId = user?.id || user?.discord_id || 'admin';
+      const adminId = user?.discord_id || user?.id || 'admin';
 
       const { error } = await supabase
         .from('gacha_coin_rolls')
