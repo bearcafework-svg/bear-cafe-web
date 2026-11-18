@@ -25,8 +25,8 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'checkin-rewards', label: 'เช็กอินรายวัน', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'redeem-codes', label: 'โค้ดแลกรางวัล', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'campaigns', label: 'จัดการโฆษณา', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
-  { id: 'gachapon', label: 'ตู้กาชาปอง', group: 'products', groupLabel: 'สินค้าและบริการ' },
-  { id: 'gift', label: 'ของขวัญหมีโยนเหรียญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
+  { id: 'gift', label: 'ของรางวัลโยนเหรียญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
+  { id: 'gift-claims', label: 'ตรวจเช็กการรับของขวัญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
 
   // ─── ดูแลชุมชน ───
   { id: 'users', label: 'จัดการผู้ใช้', group: 'community', groupLabel: 'ดูแลชุมชน' },

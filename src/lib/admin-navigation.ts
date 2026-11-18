@@ -31,6 +31,7 @@ import {
   Bot,
   HeartHandshake,
   Crown,
+  CheckCircle2,
 } from 'lucide-react';
 import { NavItem } from '@/components/ui/dropdown-navigation';
 
@@ -74,16 +75,16 @@ export function getAdminNavTree(
           title: 'ของขวัญและโปรโมชัน',
           items: [
             {
-              id: 'gachapon',
-              label: 'ตู้กาชาปอง',
-              description: 'จัดการตู้สุ่ม เรทโอกาสดรอป และของรางวัล',
-              icon: Sparkles,
+              id: 'gift',
+              label: 'ของรางวัลโยนเหรียญ',
+              description: 'จัดการของรางวัล 4 ระดับ อัตราออก และสต็อก',
+              icon: Gift,
             },
             {
-              id: 'gift',
-              label: 'ของขวัญหมีโยนเหรียญ',
-              description: 'จัดการตู้สุ่มเหรียญกาชา ตรวจสอบและแจกของรางวัล',
-              icon: Gift,
+              id: 'gift-claims',
+              label: 'ตรวจเช็กการรับของขวัญ',
+              description: 'ตรวจสอบประวัติและยืนยันการส่งมอบของขวัญแก่สมาชิก',
+              icon: CheckCircle2,
             },
             {
               id: 'checkin-rewards',

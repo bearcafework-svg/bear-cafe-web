@@ -76,7 +76,7 @@ import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOvervie
 import { CampaignsManagement } from '@/components/admin/CampaignsManagement';
 import { ProductCatalogManagement } from '@/components/admin/ProductCatalogManagement';
 import { DailyQuestsManagement } from '@/components/admin/DailyQuestsManagement';
-import { GachaponManagement } from '@/components/admin/GachaponManagement';
+import { GiftClaimsManagement } from '@/components/admin/GiftClaimsManagement';
 import { AIAssistantManagement } from '@/components/admin/AIAssistantManagement';
 import { KumaTenantsManagement } from '@/components/admin/KumaTenantsManagement';
 import { CoinGachaManagement } from '@/components/admin/CoinGachaManagement';
@@ -136,7 +136,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'sticky-messages': Pin,
   'minigames': Gamepad2,
   'daily-quests': Target,
-  'gachapon': Sparkles,
+  'gift': Gift,
+  'gift-claims': CheckCircle,
   'permissions': ShieldCheck,
   'roles-to-delete': Trash2,
   'heal-jai': HeartHandshake,
@@ -305,8 +306,8 @@ function AdminPageContent() {
         case 'sticky-messages': return canAccessPage('sticky-messages') ? <StickyMessagesManagement /> : null;
         case 'minigames': return canAccessPage('minigames') ? <MinigamesManagement /> : null;
         case 'daily-quests': return canAccessPage('daily-quests') ? <DailyQuestsManagement /> : null;
-        case 'gachapon': return canAccessPage('gachapon') ? <GachaponManagement /> : null;
         case 'gift': return canAccessPage('gift') ? <CoinGachaManagement /> : null;
+        case 'gift-claims': return canAccessPage('gift-claims') ? <GiftClaimsManagement /> : null;
         case 'ai-assistant': return canAccessPage('ai-assistant') ? <AIAssistantManagement /> : null;
         case 'heal-jai': return canAccessPage('heal-jai') ? <HealJaiManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'kuma-tenants': return canAccessPage('kuma-tenants') ? <KumaTenantsManagement /> : null;
