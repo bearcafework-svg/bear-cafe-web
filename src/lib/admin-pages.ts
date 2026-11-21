@@ -27,6 +27,7 @@ export const ADMIN_PAGES: AdminPageDef[] = [
   { id: 'campaigns', label: 'จัดการโฆษณา', group: 'products', groupLabel: 'สินค้าและบริการ', ownerOnly: true },
   { id: 'gift', label: 'ของรางวัลโยนเหรียญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
   { id: 'gift-claims', label: 'ตรวจเช็กการรับของขวัญ', group: 'products', groupLabel: 'สินค้าและบริการ' },
+  { id: 'promotions', label: 'งานโปรโมท', group: 'products', groupLabel: 'สินค้าและบริการ' },
 
   // ─── ดูแลชุมชน ───
   { id: 'users', label: 'จัดการผู้ใช้', group: 'community', groupLabel: 'ดูแลชุมชน' },

@@ -17,7 +17,14 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { DropdownMenu } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +41,7 @@ import {
   ClipboardList, AlertTriangle, ChevronRight, ChevronDown, Settings, LayoutDashboard, RefreshCw, ShoppingCart,
   Key, ArrowLeftRight, ShieldBan, Coffee, Send, CalendarCheck, Layers, Pin, Wrench, Menu,
   Copy, Target, Sparkles, Trash2, HeartHandshake, Bot, Gift,
+  MessageSquareHeart, Megaphone,
 } from 'lucide-react';
 import { SearchBar } from '@/components/admin/SearchBar';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -80,6 +88,7 @@ import { GiftClaimsManagement } from '@/components/admin/GiftClaimsManagement';
 import { AIAssistantManagement } from '@/components/admin/AIAssistantManagement';
 import { KumaTenantsManagement } from '@/components/admin/KumaTenantsManagement';
 import { CoinGachaManagement } from '@/components/admin/CoinGachaManagement';
+import { PromotionManagement } from '@/components/admin/PromotionManagement';
 
 type Profile = Tables<'profiles'>;
 type Report = Tables<'reports'>;
@@ -311,6 +320,7 @@ function AdminPageContent() {
         case 'ai-assistant': return canAccessPage('ai-assistant') ? <AIAssistantManagement /> : null;
         case 'heal-jai': return canAccessPage('heal-jai') ? <HealJaiManagement currentUser={user} isOwner={isOwner} /> : null;
         case 'kuma-tenants': return canAccessPage('kuma-tenants') ? <KumaTenantsManagement /> : null;
+        case 'promotions': return canAccessPage('promotions') ? <PromotionManagement /> : null;
 
         default: return null;
       }
@@ -434,28 +444,52 @@ function AdminPageContent() {
               title="สลับธีม (โหมดมืด / สว่าง)"
             />
 
-            {/* User Profile Avatar with Clickable Staff Note Modal */}
-            <button
-              type="button"
-              onClick={() => setStaffNoteOpen(true)}
-              className="rounded-full ring-2 ring-primary/20 hover:ring-primary/50 transition-all hover:scale-105 active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary p-0.5 shrink-0"
-              title="คลิกเพื่อแก้ไขข้อความต้อนรับทีมงาน (staff_members.notes)"
-            >
-              <Avatar
-                className="w-8 h-8 rounded-full border border-border/60 shadow-xs shrink-0 overflow-hidden"
-              >
-                {user?.avatar_url && (
-                  <AvatarImage
-                    src={user.avatar_url}
-                    alt={user.username || 'User Profile'}
-                    className="object-cover w-full h-full"
-                  />
-                )}
-                <AvatarFallback className="w-full h-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-primary font-bold">
-                  <User className="w-4 h-4" />
-                </AvatarFallback>
-              </Avatar>
-            </button>
+            {/* User Profile Avatar with Dropdown Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-full ring-2 ring-primary/20 hover:ring-primary/50 transition-all hover:scale-105 active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary p-0.5 shrink-0"
+                  title="เมนูบัญชีทีมงาน"
+                >
+                  <Avatar
+                    className="w-8 h-8 rounded-full border border-border/60 shadow-xs shrink-0 overflow-hidden"
+                  >
+                    {user?.avatar_url && (
+                      <AvatarImage
+                        src={user.avatar_url}
+                        alt={user.username || 'User Profile'}
+                        className="object-cover w-full h-full"
+                      />
+                    )}
+                    <AvatarFallback className="w-full h-full bg-gradient-to-br from-primary/20 to-honey/20 flex items-center justify-center text-primary font-bold">
+                      <User className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-2xl z-50">
+                <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                  <span className="truncate">{user?.discord_username || user?.username || 'ทีมงาน'}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">Staff</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-1 bg-border/60" />
+                <DropdownMenuItem
+                  onClick={() => setStaffNoteOpen(true)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium cursor-pointer text-foreground hover:bg-muted focus:bg-muted"
+                >
+                  <MessageSquareHeart className="w-4 h-4 text-primary shrink-0" />
+                  <span className="flex-1">แก้ไขข้อความต้อนรับ</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleNavClick('promotions')}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium cursor-pointer text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 focus:bg-amber-500/10"
+                >
+                  <Megaphone className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="flex-1 font-semibold">งานโปรโมท</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Staff Note Modal */}
             <StaffNoteModal
