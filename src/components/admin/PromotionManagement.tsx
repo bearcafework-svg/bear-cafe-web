@@ -74,6 +74,7 @@ const STORAGE_CONFIG_KEY = 'bear_cafe_fb_scraper_config_v2';
 const STORAGE_PROMOTED_KEY = 'bear_cafe_fb_promoted_urls_v1';
 
 const PRESET_KEYWORDS = ['หาดิสสิง', 'หาดิสเข้า', 'หาคนเข้าดิส', 'หาดิสลง', 'หาดิส'];
+const WORKER_URL = 'http://103.245.164.156:3000';
 
 export function PromotionManagement() {
   const { toast } = useToast();
@@ -87,8 +88,6 @@ export function PromotionManagement() {
   const [maxDays, setMaxDays] = useState(7);
   const [excludeLinks, setExcludeLinks] = useState(true);
   const [headless, setHeadless] = useState(true);
-  const [workerUrl, setWorkerUrl] = useState('http://103.245.164.156:3000');
-  const [showServerSetting, setShowServerSetting] = useState(false);
 
   // Scraping & Results State
   const [loading, setLoading] = useState(false);
@@ -130,7 +129,6 @@ export function PromotionManagement() {
         if (parsed.maxDays) setMaxDays(parsed.maxDays);
         if (typeof parsed.excludeLinks === 'boolean') setExcludeLinks(parsed.excludeLinks);
         if (typeof parsed.headless === 'boolean') setHeadless(parsed.headless);
-        if (parsed.workerUrl) setWorkerUrl(parsed.workerUrl);
       }
 
       const savedPromoted = localStorage.getItem(STORAGE_PROMOTED_KEY);
@@ -145,7 +143,7 @@ export function PromotionManagement() {
   // Check Worker & Facebook User Session Status
   const checkWorkerAndStatus = useCallback(async () => {
     try {
-      const cleanUrl = workerUrl.replace(/\/$/, '');
+      const cleanUrl = WORKER_URL.replace(/\/$/, '');
       const res = await fetch(`${cleanUrl}/api/status?userId=${encodeURIComponent(currentUserId)}`, {
         signal: AbortSignal.timeout(4000)
       });
@@ -161,7 +159,7 @@ export function PromotionManagement() {
       setWorkerOnline(false);
       setFbLoggedIn(false);
     }
-  }, [workerUrl, currentUserId]);
+  }, [currentUserId]);
 
   useEffect(() => {
     checkWorkerAndStatus();
@@ -170,15 +168,14 @@ export function PromotionManagement() {
   }, [checkWorkerAndStatus]);
 
   // Save config changes to localStorage
-  const saveCurrentConfig = (newGroups?: string[], newKeywords?: string[], newDays?: number, newWorkerUrl?: string) => {
+  const saveCurrentConfig = (newGroups?: string[], newKeywords?: string[], newDays?: number) => {
     try {
       const config = {
         groups: newGroups || groups,
         keywords: newKeywords || keywords,
         maxDays: newDays !== undefined ? newDays : maxDays,
         excludeLinks,
-        headless,
-        workerUrl: newWorkerUrl !== undefined ? newWorkerUrl : workerUrl
+        headless
       };
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(config));
     } catch (e) {
@@ -264,7 +261,7 @@ export function PromotionManagement() {
     setFbAuthLoading(true);
     setFbError(null);
 
-    const cleanUrl = workerUrl.replace(/\/$/, '');
+    const cleanUrl = WORKER_URL.replace(/\/$/, '');
 
     try {
       if (fbStep === 'credentials') {
@@ -349,7 +346,7 @@ export function PromotionManagement() {
   const handleFacebookLogout = async () => {
     if (!confirm('คุณต้องการตัดการเชื่อมต่อบัญชี Facebook ของคุณออกจากเซิร์ฟเวอร์หรือไม่?')) return;
     try {
-      const cleanUrl = workerUrl.replace(/\/$/, '');
+      const cleanUrl = WORKER_URL.replace(/\/$/, '');
       const res = await fetch(`${cleanUrl}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -409,7 +406,7 @@ export function PromotionManagement() {
 
   // Poll progress while scraping
   const startProgressPolling = () => {
-    const cleanUrl = workerUrl.replace(/\/$/, '');
+    const cleanUrl = WORKER_URL.replace(/\/$/, '');
     if (pollingRef.current) clearInterval(pollingRef.current);
 
     pollingRef.current = setInterval(async () => {
@@ -467,7 +464,7 @@ export function PromotionManagement() {
     saveCurrentConfig();
 
     try {
-      const res = await fetch(`${workerUrl.replace(/\/$/, '')}/api/scrape`, {
+      const res = await fetch(`${WORKER_URL.replace(/\/$/, '')}/api/scrape`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -567,47 +564,8 @@ export function PromotionManagement() {
               </Button>
             )
           )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowServerSetting(!showServerSetting)}
-            className="w-8 h-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-            title="ตั้งค่าที่อยู่ Worker Server"
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
         </div>
       </div>
-
-      {/* ─── Server URL Setting Bar (Optional) ─── */}
-      {showServerSetting && (
-        <div className="p-3.5 rounded-2xl border border-border/60 bg-muted/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Server className="w-4 h-4 text-primary" />
-            <span>ที่อยู่ Scraper Worker (VPS SSH หรือเซิร์ฟเวอร์):</span>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Input
-              value={workerUrl}
-              onChange={e => {
-                setWorkerUrl(e.target.value);
-                saveCurrentConfig(undefined, undefined, undefined, e.target.value);
-              }}
-              placeholder="http://103.245.164.156:3000"
-              className="h-8 text-xs font-mono max-w-sm rounded-xl border-border/60"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={checkWorkerAndStatus}
-              className="h-8 text-xs rounded-xl cursor-pointer"
-            >
-              ทดสอบเชื่อมต่อ
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* ─── Configuration Form ─── */}
       <Card className="border border-border/60 shadow-xs bg-card/60 backdrop-blur-md">
