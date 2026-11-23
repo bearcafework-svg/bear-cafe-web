@@ -24,7 +24,7 @@ import {
   Search, ArrowUp, Clock, Globe, Eye, MousePointerClick,
   AlertTriangle, LinkIcon, Timer, Trash2, ChevronLeft, ChevronRight, Star,
   Filter, LogIn, ShieldCheck, Handshake, RefreshCw, Flame, Trophy, Heart, Bookmark, Sparkles, Tag, ChevronDown, X,
-  MoreHorizontal, Check, ShoppingBag, Headphones, Rocket, ArrowUpDown, XCircle,
+  MoreHorizontal, Check, ShoppingBag, Headphones, Rocket, ArrowUpDown, XCircle, Gamepad2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ActiveVoiceRoomsModal, type ActiveVoiceRoom } from '@/components/discord/ActiveVoiceRoomsModal';
@@ -2188,7 +2188,7 @@ export default function DiscordServersPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="pt-2 flex items-center justify-center gap-3"
+            className="pt-2 flex flex-wrap items-center justify-center gap-3"
           >
             <Button
               onClick={handleOpenAdd}
@@ -2197,6 +2197,22 @@ export default function DiscordServersPage() {
             >
               <Plus className="w-4 h-4 mr-2" />
               <span>แปะเซิร์ฟเวอร์ฟรี</span>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="rounded-full border-border/80 bg-background/80 hover:bg-muted/80 backdrop-blur-sm font-medium text-sm px-6 h-11 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xs"
+            >
+              <a
+                href="https://discord.com/oauth2/authorize?client_id=1538896195253178409"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center"
+              >
+                <Gamepad2 className="w-4 h-4 mr-2 text-primary" />
+                <span>บอทมินิเกมฟรี</span>
+              </a>
             </Button>
           </motion.div>
         </div>
